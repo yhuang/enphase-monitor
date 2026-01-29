@@ -239,12 +239,11 @@ func main() {
 	}
 
 	// Create display with colors and timezone from config (or defaults)
-	var display *Display
+	colors := getDefaultColors()
 	if config.Colors != nil {
-		display = NewDisplayWithColorsAndTimezone(*config.Colors, reportTZ)
-	} else {
-		display = NewDisplayWithColorsAndTimezone(getDefaultColors(), reportTZ)
+		colors = *config.Colors
 	}
+	display := NewDisplayWithColorsAndTimezone(colors, reportTZ)
 
 	// Setup signal handling for graceful shutdown using context cancellation.
 	// signal.NotifyContext returns a context that is cancelled when SIGINT or SIGTERM
@@ -290,7 +289,7 @@ func runOnce(ctx context.Context, aggregator *DataAggregator, display *Display, 
 	metrics, err := aggregator.GetAggregatedMetrics(ctx, config.Systems, config.API, testDate, reportTZ)
 	if err != nil {
 		// Check if it is a 429 rate limit error - if so, the error message already contains wait time info
-		if strings.Contains(err.Error(), "rate limit exceeded (429)") {
+		if strings.Contains(err.Error(), RateLimitError) {
 			// Error message already printed in aggregator.go, just exit
 			os.Exit(1)
 		}

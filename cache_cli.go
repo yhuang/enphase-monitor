@@ -9,6 +9,13 @@ import (
 	"time"
 )
 
+// Date format constants
+const (
+	dateFormat    = "2006-01-02"
+	altDateFormat = "2006/01/02"
+	jsonExtension = ".json"
+)
+
 // ClearTodayCache clears only cache files for today's date
 // It identifies today's cache by checking:
 // 1. The CachedAt timestamp (must be today)
@@ -17,7 +24,7 @@ import (
 // preserving cache files from yesterday or earlier
 func ClearTodayCache() error {
 	today := time.Now()
-	todayStr := today.Format("2006-01-02")
+	todayStr := today.Format(dateFormat)
 
 	// Check if cache directory exists
 	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
@@ -38,7 +45,7 @@ func ClearTodayCache() error {
 		}
 
 		// Only process .json files
-		if filepath.Ext(entry.Name()) != ".json" {
+		if filepath.Ext(entry.Name()) != jsonExtension {
 			continue
 		}
 
@@ -49,7 +56,7 @@ func ClearTodayCache() error {
 		if err != nil {
 			continue
 		}
-		fileModDate := fileInfo.ModTime().Format("2006-01-02")
+		fileModDate := fileInfo.ModTime().Format(dateFormat)
 
 		// If file was not modified today, skip it (preserve past dates)
 		if fileModDate != todayStr {
@@ -73,7 +80,7 @@ func ClearTodayCache() error {
 			continue
 		}
 
-		cachedDate := cached.CachedAt.Format("2006-01-02")
+		cachedDate := cached.CachedAt.Format(dateFormat)
 
 		// Only delete if both cached today AND file modified today
 		// This ensures we are deleting cache for today, not past dates that were accessed today

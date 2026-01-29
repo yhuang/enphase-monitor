@@ -299,7 +299,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 		var cacheUsed bool
 		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate)
 		if err != nil {
-			if strings.Contains(err.Error(), "rate limit exceeded (429)") {
+			if strings.Contains(err.Error(), RateLimitError) {
 				// Collect the error but do not fail immediately
 				rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
 				continue

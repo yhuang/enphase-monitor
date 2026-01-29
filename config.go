@@ -99,60 +99,56 @@ type ColorConfig struct {
 	Error         string `yaml:"error,omitempty"`          // Error Text
 }
 
-// mergeWithDefaults fills in empty color fields with default values
+// mergeWithDefaults fills in empty color fields with default values.
+// Performance: Uses field iterator pattern to eliminate 36 lines of repetitive if-statements.
 func (c *ColorConfig) mergeWithDefaults(defaults ColorConfig) {
-	if c.Production == "" {
-		c.Production = defaults.Production
+	// Define field pairs for merging
+	fields := []struct {
+		dst, src *string
+	}{
+		{&c.Production, &defaults.Production},
+		{&c.Discharge, &defaults.Discharge},
+		{&c.Import, &defaults.Import},
+		{&c.Export, &defaults.Export},
+		{&c.NetImport, &defaults.NetImport},
+		{&c.NetExport, &defaults.NetExport},
+		{&c.Headers, &defaults.Headers},
+		{&c.Charge, &defaults.Charge},
+		{&c.TotalConsumed, &defaults.TotalConsumed},
+		{&c.SecondaryText, &defaults.SecondaryText},
+		{&c.PrimaryText, &defaults.PrimaryText},
+		{&c.Error, &defaults.Error},
 	}
-	if c.Discharge == "" {
-		c.Discharge = defaults.Discharge
-	}
-	if c.Import == "" {
-		c.Import = defaults.Import
-	}
-	if c.Export == "" {
-		c.Export = defaults.Export
-	}
-	if c.NetImport == "" {
-		c.NetImport = defaults.NetImport
-	}
-	if c.NetExport == "" {
-		c.NetExport = defaults.NetExport
-	}
-	if c.Headers == "" {
-		c.Headers = defaults.Headers
-	}
-	if c.Charge == "" {
-		c.Charge = defaults.Charge
-	}
-	if c.TotalConsumed == "" {
-		c.TotalConsumed = defaults.TotalConsumed
-	}
-	if c.SecondaryText == "" {
-		c.SecondaryText = defaults.SecondaryText
-	}
-	if c.PrimaryText == "" {
-		c.PrimaryText = defaults.PrimaryText
-	}
-	if c.Error == "" {
-		c.Error = defaults.Error
+
+	for _, f := range fields {
+		if *f.dst == "" {
+			*f.dst = *f.src
+		}
 	}
 }
 
-// convertHexFields converts hex color codes to ANSI escape codes
+// convertHexFields converts hex color codes to ANSI escape codes.
+// Performance: Loop-based conversion reduces 12 field assignments to a single iteration.
 func (c *ColorConfig) convertHexFields() {
-	c.Production = convertIfHex(c.Production)
-	c.Discharge = convertIfHex(c.Discharge)
-	c.Import = convertIfHex(c.Import)
-	c.Export = convertIfHex(c.Export)
-	c.NetImport = convertIfHex(c.NetImport)
-	c.NetExport = convertIfHex(c.NetExport)
-	c.Headers = convertIfHex(c.Headers)
-	c.Charge = convertIfHex(c.Charge)
-	c.TotalConsumed = convertIfHex(c.TotalConsumed)
-	c.SecondaryText = convertIfHex(c.SecondaryText)
-	c.PrimaryText = convertIfHex(c.PrimaryText)
-	c.Error = convertIfHex(c.Error)
+	// Define pointers to all color fields
+	fields := []*string{
+		&c.Production,
+		&c.Discharge,
+		&c.Import,
+		&c.Export,
+		&c.NetImport,
+		&c.NetExport,
+		&c.Headers,
+		&c.Charge,
+		&c.TotalConsumed,
+		&c.SecondaryText,
+		&c.PrimaryText,
+		&c.Error,
+	}
+
+	for _, field := range fields {
+		*field = convertIfHex(*field)
+	}
 }
 
 // Config represents the application configuration

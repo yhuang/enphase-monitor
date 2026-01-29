@@ -59,6 +59,14 @@ import (
 	"time"
 )
 
+// Token timing constants
+const (
+	// tokenRefreshBuffer is how early we refresh tokens before they expire (5 minutes)
+	tokenRefreshBuffer = 5 * time.Minute
+	// oauthRequestTimeout is the HTTP timeout for OAuth requests
+	oauthRequestTimeout = 30 * time.Second
+)
+
 // OAuthTokenResponse represents the OAuth token response
 type OAuthTokenResponse struct {
 	AccessToken  string `json:"access_token"`
@@ -79,7 +87,7 @@ var tokenCache *TokenCache
 
 // oauthHTTPClient is reused across OAuth calls to enable connection reuse.
 var oauthHTTPClient = &http.Client{
-	Timeout: 30 * time.Second,
+	Timeout: oauthRequestTimeout,
 }
 
 // GetAuthorizationURL generates the authorization URL for the user to visit (one-time setup)
@@ -160,8 +168,8 @@ func ExchangeAuthorizationCode(ctx context.Context, apiConfig *APIConfig, code s
 
 // GetAccessToken retrieves an OAuth access token using refresh token or other available methods
 func GetAccessToken(ctx context.Context, apiConfig *APIConfig) (string, error) {
-	// Check cache first
-	if tokenCache != nil && time.Now().Before(tokenCache.ExpiresAt.Add(-5*time.Minute)) {
+	// Check cache first - refresh if within buffer window of expiration
+	if tokenCache != nil && time.Now().Before(tokenCache.ExpiresAt.Add(-tokenRefreshBuffer)) {
 		return tokenCache.Token, nil
 	}
 

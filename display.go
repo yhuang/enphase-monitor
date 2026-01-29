@@ -69,10 +69,14 @@ func getDefaultColors() ColorConfig {
 	}
 }
 
-// Display handles formatting and presenting metrics to the user
+// Display handles formatting and presenting metrics to the user.
+// Performance: Separator strings are pre-computed in the constructor to avoid repeated
+// strings.Repeat() calls during rendering (previously called 6 times per display).
 type Display struct {
-	colors   ColorConfig
-	timezone *time.Location // Timezone for reporting/display
+	colors        ColorConfig
+	timezone      *time.Location // Timezone for reporting/display
+	separatorLine string         // Cached separator line (57 '=' characters)
+	subSeparator  string         // Cached sub-separator line (57 '-' characters)
 }
 
 // NewDisplayWithColorsAndTimezone creates a new display instance with custom colors and timezone
@@ -81,9 +85,15 @@ func NewDisplayWithColorsAndTimezone(colors ColorConfig, tz *time.Location) *Dis
 	// Use defaults for any colors not specified
 	// Note: Reset and Bold are constants defined in constants.go
 	colors.mergeWithDefaults(defaultColors)
+
+	// Pre-compute separator strings to avoid repeated allocations (6 calls per render)
+	const separatorWidth = 57
+
 	return &Display{
-		colors:   colors,
-		timezone: tz,
+		colors:        colors,
+		timezone:      tz,
+		separatorLine: strings.Repeat("=", separatorWidth),
+		subSeparator:  strings.Repeat("-", separatorWidth),
 	}
 }
 
@@ -96,9 +106,9 @@ func (d *Display) ShowMetrics(metrics *AggregatedMetrics) {
 }
 
 func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate time.Time) {
-	fmt.Println("\n" + d.colors.Headers + strings.Repeat("=", 57) + Reset)
+	fmt.Println("\n" + d.colors.Headers + d.separatorLine + Reset)
 	fmt.Printf("  %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", Bold, d.colors.Headers, Reset)
-	fmt.Println(d.colors.Headers + strings.Repeat("=", 57) + Reset)
+	fmt.Println(d.colors.Headers + d.separatorLine + Reset)
 
 	// Show query range
 	// Use the configured timezone for display
@@ -143,12 +153,12 @@ func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate tim
 		fmt.Printf(" %s(live)%s", d.colors.Discharge, Reset)
 	}
 	fmt.Println()
-	fmt.Println(d.colors.Headers + strings.Repeat("=", 57) + Reset)
+	fmt.Println(d.colors.Headers + d.separatorLine + Reset)
 }
 
 func (d *Display) printTodayEnergy(metrics *AggregatedMetrics) {
 	fmt.Printf("\n %s%sCOMBINED ENERGY REPORT (kWh)%s\n", Bold, d.colors.PrimaryText, Reset)
-	fmt.Println(d.colors.SecondaryText + strings.Repeat("-", 57) + Reset)
+	fmt.Println(d.colors.SecondaryText + d.subSeparator + Reset)
 
 	fmt.Printf("  %sProduced:%s               %s%8.1f kWh%s\n", d.colors.PrimaryText, Reset, d.colors.Production, metrics.ProductionToday, Reset)
 	fmt.Printf("  %sConsumed:%s               %s%8.1f kWh%s\n", d.colors.PrimaryText, Reset, d.colors.TotalConsumed, metrics.ConsumptionToday, Reset)
@@ -173,7 +183,7 @@ func (d *Display) printIndividualSystems(metrics *AggregatedMetrics) {
 	}
 
 	fmt.Printf("\n %s%sINDIVIDUAL SYSTEMS REPORT%s\n", Bold, d.colors.PrimaryText, Reset)
-	fmt.Println(d.colors.SecondaryText + strings.Repeat("-", 57) + Reset)
+	fmt.Println(d.colors.SecondaryText + d.subSeparator + Reset)
 
 	for i, sys := range metrics.Systems {
 		displayName := sys.Name
@@ -210,7 +220,7 @@ func (d *Display) printIndividualSystems(metrics *AggregatedMetrics) {
 }
 
 func (d *Display) printSeparator() {
-	fmt.Println("\n" + d.colors.Headers + strings.Repeat("=", 57) + Reset + "\n")
+	fmt.Println("\n" + d.colors.Headers + d.separatorLine + Reset + "\n")
 }
 
 // ShowError displays an error message

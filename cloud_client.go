@@ -367,7 +367,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 			metrics.GridImportToday = 0
 		} else {
 			// For today, log the error (but suppress 429 rate limit warnings - they're handled by cache)
-			if !strings.Contains(err.Error(), "rate limit exceeded (429)") {
+			if !strings.Contains(err.Error(), RateLimitError) {
 				fmt.Printf("WARNING: Failed to get grid import: %v\n", err)
 			}
 			metrics.GridImportToday = 0
@@ -386,7 +386,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 			metrics.GridExportToday = 0
 		} else {
 			// For today, log the error (but suppress 429 rate limit warnings - they're handled by cache)
-			if !strings.Contains(err.Error(), "rate limit exceeded (429)") {
+			if !strings.Contains(err.Error(), RateLimitError) {
 				fmt.Printf("WARNING: Failed to get grid export: %v\n", err)
 			}
 			metrics.GridExportToday = 0
@@ -590,7 +590,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 				resp := cached.toHTTPResponse()
 				return resp, true, nil // Cache was used (429 fallback in no-cache mode)
 			}
-			return nil, false, fmt.Errorf("rate limit exceeded (429)")
+			return nil, false, fmt.Errorf(RateLimitError)
 		}
 		// Save response to cache for future use (even in no-cache mode)
 		bodyBytes, err := io.ReadAll(resp.Body)
@@ -656,7 +656,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 			return resp, true, nil // Cache was used (429 retry)
 		}
 		// No cache available for 429 - return error
-		return nil, false, fmt.Errorf("rate limit exceeded (429)")
+		return nil, false, fmt.Errorf(RateLimitError)
 	}
 
 	// Handle other non-OK status codes
