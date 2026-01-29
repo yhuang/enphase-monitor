@@ -1,0 +1,48 @@
+# Enphase Monitor Configuration
+# Copy this file to config.yaml and fill in your actual values
+
+# API Configuration (for Cloud API authentication)
+# Get these from Enphase Developer Portal: https://developer-v4.enphase.com/
+api:
+  key: "YOUR_API_KEY"  # API Key from Enphase Developer Portal
+  client_id: "YOUR_CLIENT_ID"  # OAuth Client ID
+  client_secret: "YOUR_CLIENT_SECRET"  # OAuth Client Secret
+  authorization_url: "https://api.enphaseenergy.com/oauth/token"  # OAuth token endpoint
+  redirect_uri: "http://localhost:8080/callback"  # Redirect URI (must match your app settings in developer portal)
+  refresh_token: "YOUR_REFRESH_TOKEN"  # Obtained from one-time OAuth setup (run: ./enphase-monitor --setup-oauth)
+
+# Your Enphase Systems
+# Each system requires a system ID from Enlighten (get from Enlighten URL)
+# All systems use the same API credentials configured above
+
+systems:
+  - name: "Left Subpanel"
+    id: "YOUR_SYSTEM_ID"  # Enlighten system ID (get from Enlighten URL)
+
+  - name: "Right Subpanel"
+    id: "YOUR_OTHER_SYSTEM_ID"  # Different system ID, same API credentials
+
+# Refresh interval in seconds (how often to query the API)
+refresh_interval: 3600  # 1 hour (recommended to respect API rate limits)
+
+# Timezone for reporting/display (optional)
+# Examples: "US/Pacific", "America/New_York", "Europe/London"
+# timezone: "US/Pacific"
+
+# Color customization (optional - uses defaults if not specified)
+# You can use either hex color codes (e.g., "#FF5733") or ANSI escape codes (e.g., "\033[38;5;208m")
+# Hex codes will be automatically converted to ANSI codes. Leave empty or omit to use defaults.
+# Note: reset and bold are constants defined in constants.go and cannot be customized
+#colors:
+#  production: "#FF8800"        # Solar production - hex code
+#  discharge: "#00AA00"         # Battery discharge, positive metrics - hex code
+#  import: "#0088FF"            # Consumption, grid import - hex code
+#  export: "#FFCC00"            # Grid export - hex code
+#  net_import: "#0088FF"        # Net Energy Flow (Import) - hex code
+#  net_export: "#FFCC00"        # Net Energy Flow (Export) - hex code
+#  headers: "#00FFFF"           # Headers, separators - hex code
+#  charge: "#FF00FF"            # Battery charge - hex code
+#  total_consumed: "#808080"    # Total consumed - hex code
+#  secondary_text: "#808080"    # Secondary info - hex code
+#  primary_text: "#FFFFFF"      # Primary text - hex code
+#  error: "#FF0000"             # Error messages - hex code

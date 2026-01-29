@@ -1,0 +1,31 @@
+{
+  "date": "2026-01-15",
+  "systems": [
+    {
+      "id": "5525881",
+      "name": "Right Subpanel",
+      "expected": {
+        "grid_import": 18.4,
+        "grid_export": 11.0,
+        "production": 20.8,
+        "battery_discharged": 6.0,
+        "battery_charged": 7.7,
+        "net_imported": 7.5,
+        "consumption": 26.7
+      }
+    },
+    {
+      "id": "5392556",
+      "name": "Left Subpanel",
+      "expected": {
+        "grid_import": 16.3,
+        "grid_export": 13.3,
+        "production": 23.8,
+        "battery_discharged": 1.1,
+        "battery_charged": 5.6,
+        "net_imported": 3.1,
+        "consumption": 22.4
+      }
+    }
+  ]
+}

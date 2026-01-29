@@ -1,0 +1,6 @@
+enphase-monitor
+*.yaml
+.claude/
+test-data/cache/
+.cache
+.github/
