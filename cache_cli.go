@@ -1,3 +1,30 @@
+// Package main - cache_cli.go
+//
+// PURPOSE
+// -------
+// This file implements CLI commands for cache inspection and management.
+// Provides tools to list, inspect, and clear cached API responses.
+//
+// CACHE COMMANDS
+// --------------
+//   - --list-cache: List all cached responses with metadata
+//   - --inspect-cache <hash|date>: View detailed cache entry or all entries for a date
+//   - --clear-cache: Clear today's cache only (preserves historical)
+//   - --clear-all-cache: Clear all cached responses
+//
+// CACHE ENTRY STRUCTURE
+// ---------------------
+// Each cache file contains:
+//   - status_code: HTTP status code
+//   - headers: HTTP response headers
+//   - body: Raw API response (JSON)
+//   - cached_at: Timestamp when cached
+//   - queried_date: Date that was queried (YYYY-MM-DD)
+//
+// CACHE FILE NAMING
+// -----------------
+// Files are named by SHA256 hash of normalized URL (includes query params).
+// Format: {hash}.json where {hash} is 64-character hexadecimal string.
 package main
 
 import (
@@ -9,13 +36,6 @@ import (
 	"time"
 )
 
-// Date format constants
-const (
-	dateFormat    = "2006-01-02"
-	altDateFormat = "2006/01/02"
-	jsonExtension = ".json"
-)
-
 // ClearTodayCache clears only cache files for today's date
 // It identifies today's cache by checking:
 // 1. The CachedAt timestamp (must be today)
@@ -24,7 +44,7 @@ const (
 // preserving cache files from yesterday or earlier
 func ClearTodayCache() error {
 	today := time.Now()
-	todayStr := today.Format(dateFormat)
+	todayStr := today.Format(DateFormat)
 
 	// Check if cache directory exists
 	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
@@ -45,7 +65,7 @@ func ClearTodayCache() error {
 		}
 
 		// Only process .json files
-		if filepath.Ext(entry.Name()) != jsonExtension {
+		if filepath.Ext(entry.Name()) != JSONExtension {
 			continue
 		}
 
@@ -56,7 +76,7 @@ func ClearTodayCache() error {
 		if err != nil {
 			continue
 		}
-		fileModDate := fileInfo.ModTime().Format(dateFormat)
+		fileModDate := fileInfo.ModTime().Format(DateFormat)
 
 		// If file was not modified today, skip it (preserve past dates)
 		if fileModDate != todayStr {
@@ -80,11 +100,11 @@ func ClearTodayCache() error {
 			continue
 		}
 
-		cachedDate := cached.CachedAt.Format(dateFormat)
+		cachedDate := cached.CachedAt.Format(DateFormat)
 
 		// Only delete if both cached today AND file modified today
 		// This ensures we are deleting cache for today, not past dates that were accessed today
-		if cachedDate == todayStr && fileModDate == todayStr {
+		if cachedDate == todayStr {
 			// Delete this cache file (it is for today)
 			if err := os.Remove(cachePath); err == nil {
 				deletedCount++
@@ -150,10 +170,7 @@ func ListCacheEntries() ([]CacheEntry, error) {
 		}
 
 		// Extract hash from filename (remove .json extension)
-		hash := entry.Name()
-		if len(hash) > 5 && hash[len(hash)-5:] == ".json" {
-			hash = hash[:len(hash)-5]
-		}
+		hash := strings.TrimSuffix(entry.Name(), JSONExtension)
 
 		cachePath := filepath.Join(cacheDir, entry.Name())
 		info, err := entry.Info()
@@ -291,7 +308,7 @@ func FindCacheEntriesByDate(targetDate time.Time, tz *time.Location) ([]CacheEnt
 
 	// Format the target date directly without timezone conversion
 	// The dates in cache entries are already in YYYY-MM-DD format and do not need timezone adjustment
-	targetDateStr := targetDate.Format("2006-01-02")
+	targetDateStr := targetDate.Format(DateFormat)
 
 	var matchingEntries []CacheEntry
 	for _, entry := range allEntries {
@@ -301,15 +318,15 @@ func FindCacheEntriesByDate(targetDate time.Time, tz *time.Location) ([]CacheEnt
 			// Normalize both dates for comparison (remove any whitespace)
 			entryDate := strings.TrimSpace(entry.Date)
 			// Also try to parse and reformat the date in case the format differs
-			if parsedDate, err := time.Parse("2006-01-02", entryDate); err == nil {
-				entryDate = parsedDate.Format("2006-01-02")
+			if parsedDate, err := time.Parse(DateFormat, entryDate); err == nil {
+				entryDate = parsedDate.Format(DateFormat)
 			} else {
 				// Try other common date formats
-				if parsedDate, err := time.Parse("2006/01/02", entryDate); err == nil {
-					entryDate = parsedDate.Format("2006-01-02")
+				if parsedDate, err := time.Parse(AltDateFormat, entryDate); err == nil {
+					entryDate = parsedDate.Format(DateFormat)
 				}
 			}
-			// Direct string comparison should work if both are in "2006-01-02" format
+			// Direct string comparison should work if both are in DateFormat
 			if entryDate == targetDateStr {
 				matchingEntries = append(matchingEntries, entry)
 			}
@@ -319,7 +336,7 @@ func FindCacheEntriesByDate(targetDate time.Time, tz *time.Location) ([]CacheEnt
 			if err != nil {
 				continue
 			}
-			cachedDateStr := cached.CachedAt.In(tz).Format("2006-01-02")
+			cachedDateStr := cached.CachedAt.In(tz).Format(DateFormat)
 			if cachedDateStr == targetDateStr {
 				matchingEntries = append(matchingEntries, entry)
 			}
@@ -353,7 +370,7 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 		firstTime := time.Unix(telemetryResp.Intervals[0].EndAt, 0)
 		defaultTZ, _ := time.LoadLocation("US/Pacific")
 		firstTime = firstTime.In(defaultTZ)
-		date = firstTime.Format("2006-01-02")
+		date = firstTime.Format(DateFormat)
 
 		// Determine endpoint type based on which fields are populated
 		// Battery has charge/discharge, others have WhDlvd/WhRcvd/Enwh
@@ -384,7 +401,7 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 				totalDischarge += interval.Discharge.Enwh
 			}
 			summary = fmt.Sprintf("Battery: %d intervals, charge=%.2f, discharge=%.2f kWh",
-				len(telemetryResp.Intervals), totalCharge/1000.0, totalDischarge/1000.0)
+				len(telemetryResp.Intervals), totalCharge/WhToKWh, totalDischarge/WhToKWh)
 		} else if hasWhDel && !hasWhRcv {
 			endpoint = "energy_import_telemetry"
 			var totalImport float64
@@ -392,7 +409,7 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 				totalImport += interval.WhDel
 			}
 			summary = fmt.Sprintf("Import: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalImport/1000.0)
+				len(telemetryResp.Intervals), totalImport/WhToKWh)
 		} else if hasWhRcv && !hasWhDel {
 			endpoint = "energy_export_telemetry"
 			var totalExport float64
@@ -400,7 +417,7 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 				totalExport += interval.WhRcv
 			}
 			summary = fmt.Sprintf("Export: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalExport/1000.0)
+				len(telemetryResp.Intervals), totalExport/WhToKWh)
 		} else if hasEnwh {
 			// Could be production_meter or consumption_meter - check URL in cache or use Enwh
 			endpoint = "telemetry/production_meter" // Default assumption
@@ -409,7 +426,7 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 				totalEnwh += interval.Enwh
 			}
 			summary = fmt.Sprintf("Production/Consumption: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalEnwh/1000.0)
+				len(telemetryResp.Intervals), totalEnwh/WhToKWh)
 		}
 		return
 	}

@@ -87,13 +87,11 @@ func NewDisplayWithColorsAndTimezone(colors ColorConfig, tz *time.Location) *Dis
 	colors.mergeWithDefaults(defaultColors)
 
 	// Pre-compute separator strings to avoid repeated allocations (6 calls per render)
-	const separatorWidth = 57
-
 	return &Display{
 		colors:        colors,
 		timezone:      tz,
-		separatorLine: strings.Repeat("=", separatorWidth),
-		subSeparator:  strings.Repeat("-", separatorWidth),
+		separatorLine: strings.Repeat("=", SeparatorWidth),
+		subSeparator:  strings.Repeat("-", SeparatorWidth),
 	}
 }
 
@@ -160,20 +158,11 @@ func (d *Display) printTodayEnergy(metrics *AggregatedMetrics) {
 	fmt.Printf("\n %s%sCOMBINED ENERGY REPORT (kWh)%s\n", Bold, d.colors.PrimaryText, Reset)
 	fmt.Println(d.colors.SecondaryText + d.subSeparator + Reset)
 
-	fmt.Printf("  %sProduced:%s               %s%8.1f kWh%s\n", d.colors.PrimaryText, Reset, d.colors.Production, metrics.ProductionToday, Reset)
-	fmt.Printf("  %sConsumed:%s               %s%8.1f kWh%s\n", d.colors.PrimaryText, Reset, d.colors.TotalConsumed, metrics.ConsumptionToday, Reset)
+	d.printMetric("Produced", metrics.ProductionToday, d.colors.Production, "  ")
+	d.printMetric("Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "  ")
 
-	// Show net energy flow (sum of net import across all systems)
-	netEnergyFlow := metrics.GridImportToday - metrics.GridExportToday
-	if netEnergyFlow < 0 {
-		fmt.Printf("  %sNet Energy Flow:%s        %s%8.1f kWh%s %s(export)%s\n",
-			d.colors.PrimaryText, Reset, d.colors.NetExport, -netEnergyFlow, Reset,
-			d.colors.NetExport, Reset)
-	} else {
-		fmt.Printf("  %sNet Energy Flow:%s        %s%8.1f kWh%s %s(import)%s\n",
-			d.colors.PrimaryText, Reset, d.colors.NetImport, netEnergyFlow, Reset,
-			d.colors.NetImport, Reset)
-	}
+	// Show net energy flow (already calculated in aggregator)
+	d.printNetFlow("Net Energy Flow", metrics.NetImportToday, "  ")
 
 }
 
@@ -193,34 +182,42 @@ func (d *Display) printIndividualSystems(metrics *AggregatedMetrics) {
 			d.colors.Headers, i+1, Reset,
 			Bold, displayName, Reset,
 			d.colors.SecondaryText, identifier, Reset)
-		fmt.Printf("      %sImported from the Grid:%s     %s%8.1f kWh%s\n",
-			d.colors.SecondaryText, Reset, d.colors.Import, sys.GridImportToday, Reset)
-		fmt.Printf("      %sExported to the Grid:%s       %s%8.1f kWh%s\n",
-			d.colors.SecondaryText, Reset, d.colors.Export, sys.GridExportToday, Reset)
-		fmt.Printf("      %sCaptured from the Sun:%s      %s%8.1f kWh%s\n",
-			d.colors.SecondaryText, Reset, d.colors.Production, sys.ProductionToday, Reset)
-		if sys.NetImportedToday < 0 {
-			fmt.Printf("      %sNet Energy Flow:%s            %s%8.1f kWh%s %s(export)%s\n",
-				d.colors.SecondaryText, Reset, d.colors.NetExport, -sys.NetImportedToday, Reset,
-				d.colors.NetExport, Reset)
-		} else {
-			fmt.Printf("      %sNet Energy Flow:%s            %s%8.1f kWh%s %s(import)%s\n",
-				d.colors.SecondaryText, Reset, d.colors.NetImport, sys.NetImportedToday, Reset,
-				d.colors.NetImport, Reset)
-		}
-		fmt.Printf("      %sCharged to Battery:%s         %s%8.1f kWh%s\n",
-			d.colors.SecondaryText, Reset, d.colors.Charge, sys.BatteryChargedToday, Reset)
-		fmt.Printf("      %sDischarged from Battery:%s    %s%8.1f kWh%s\n",
-			d.colors.SecondaryText, Reset, d.colors.Discharge, sys.BatteryDischargedToday, Reset)
+		d.printMetric("Imported from the Grid", sys.GridImportToday, d.colors.Import, "      ")
+		d.printMetric("Exported to the Grid", sys.GridExportToday, d.colors.Export, "      ")
+		d.printMetric("Captured from the Sun", sys.ProductionToday, d.colors.Production, "      ")
+		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "      ")
+		d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "      ")
+		d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "      ")
 		fmt.Printf("      %sBattery Charge Percentage:%s      %s%7d%%%s\n",
 			d.colors.SecondaryText, Reset, d.colors.Charge, sys.BatterySOC, Reset)
-		fmt.Printf("      %sTotal Consumed:%s             %s%8.1f kWh%s\n",
-			d.colors.SecondaryText, Reset, d.colors.TotalConsumed, sys.ConsumptionToday, Reset)
+		d.printMetric("Total Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "      ")
 	}
 }
 
 func (d *Display) printSeparator() {
 	fmt.Println("\n" + d.colors.Headers + d.separatorLine + Reset + "\n")
+}
+
+// printMetric prints a labeled metric value with consistent formatting
+func (d *Display) printMetric(label string, value float64, valueColor string, indent string) {
+	fmt.Printf("%s%s%s:%s%s%8.1f kWh%s\n",
+		indent, d.colors.SecondaryText, label, Reset,
+		valueColor, value, Reset)
+}
+
+// printNetFlow prints net energy flow with appropriate color and direction label
+func (d *Display) printNetFlow(label string, netValue float64, indent string) {
+	if netValue < 0 {
+		fmt.Printf("%s%s%s:%s%s%8.1f kWh%s %s(export)%s\n",
+			indent, d.colors.SecondaryText, label, Reset,
+			d.colors.NetExport, -netValue, Reset,
+			d.colors.NetExport, Reset)
+	} else {
+		fmt.Printf("%s%s%s:%s%s%8.1f kWh%s %s(import)%s\n",
+			indent, d.colors.SecondaryText, label, Reset,
+			d.colors.NetImport, netValue, Reset,
+			d.colors.NetImport, Reset)
+	}
 }
 
 // ShowError displays an error message

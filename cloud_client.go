@@ -134,7 +134,7 @@ func NewEnlightenCloudClient(systemID, apiKey, accessToken string, timezone *tim
 		accessToken: accessToken,
 		timezone:    timezone,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: APIRequestTimeout,
 		},
 	}
 }
@@ -221,8 +221,8 @@ func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testD
 	}
 
 	// Sum all wh_imported values
-	importWh := sumIntervalValues(allIntervals, "wh_imported")
-	return importWh / 1000.0, nil // Convert Wh to kWh
+	importWh := sumIntervalValues(allIntervals, FieldWhImported)
+	return importWh / WhToKWh, nil // Convert Wh to kWh
 }
 
 // GetEnergyExportForDate gets the total energy exported to the grid for a specific date.
@@ -242,8 +242,8 @@ func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testD
 	// Sum intervals that fall within the requested day (in configured timezone)
 	// For export telemetry: WhExported = energy exported per interval
 	// These are incremental values per 15-minute interval, so we sum them
-	exportWh := sumIntervalValues(allIntervals, "wh_exported")
-	return exportWh / 1000.0, nil // Convert Wh to kWh
+	exportWh := sumIntervalValues(allIntervals, FieldWhExported)
+	return exportWh / WhToKWh, nil // Convert Wh to kWh
 }
 
 // GetProductionForDate gets the total energy production for a specific date.
@@ -269,8 +269,8 @@ func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDat
 	// Sum all wh_del values from intervals
 	// For production telemetry: WhDel = energy produced per interval
 	// These are incremental values per 15-minute interval
-	productionWh := sumIntervalValues(allIntervals, "wh_del")
-	return productionWh / 1000.0, nil // Convert Wh to kWh
+	productionWh := sumIntervalValues(allIntervals, FieldWhDel)
+	return productionWh / WhToKWh, nil // Convert Wh to kWh
 }
 
 // GetConsumptionForDate gets the total energy consumption for a specific date.
@@ -290,8 +290,8 @@ func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDa
 	// Sum intervals that fall within the requested day (in configured timezone)
 	// For consumption telemetry: Enwh = energy consumed per interval
 	// These are incremental values per 15-minute interval, so we sum them
-	consumptionWh := sumIntervalValues(intervals, "enwh")
-	return consumptionWh / 1000.0, nil // Convert Wh to kWh
+	consumptionWh := sumIntervalValues(intervals, FieldEnwh)
+	return consumptionWh / WhToKWh, nil // Convert Wh to kWh
 }
 
 // GetBatteryDataForDate gets battery charge, discharge, and State of Charge (SOC) for a specific date.
@@ -313,7 +313,7 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	socPercent := 0
 	if data.LastReportedAggregateSOC != "" {
 		// Parse string like "97%" to integer 97
-		socStr := strings.TrimSuffix(data.LastReportedAggregateSOC, "%")
+		socStr := strings.TrimSuffix(data.LastReportedAggregateSOC, BatterySOCPercentSuffix)
 		if parsedSOC, err := strconv.Atoi(socStr); err == nil {
 			socPercent = parsedSOC
 		}
@@ -341,7 +341,7 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 		}
 	}
 
-	return chargeWh / 1000.0, dischargeWh / 1000.0, socPercent, nil // Convert Wh to kWh
+	return chargeWh / WhToKWh, dischargeWh / WhToKWh, socPercent, nil // Convert Wh to kWh
 }
 
 // GetMetricsFromCloud fetches all today's metrics from the Cloud API
@@ -353,51 +353,56 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	}
 	cacheUsed := false
 
+	// Helper to handle optional metrics that may fail (grid import/export, battery)
+	shouldLogError := func(err error) bool {
+		if isPastDate(testDate, c.timezone) {
+			return false // Silently use 0 for past dates
+		}
+		// For today, log only non-rate-limit errors
+		return !isRateLimitError(err)
+	}
+
+	// Helper to check context cancellation
+	checkCancelled := func() error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return nil
+	}
+
 	// Fetch all metrics - make grid import/export optional (they may fail with 500)
 	var err error
 
 	metrics.GridImportToday, err = c.GetEnergyImportForDate(ctx, testDate)
 	if err != nil {
-		if ctx.Err() != nil {
-			return nil, false, ctx.Err()
+		if err := checkCancelled(); err != nil {
+			return nil, false, err
 		}
-		// Grid import may fail - continue with 0 (silently for past dates if cache not found)
-		if isPastDate(testDate, c.timezone) {
-			// For past dates, silently use 0 if cache not found
-			metrics.GridImportToday = 0
-		} else {
-			// For today, log the error (but suppress 429 rate limit warnings - they're handled by cache)
-			if !strings.Contains(err.Error(), RateLimitError) {
-				fmt.Printf("WARNING: Failed to get grid import: %v\n", err)
-			}
-			metrics.GridImportToday = 0
+		// Grid import may fail - continue with 0
+		if shouldLogError(err) {
+			fmt.Printf("WARNING: Failed to get grid import: %v\n", err)
 		}
+		metrics.GridImportToday = 0
 	}
 	cacheUsed = cacheUsed || c.cacheUsed
 
 	metrics.GridExportToday, err = c.GetEnergyExportForDate(ctx, testDate)
 	if err != nil {
-		if ctx.Err() != nil {
-			return nil, false, ctx.Err()
+		if err := checkCancelled(); err != nil {
+			return nil, false, err
 		}
-		// Grid export may fail - continue with 0 (silently for past dates if cache not found)
-		if isPastDate(testDate, c.timezone) {
-			// For past dates, silently use 0 if cache not found
-			metrics.GridExportToday = 0
-		} else {
-			// For today, log the error (but suppress 429 rate limit warnings - they're handled by cache)
-			if !strings.Contains(err.Error(), RateLimitError) {
-				fmt.Printf("WARNING: Failed to get grid export: %v\n", err)
-			}
-			metrics.GridExportToday = 0
+		// Grid export may fail - continue with 0
+		if shouldLogError(err) {
+			fmt.Printf("WARNING: Failed to get grid export: %v\n", err)
 		}
+		metrics.GridExportToday = 0
 	}
 	cacheUsed = cacheUsed || c.cacheUsed
 
 	metrics.ProductionToday, err = c.GetProductionForDate(ctx, testDate)
 	if err != nil {
-		if ctx.Err() != nil {
-			return nil, false, ctx.Err()
+		if err := checkCancelled(); err != nil {
+			return nil, false, err
 		}
 		return nil, false, fmt.Errorf("failed to get production: %w", err)
 	}
@@ -405,8 +410,8 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 
 	metrics.BatteryChargedToday, metrics.BatteryDischargedToday, metrics.BatterySOC, err = c.GetBatteryDataForDate(ctx, testDate)
 	if err != nil {
-		if ctx.Err() != nil {
-			return nil, false, ctx.Err()
+		if err := checkCancelled(); err != nil {
+			return nil, false, err
 		}
 		// Log the error but continue without battery data
 		// This helps understand why battery data might be missing
@@ -420,8 +425,8 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	// Get consumption from API (more accurate than calculation)
 	metrics.ConsumptionToday, err = c.GetConsumptionForDate(ctx, testDate)
 	if err != nil {
-		if ctx.Err() != nil {
-			return nil, false, ctx.Err()
+		if err := checkCancelled(); err != nil {
+			return nil, false, err
 		}
 		// Fallback to calculation if API fails
 		metrics.ConsumptionToday = metrics.ProductionToday +

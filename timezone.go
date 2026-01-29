@@ -35,9 +35,9 @@ func LoadTimezone(timezoneStr string) (*time.Location, error) {
 	if err != nil {
 		// If invalid, fall back to system timezone
 		systemTZ := time.Now().Location()
-		// If system timezone is UTC, use US/Pacific as last resort
-		if systemTZ.String() == "UTC" {
-			if fallbackTZ, err := time.LoadLocation("US/Pacific"); err == nil {
+		// If system timezone is UTC, use FallbackTimezone as last resort
+		if systemTZ.String() == UTCTimezone {
+			if fallbackTZ, err := time.LoadLocation(FallbackTimezone); err == nil {
 				return fallbackTZ, nil
 			}
 		}
@@ -85,7 +85,7 @@ func isPastDate(targetDate time.Time, tz *time.Location) bool {
 
 // ParseDateInTimezone parses a date string in YYYY-MM-DD format in the specified timezone
 func ParseDateInTimezone(dateStr string, tz *time.Location) (time.Time, error) {
-	parsed, err := time.ParseInLocation("2006-01-02", dateStr, tz)
+	parsed, err := time.ParseInLocation(DateFormat, dateStr, tz)
 	if err != nil {
 		return time.Time{}, err
 	}

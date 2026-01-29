@@ -121,7 +121,7 @@ func normalizeURLForCache(urlStr string, tz *time.Location) string {
 	if startAt := query.Get("start_at"); startAt != "" {
 		if timestamp, err := strconv.ParseInt(startAt, 10, 64); err == nil {
 			t := time.Unix(timestamp, 0).In(tz)
-			dateStr := t.Format("2006-01-02")
+			dateStr := t.Format(DateFormat)
 			query.Del("start_at")
 			query.Set("start_date", dateStr)
 		}
@@ -129,7 +129,7 @@ func normalizeURLForCache(urlStr string, tz *time.Location) string {
 	if endAt := query.Get("end_at"); endAt != "" {
 		if timestamp, err := strconv.ParseInt(endAt, 10, 64); err == nil {
 			t := time.Unix(timestamp, 0).In(tz)
-			dateStr := t.Format("2006-01-02")
+			dateStr := t.Format(DateFormat)
 			query.Del("end_at")
 			query.Set("end_date", dateStr)
 		}
@@ -163,7 +163,7 @@ func extractQueriedDateFromURL(urlStr string, tz *time.Location) string {
 	if startAt := query.Get("start_at"); startAt != "" {
 		if timestamp, err := strconv.ParseInt(startAt, 10, 64); err == nil {
 			t := time.Unix(timestamp, 0).In(tz)
-			return t.Format("2006-01-02")
+			return t.Format(DateFormat)
 		}
 	}
 

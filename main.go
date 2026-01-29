@@ -96,11 +96,16 @@ func main() {
 	inspectCache := flag.String("inspect-cache", "", "Inspect cached responses by hash or date (YYYY-MM-DD format). Use --list-cache to see hashes.")
 	flag.Parse()
 
+	// Helper function for exiting with error message
+	exitWithError := func(msg string, args ...interface{}) {
+		fmt.Fprintf(os.Stderr, msg, args...)
+		os.Exit(1)
+	}
+
 	// Handle clear cache for today only
 	if *clearCache {
 		if err := ClearTodayCache(); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to clear today's cache: %v\n", err)
-			os.Exit(1)
+			exitWithError("Failed to clear today's cache: %v\n", err)
 		}
 		return
 	}
@@ -108,8 +113,7 @@ func main() {
 	// Handle clear all cache
 	if *clearAllCache {
 		if err := ClearAllCache(); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to clear all cache: %v\n", err)
-			os.Exit(1)
+			exitWithError("Failed to clear all cache: %v\n", err)
 		}
 		fmt.Println("All cache cleared successfully")
 		return
@@ -119,8 +123,7 @@ func main() {
 	if *listCache {
 		entries, err := ListCacheEntries()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to list cache entries: %v\n", err)
-			os.Exit(1)
+			exitWithError("Failed to list cache entries: %v\n", err)
 		}
 		if len(entries) == 0 {
 			fmt.Println("No cached responses found")
@@ -141,7 +144,7 @@ func main() {
 			if entry.Summary != "" {
 				fmt.Printf("    %s\n", entry.Summary)
 			}
-			fmt.Printf("    Cached At: %s\n", entry.CachedAt.Format("2006-01-02 15:04:05 MST"))
+			fmt.Printf("    Cached At: %s\n", entry.CachedAt.Format(TimestampFormat))
 			fmt.Printf("    Size: %d bytes\n", entry.Size)
 			fmt.Println()
 		}
@@ -152,7 +155,7 @@ func main() {
 	// Handle inspect cache by hash or date
 	if *inspectCache != "" {
 		// Check if it is a date (YYYY-MM-DD format) or a hash
-		if date, err := time.Parse("2006-01-02", *inspectCache); err == nil {
+		if date, err := time.Parse(DateFormat, *inspectCache); err == nil {
 			// It is a date - show all cache entries for this date
 			// Load config to get timezone, but use default if config not available
 			var tz *time.Location
@@ -163,8 +166,7 @@ func main() {
 			}
 			entries, err := FindCacheEntriesByDate(date, tz)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to find cache entries: %v\n", err)
-				os.Exit(1)
+				exitWithError("Failed to find cache entries: %v\n", err)
 			}
 			if len(entries) == 0 {
 				fmt.Printf("No cached responses found for date %s\n", *inspectCache)
@@ -190,9 +192,10 @@ func main() {
 			}
 			fmt.Printf("Found %d cached responses for %s:\n\n", len(entries), *inspectCache)
 			for i, entry := range entries {
-				fmt.Printf("=" + strings.Repeat("=", 70) + "\n")
+				separator := strings.Repeat("=", 71)
+				fmt.Printf(separator + "\n")
 				fmt.Printf("Entry %d of %d\n", i+1, len(entries))
-				fmt.Printf("=" + strings.Repeat("=", 70) + "\n")
+				fmt.Printf(separator + "\n")
 				if err := InspectCacheEntry(entry.Key); err != nil {
 					fmt.Fprintf(os.Stderr, "Failed to inspect cache entry %s: %v\n", entry.Key, err)
 					continue
@@ -204,8 +207,7 @@ func main() {
 		} else {
 			// It is a hash - show single entry
 			if err := InspectCacheEntry(*inspectCache); err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to inspect cache entry: %v\n", err)
-				os.Exit(1)
+				exitWithError("Failed to inspect cache entry: %v\n", err)
 			}
 		}
 		return
@@ -214,16 +216,13 @@ func main() {
 	// Load configuration
 	config, err := LoadConfig(*configFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
-		fmt.Fprintf(os.Stderr, "\nPlease copy config.yaml.example to config.yaml and fill in your details.\n")
-		os.Exit(1)
+		exitWithError("Failed to load configuration: %v\n\nPlease copy config.yaml.example to config.yaml and fill in your details.\n", err)
 	}
 
 	// Handle OAuth setup
 	if *setupOAuth {
 		if err := SetupOAuth(config); err != nil {
-			fmt.Fprintf(os.Stderr, "OAuth setup failed: %v\n", err)
-			os.Exit(1)
+			exitWithError("OAuth setup failed: %v\n", err)
 		}
 		return
 	}
@@ -289,7 +288,7 @@ func runOnce(ctx context.Context, aggregator *DataAggregator, display *Display, 
 	metrics, err := aggregator.GetAggregatedMetrics(ctx, config.Systems, config.API, testDate, reportTZ)
 	if err != nil {
 		// Check if it is a 429 rate limit error - if so, the error message already contains wait time info
-		if strings.Contains(err.Error(), RateLimitError) {
+		if isRateLimitError(err) {
 			// Error message already printed in aggregator.go, just exit
 			os.Exit(1)
 		}
@@ -305,7 +304,7 @@ func runOnce(ctx context.Context, aggregator *DataAggregator, display *Display, 
 			fmt.Fprintf(os.Stderr, "ERROR: --test flag requires --date flag to specify which date to validate\n")
 			os.Exit(1)
 		}
-		testDateStr := testDate.Format("2006-01-02")
+		testDateStr := testDate.Format(DateFormat)
 		if err := ValidateMetrics(metrics, testDateStr); err != nil {
 			fmt.Fprintf(os.Stderr, "\nValidation failed: %v\n", err)
 			os.Exit(1)
@@ -345,7 +344,7 @@ func fetchAndDisplay(ctx context.Context, aggregator *DataAggregator, display *D
 			return
 		}
 		// Check if it's a 429 rate limit error - if so, exit instead of continuing
-		if strings.Contains(err.Error(), "rate limit exceeded (429)") {
+		if isRateLimitError(err) {
 			// Error message already printed in aggregator.go, just exit
 			os.Exit(1)
 		}

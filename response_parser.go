@@ -31,8 +31,8 @@ func parseNestedTelemetryResponse(bodyBytes []byte) ([]TelemetryInterval, error)
 	var data TelemetryResponseNested
 	if err := json.Unmarshal(bodyBytes, &data); err != nil {
 		bodyPreview := string(bodyBytes)
-		if len(bodyPreview) > 200 {
-			bodyPreview = bodyPreview[:200] + "..."
+		if len(bodyPreview) > ResponseBodyPreviewLength {
+			bodyPreview = bodyPreview[:ResponseBodyPreviewLength] + "..."
 		}
 		return nil, fmt.Errorf("failed to decode nested telemetry response (body preview: %s): %w", bodyPreview, err)
 	}
@@ -71,22 +71,22 @@ func readResponseBody(respBody io.ReadCloser) ([]byte, error) {
 }
 
 // sumIntervalValues sums a specific field from telemetry intervals.
-// The fieldName parameter determines which field to sum:
-//   - "wh_imported": sums WhImported values
-//   - "wh_exported": sums WhExported values
-//   - "wh_del": sums WhDel values
-//   - "enwh": sums Enwh values
+// The fieldName should use one of the field constants defined in constants.go:
+//   - FieldWhImported: sums WhImported values (grid import)
+//   - FieldWhExported: sums WhExported values (grid export)
+//   - FieldWhDel: sums WhDel values (production)
+//   - FieldEnwh: sums Enwh values (consumption/battery)
 func sumIntervalValues(intervals []TelemetryInterval, fieldName string) float64 {
 	var total float64
 	for _, interval := range intervals {
 		switch fieldName {
-		case "wh_imported":
+		case FieldWhImported:
 			total += interval.WhImported
-		case "wh_exported":
+		case FieldWhExported:
 			total += interval.WhExported
-		case "wh_del":
+		case FieldWhDel:
 			total += interval.WhDel
-		case "enwh":
+		case FieldEnwh:
 			total += interval.Enwh
 		}
 	}

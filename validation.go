@@ -1,3 +1,21 @@
+// Package main - validation.go
+//
+// PURPOSE
+// -------
+// This file implements validation logic for test mode (--test flag).
+// Compares actual metrics against expected values with configurable tolerance.
+//
+// VALIDATION STRATEGY
+// -------------------
+//   - Tolerance: ±10% of expected value (configurable via ValidationTolerancePercent)
+//   - Minimum tolerance: 0.1 kWh for small values (ValidationMinToleranceKWh)
+//   - Per-system validation with detailed comparison reports
+//   - Handles edge cases: zero values, infinite percentages, rounding
+//
+// EXPECTED VALUES FORMAT
+// ----------------------
+// Expected values are stored in test-data/expected_values_YYYY-MM-DD.json
+// Format: {"date": "...", "systems": [{"id": "...", "expected": {...}}]}
 package main
 
 import (
@@ -6,14 +24,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-)
-
-// Validation tolerance constants
-const (
-	// tolerancePercent is the acceptable deviation from expected value (10%)
-	tolerancePercent = 0.10
-	// minToleranceKWh is the minimum tolerance in kWh for small values
-	minToleranceKWh = 0.1
 )
 
 // ExpectedValues represents the expected values for a test date
@@ -86,9 +96,9 @@ func ValidateMetrics(metrics *AggregatedMetrics, testDate string) error {
 			diff := actual - expected
 			status := "✅"
 			// Calculate tolerance with minimum for small values
-			tolerance := math.Abs(expected) * tolerancePercent
-			if tolerance < minToleranceKWh {
-				tolerance = minToleranceKWh
+			tolerance := math.Abs(expected) * ValidationTolerancePercent
+			if tolerance < ValidationMinToleranceKWh {
+				tolerance = ValidationMinToleranceKWh
 			}
 			if math.Abs(diff) > tolerance {
 				status = "❌"
@@ -101,7 +111,7 @@ func ValidateMetrics(metrics *AggregatedMetrics, testDate string) error {
 			} else if diff != 0 {
 				// If expected is 0 but actual is not, percentage is infinite/undefined
 				// Use a large number to indicate significant difference
-				percentDiff = 999.9
+				percentDiff = ValidationInfinitePercent
 			} else {
 				percentDiff = 0.0
 			}
@@ -113,7 +123,7 @@ func ValidateMetrics(metrics *AggregatedMetrics, testDate string) error {
 			// Percentage: format as string with fixed width (12 chars) for right alignment, whole numbers only
 			// If percentage rounds to zero, do not show the sign
 			var percentStr string
-			if math.Abs(percentDiff) < 0.5 {
+			if math.Abs(percentDiff) < ValidationPercentThreshold {
 				percentStr = fmt.Sprintf("(0%%)")
 			} else {
 				percentStr = fmt.Sprintf("(%+.0f%%)", percentDiff)
@@ -156,4 +166,3 @@ func ValidateMetrics(metrics *AggregatedMetrics, testDate string) error {
 	fmt.Println("❌ SOME VALIDATIONS FAILED")
 	return fmt.Errorf("validation failed")
 }
-

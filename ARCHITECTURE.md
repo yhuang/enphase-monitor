@@ -63,7 +63,7 @@ enphase-monitor/
 ├── response_parser.go   # Telemetry JSON parsing utilities
 │
 ├── display.go           # Terminal formatting and color output
-├── constants.go         # ANSI formatting constants
+├── constants.go         # Centralized constants repository (20+ constants)
 ├── timezone.go          # Timezone utilities
 ├── url_builder.go       # Telemetry URL construction
 │
@@ -449,7 +449,7 @@ only accessed from the main goroutine, so no mutex is needed.
 | File                                | Responsibility                                  | Key Lines      |
 |-------------------------------------|-------------------------------------------------|----------------|
 | [display.go](display.go)            | ANSI formatting, report structure               | Lines 114-260  |
-| [constants.go](constants.go)        | `Reset` and `Bold` ANSI constants               | Full file      |
+| [constants.go](constants.go)        | Centralized constants (20+ added across 50 refactoring rounds) | Full file      |
 | [timezone.go](timezone.go)          | Timezone loading and date boundary calculations | Lines 7-50     |
 | [url_builder.go](url_builder.go)    | Telemetry URL construction helpers              | Full file      |
 | [validation.go](validation.go)      | Test mode validation (--test flag)              | Lines 30-150   |

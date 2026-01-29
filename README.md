@@ -382,7 +382,7 @@ colors:
 - **Hex codes** (e.g., `#FF5733`): Automatically converted to ANSI color codes
 - **ANSI escape codes** (e.g., `\033[38;5;208m`): Used directly as-is
 
-**Note:** `reset` and `bold` are constants defined in `constants.go` and cannot be customized.
+**Note:** `Reset` and `Bold` are constants defined in `constants.go` and cannot be customized.
 
 ## Troubleshooting
 
@@ -527,7 +527,7 @@ This project includes comprehensive documentation for different learning paths:
 enphase-monitor/
 ├── main.go                     # Application entry point and CLI handling
 ├── config.go                   # Configuration loading, validation, and color conversion
-├── constants.go                # ANSI font style constants (Reset, Bold)
+├── constants.go                # Centralized constants repository (20+ constants)
 ├── cloud_client.go             # Enphase Cloud API v4 client
 ├── aggregator.go               # Data aggregation logic across systems
 ├── display.go                  # Terminal output formatting and color display
@@ -535,6 +535,9 @@ enphase-monitor/
 ├── cache_cli.go                # Cache management CLI commands
 ├── oauth.go                    # OAuth token management
 ├── setup_oauth.go              # OAuth setup wizard
+├── timezone.go                 # Timezone utilities
+├── url_builder.go              # API URL construction helpers
+├── response_parser.go          # JSON parsing utilities
 ├── config.yaml.example         # Example configuration with all options
 ├── config.yaml                 # Your actual configuration (create from example)
 ├── test-data/                  # Test data and cache directory

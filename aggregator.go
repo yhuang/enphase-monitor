@@ -207,7 +207,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -221,6 +220,7 @@ type AggregatedMetrics struct {
 	ConsumptionToday float64
 	GridImportToday  float64
 	GridExportToday  float64
+	NetImportToday   float64 // Grid Import - Grid Export (positive = import, negative = export)
 
 	// Individual System Data
 	Systems []SystemMetrics
@@ -276,7 +276,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 	for _, sys := range systems {
 		// Use Cloud API
 		if apiConfig == nil {
-			return nil, fmt.Errorf("api configuration required for system %s", sys.Name)
+			return nil, fmt.Errorf("%s for system %s", ErrAPIConfigRequired, sys.Name)
 		}
 		if apiConfig.Key == "" {
 			return nil, fmt.Errorf("api.key required for system %s", sys.Name)
@@ -289,7 +289,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 
 		accessToken, err := GetAccessToken(ctx, apiConfig)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get OAuth access token for system %s: %w", sys.Name, err)
+			return nil, fmt.Errorf("%s for system %s: %w", ErrTokenRefreshFailed, sys.Name, err)
 		}
 
 		// Use the report timezone for all systems (from config, system, or US/Pacific fallback)
@@ -299,7 +299,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 		var cacheUsed bool
 		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate)
 		if err != nil {
-			if strings.Contains(err.Error(), RateLimitError) {
+			if isRateLimitError(err) {
 				// Collect the error but do not fail immediately
 				rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
 				continue
@@ -342,13 +342,16 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 		metrics.GridExportToday += localMetrics.GridExportToday
 	}
 
+	// Calculate net import (positive = net import, negative = net export)
+	metrics.NetImportToday = metrics.GridImportToday - metrics.GridExportToday
+
 	metrics.CacheUsed = anyCacheUsed
 
 	// If we collected any 429 errors that could not be resolved with cache, print them once and exit
 	if len(rateLimitErrors) > 0 {
 		// Enphase API rate limit window is 60 seconds (10 requests/minute for free tier)
 		fmt.Fprintf(os.Stderr, "ERROR: API rate limit exceeded (429)\n")
-		fmt.Fprintf(os.Stderr, "Please wait 60 seconds before rerunning the program.\n")
+		fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", APIRateLimitWaitSeconds)
 		return nil, fmt.Errorf("rate limit exceeded (429): %d system(s) affected", len(rateLimitErrors))
 	}
 

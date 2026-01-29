@@ -102,7 +102,7 @@ func GetAuthorizationURL(apiConfig *APIConfig) (string, error) {
 		return "", fmt.Errorf("redirect_uri is required in API configuration")
 	}
 
-	authURL := "https://api.enphaseenergy.com/oauth/authorize"
+	authURL := EnphaseOAuthAuthorizeURL
 	params := url.Values{}
 	params.Set("response_type", "code")
 	params.Set("client_id", apiConfig.ClientID)
@@ -153,7 +153,7 @@ func ExchangeAuthorizationCode(ctx context.Context, apiConfig *APIConfig, code s
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != HTTPStatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, string(body))
 	}
@@ -186,25 +186,25 @@ func GetAccessToken(ctx context.Context, apiConfig *APIConfig) (string, error) {
 	}
 
 	// Determine which grant type to use
-	var data url.Values
+	var formData url.Values
 
 	// Priority 1: Use refresh token if available (for developer plan)
 	if apiConfig.RefreshToken != "" {
-		data = url.Values{}
-		data.Set("grant_type", "refresh_token")
-		data.Set("refresh_token", apiConfig.RefreshToken)
+		formData = url.Values{}
+		formData.Set("grant_type", "refresh_token")
+		formData.Set("refresh_token", apiConfig.RefreshToken)
 	} else if apiConfig.Username != "" && apiConfig.Password != "" {
 		// Priority 2: Use password grant (for Partner/Installer plans)
-		data = url.Values{}
-		data.Set("grant_type", "password")
-		data.Set("username", apiConfig.Username)
-		data.Set("password", apiConfig.Password)
+		formData = url.Values{}
+		formData.Set("grant_type", "password")
+		formData.Set("username", apiConfig.Username)
+		formData.Set("password", apiConfig.Password)
 	} else {
 		// No valid authentication method available
 		return "", fmt.Errorf("no valid authentication method available. For developer plan: you need to complete one-time authorization to get a refresh_token. See README for instructions.")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", apiConfig.AuthorizationURL, bytes.NewBufferString(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, "POST", apiConfig.AuthorizationURL, bytes.NewBufferString(formData.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("failed to create token request: %w", err)
 	}
@@ -222,12 +222,12 @@ func GetAccessToken(ctx context.Context, apiConfig *APIConfig) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != HTTPStatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		errorMsg := string(body)
 
 		// Provide helpful error message for common OAuth errors
-		if resp.StatusCode == http.StatusUnauthorized {
+		if resp.StatusCode == HTTPStatusUnauthorized {
 			if apiConfig.RefreshToken != "" {
 				return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
 					"Your refresh token appears to be invalid or expired. Please regenerate it by running:\n"+

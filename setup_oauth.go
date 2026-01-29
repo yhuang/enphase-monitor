@@ -1,3 +1,25 @@
+// Package main - setup_oauth.go
+//
+// PURPOSE
+// -------
+// This file implements the interactive OAuth setup wizard for first-time configuration.
+// Guides users through the OAuth 2.0 authorization flow to obtain a refresh token.
+//
+// SETUP FLOW
+// ----------
+//  1. Prompts for redirect URI (if not in config)
+//  2. Generates authorization URL
+//  3. Opens browser to authorization page
+//  4. Prompts for authorization code from redirect
+//  5. Exchanges code for access and refresh tokens
+//  6. Displays config.yaml snippet with tokens
+//  7. Clears credentials from terminal for security
+//
+// SECURITY FEATURES
+// -----------------
+//   - Previews sensitive data (truncates long values)
+//   - Clears credentials from terminal after user confirmation
+//   - Uses ANSI escape codes to erase terminal lines
 package main
 
 import (
@@ -13,6 +35,7 @@ import (
 
 // openBrowser opens the specified URL in the default browser
 func openBrowser(url string) error {
+	// Map of OS to command
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
@@ -22,7 +45,7 @@ func openBrowser(url string) error {
 	case "windows":
 		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
 	default:
-		return fmt.Errorf("unsupported platform")
+		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
 	return cmd.Start()
 }
@@ -182,7 +205,7 @@ func SetupOAuth(config *Config) error {
 		fmt.Sprintf("  key: %s", config.API.Key),
 		fmt.Sprintf("  client_id: %s", config.API.ClientID),
 		fmt.Sprintf("  client_secret: %s", config.API.ClientSecret),
-		"  authorization_url: https://api.enphaseenergy.com/oauth/token",
+		fmt.Sprintf("  authorization_url: %s", EnphaseOAuthTokenURL),
 		fmt.Sprintf("  redirect_uri: %s", redirectURI),
 		fmt.Sprintf("  refresh_token: %s", tokenResp.RefreshToken),
 	}
