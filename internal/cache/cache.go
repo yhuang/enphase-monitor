@@ -17,13 +17,14 @@
 //   - Provides cache inspection and management tools (--inspect-cache)
 //   - Handles past date queries with cache fallback
 //   - Normalizes URLs for consistent cache keys (timestamps → dates)
-package main
+package cache
 
 import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"enphase-monitor/internal/constants"
 	"fmt"
 	"io"
 	"net/http"
@@ -34,10 +35,33 @@ import (
 	"time"
 )
 
-const cacheDir = "test-data/cache"
+// getCacheDir returns the cache directory path, resolving it relative to the project root.
+// This ensures cache files are always stored in test-data/cache/ at the project root,
+// regardless of where tests or the application are run from.
+func getCacheDir() string {
+	// Try to find the project root by looking for go.mod
+	dir, err := os.Getwd()
+	if err != nil {
+		return "test-data/cache" // fallback to relative path
+	}
+	
+	// Walk up the directory tree to find go.mod
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return filepath.Join(dir, "test-data", "cache")
+		}
+		
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached root without finding go.mod, use relative path
+			return "test-data/cache"
+		}
+		dir = parent
+	}
+}
 
-// redactURLKey strips the "key" query parameter from a URL for safe inclusion in error messages.
-func redactURLKey(rawURL string) string {
+// RedactURLKey strips the "key" query parameter from a URL for safe inclusion in error messages.
+func RedactURLKey(rawURL string) string {
 	parsed, err := neturl.Parse(rawURL)
 	if err != nil {
 		return rawURL
@@ -50,10 +74,16 @@ func redactURLKey(rawURL string) string {
 	return parsed.String()
 }
 
-const minRequestInterval = 1 * time.Minute // Minimum time between API requests (used for cache staleness)
+// MinRequestInterval is the minimum time between API requests (used for cache staleness)
+const MinRequestInterval = 1 * time.Minute
 
 // testMode forces cache-only mode (no live API calls)
 var testMode = false
+
+// TestMode returns whether test mode is enabled
+func TestMode() bool {
+	return testMode
+}
 
 // SetTestMode enables or disables test mode
 func SetTestMode(enabled bool) {
@@ -63,6 +93,11 @@ func SetTestMode(enabled bool) {
 // cacheDisabled forces live API calls (skip cache lookup)
 var cacheDisabled = false
 
+// CacheDisabled returns whether cache is disabled
+func CacheDisabled() bool {
+	return cacheDisabled
+}
+
 // SetCacheDisabled enables or disables cache bypass
 func SetCacheDisabled(disabled bool) {
 	cacheDisabled = disabled
@@ -70,6 +105,16 @@ func SetCacheDisabled(disabled bool) {
 
 // rateLimitWarningShown tracks if we've already warned about 429 fallback
 var rateLimitWarningShown = false
+
+// RateLimitWarningShown returns whether a rate limit warning has been shown
+func RateLimitWarningShown() bool {
+	return rateLimitWarningShown
+}
+
+// SetRateLimitWarningShown sets the rate limit warning flag
+func SetRateLimitWarningShown(shown bool) {
+	rateLimitWarningShown = shown
+}
 
 // CachedResponse stores a cached API response
 type CachedResponse struct {
@@ -81,7 +126,8 @@ type CachedResponse struct {
 }
 
 // toHTTPResponse reconstructs an *http.Response from a cached response.
-func (c *CachedResponse) toHTTPResponse() *http.Response {
+// ToHTTPResponse reconstructs an *http.Response from a cached response.
+func (c *CachedResponse) ToHTTPResponse() *http.Response {
 	resp := &http.Response{
 		StatusCode: c.StatusCode,
 		Header:     make(http.Header),
@@ -93,21 +139,21 @@ func (c *CachedResponse) toHTTPResponse() *http.Response {
 	return resp
 }
 
-// getCacheKey generates a cache key from a URL
+// GetCacheKey generates a cache key from a URL
 // Normalizes timestamps in the URL to use date strings for consistent caching
-func getCacheKey(url string, tz *time.Location) string {
+func GetCacheKey(url string, tz *time.Location) string {
 	// Normalize the URL by replacing Unix timestamps with date strings
 	// This allows the same endpoint/date to use the same cache key
-	normalizedURL := normalizeURLForCache(url, tz)
+	normalizedURL := NormalizeURLForCache(url, tz)
 	hash := sha256.Sum256([]byte(normalizedURL))
 	return hex.EncodeToString(hash[:])
 }
 
-// normalizeURLForCache normalizes a URL by replacing timestamps with date strings
+// NormalizeURLForCache normalizes a URL by replacing timestamps with date strings
 // Also normalizes date strings to ensure consistent cache keys
 // Example: ...start_at=1735717600&end_at=1737504000 -> ...start_at=2026-01-20&end_at=2026-01-20
 // Example: ...start_date=2026-01-20&end_date=2026-01-20 -> ...start_date=2026-01-20&end_date=2026-01-20 (no change)
-func normalizeURLForCache(urlStr string, tz *time.Location) string {
+func NormalizeURLForCache(urlStr string, tz *time.Location) string {
 	// Parse URL to extract query parameters
 	parsedURL, err := neturl.Parse(urlStr)
 	if err != nil {
@@ -121,7 +167,7 @@ func normalizeURLForCache(urlStr string, tz *time.Location) string {
 	if startAt := query.Get("start_at"); startAt != "" {
 		if timestamp, err := strconv.ParseInt(startAt, 10, 64); err == nil {
 			t := time.Unix(timestamp, 0).In(tz)
-			dateStr := t.Format(DateFormat)
+			dateStr := t.Format(constants.DateFormat)
 			query.Del("start_at")
 			query.Set("start_date", dateStr)
 		}
@@ -129,7 +175,7 @@ func normalizeURLForCache(urlStr string, tz *time.Location) string {
 	if endAt := query.Get("end_at"); endAt != "" {
 		if timestamp, err := strconv.ParseInt(endAt, 10, 64); err == nil {
 			t := time.Unix(timestamp, 0).In(tz)
-			dateStr := t.Format(DateFormat)
+			dateStr := t.Format(constants.DateFormat)
 			query.Del("end_at")
 			query.Set("end_date", dateStr)
 		}
@@ -163,7 +209,7 @@ func extractQueriedDateFromURL(urlStr string, tz *time.Location) string {
 	if startAt := query.Get("start_at"); startAt != "" {
 		if timestamp, err := strconv.ParseInt(startAt, 10, 64); err == nil {
 			t := time.Unix(timestamp, 0).In(tz)
-			return t.Format(DateFormat)
+			return t.Format(constants.DateFormat)
 		}
 	}
 
@@ -175,15 +221,15 @@ func extractQueriedDateFromURL(urlStr string, tz *time.Location) string {
 	return ""
 }
 
-// getCachePath returns the file path for a cached response
-func getCachePath(url string, tz *time.Location) string {
-	key := getCacheKey(url, tz)
-	return filepath.Join(cacheDir, key+".json")
+// GetCachePath returns the file path for a cached response
+func GetCachePath(url string, tz *time.Location) string {
+	key := GetCacheKey(url, tz)
+	return filepath.Join(getCacheDir(), key+constants.JSONExtension)
 }
 
-// loadCachedResponse loads a cached response from disk
-func loadCachedResponse(url string, tz *time.Location) (*CachedResponse, error) {
-	cachePath := getCachePath(url, tz)
+// LoadCachedResponse loads a cached response from disk
+func LoadCachedResponse(url string, tz *time.Location) (*CachedResponse, error) {
+	cachePath := GetCachePath(url, tz)
 
 	data, err := os.ReadFile(cachePath)
 	if err != nil {
@@ -201,10 +247,10 @@ func loadCachedResponse(url string, tz *time.Location) (*CachedResponse, error) 
 	return &cached, nil
 }
 
-// saveCachedResponseFromBytes saves a response to the cache using pre-read body bytes
-func saveCachedResponseFromBytes(url string, resp *http.Response, bodyBytes []byte, tz *time.Location) error {
+// SaveCachedResponseFromBytes saves a response to the cache using pre-read body bytes
+func SaveCachedResponseFromBytes(url string, resp *http.Response, bodyBytes []byte, tz *time.Location) error {
 	// Create cache directory if it does not exist
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(getCacheDir(), 0755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
@@ -234,7 +280,7 @@ func saveCachedResponseFromBytes(url string, resp *http.Response, bodyBytes []by
 	}
 
 	// Write to file
-	cachePath := getCachePath(url, tz)
+	cachePath := GetCachePath(url, tz)
 	if err := os.WriteFile(cachePath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write cache file: %w", err)
 	}

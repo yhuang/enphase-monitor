@@ -1,4 +1,4 @@
-// Package main - timezone.go
+// Package timezone provides utilities for timezone handling and date boundary calculations.
 //
 // PURPOSE
 // -------
@@ -6,7 +6,7 @@
 // Ensures all date ranges use the configured timezone (not UTC).
 //
 // For timezone configuration details, see:
-//   - config.go: LoadTimezone() usage and fallback logic
+//   - config package: LoadTimezone() usage and fallback logic
 //   - config.yaml.example: timezone configuration examples
 //   - README.md: "Optional Settings" section
 //
@@ -16,10 +16,12 @@
 // timezone to match how Enphase calculates daily totals. Using UTC would
 // result in incorrect date ranges and mismatched totals.
 
-package main
+package timezone
 
 import (
 	"time"
+
+	"enphase-monitor/internal/constants"
 )
 
 // LoadTimezone loads a timezone location from a timezone string (e.g., "America/Los_Angeles").
@@ -36,8 +38,8 @@ func LoadTimezone(timezoneStr string) (*time.Location, error) {
 		// If invalid, fall back to system timezone
 		systemTZ := time.Now().Location()
 		// If system timezone is UTC, use FallbackTimezone as last resort
-		if systemTZ.String() == UTCTimezone {
-			if fallbackTZ, err := time.LoadLocation(FallbackTimezone); err == nil {
+		if systemTZ.String() == constants.UTCTimezone {
+			if fallbackTZ, err := time.LoadLocation(constants.FallbackTimezone); err == nil {
 				return fallbackTZ, nil
 			}
 		}
@@ -46,9 +48,9 @@ func LoadTimezone(timezoneStr string) (*time.Location, error) {
 	return tz, nil
 }
 
-// getDayBoundaries returns the start and end times for a given date in the specified timezone.
+// GetDayBoundaries returns the start and end times for a given date in the specified timezone.
 // The end time is capped to the current time if the date is today to prevent 422 errors.
-func getDayBoundaries(targetDate time.Time, tz *time.Location) (dayStart, dayEnd time.Time) {
+func GetDayBoundaries(targetDate time.Time, tz *time.Location) (dayStart, dayEnd time.Time) {
 	var date time.Time
 	if !targetDate.IsZero() {
 		date = targetDate.In(tz)
@@ -70,8 +72,8 @@ func getDayBoundaries(targetDate time.Time, tz *time.Location) (dayStart, dayEnd
 	return dayStart, dayEnd
 }
 
-// isPastDate checks if the given date is before today in the specified timezone.
-func isPastDate(targetDate time.Time, tz *time.Location) bool {
+// IsPastDate checks if the given date is before today in the specified timezone.
+func IsPastDate(targetDate time.Time, tz *time.Location) bool {
 	if targetDate.IsZero() {
 		return false
 	}
@@ -85,7 +87,7 @@ func isPastDate(targetDate time.Time, tz *time.Location) bool {
 
 // ParseDateInTimezone parses a date string in YYYY-MM-DD format in the specified timezone
 func ParseDateInTimezone(dateStr string, tz *time.Location) (time.Time, error) {
-	parsed, err := time.ParseInLocation(DateFormat, dateStr, tz)
+	parsed, err := time.ParseInLocation(constants.DateFormat, dateStr, tz)
 	if err != nil {
 		return time.Time{}, err
 	}

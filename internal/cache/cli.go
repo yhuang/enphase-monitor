@@ -25,10 +25,11 @@
 // -----------------
 // Files are named by SHA256 hash of normalized URL (includes query params).
 // Format: {hash}.json where {hash} is 64-character hexadecimal string.
-package main
+package cache
 
 import (
 	"encoding/json"
+	"enphase-monitor/internal/constants"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,15 +45,15 @@ import (
 // preserving cache files from yesterday or earlier
 func ClearTodayCache() error {
 	today := time.Now()
-	todayStr := today.Format(DateFormat)
+	todayStr := today.Format(constants.DateFormat)
 
 	// Check if cache directory exists
-	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+	if _, err := os.Stat(getCacheDir()); os.IsNotExist(err) {
 		fmt.Printf("No cache directory found\n")
 		return nil
 	}
 
-	entries, err := os.ReadDir(cacheDir)
+	entries, err := os.ReadDir(getCacheDir())
 	if err != nil {
 		return fmt.Errorf("failed to read cache directory: %w", err)
 	}
@@ -65,18 +66,18 @@ func ClearTodayCache() error {
 		}
 
 		// Only process .json files
-		if filepath.Ext(entry.Name()) != JSONExtension {
+		if filepath.Ext(entry.Name()) != constants.JSONExtension {
 			continue
 		}
 
-		cachePath := filepath.Join(cacheDir, entry.Name())
+		cachePath := filepath.Join(getCacheDir(), entry.Name())
 
 		// Check file modification time first (faster than reading the file)
 		fileInfo, err := os.Stat(cachePath)
 		if err != nil {
 			continue
 		}
-		fileModDate := fileInfo.ModTime().Format(DateFormat)
+		fileModDate := fileInfo.ModTime().Format(constants.DateFormat)
 
 		// If file was not modified today, skip it (preserve past dates)
 		if fileModDate != todayStr {
@@ -100,7 +101,7 @@ func ClearTodayCache() error {
 			continue
 		}
 
-		cachedDate := cached.CachedAt.Format(DateFormat)
+		cachedDate := cached.CachedAt.Format(constants.DateFormat)
 
 		// Only delete if both cached today AND file modified today
 		// This ensures we are deleting cache for today, not past dates that were accessed today
@@ -131,7 +132,7 @@ func ClearTodayCache() error {
 
 // ClearAllCache clears all cached API responses
 func ClearAllCache() error {
-	return os.RemoveAll(cacheDir)
+	return os.RemoveAll(getCacheDir())
 }
 
 // CacheEntry represents a cached API response with metadata
@@ -149,11 +150,11 @@ type CacheEntry struct {
 
 // ListCacheEntries returns all cached API responses with their metadata
 func ListCacheEntries() ([]CacheEntry, error) {
-	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+	if _, err := os.Stat(getCacheDir()); os.IsNotExist(err) {
 		return []CacheEntry{}, nil
 	}
 
-	entries, err := os.ReadDir(cacheDir)
+	entries, err := os.ReadDir(getCacheDir())
 	if err != nil {
 		return nil, err
 	}
@@ -170,16 +171,16 @@ func ListCacheEntries() ([]CacheEntry, error) {
 		}
 
 		// Extract hash from filename (remove .json extension)
-		hash := strings.TrimSuffix(entry.Name(), JSONExtension)
+		hash := strings.TrimSuffix(entry.Name(), constants.JSONExtension)
 
-		cachePath := filepath.Join(cacheDir, entry.Name())
+		cachePath := filepath.Join(getCacheDir(), entry.Name())
 		info, err := entry.Info()
 		if err != nil {
 			continue
 		}
 
 		// Try to load the cached response to get timestamp and parse response
-		cached, err := loadCachedResponseByPath(cachePath)
+		cached, err := LoadCachedResponseByPath(cachePath)
 		if err != nil {
 			// If we cannot load it, still include it but with minimal info
 			cacheEntries = append(cacheEntries, CacheEntry{
@@ -221,8 +222,8 @@ func ListCacheEntries() ([]CacheEntry, error) {
 	return cacheEntries, nil
 }
 
-// loadCachedResponseByPath loads a cached response from a specific file path
-func loadCachedResponseByPath(cachePath string) (*CachedResponse, error) {
+// LoadCachedResponseByPath loads a cached response from a specific file path
+func LoadCachedResponseByPath(cachePath string) (*CachedResponse, error) {
 	data, err := os.ReadFile(cachePath)
 	if err != nil {
 		return nil, err
@@ -238,8 +239,8 @@ func loadCachedResponseByPath(cachePath string) (*CachedResponse, error) {
 
 // InspectCacheEntry displays detailed information about a cached response
 func InspectCacheEntry(hash string) error {
-	cachePath := filepath.Join(cacheDir, hash+".json")
-	cached, err := loadCachedResponseByPath(cachePath)
+	cachePath := filepath.Join(getCacheDir(), hash+constants.JSONExtension)
+	cached, err := LoadCachedResponseByPath(cachePath)
 	if err != nil {
 		return fmt.Errorf("failed to load cache file: %w", err)
 	}
@@ -308,7 +309,7 @@ func FindCacheEntriesByDate(targetDate time.Time, tz *time.Location) ([]CacheEnt
 
 	// Format the target date directly without timezone conversion
 	// The dates in cache entries are already in YYYY-MM-DD format and do not need timezone adjustment
-	targetDateStr := targetDate.Format(DateFormat)
+	targetDateStr := targetDate.Format(constants.DateFormat)
 
 	var matchingEntries []CacheEntry
 	for _, entry := range allEntries {
@@ -318,12 +319,12 @@ func FindCacheEntriesByDate(targetDate time.Time, tz *time.Location) ([]CacheEnt
 			// Normalize both dates for comparison (remove any whitespace)
 			entryDate := strings.TrimSpace(entry.Date)
 			// Also try to parse and reformat the date in case the format differs
-			if parsedDate, err := time.Parse(DateFormat, entryDate); err == nil {
-				entryDate = parsedDate.Format(DateFormat)
+			if parsedDate, err := time.Parse(constants.DateFormat, entryDate); err == nil {
+				entryDate = parsedDate.Format(constants.DateFormat)
 			} else {
 				// Try other common date formats
-				if parsedDate, err := time.Parse(AltDateFormat, entryDate); err == nil {
-					entryDate = parsedDate.Format(DateFormat)
+				if parsedDate, err := time.Parse(constants.AltDateFormat, entryDate); err == nil {
+					entryDate = parsedDate.Format(constants.DateFormat)
 				}
 			}
 			// Direct string comparison should work if both are in DateFormat
@@ -332,11 +333,11 @@ func FindCacheEntriesByDate(targetDate time.Time, tz *time.Location) ([]CacheEnt
 			}
 		} else {
 			// Fallback: check cached timestamp if Date was not parsed from response
-			cached, err := loadCachedResponseByPath(entry.Path)
+			cached, err := LoadCachedResponseByPath(entry.Path)
 			if err != nil {
 				continue
 			}
-			cachedDateStr := cached.CachedAt.In(tz).Format(DateFormat)
+			cachedDateStr := cached.CachedAt.In(tz).Format(constants.DateFormat)
 			if cachedDateStr == targetDateStr {
 				matchingEntries = append(matchingEntries, entry)
 			}
@@ -370,7 +371,7 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 		firstTime := time.Unix(telemetryResp.Intervals[0].EndAt, 0)
 		defaultTZ, _ := time.LoadLocation("US/Pacific")
 		firstTime = firstTime.In(defaultTZ)
-		date = firstTime.Format(DateFormat)
+		date = firstTime.Format(constants.DateFormat)
 
 		// Determine endpoint type based on which fields are populated
 		// Battery has charge/discharge, others have WhDlvd/WhRcvd/Enwh
@@ -401,7 +402,7 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 				totalDischarge += interval.Discharge.Enwh
 			}
 			summary = fmt.Sprintf("Battery: %d intervals, charge=%.2f, discharge=%.2f kWh",
-				len(telemetryResp.Intervals), totalCharge/WhToKWh, totalDischarge/WhToKWh)
+				len(telemetryResp.Intervals), totalCharge/constants.WhToKWh, totalDischarge/constants.WhToKWh)
 		} else if hasWhDel && !hasWhRcv {
 			endpoint = "energy_import_telemetry"
 			var totalImport float64
@@ -409,7 +410,7 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 				totalImport += interval.WhDel
 			}
 			summary = fmt.Sprintf("Import: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalImport/WhToKWh)
+				len(telemetryResp.Intervals), totalImport/constants.WhToKWh)
 		} else if hasWhRcv && !hasWhDel {
 			endpoint = "energy_export_telemetry"
 			var totalExport float64
@@ -417,7 +418,7 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 				totalExport += interval.WhRcv
 			}
 			summary = fmt.Sprintf("Export: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalExport/WhToKWh)
+				len(telemetryResp.Intervals), totalExport/constants.WhToKWh)
 		} else if hasEnwh {
 			// Could be production_meter or consumption_meter - check URL in cache or use Enwh
 			endpoint = "telemetry/production_meter" // Default assumption
@@ -426,7 +427,7 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 				totalEnwh += interval.Enwh
 			}
 			summary = fmt.Sprintf("Production/Consumption: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalEnwh/WhToKWh)
+				len(telemetryResp.Intervals), totalEnwh/constants.WhToKWh)
 		}
 		return
 	}

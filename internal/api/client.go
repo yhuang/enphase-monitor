@@ -1,4 +1,4 @@
-// Package main - cloud_client.go
+// Package api - client.go
 //
 // PURPOSE
 // -------
@@ -99,7 +99,7 @@
 // - 429 Too Many Requests: Rate limit exceeded (api_cache.go handles caching)
 // - 500 Server Error: Returned to caller (cache fallback if available)
 // - Network errors: Returned to caller for handling
-package main
+package api
 
 import (
 	"bytes"
@@ -112,12 +112,21 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"enphase-monitor/internal/cache"
+	"enphase-monitor/internal/parser"
+	"enphase-monitor/internal/timezone"
+	"enphase-monitor/internal/constants"
 )
 
 // EnlightenCloudClient handles communication with Enphase Enlighten Cloud API v4.
 // It manages authentication, request formatting, and response parsing for
 // a specific system ID.
+//
+// TESTABILITY: The baseURL field allows dependency injection for testing.
+// Production code uses EnphaseAPIv4SystemsURL constant, tests can inject mock server URL.
 type EnlightenCloudClient struct {
+	baseURL     string         // Base URL for API requests (injectable for testing)
 	systemID    string
 	apiKey      string
 	accessToken string
@@ -127,14 +136,31 @@ type EnlightenCloudClient struct {
 }
 
 // NewEnlightenCloudClient creates a new client for Enlighten Cloud API with API key and OAuth token
+// Uses the production Enphase API URL
 func NewEnlightenCloudClient(systemID, apiKey, accessToken string, timezone *time.Location) *EnlightenCloudClient {
 	return &EnlightenCloudClient{
+		baseURL:     constants.EnphaseAPIv4SystemsURL,
 		systemID:    systemID,
 		apiKey:      apiKey,
 		accessToken: accessToken,
 		timezone:    timezone,
 		httpClient: &http.Client{
-			Timeout: APIRequestTimeout,
+			Timeout: constants.APIRequestTimeout,
+		},
+	}
+}
+
+// NewEnlightenCloudClientWithBaseURL creates a client with a custom base URL (for testing)
+// This constructor enables dependency injection for testing with mock HTTP servers
+func NewEnlightenCloudClientWithBaseURL(baseURL, systemID, apiKey, accessToken string, timezone *time.Location) *EnlightenCloudClient {
+	return &EnlightenCloudClient{
+		baseURL:     baseURL,
+		systemID:    systemID,
+		apiKey:      apiKey,
+		accessToken: accessToken,
+		timezone:    timezone,
+		httpClient: &http.Client{
+			Timeout: constants.APIRequestTimeout,
 		},
 	}
 }
@@ -143,8 +169,9 @@ func NewEnlightenCloudClient(systemID, apiKey, accessToken string, timezone *tim
 // It handles the common pattern of: make request, track cache usage, read body, close response.
 // This helper eliminates ~15 lines of boilerplate per method (5 methods = ~75 lines saved).
 func (c *EnlightenCloudClient) fetchTelemetryData(ctx context.Context, endpoint string, testDate time.Time) ([]byte, error) {
-	dayStart, dayEnd := getDayBoundaries(testDate, c.timezone)
-	reqURL := buildTelemetryURL(c.systemID, endpoint, c.apiKey, dayStart, dayEnd)
+	dayStart, dayEnd := timezone.GetDayBoundaries(testDate, c.timezone)
+	// Use client's baseURL for dependency injection (testability)
+	reqURL := c.buildTelemetryURL(endpoint, dayStart, dayEnd)
 
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate)
 	c.cacheUsed = cacheUsed
@@ -153,51 +180,23 @@ func (c *EnlightenCloudClient) fetchTelemetryData(ctx context.Context, endpoint 
 	}
 	defer resp.Body.Close()
 
-	return readResponseBody(resp.Body)
+	return parser.ReadResponseBody(resp.Body)
 }
 
-// TelemetryResponse represents the response from telemetry endpoints
-// Note: production_meter, consumption_meter, battery return a single array
-type TelemetryResponse struct {
-	LastReportedAggregateSOC string              `json:"last_reported_aggregate_soc,omitempty"` // Battery state of charge percentage as string (e.g., "97%")
-	Intervals                []TelemetryInterval `json:"intervals"`
+// buildTelemetryURL constructs a URL using the client's base URL and parameters
+// This method uses the injected baseURL for testability
+func (c *EnlightenCloudClient) buildTelemetryURL(endpoint string, dayStart, dayEnd time.Time) string {
+	baseURL := fmt.Sprintf("%s/%s/%s", c.baseURL, c.systemID, endpoint)
+	return fmt.Sprintf("%s?key=%s&start_at=%d&end_at=%d",
+		baseURL,
+		c.apiKey,
+		dayStart.Unix(),
+		dayEnd.Unix(),
+	)
 }
 
-// TelemetryResponseNested represents the response from energy_import_telemetry and energy_export_telemetry
-// which return intervals as an array of arrays
-type TelemetryResponseNested struct {
-	Intervals [][]TelemetryInterval `json:"intervals"`
-}
-
-// TelemetryInterval represents a single 15-minute interval
-type TelemetryInterval struct {
-	EndAt      int64   `json:"end_at"`      // Unix timestamp
-	WhDel      float64 `json:"wh_del"`      // Energy delivered (for production_meter)
-	WhRcv      float64 `json:"wh_rcv"`      // Energy received (legacy - not used in current endpoints)
-	WhImported float64 `json:"wh_imported"` // Energy imported (for energy_import_telemetry)
-	WhExported float64 `json:"wh_exported"` // Energy exported (for energy_export_telemetry)
-	Enwh       float64 `json:"enwh"`        // Energy in Wh (for production_meter, consumption_meter)
-	Charge     struct {
-		Enwh float64 `json:"enwh"` // Energy charged in Wh
-	} `json:"charge"`
-	Discharge struct {
-		Enwh float64 `json:"enwh"` // Energy discharged in Wh
-	} `json:"discharge"`
-}
-
-// LocalMetrics contains processed metrics from the Cloud API
-// This struct is used to standardize the format of metrics returned from GetMetricsFromCloud
-type LocalMetrics struct {
-	Timestamp              time.Time // When these metrics were collected
-	ProductionToday        float64   // kWh - Solar energy produced today
-	ConsumptionToday       float64   // kWh - Energy consumed today
-	GridImportToday        float64   // kWh - Energy imported from grid today
-	GridExportToday        float64   // kWh - Energy exported to grid today
-	BatteryChargedToday    float64   // kWh - Energy charged to battery today
-	BatteryDischargedToday float64   // kWh - Energy discharged from battery today
-	BatterySOC             int       // State of charge percentage (0-100)
-}
-
+// LocalMetrics is exported in types.go
+//
 // GetEnergyImportForDate gets the total energy imported from the grid for a specific date.
 // If testDate is nil, uses today. Uses energy_import_telemetry endpoint which respects date filtering.
 func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time) (float64, error) {
@@ -207,7 +206,7 @@ func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testD
 	}
 
 	// For energy_import_telemetry, intervals is an array of arrays
-	allIntervals, err := parseNestedTelemetryResponse(bodyBytes)
+	allIntervals, err := parser.ParseNestedTelemetryResponse(bodyBytes)
 	if err != nil {
 		return 0, err
 	}
@@ -221,8 +220,8 @@ func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testD
 	}
 
 	// Sum all wh_imported values
-	importWh := sumIntervalValues(allIntervals, FieldWhImported)
-	return importWh / WhToKWh, nil // Convert Wh to kWh
+	importWh := parser.SumIntervalValues(allIntervals, constants.FieldWhImported)
+	return importWh / constants.WhToKWh, nil // Convert Wh to kWh
 }
 
 // GetEnergyExportForDate gets the total energy exported to the grid for a specific date.
@@ -234,7 +233,7 @@ func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testD
 	}
 
 	// For energy_export_telemetry, intervals is an array of arrays
-	allIntervals, err := parseNestedTelemetryResponse(bodyBytes)
+	allIntervals, err := parser.ParseNestedTelemetryResponse(bodyBytes)
 	if err != nil {
 		return 0, err
 	}
@@ -242,8 +241,8 @@ func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testD
 	// Sum intervals that fall within the requested day (in configured timezone)
 	// For export telemetry: WhExported = energy exported per interval
 	// These are incremental values per 15-minute interval, so we sum them
-	exportWh := sumIntervalValues(allIntervals, FieldWhExported)
-	return exportWh / WhToKWh, nil // Convert Wh to kWh
+	exportWh := parser.SumIntervalValues(allIntervals, constants.FieldWhExported)
+	return exportWh / constants.WhToKWh, nil // Convert Wh to kWh
 }
 
 // GetProductionForDate gets the total energy production for a specific date.
@@ -257,10 +256,10 @@ func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDat
 
 	// Try parsing as nested array format first (like import/export endpoints)
 	// Some endpoints may return nested arrays, others return single arrays
-	allIntervals, err := parseNestedTelemetryResponse(bodyBytes)
+	allIntervals, err := parser.ParseNestedTelemetryResponse(bodyBytes)
 	if err != nil {
 		// If nested parsing fails, try single array format
-		allIntervals, err = parseTelemetryResponse(bodyBytes)
+		allIntervals, err = parser.ParseTelemetryResponse(bodyBytes)
 		if err != nil {
 			return 0, err
 		}
@@ -269,8 +268,8 @@ func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDat
 	// Sum all wh_del values from intervals
 	// For production telemetry: WhDel = energy produced per interval
 	// These are incremental values per 15-minute interval
-	productionWh := sumIntervalValues(allIntervals, FieldWhDel)
-	return productionWh / WhToKWh, nil // Convert Wh to kWh
+	productionWh := parser.SumIntervalValues(allIntervals, constants.FieldWhDel)
+	return productionWh / constants.WhToKWh, nil // Convert Wh to kWh
 }
 
 // GetConsumptionForDate gets the total energy consumption for a specific date.
@@ -282,7 +281,7 @@ func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDa
 	}
 
 	// Parse telemetry response (single array format)
-	intervals, err := parseTelemetryResponse(bodyBytes)
+	intervals, err := parser.ParseTelemetryResponse(bodyBytes)
 	if err != nil {
 		return 0, err
 	}
@@ -290,8 +289,8 @@ func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDa
 	// Sum intervals that fall within the requested day (in configured timezone)
 	// For consumption telemetry: Enwh = energy consumed per interval
 	// These are incremental values per 15-minute interval, so we sum them
-	consumptionWh := sumIntervalValues(intervals, FieldEnwh)
-	return consumptionWh / WhToKWh, nil // Convert Wh to kWh
+	consumptionWh := parser.SumIntervalValues(intervals, constants.FieldEnwh)
+	return consumptionWh / constants.WhToKWh, nil // Convert Wh to kWh
 }
 
 // GetBatteryDataForDate gets battery charge, discharge, and State of Charge (SOC) for a specific date.
@@ -304,7 +303,7 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 		return 0, 0, 0, fmt.Errorf("battery API request failed: %w", err)
 	}
 
-	var data TelemetryResponse
+	var data parser.TelemetryResponse
 	if err := json.Unmarshal(bodyBytes, &data); err != nil {
 		return 0, 0, 0, fmt.Errorf("parsing battery response JSON: %w", err)
 	}
@@ -313,7 +312,7 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	socPercent := 0
 	if data.LastReportedAggregateSOC != "" {
 		// Parse string like "97%" to integer 97
-		socStr := strings.TrimSuffix(data.LastReportedAggregateSOC, BatterySOCPercentSuffix)
+		socStr := strings.TrimSuffix(data.LastReportedAggregateSOC, constants.BatterySOCPercentSuffix)
 		if parsedSOC, err := strconv.Atoi(socStr); err == nil {
 			socPercent = parsedSOC
 		}
@@ -325,7 +324,7 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	// - discharge.enwh = energy discharged from battery (Wh) per interval
 	// These are incremental values per 15-minute interval, so we sum them
 	// Filter by configured timezone (dayStart to dayEnd)
-	dayStart, dayEnd := getDayBoundaries(testDate, c.timezone)
+	dayStart, dayEnd := timezone.GetDayBoundaries(testDate, c.timezone)
 	var chargeWh, dischargeWh float64
 
 	for _, interval := range data.Intervals {
@@ -341,7 +340,7 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 		}
 	}
 
-	return chargeWh / WhToKWh, dischargeWh / WhToKWh, socPercent, nil // Convert Wh to kWh
+	return chargeWh / constants.WhToKWh, dischargeWh / constants.WhToKWh, socPercent, nil // Convert Wh to kWh
 }
 
 // GetMetricsFromCloud fetches all today's metrics from the Cloud API
@@ -355,11 +354,11 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 
 	// Helper to handle optional metrics that may fail (grid import/export, battery)
 	shouldLogError := func(err error) bool {
-		if isPastDate(testDate, c.timezone) {
+		if timezone.IsPastDate(testDate, c.timezone) {
 			return false // Silently use 0 for past dates
 		}
 		// For today, log only non-rate-limit errors
-		return !isRateLimitError(err)
+		return !constants.IsRateLimitError(err)
 	}
 
 	// Helper to check context cancellation
@@ -490,17 +489,17 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// Determine if we are querying a past date (affects caching strategy)
 	// Use the report timezone
 	// ─────────────────────────────────────────────────────────────────────────
-	isPastDate := isPastDate(targetDate, c.timezone)
+	isDateInPast := timezone.IsPastDate(targetDate, c.timezone)
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// SECTION 2: CACHE LOOKUP
 	// First, try to load any existing cached response for this URL.
 	// We will use this either directly (if valid) or as fallback (if API fails).
 	// ─────────────────────────────────────────────────────────────────────────
-	cached, cacheErr := loadCachedResponse(url, c.timezone)
+	cached, cacheErr := cache.LoadCachedResponse(url, c.timezone)
 
 	// If cache lookup failed for past dates, try to find cache by endpoint and date
-	if cacheErr != nil && isPastDate && !targetDate.IsZero() {
+	if cacheErr != nil && isDateInPast && !targetDate.IsZero() {
 		// Extract endpoint from URL
 		parsedURL, err := neturl.Parse(url)
 		if err == nil {
@@ -520,7 +519,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 			// Use the report timezone
 			targetDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, c.timezone)
 			dateStr := targetDay.Format("2006-01-02")
-			allEntries, err := ListCacheEntries()
+			allEntries, err := cache.ListCacheEntries()
 			if err == nil {
 				for _, entry := range allEntries {
 					// Match by endpoint, system ID, and date
@@ -528,7 +527,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 					entrySystemID := entry.SystemID
 					if entrySystemID == systemID && entry.Endpoint == endpoint && entry.Date == dateStr {
 						// Found a matching cache entry - use it
-						foundCached, err := loadCachedResponseByPath(entry.Path)
+						foundCached, err := cache.LoadCachedResponseByPath(entry.Path)
 						if err == nil {
 							cached = foundCached
 							cacheErr = nil // Clear the error since we found a match
@@ -545,15 +544,15 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// In test mode, ONLY use cache - never make live API calls.
 	// This allows validating behavior without hitting the real API.
 	// ─────────────────────────────────────────────────────────────────────────
-	if testMode {
+	if cache.TestMode() {
 		if cacheErr == nil {
-			resp := cached.toHTTPResponse()
+			resp := cached.ToHTTPResponse()
 			return resp, true, nil // Cache was used (test mode)
 		}
 		// In test mode, provide more detailed error about missing cache
-		cachePath := getCachePath(url, c.timezone)
-		normalizedURL := normalizeURLForCache(url, c.timezone)
-		return nil, false, fmt.Errorf("test mode: no cached response available. Cache path: %s, Normalized URL: %s", cachePath, redactURLKey(normalizedURL))
+		cachePath := cache.GetCachePath(url, c.timezone)
+		normalizedURL := cache.NormalizeURLForCache(url, c.timezone)
+		return nil, false, fmt.Errorf("test mode: no cached response available. Cache path: %s, Normalized URL: %s", cachePath, cache.RedactURLKey(normalizedURL))
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
@@ -561,7 +560,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// When cache is disabled, skip cache lookup and always make live API calls.
 	// Note: We still fall back to cache on 429 errors as a safety measure.
 	// ─────────────────────────────────────────────────────────────────────────
-	if cacheDisabled {
+	if cache.CacheDisabled() {
 		// Make direct API request
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
@@ -574,11 +573,11 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		if err != nil {
 			// Even in no-cache mode, fall back to cache on error
 			if cacheErr == nil {
-				if !rateLimitWarningShown {
+				if !cache.RateLimitWarningShown() {
 					fmt.Printf("WARNING: API error - returning cached data despite --no-cache flag\n")
-					rateLimitWarningShown = true
+					cache.SetRateLimitWarningShown(true)
 				}
-				resp := cached.toHTTPResponse()
+				resp := cached.ToHTTPResponse()
 				return resp, true, nil // Cache was used (error fallback in no-cache mode)
 			}
 			return nil, false, fmt.Errorf("API request failed: %w", err)
@@ -588,14 +587,14 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		if resp.StatusCode == 429 {
 			resp.Body.Close()
 			if cacheErr == nil {
-				if !rateLimitWarningShown {
+				if !cache.RateLimitWarningShown() {
 					fmt.Printf("WARNING: Rate limited (429) - returning cached data despite --no-cache flag\n")
-					rateLimitWarningShown = true
+					cache.SetRateLimitWarningShown(true)
 				}
-				resp := cached.toHTTPResponse()
+				resp := cached.ToHTTPResponse()
 				return resp, true, nil // Cache was used (429 fallback in no-cache mode)
 			}
-			return nil, false, fmt.Errorf(RateLimitError)
+			return nil, false, fmt.Errorf(constants.RateLimitError)
 		}
 		// Save response to cache for future use (even in no-cache mode)
 		bodyBytes, err := io.ReadAll(resp.Body)
@@ -608,7 +607,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 			StatusCode: resp.StatusCode,
 			Header:     resp.Header,
 		}
-		_ = saveCachedResponseFromBytes(url, tempResp, bodyBytes, c.timezone)
+		_ = cache.SaveCachedResponseFromBytes(url, tempResp, bodyBytes, c.timezone)
 		return &http.Response{
 			StatusCode: resp.StatusCode,
 			Header:     resp.Header,
@@ -620,13 +619,13 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	var isCacheStale bool
 	if cacheErr == nil && !cached.CachedAt.IsZero() {
 		cacheAge := time.Since(cached.CachedAt)
-		isCacheStale = cacheAge >= minRequestInterval
+		isCacheStale = cacheAge >= cache.MinRequestInterval
 	}
 
 	// For past dates (yesterday or earlier), prefer cache but allow live API calls if cache does not exist
-	if isPastDate && cacheErr == nil {
+	if isDateInPast && cacheErr == nil {
 		// Cache exists for past date - use it
-		return cached.toHTTPResponse(), true, nil // Cache was used (past date)
+		return cached.ToHTTPResponse(), true, nil // Cache was used (past date)
 	}
 
 	// Make the API request
@@ -641,7 +640,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	if err != nil {
 		// If API call failed, try cache as fallback
 		if cacheErr == nil {
-			resp := cached.toHTTPResponse()
+			resp := cached.ToHTTPResponse()
 			return resp, true, nil // Cache was used (error fallback)
 		}
 		return nil, false, fmt.Errorf("API request failed: %w", err)
@@ -652,16 +651,16 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		resp.Body.Close()
 		if cacheErr == nil {
 			// Cache exists - use it silently
-			resp := cached.toHTTPResponse()
+			resp := cached.ToHTTPResponse()
 			return resp, true, nil // Cache was used (429 fallback)
 		}
 		// Try one more time to load cache
-		if retryCached, retryErr := loadCachedResponse(url, c.timezone); retryErr == nil {
-			resp := retryCached.toHTTPResponse()
+		if retryCached, retryErr := cache.LoadCachedResponse(url, c.timezone); retryErr == nil {
+			resp := retryCached.ToHTTPResponse()
 			return resp, true, nil // Cache was used (429 retry)
 		}
 		// No cache available for 429 - return error
-		return nil, false, fmt.Errorf(RateLimitError)
+		return nil, false, fmt.Errorf(constants.RateLimitError)
 	}
 
 	// Handle other non-OK status codes
@@ -671,22 +670,22 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 
 		// For other errors, try cache as fallback
 		// For past dates, always prefer cache over live API errors
-		if isPastDate {
+		if isDateInPast {
 			// Re-try cache lookup in case it failed initially
 			if cacheErr == nil && !isCacheStale {
 				// Cache exists and is valid - use it
-				resp := cached.toHTTPResponse()
+				resp := cached.ToHTTPResponse()
 				return resp, true, nil // Cache was used (fallback for past date)
 			}
 			// Try one more time to load cache - maybe the initial lookup failed due to timing
-			if retryCached, retryErr := loadCachedResponse(url, c.timezone); retryErr == nil {
-				resp := retryCached.toHTTPResponse()
+			if retryCached, retryErr := cache.LoadCachedResponse(url, c.timezone); retryErr == nil {
+				resp := retryCached.ToHTTPResponse()
 				return resp, true, nil // Cache was used (retry for past date)
 			}
 		} else {
 			// For non-past dates, try cache as fallback if it exists and is not stale
 			if cacheErr == nil && !isCacheStale {
-				resp := cached.toHTTPResponse()
+				resp := cached.ToHTTPResponse()
 				return resp, true, nil // Cache was used (fallback)
 			}
 		}
@@ -710,7 +709,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		Header:     resp.Header,
 		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
 	}
-	_ = saveCachedResponseFromBytes(url, tempResp, bodyBytes, c.timezone)
+	_ = cache.SaveCachedResponseFromBytes(url, tempResp, bodyBytes, c.timezone)
 
 	// Return response with readable body
 	return &http.Response{

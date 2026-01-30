@@ -1,4 +1,4 @@
-// Package main - setup_oauth.go
+// Package oauth - setup.go
 //
 // PURPOSE
 // -------
@@ -20,7 +20,7 @@
 //   - Previews sensitive data (truncates long values)
 //   - Clears credentials from terminal after user confirmation
 //   - Uses ANSI escape codes to erase terminal lines
-package main
+package oauth
 
 import (
 	"bufio"
@@ -31,6 +31,9 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"enphase-monitor/internal/config"
+	"enphase-monitor/internal/constants"
 )
 
 // openBrowser opens the specified URL in the default browser
@@ -50,18 +53,18 @@ func openBrowser(url string) error {
 	return cmd.Start()
 }
 
-// SetupOAuth helps users complete the one-time OAuth authorization flow
-func SetupOAuth(config *Config) error {
-	if config.API == nil {
+// Setup helps users complete the one-time OAuth authorization flow
+func Setup(cfg *config.Config) error {
+	if cfg.API == nil {
 		return fmt.Errorf("API configuration is required")
 	}
 
-	if config.API.ClientID == "" {
+	if cfg.API.ClientID == "" {
 		return fmt.Errorf("client_id is required in API configuration")
 	}
 
 	// Get redirect URI from config or prompt
-	redirectURI := config.API.RedirectURI
+	redirectURI := cfg.API.RedirectURI
 	if redirectURI == "" {
 		fmt.Print("Enter your redirect URI (e.g., http://localhost:8080/callback): ")
 		reader := bufio.NewReader(os.Stdin)
@@ -75,11 +78,11 @@ func SetupOAuth(config *Config) error {
 			fmt.Printf("Using default: %s\n", redirectURI)
 		}
 		// Update config with the redirect URI (needed for GetAuthorizationURL)
-		config.API.RedirectURI = redirectURI
+		cfg.API.RedirectURI = redirectURI
 	}
 
 	// Generate authorization URL
-	authURL, err := GetAuthorizationURL(config.API)
+	authURL, err := GetAuthorizationURL(cfg.API)
 	if err != nil {
 		return fmt.Errorf("failed to generate authorization URL: %w", err)
 	}
@@ -89,11 +92,11 @@ func SetupOAuth(config *Config) error {
 	fmt.Println("==========================================")
 	fmt.Println()
 	fmt.Println("Loaded configuration:")
-	clientIDPreview := config.API.ClientID
+	clientIDPreview := cfg.API.ClientID
 	if len(clientIDPreview) > 20 {
 		clientIDPreview = clientIDPreview[:20] + "..."
 	}
-	apiKeyPreview := config.API.Key
+	apiKeyPreview := cfg.API.Key
 	if len(apiKeyPreview) > 20 {
 		apiKeyPreview = apiKeyPreview[:20] + "..."
 	}
@@ -168,7 +171,7 @@ func SetupOAuth(config *Config) error {
 
 	// Exchange code for tokens
 	fmt.Println("\nExchanging authorization code for tokens...")
-	tokenResp, err := ExchangeAuthorizationCode(context.Background(), config.API, code)
+	tokenResp, err := ExchangeAuthorizationCode(context.Background(), cfg.API, code)
 	if err != nil {
 		return fmt.Errorf("failed to exchange authorization code: %w", err)
 	}
@@ -202,10 +205,10 @@ func SetupOAuth(config *Config) error {
 	fmt.Println()
 	configLines := []string{
 		"api:",
-		fmt.Sprintf("  key: %s", config.API.Key),
-		fmt.Sprintf("  client_id: %s", config.API.ClientID),
-		fmt.Sprintf("  client_secret: %s", config.API.ClientSecret),
-		fmt.Sprintf("  authorization_url: %s", EnphaseOAuthTokenURL),
+		fmt.Sprintf("  key: %s", cfg.API.Key),
+		fmt.Sprintf("  client_id: %s", cfg.API.ClientID),
+		fmt.Sprintf("  client_secret: %s", cfg.API.ClientSecret),
+		fmt.Sprintf("  authorization_url: %s", constants.EnphaseOAuthTokenURL),
 		fmt.Sprintf("  redirect_uri: %s", redirectURI),
 		fmt.Sprintf("  refresh_token: %s", tokenResp.RefreshToken),
 	}

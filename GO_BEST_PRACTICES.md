@@ -598,7 +598,7 @@ This section summarizes the coding conventions and best practices followed throu
 - **Test files end with `_test.go`** - Go test runner convention
 - **Test functions start with `Test`** - `func TestFunctionName(t *testing.T)`
 - **Use table-driven tests** - Test multiple cases in one function
-- **Validate against expected values** - This codebase uses `validation.go`
+- **Validate against expected values** - This codebase uses `internal/validation/validation.go`
 
 ---
 

@@ -525,25 +525,54 @@ This project includes comprehensive documentation for different learning paths:
 
 ```
 enphase-monitor/
-├── main.go                     # Application entry point and CLI handling
-├── config.go                   # Configuration loading, validation, and color conversion
-├── constants.go                # Centralized constants repository (20+ constants)
-├── cloud_client.go             # Enphase Cloud API v4 client
-├── aggregator.go               # Data aggregation logic across systems
-├── display.go                  # Terminal output formatting and color display
-├── api_cache.go                # API response caching and cache management
-├── cache_cli.go                # Cache management CLI commands
-├── oauth.go                    # OAuth token management
-├── setup_oauth.go              # OAuth setup wizard
-├── timezone.go                 # Timezone utilities
-├── url_builder.go              # API URL construction helpers
-├── response_parser.go          # JSON parsing utilities
+├── main.go                     # Application entry point (orchestration only)
+├── internal/                   # Internal packages
+│   ├── aggregator/             # Multi-system data aggregation
+│   │   ├── types.go            # Metric data structures
+│   │   └── aggregator.go       # Aggregation logic with dependency injection
+│   ├── api/                    # HTTP client for Cloud API v4
+│   │   ├── client.go           # Enlighten Cloud API client
+│   │   ├── types.go            # API request/response types
+│   │   ├── interface.go        # API client interfaces
+│   │   └── client_test.go      # API client tests
+│   ├── app/                    # Application execution logic
+│   │   ├── setup.go            # App initialization & configuration
+│   │   └── runner.go           # Execution modes (once/continuous)
+│   ├── cache/                  # Disk-based response caching
+│   │   ├── cache.go            # Cache implementation
+│   │   └── cli.go              # Cache utilities
+│   ├── cli/                    # Command-line interface
+│   │   ├── flags.go            # CLI flag parsing
+│   │   └── cache_commands.go  # Cache management commands
+│   ├── config/                 # Configuration types
+│   │   ├── config.go           # YAML loading & validation
+│   │   └── config_test.go      # Configuration tests
+│   ├── display/                # Terminal output formatting
+│   │   └── display.go          # Display with color customization
+│   ├── oauth/                  # OAuth 2.0 authentication
+│   │   ├── oauth.go            # Token management & refresh
+│   │   ├── setup.go            # Interactive OAuth wizard
+│   │   └── oauth_test.go       # OAuth tests
+│   ├── parser/                 # JSON telemetry parsing
+│   │   ├── parser.go           # Response parsing utilities
+│   │   └── parser_test.go      # Parser tests
+│   ├── timezone/               # Timezone handling
+│   │   ├── timezone.go         # Timezone utilities
+│   │   └── timezone_test.go    # Timezone tests
+│   ├── urlbuilder/             # API URL construction
+│   │   └── urlbuilder.go       # URL building helpers
+│   ├── validation/             # Test mode validation
+│   │   ├── validation.go       # Metrics validation logic
+│   │   ├── validation_test.go  # Unit tests
+│   │   └── validation_integration_test.go  # Integration tests
+│   └── constants/              # Centralized constants
+│       ├── constants.go        # Application-wide constants
+│       └── constants_test.go   # Constants tests
 ├── config.yaml.example         # Example configuration with all options
 ├── config.yaml                 # Your actual configuration (create from example)
 ├── test-data/                  # Test data and cache directory
 │   ├── cache/                  # Cached API responses
 │   └── expected_values_*.json  # Expected values for validation
-├── validation.go               # Validation test code
 ├── go.mod                      # Go module definition
 ├── go.sum                      # Go module checksums
 ├── Makefile                    # Build automation

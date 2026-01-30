@@ -52,9 +52,10 @@
 //   - Falls back to closest ANSI color if exact match not available
 //
 // If colors are not specified, defaults from getDefaultColors() are used.
-package main
+package config
 
 import (
+	"enphase-monitor/internal/constants"
 	"fmt"
 	"math"
 	"os"
@@ -99,9 +100,9 @@ type ColorConfig struct {
 	Error         string `yaml:"error,omitempty"`          // Error Text
 }
 
-// mergeWithDefaults fills in empty color fields with default values.
+// MergeWithDefaults fills in empty color fields with default values.
 // Performance: Uses field iterator pattern to eliminate 36 lines of repetitive if-statements.
-func (c *ColorConfig) mergeWithDefaults(defaults ColorConfig) {
+func (c *ColorConfig) MergeWithDefaults(defaults ColorConfig) {
 	// Define field pairs for merging
 	fields := []struct {
 		dst, src *string
@@ -180,11 +181,11 @@ func LoadConfig(filename string) (*Config, error) {
 	for i, sys := range config.Systems {
 		// System must have id (Cloud API)
 		if sys.ID == "" {
-			return nil, fmt.Errorf("%s (system %d: %s) for Cloud API", ErrInvalidSystemID, i, sys.Name)
+			return nil, fmt.Errorf("%s (system %d: %s) for Cloud API", constants.ErrInvalidSystemID, i, sys.Name)
 		}
 		// API credentials are required for Cloud API
 		if config.API == nil {
-			return nil, fmt.Errorf("%s for system %d (%s) using Cloud API", ErrAPIConfigRequired, i, sys.Name)
+			return nil, fmt.Errorf("%s for system %d (%s) using Cloud API", constants.ErrAPIConfigRequired, i, sys.Name)
 		}
 		if config.API.Key == "" || config.API.ClientID == "" || config.API.ClientSecret == "" {
 			return nil, fmt.Errorf("api.key, api.client_id, and api.client_secret required for system %d (%s) using Cloud API", i, sys.Name)
@@ -241,23 +242,23 @@ func hexToANSI(hex string) string {
 
 	if len(hex) == 6 {
 		// Full hex: #RRGGBB
-		r, err = strconv.ParseInt(hex[0:2], HexBase, 64)
+		r, err = strconv.ParseInt(hex[0:2], constants.HexBase, 64)
 		if err != nil {
 			return "" // Invalid hex, return empty
 		}
-		g, err = strconv.ParseInt(hex[2:4], HexBase, 64)
+		g, err = strconv.ParseInt(hex[2:4], constants.HexBase, 64)
 		if err != nil {
 			return ""
 		}
-		b, err = strconv.ParseInt(hex[4:6], HexBase, 64)
+		b, err = strconv.ParseInt(hex[4:6], constants.HexBase, 64)
 		if err != nil {
 			return ""
 		}
 	} else if len(hex) == 3 {
 		// Short hex: #RGB -> #RRGGBB
-		rVal, err1 := strconv.ParseInt(string(hex[0]), HexBase, 64)
-		gVal, err2 := strconv.ParseInt(string(hex[1]), HexBase, 64)
-		bVal, err3 := strconv.ParseInt(string(hex[2]), HexBase, 64)
+		rVal, err1 := strconv.ParseInt(string(hex[0]), constants.HexBase, 64)
+		gVal, err2 := strconv.ParseInt(string(hex[1]), constants.HexBase, 64)
+		bVal, err3 := strconv.ParseInt(string(hex[2]), constants.HexBase, 64)
 		if err1 != nil || err2 != nil || err3 != nil {
 			return ""
 		}
@@ -272,17 +273,17 @@ func hexToANSI(hex string) string {
 	// ANSI 256-color palette: 16 + 36*r + 6*g + b
 	// Where r, g, b are in range 0-5 (6 levels each)
 	// Map 0-255 to 0-5: use value * 5 / 255 for better accuracy
-	r6 := int(math.Round((float64(r) * float64(ANSIColorCubeLevels-1)) / float64(RGBMaxValue)))
-	g6 := int(math.Round((float64(g) * float64(ANSIColorCubeLevels-1)) / float64(RGBMaxValue)))
-	b6 := int(math.Round((float64(b) * float64(ANSIColorCubeLevels-1)) / float64(RGBMaxValue)))
+	r6 := int(math.Round((float64(r) * float64(constants.ANSIColorCubeLevels-1)) / float64(constants.RGBMaxValue)))
+	g6 := int(math.Round((float64(g) * float64(constants.ANSIColorCubeLevels-1)) / float64(constants.RGBMaxValue)))
+	b6 := int(math.Round((float64(b) * float64(constants.ANSIColorCubeLevels-1)) / float64(constants.RGBMaxValue)))
 
 	// Clamp to 0-5 range using Go 1.21 built-in min/max
-	r6 = max(0, min(ANSIColorCubeLevels-1, r6))
-	g6 = max(0, min(ANSIColorCubeLevels-1, g6))
-	b6 = max(0, min(ANSIColorCubeLevels-1, b6))
+	r6 = max(0, min(constants.ANSIColorCubeLevels-1, r6))
+	g6 = max(0, min(constants.ANSIColorCubeLevels-1, g6))
+	b6 = max(0, min(constants.ANSIColorCubeLevels-1, b6))
 
 	// Calculate ANSI color code (16-231 for color cube)
-	ansiCode := ANSIColorCubeBase + 36*r6 + ANSIColorCubeLevels*g6 + b6
+	ansiCode := constants.ANSIColorCubeBase + 36*r6 + constants.ANSIColorCubeLevels*g6 + b6
 
 	// Return ANSI escape code
 	return fmt.Sprintf("\033[38;5;%dm", ansiCode)

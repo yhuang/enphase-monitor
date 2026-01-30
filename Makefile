@@ -1,4 +1,4 @@
-.PHONY: build run run-once install clean help
+.PHONY: build run run-once install clean test test-coverage test-verbose test-one help
 
 # Binary name
 BINARY_NAME=enphase-monitor
@@ -39,14 +39,35 @@ setup:
 clean:
 	@echo "Cleaning..."
 	rm -f $(BINARY_NAME)
-	go clean
+	rm -f coverage.out coverage.html
+	go clean -testcache
 	@echo "Clean complete"
 
 # Run tests (validation tests require test data - see README.md Testing section)
-test:
-	@echo "Note: Unit tests not yet implemented."
-	@echo "For validation tests, use: ./enphase-monitor --test --date YYYY-MM-DD"
-	@echo "Or run: ./run-tests.sh"
+test: build
+	@echo "Running tests..."
+	go test -v ./...
+
+# Run tests with coverage report
+test-coverage:
+	@echo "Running tests with coverage..."
+	go test -coverprofile=coverage.out ./...
+	@echo "Coverage report generated: coverage.out"
+	@echo "To view HTML report, run: go tool cover -html=coverage.out"
+
+# Run tests in verbose mode without cache
+test-verbose: build
+	@echo "Running tests in verbose mode..."
+	go test -v -count=1 ./...
+
+# Run a specific test by name
+test-one:
+	@echo "Running specific test: $(TEST)"
+	@if [ -z "$(TEST)" ]; then \
+		echo "Usage: make test-one TEST=TestName"; \
+		exit 1; \
+	fi
+	go test -v -run $(TEST) ./...
 
 # Format code
 fmt:

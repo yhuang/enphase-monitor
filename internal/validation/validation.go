@@ -1,4 +1,4 @@
-// Package main - validation.go
+// Package validation - validation.go
 //
 // PURPOSE
 // -------
@@ -16,7 +16,7 @@
 // ----------------------
 // Expected values are stored in test-data/expected_values_YYYY-MM-DD.json
 // Format: {"date": "...", "systems": [{"id": "...", "expected": {...}}]}
-package main
+package validation
 
 import (
 	"encoding/json"
@@ -24,6 +24,9 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+
+	"enphase-monitor/internal/aggregator"
+	"enphase-monitor/internal/constants"
 )
 
 // ExpectedValues represents the expected values for a test date
@@ -45,7 +48,7 @@ type ExpectedValues struct {
 }
 
 // ValidateMetrics compares actual metrics against expected values
-func ValidateMetrics(metrics *AggregatedMetrics, testDate string) error {
+func ValidateMetrics(metrics *aggregator.AggregatedMetrics, testDate string) error {
 	// Load expected values
 	expectedFile := filepath.Join("test-data", fmt.Sprintf("expected_values_%s.json", testDate))
 	data, err := os.ReadFile(expectedFile)
@@ -68,7 +71,7 @@ func ValidateMetrics(metrics *AggregatedMetrics, testDate string) error {
 	allPassed := true
 	for _, expectedSys := range expected.Systems {
 		// Find matching system in actual metrics
-		var actualSys *SystemMetrics
+		var actualSys *aggregator.SystemMetrics
 		for i := range metrics.Systems {
 			if metrics.Systems[i].ID == expectedSys.ID {
 				actualSys = &metrics.Systems[i]
@@ -96,9 +99,9 @@ func ValidateMetrics(metrics *AggregatedMetrics, testDate string) error {
 			diff := actual - expected
 			status := "✅"
 			// Calculate tolerance with minimum for small values
-			tolerance := math.Abs(expected) * ValidationTolerancePercent
-			if tolerance < ValidationMinToleranceKWh {
-				tolerance = ValidationMinToleranceKWh
+			tolerance := math.Abs(expected) * constants.ValidationTolerancePercent
+			if tolerance < constants.ValidationMinToleranceKWh {
+				tolerance = constants.ValidationMinToleranceKWh
 			}
 			if math.Abs(diff) > tolerance {
 				status = "❌"
@@ -111,7 +114,7 @@ func ValidateMetrics(metrics *AggregatedMetrics, testDate string) error {
 			} else if diff != 0 {
 				// If expected is 0 but actual is not, percentage is infinite/undefined
 				// Use a large number to indicate significant difference
-				percentDiff = ValidationInfinitePercent
+				percentDiff = constants.ValidationInfinitePercent
 			} else {
 				percentDiff = 0.0
 			}
@@ -123,7 +126,7 @@ func ValidateMetrics(metrics *AggregatedMetrics, testDate string) error {
 			// Percentage: format as string with fixed width (12 chars) for right alignment, whole numbers only
 			// If percentage rounds to zero, do not show the sign
 			var percentStr string
-			if math.Abs(percentDiff) < ValidationPercentThreshold {
+			if math.Abs(percentDiff) < constants.ValidationPercentThreshold {
 				percentStr = fmt.Sprintf("(0%%)")
 			} else {
 				percentStr = fmt.Sprintf("(%+.0f%%)", percentDiff)

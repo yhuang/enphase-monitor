@@ -50,22 +50,49 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go              # Entry point, CLI flags, execution control
-├── config.go            # Configuration loading and validation
-├── aggregator.go        # Multi-system data aggregation orchestrator
-│
-├── cloud_client.go      # Enlighten Cloud API v4 client
-├── oauth.go             # OAuth 2.0 token management
-├── setup_oauth.go       # Interactive OAuth setup wizard
-│
-├── api_cache.go         # Disk-based response caching & cache utilities
-├── cache_cli.go         # Cache management CLI commands
-├── response_parser.go   # Telemetry JSON parsing utilities
-│
-├── display.go           # Terminal formatting and color output
-├── constants.go         # Centralized constants repository (20+ constants)
-├── timezone.go          # Timezone utilities
-├── url_builder.go       # Telemetry URL construction
+├── main.go              # Entry point (171 lines) - orchestration only
+├── internal/
+│   ├── aggregator/      # Multi-system data aggregation
+│   │   ├── types.go     # Metric data structures
+│   │   └── aggregator.go # Aggregation logic with DI
+│   ├── api/             # HTTP client for Cloud API v4
+│   │   ├── client.go    # Enlighten Cloud API client
+│   │   ├── types.go     # API request/response types
+│   │   ├── interface.go # API client interfaces
+│   │   └── client_test.go # API client tests
+│   ├── app/             # Application execution logic
+│   │   ├── setup.go     # App initialization & configuration
+│   │   └── runner.go    # Execution modes (once/continuous)
+│   ├── cache/           # Disk-based response caching
+│   │   ├── cache.go     # Cache implementation
+│   │   └── cli.go       # Cache utilities
+│   ├── cli/             # Command-line interface
+│   │   ├── flags.go     # CLI flag parsing
+│   │   └── cache_commands.go # Cache management commands
+│   ├── config/          # Configuration types
+│   │   ├── config.go    # YAML loading & validation
+│   │   └── config_test.go # Configuration tests
+│   ├── display/         # Terminal output formatting
+│   │   └── display.go   # Display with color customization
+│   ├── oauth/           # OAuth 2.0 authentication
+│   │   ├── oauth.go     # Token management & refresh
+│   │   ├── setup.go     # Interactive OAuth wizard
+│   │   └── oauth_test.go # OAuth tests
+│   ├── parser/          # JSON telemetry parsing
+│   │   ├── parser.go    # Response parsing utilities
+│   │   └── parser_test.go # Parser tests
+│   ├── timezone/        # Timezone handling
+│   │   ├── timezone.go  # Timezone utilities
+│   │   └── timezone_test.go # Timezone tests
+│   ├── urlbuilder/      # API URL construction
+│   │   └── urlbuilder.go # URL building helpers
+│   ├── validation/      # Test mode validation
+│   │   ├── validation.go # Metrics validation logic
+│   │   ├── validation_test.go # Unit tests
+│   │   └── validation_integration_test.go # Integration tests
+│   └── constants/       # Centralized constants (20+)
+│       ├── constants.go # Application-wide constants
+│       └── constants_test.go # Constants tests
 │
 ├── config.yaml          # User configuration (not in git)
 ├── config.yaml.example  # Configuration template
@@ -81,30 +108,38 @@ enphase-monitor/
 ```
 ┌───────────────────────────────────────────────────────────────────┐
 │  1. ENTRY POINT (main.go)                                         │
-│     └─► Parse CLI flags (flag package)                            │
-│         └─► Dispatch to appropriate handler                       │
+│     └─► cli.ParseFlags() from internal/cli                        │
+│         └─► Handle cache commands (internal/cli)                  │
+│             └─► Or continue to application setup                  │
 └───────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│  2. CONFIGURATION (config.go)                                     │
-│     └─► LoadConfig() reads YAML file                              │
-│         └─► Validates system configurations                       │
-│             └─► Converts hex colors to ANSI codes                 │
+│  2. SETUP (internal/app)                                          │
+│     └─► config.LoadConfig() reads YAML file                       │
+│         └─► app.CreateOAuthAdapter() for token management         │
+│             └─► app.SetupDisplay() with colors                    │
 └───────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│  3. AGGREGATION (aggregator.go)                                   │
+│  3. EXECUTION (internal/app)                                      │
+│     └─► app.RunOnce() or app.RunContinuous()                      │
+│         └─► fetchAndDisplay() calls aggregator                    │
+└───────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌───────────────────────────────────────────────────────────────────┐
+│  4. AGGREGATION (internal/aggregator)                             │
 │     └─► GetAggregatedMetrics() loops through systems              │
-│         └─► Creates EnlightenCloudClient for each system          │
+│         └─► Uses internal/api for HTTP requests                   │
 │             └─► Fetches production, consumption, grid, battery    │
 └───────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│  4. API CALLS (cloud_client.go)                                   │
-│     └─► Each call goes through caching layer (api_cache.go)       │
+│  5. API CALLS (internal/api)                                      │
+│     └─► Each call goes through caching layer (internal/cache)     │
 │         ├─► Check cache first (for rate limit protection)         │
 │         ├─► Make HTTP request if cache miss                       │
 │         └─► Save response to cache                                │
@@ -112,7 +147,7 @@ enphase-monitor/
                                     │
                                     ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│  5. RESPONSE PARSING (response_parser.go)                         │
+│  6. RESPONSE PARSING (internal/parser)                            │
 │     └─► Parse JSON telemetry data                                 │
 │         └─► Sum interval values for daily totals                  │
 │             └─► Convert Wh to kWh                                 │
@@ -120,7 +155,7 @@ enphase-monitor/
                                     │
                                     ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│  6. DISPLAY (display.go)                                          │
+│  7. DISPLAY (internal/display)                                    │
 │     └─► ShowMetrics() formats output                              │
 │         ├─► printHeader() - Query range and timestamp             │
 │         ├─► printTodayEnergy() - Combined totals                  │
@@ -139,7 +174,7 @@ enphase-monitor/
                              │
                              ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                        LoadConfig()                               │
+│                  internal/config/LoadConfig()                     │
 │   Parses YAML, validates systems, converts colors                 │
 └────────────────────────────┬──────────────────────────────────────┘
                              │
@@ -151,22 +186,22 @@ enphase-monitor/
                              │
                              ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                  EnlightenCloudClient                             │
-│  - OAuth authentication                                           │
+│              internal/api/EnlightenCloudClient                    │
+│  - OAuth authentication (internal/oauth)                          │
 │  - Telemetry endpoints                                            │
 │  - 15-min intervals                                               │
 └────────────────────────────┬──────────────────────────────────────┘
                              │
                              ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                     API Cache Layer                               │
+│                  internal/cache/Cache Layer                       │
 │  - Rate limit tracking                                            │
 │  - Disk-based storage                                             │
 └────────────────────────────┬──────────────────────────────────────┘
                              │
                              ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                    AggregatedMetrics                              │
+│              internal/aggregator/AggregatedMetrics                │
 │   - Sums production, consumption across systems                   │
 │   - Aggregates battery charge/discharge across systems            │
 │   - Tracks cache usage flag                                       │
@@ -174,7 +209,7 @@ enphase-monitor/
                            │
                            ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                        Display                                    │
+│                  internal/display/Display                         │
 │   - ANSI color formatting                                         │
 │   - Structured report output                                      │
 └───────────────────────────────────────────────────────────────────┘
@@ -420,39 +455,65 @@ only accessed from the main goroutine, so no mutex is needed.
 
 ## File Descriptions
 
-### Core Application Files
+### Main Package
 
-| File                           | Responsibility                                         | Key Lines                              |
-|--------------------------------|--------------------------------------------------------|----------------------------------------|
-| [main.go](main.go)             | CLI entry, flag parsing, run modes (once/continuous)   | Lines 73-352                           |
-| [config.go](config.go)         | YAML loading, validation, hex-to-ANSI conversion       | Lines 159-260                          |
-| [aggregator.go](aggregator.go) | Orchestrates data collection, combines system metrics  | Lines 26-209 (tables), 264-370 (logic) |
+| File                    | Responsibility                                         | Lines |
+|-------------------------|--------------------------------------------------------|-------|
+| [main.go](main.go)      | Application entry point (pure orchestration)           | 171   |
 
-### API Client Files
+### Internal Packages - Application Layer
 
-| File                               | Responsibility                             | Key Lines                                    |
-|------------------------------------|--------------------------------------------|----------------------------------------------|
-| [cloud_client.go](cloud_client.go) | Enlighten Cloud API v4, telemetry fetching | Lines 145-157 (helper), 397-660 (main logic) |
-| [oauth.go](oauth.go)               | OAuth 2.0 token refresh, caching           | Lines 73-200                                 |
-| [setup_oauth.go](setup_oauth.go)   | Interactive browser-based OAuth setup      | Full file                                    |
+| Package/File                                      | Responsibility                                    | Key Info     |
+|---------------------------------------------------|---------------------------------------------------|--------------|
+| [internal/app/setup.go](internal/app/setup.go)         | Application initialization & configuration        | Setup funcs  |
+| [internal/app/runner.go](internal/app/runner.go)       | Execution modes (once/continuous)                 | Run modes    |
 
-### Data Processing Files
+### Internal Packages - CLI Layer
 
-| File                                     | Responsibility                                    | Key Lines    |
-|------------------------------------------|---------------------------------------------------|--------------|
-| [api_cache.go](api_cache.go)             | Disk caching, cache management, URL normalization | Lines 85-230 |
-| [cache_cli.go](cache_cli.go)             | Cache inspection and management CLI commands      | Full file    |
-| [response_parser.go](response_parser.go) | JSON parsing helpers for telemetry data           | Lines 11-60  |
+| Package/File                                      | Responsibility                                    | Key Info     |
+|---------------------------------------------------|---------------------------------------------------|--------------|
+| [internal/cli/flags.go](internal/cli/flags.go)         | CLI flag parsing and definitions                  | Flag struct  |
+| [internal/cli/cache_commands.go](internal/cli/cache_commands.go) | Cache management command handlers     | Cache CLI    |
 
-### Utility Files
+### Internal Packages - Authentication
 
-| File                                | Responsibility                                  | Key Lines      |
-|-------------------------------------|-------------------------------------------------|----------------|
-| [display.go](display.go)            | ANSI formatting, report structure               | Lines 114-260  |
-| [constants.go](constants.go)        | Centralized constants (20+ added across 50 refactoring rounds) | Full file      |
-| [timezone.go](timezone.go)          | Timezone loading and date boundary calculations | Lines 7-50     |
-| [url_builder.go](url_builder.go)    | Telemetry URL construction helpers              | Full file      |
-| [validation.go](validation.go)      | Test mode validation (--test flag)              | Lines 30-150   |
+| Package/File                                      | Responsibility                                    | Key Info     |
+|---------------------------------------------------|---------------------------------------------------|--------------|
+| [internal/oauth/oauth.go](internal/oauth/oauth.go)     | OAuth token management & refresh                  | Token logic  |
+| [internal/oauth/setup.go](internal/oauth/setup.go)     | Interactive OAuth setup wizard                    | OAuth wizard |
+| [internal/oauth/oauth_test.go](internal/oauth/oauth_test.go) | OAuth tests                               | Test suite   |
+
+### Internal Packages - Business Logic
+
+| Package/File                                      | Responsibility                                    | Key Info     |
+|---------------------------------------------------|---------------------------------------------------|--------------|
+| [internal/aggregator/types.go](internal/aggregator/types.go)         | Metric data structures                            | 41 lines     |
+| [internal/aggregator/aggregator.go](internal/aggregator/aggregator.go) | Multi-system aggregation with DI                  | 163 lines    |
+| [internal/display/display.go](internal/display/display.go)           | Terminal output formatting with colors            | 197 lines    |
+| [internal/api/*](internal/api/)                   | HTTP client for Enphase Cloud API v4              | Multiple     |
+| [internal/cache/*](internal/cache/)               | Disk-based response caching                       | Multiple     |
+| [internal/parser/*](internal/parser/)             | JSON telemetry response parsing                   | Multiple     |
+| [internal/config/*](internal/config/)             | Configuration types and utilities                 | Multiple     |
+| [internal/timezone/*](internal/timezone/)         | Timezone handling and date boundaries             | Multiple     |
+| [internal/validation/*](internal/validation/)     | Test mode validation with tolerance checks        | Multiple     |
+| [internal/constants/*](internal/constants/)       | Centralized constants (20+ constants)             | Multiple     |
+| [config.go](config.go)             | YAML loading, validation, color conversion | Lines 159-260|
+| [oauth.go](oauth.go)               | OAuth 2.0 token refresh, caching           | Lines 73-200 |
+| [setup_oauth.go](setup_oauth.go)   | Interactive browser-based OAuth setup      | Full file    |
+| [validation.go](validation.go)     | Test mode validation (--test flag)         | Lines 30-150 |
+
+### Internal Packages - Business Logic
+
+| Package/File                                      | Responsibility                                    | Key Info     |
+|---------------------------------------------------|---------------------------------------------------|--------------|
+| [internal/aggregator/types.go](internal/aggregator/types.go)         | Metric data structures                            | 41 lines     |
+| [internal/aggregator/aggregator.go](internal/aggregator/aggregator.go) | Multi-system aggregation with DI                  | 163 lines    |
+| [internal/display/display.go](internal/display/display.go)           | Terminal output formatting with colors            | 197 lines    |
+| [internal/api/*](internal/api/)                   | HTTP client for Enphase Cloud API v4              | Multiple     |
+| [internal/cache/*](internal/cache/)               | Disk-based response caching                       | Multiple     |
+| [internal/parser/*](internal/parser/)             | JSON telemetry response parsing                   | Multiple     |
+| [internal/config/*](internal/config/)             | Configuration types and utilities                 | Multiple     |
+| [internal/timezone/*](internal/timezone/)         | Timezone handling and date boundaries             | Multiple     |
 
 ---
 
@@ -469,14 +530,14 @@ only accessed from the main goroutine, so no mutex is needed.
    - See how flags are parsed and execution modes are handled
 
 3. **Follow the Data Flow**
-   - Read `config.go` - See how Go handles YAML and struct validation
-   - Trace `aggregator.go` - Follow data from systems to output (see [GO_CONCEPTS.md](GO_CONCEPTS.md) for Go concepts)
-   - Study `cloud_client.go` - Learn HTTP client patterns and error handling
+   - Read `internal/config/config.go` - See how Go handles YAML and struct validation
+   - Trace `internal/aggregator/aggregator.go` - Follow data from systems to output (see [GO_CONCEPTS.md](GO_CONCEPTS.md) for Go concepts)
+   - Study `internal/api/client.go` - Learn HTTP client patterns and error handling
 
 4. **Explore Advanced Features**
-   - Explore `api_cache.go` - Understand caching and file I/O
-   - Review `display.go` - See terminal formatting techniques
-   - Study `oauth.go` - Understand token management and refresh patterns
+   - Explore `internal/cache/cache.go` - Understand caching and file I/O
+   - Review `internal/display/display.go` - See terminal formatting techniques
+   - Study `internal/oauth/oauth.go` - Understand token management and refresh patterns
 
 5. **Deep Dive into Concurrency**
    - Read **[GO_CONCEPTS.md](GO_CONCEPTS.md#channels-and-signals)** for detailed explanation of channels and signal handling
@@ -484,15 +545,15 @@ only accessed from the main goroutine, so no mutex is needed.
 
 ### Key Files for Learning Go Patterns
 
-| Pattern                | Files to Study                           | What to Look For                                                      |
-|------------------------|------------------------------------------|-----------------------------------------------------------------------|
-| **Error Handling**     | `oauth.go`, `cloud_client.go`            | `%w` error wrapping, error propagation                                |
-| **Channels & Select**  | `main.go`                                | `select` statement, signal handling, graceful shutdown                |
-| **Concurrency**        | `main.go`                                | Channels, select statement, signal handling (single-threaded execution) |
-| **Struct Methods**     | All files                                | Pointer vs value receivers, method design                             |
-| **JSON Parsing**       | `response_parser.go`, `cloud_client.go`  | Struct tags, JSON marshaling/unmarshaling                             |
-| **Defer Usage**        | Throughout                               | Resource cleanup, guaranteed execution                                |
-| **Interfaces**         | Throughout                               | Implicit satisfaction, dependency injection                           |
+| Pattern                | Files to Study                                      | What to Look For                                                      |
+|------------------------|-----------------------------------------------------|-----------------------------------------------------------------------|
+| **Error Handling**     | `internal/oauth/oauth.go`, `internal/api/client.go` | `%w` error wrapping, error propagation                                |
+| **Channels & Select**  | `main.go`                                           | `select` statement, signal handling, graceful shutdown                |
+| **Concurrency**        | `main.go`                                           | Channels, select statement, signal handling (single-threaded execution) |
+| **Struct Methods**     | All files                                           | Pointer vs value receivers, method design                             |
+| **JSON Parsing**       | `internal/parser/parser.go`, `internal/api/client.go` | Struct tags, JSON marshaling/unmarshaling                             |
+| **Defer Usage**        | Throughout                                          | Resource cleanup, guaranteed execution                                |
+| **Interfaces**         | Throughout                                          | Implicit satisfaction, dependency injection                           |
 
 ### Code Reading Strategy
 

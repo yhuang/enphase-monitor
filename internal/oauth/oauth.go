@@ -46,7 +46,7 @@
 //
 // The GetAccessToken() function provides helpful error messages suggesting
 // users run --setup-oauth if refresh token is missing or invalid.
-package main
+package oauth
 
 import (
 	"bytes"
@@ -57,6 +57,9 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"enphase-monitor/internal/config"
+	"enphase-monitor/internal/constants"
 )
 
 // Token timing constants
@@ -91,7 +94,7 @@ var oauthHTTPClient = &http.Client{
 }
 
 // GetAuthorizationURL generates the authorization URL for the user to visit (one-time setup)
-func GetAuthorizationURL(apiConfig *APIConfig) (string, error) {
+func GetAuthorizationURL(apiConfig *config.APIConfig) (string, error) {
 	if apiConfig == nil {
 		return "", fmt.Errorf("API configuration is required")
 	}
@@ -102,7 +105,7 @@ func GetAuthorizationURL(apiConfig *APIConfig) (string, error) {
 		return "", fmt.Errorf("redirect_uri is required in API configuration")
 	}
 
-	authURL := EnphaseOAuthAuthorizeURL
+	authURL := constants.EnphaseOAuthAuthorizeURL
 	params := url.Values{}
 	params.Set("response_type", "code")
 	params.Set("client_id", apiConfig.ClientID)
@@ -113,7 +116,7 @@ func GetAuthorizationURL(apiConfig *APIConfig) (string, error) {
 }
 
 // ExchangeAuthorizationCode exchanges an authorization code for access and refresh tokens
-func ExchangeAuthorizationCode(ctx context.Context, apiConfig *APIConfig, code string) (*OAuthTokenResponse, error) {
+func ExchangeAuthorizationCode(ctx context.Context, apiConfig *config.APIConfig, code string) (*OAuthTokenResponse, error) {
 	if apiConfig == nil {
 		return nil, fmt.Errorf("API configuration is required")
 	}
@@ -153,7 +156,7 @@ func ExchangeAuthorizationCode(ctx context.Context, apiConfig *APIConfig, code s
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != HTTPStatusOK {
+	if resp.StatusCode != constants.HTTPStatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, string(body))
 	}
@@ -167,7 +170,7 @@ func ExchangeAuthorizationCode(ctx context.Context, apiConfig *APIConfig, code s
 }
 
 // GetAccessToken retrieves an OAuth access token using refresh token or other available methods
-func GetAccessToken(ctx context.Context, apiConfig *APIConfig) (string, error) {
+func GetAccessToken(ctx context.Context, apiConfig *config.APIConfig) (string, error) {
 	// Check cache first - refresh if within buffer window of expiration
 	if tokenCache != nil && time.Now().Before(tokenCache.ExpiresAt.Add(-tokenRefreshBuffer)) {
 		return tokenCache.Token, nil
@@ -222,12 +225,12 @@ func GetAccessToken(ctx context.Context, apiConfig *APIConfig) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != HTTPStatusOK {
+	if resp.StatusCode != constants.HTTPStatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		errorMsg := string(body)
 
 		// Provide helpful error message for common OAuth errors
-		if resp.StatusCode == HTTPStatusUnauthorized {
+		if resp.StatusCode == constants.HTTPStatusUnauthorized {
 			if apiConfig.RefreshToken != "" {
 				return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
 					"Your refresh token appears to be invalid or expired. Please regenerate it by running:\n"+

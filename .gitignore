@@ -4,3 +4,5 @@ enphase-monitor
 test-data/cache/
 .cache
 .github/
+coverage.out
+*.coverprofile

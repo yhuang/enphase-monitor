@@ -1,8 +1,8 @@
-// Package main - constants.go
+// Package constants centralizes all application constants.
 //
 // PURPOSE
 // -------
-// This file centralizes all application constants to avoid magic numbers and strings.
+// This package centralizes all application constants to avoid magic numbers and strings.
 // By consolidating constants here, we improve maintainability and make the codebase
 // more readable and easier to modify.
 //
@@ -30,7 +30,7 @@
 //  2. Add descriptive comments explaining purpose and usage
 //  3. Use descriptive names (e.g., ValidationTolerancePercent, not just Tolerance)
 //  4. Consider if the constant should be configurable (move to config.yaml if so)
-package main
+package constants
 
 import (
 	"strings"
@@ -164,9 +164,9 @@ const (
 	EnphaseAPIv4SystemsURL = EnphaseAPIBaseURL + "/api/v4/systems"
 )
 
-// isRateLimitError checks if an error is a rate limit (429) error.
+// IsRateLimitError checks if an error is a rate limit (429) error.
 // Centralizes the repeated strings.Contains check pattern.
-func isRateLimitError(err error) bool {
+func IsRateLimitError(err error) bool {
 	if err == nil {
 		return false
 	}
