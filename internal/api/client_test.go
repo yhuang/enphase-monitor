@@ -1,3 +1,54 @@
+// Package api - client_test.go
+//
+// TEST SETUP
+// ----------
+// This test suite validates the Enphase Cloud API v4 client using mock HTTP servers.
+// Tests ensure correct request formatting and response parsing without real API calls.
+//
+// TEST PLAN
+// ---------
+// 1. Production Data Tests
+//    - Test GetProductionForDate with mock telemetry response
+//    - Test request includes Authorization header
+//    - Test response parsing (wh_del field)
+//    - Test conversion from Wh to kWh
+//
+// 2. Request Validation Tests
+//    - Test API key is included in URL
+//    - Test start_at and end_at timestamps are correct
+//    - Test Bearer token in Authorization header
+//    - Test Content-Type is application/json
+//
+// 3. Error Handling Tests
+//    - Test 401 Unauthorized response
+//    - Test 429 Rate Limit response
+//    - Test malformed JSON response
+//    - Test network errors
+//
+// TESTING APPROACH
+// ----------------
+// - httptest.NewServer creates mock Enphase API
+// - Inject mock server URL via NewEnlightenCloudClientWithBaseURL
+// - Verify request format in server handler
+// - Return mock responses for parsing tests
+//
+// DEPENDENCY INJECTION
+// --------------------
+// The client accepts baseURL parameter for testability:
+// - Production: Uses constants.EnphaseAPIv4SystemsURL
+// - Testing: Uses httptest server URL
+//
+// This allows testing without:
+// - Real API calls (no rate limits)
+// - Network dependencies (fast, deterministic)
+// - External service availability (always works)
+//
+// PATTERN USED
+// ------------
+// - Pattern 4: Mock HTTP Servers (httptest.NewServer)
+// - Pattern 8: Error Path Testing
+//
+// See TESTING.md for detailed pattern explanations.
 package api
 
 import (

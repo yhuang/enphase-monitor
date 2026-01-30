@@ -1,4 +1,4 @@
-// Package main - cache_cli.go
+// Package cache - cli.go
 //
 // PURPOSE
 // -------

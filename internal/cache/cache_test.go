@@ -1,3 +1,53 @@
+// Package cache - cache_test.go
+//
+// TEST SETUP
+// ----------
+// This test suite validates thread-safe cache state management.
+// Tests use goroutines to simulate concurrent access patterns.
+//
+// TEST PLAN
+// ---------
+// 1. Thread Safety Tests
+//    - Test concurrent TestMode access (10 goroutines × 100 iterations)
+//    - Test concurrent CacheDisabled access
+//    - Test concurrent RateLimitWarningShown access
+//    - Run with -race flag to detect data races
+//
+// 2. State Management Tests
+//    - Test SetTestMode/TestMode
+//    - Test SetCacheDisabled/CacheDisabled
+//    - Test SetRateLimitWarningShown/RateLimitWarningShown
+//    - Test ResetState clears all flags
+//
+// TESTING APPROACH
+// ----------------
+// - Use sync.WaitGroup to coordinate goroutines
+// - Each goroutine performs many rapid set/get operations
+// - ResetState() called before each test for isolation
+// - Run with `go test -race` to verify no data races
+//
+// WHY THREAD SAFETY MATTERS
+// -------------------------
+// The cache state is accessed from multiple parts of the codebase:
+// - Test mode flag checked before every API call
+// - Cache disabled flag checked in cache lookup
+// - Rate limit warning ensures message printed only once
+//
+// Mutex protection (sync.Mutex) ensures safe concurrent access.
+//
+// TEST ORGANIZATION
+// -----------------
+// This package has 3 test files (1:many pattern):
+// - cache_test.go (this file): Thread safety tests (161 lines)
+// - cache_functions_test.go: Core functionality tests (516 lines)
+// - cli_test.go: CLI utilities tests (119 lines)
+//
+// PATTERN USED
+// ------------
+// - Pattern 7: Thread Safety Testing (goroutines, sync.WaitGroup)
+// - Pattern 10: State Reset (ResetState before each test)
+//
+// See TESTING.md for detailed pattern explanations.
 package cache
 
 import (

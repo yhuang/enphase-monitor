@@ -1,3 +1,48 @@
+// Package oauth - oauth_test.go
+//
+// TEST SETUP
+// ----------
+// This test suite validates OAuth 2.0 authentication logic:
+// - Authorization URL generation
+// - Token refresh mechanics
+// - Configuration validation
+//
+// These are UNIT tests (no HTTP calls). For integration tests with mock HTTP servers,
+// see oauth_functional_test.go. For edge cases and error paths, see oauth_edge_cases_test.go.
+//
+// TEST PLAN
+// ---------
+// 1. Authorization URL Tests
+//    - Test URL contains required parameters (client_id, redirect_uri, scope)
+//    - Test URL encoding is correct
+//    - Test validation of missing/empty config fields
+//
+// 2. Token Refresh Tests
+//    - Test token expiration detection
+//    - Test cache hit/miss logic
+//    - Test token data structure
+//
+// TESTING APPROACH
+// ----------------
+// - Table-driven tests for multiple scenarios
+// - URL validation by checking required substrings
+// - Config validation tests for missing fields
+// - No external HTTP calls (pure unit tests)
+//
+// TEST ORGANIZATION
+// -----------------
+// This package has 3 test files (1:many pattern):
+// - oauth_test.go (this file): Basic unit tests (270 lines)
+// - oauth_functional_test.go: Integration tests with mock HTTP (598 lines)
+// - oauth_edge_cases_test.go: Edge cases and error paths (442 lines)
+//
+// PATTERN USED
+// ------------
+// - Pattern 1: Table-Driven Tests
+// - Pattern 3: Subtests with t.Run()
+// - Pattern 10: State Reset (token cache)
+//
+// See TESTING.md for detailed pattern explanations.
 package oauth
 
 import (

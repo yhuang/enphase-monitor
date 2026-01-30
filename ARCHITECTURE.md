@@ -50,58 +50,62 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go              # Entry point (~197 lines) - orchestration only
+├── main.go                                # Entry point (~197 lines) - orchestration only
 ├── internal/
-│   ├── aggregator/      # Multi-system data aggregation
-│   │   ├── types.go     # Metric data structures (AggregatedMetrics, SystemMetrics)
-│   │   ├── aggregator.go # Aggregation logic with dependency injection
-│   │   └── aggregator_test.go # Aggregator tests with mock clients
-│   ├── api/             # HTTP client for Cloud API v4
-│   │   ├── client.go    # Enlighten Cloud API client
-│   │   ├── types.go     # API request/response types
-│   │   ├── interface.go # CloudClient interface for testability
-│   │   └── client_test.go # API client tests
-│   ├── app/             # Application execution logic
-│   │   ├── setup.go     # App initialization & configuration
-│   │   └── runner.go    # Execution modes (once/continuous)
-│   ├── cache/           # Disk-based response caching
-│   │   ├── cache.go     # Thread-safe cache implementation
-│   │   ├── cli.go       # Cache utilities
-│   │   └── cache_test.go # Cache state and thread safety tests
-│   ├── cli/             # Command-line interface
-│   │   ├── flags.go     # CLI flag parsing
-│   │   └── cache_commands.go # Cache management commands
-│   ├── config/          # Configuration types
-│   │   ├── config.go    # YAML loading & validation (uses type aliases)
-│   │   └── config_test.go # Configuration tests
-│   ├── constants/       # Centralized constants (20+)
-│   │   ├── constants.go # Application-wide constants
-│   │   └── constants_test.go # Constants tests
-│   ├── display/         # Terminal output formatting
-│   │   ├── display.go   # Display with io.Writer injection for testability
-│   │   └── display_test.go # Display output tests
-│   ├── oauth/           # OAuth 2.0 authentication
-│   │   ├── oauth.go     # Token management & refresh
-│   │   ├── setup.go     # Interactive OAuth wizard
-│   │   └── oauth_test.go # OAuth tests
-│   ├── parser/          # JSON telemetry parsing
-│   │   ├── parser.go    # Response parsing utilities
-│   │   └── parser_test.go # Parser tests
-│   ├── timezone/        # Timezone handling
-│   │   ├── timezone.go  # Timezone utilities
-│   │   └── timezone_test.go # Timezone tests
-│   ├── types/           # Shared type definitions
-│   │   └── types.go     # SystemConfig, APIConfig (breaks circular deps)
-│   ├── urlbuilder/      # API URL construction
-│   │   └── urlbuilder.go # URL building helpers
-│   └── validation/      # Test mode validation
-│       ├── validation.go # Metrics validation logic
-│       ├── validation_test.go # Unit tests
-│       └── validation_integration_test.go # Integration tests
+│   ├── aggregator/                        # Multi-system data aggregation
+│   │   ├── types.go                       # Metric data structures (AggregatedMetrics, SystemMetrics)
+│   │   ├── aggregator.go                  # Aggregation logic with dependency injection
+│   │   └── aggregator_test.go             # Aggregator tests with mock clients
+│   ├── api/                               # HTTP client for Cloud API v4
+│   │   ├── client.go                      # Enlighten Cloud API client
+│   │   ├── types.go                       # API request/response types
+│   │   ├── interface.go                   # CloudClient interface for testability
+│   │   └── client_test.go                 # API client tests
+│   ├── app/                               # Application execution logic
+│   │   ├── setup.go                       # App initialization & configuration
+│   │   └── runner.go                      # Execution modes (once/continuous)
+│   ├── cache/                             # Disk-based response caching
+│   │   ├── cache.go                       # Thread-safe cache implementation
+│   │   ├── cli.go                         # Cache inspection utilities
+│   │   ├── cache_test.go                  # Cache state and thread safety tests
+│   │   └── cache_functions_test.go        # Cache functionality tests
+│   ├── cli/                               # Command-line interface
+│   │   ├── flags.go                       # CLI flag parsing
+│   │   └── cache_commands.go              # Cache management commands
+│   ├── config/                            # Configuration types
+│   │   ├── config.go                      # YAML loading & validation (uses type aliases)
+│   │   └── config_test.go                 # Configuration tests
+│   ├── constants/                         # Centralized constants (20+)
+│   │   ├── constants.go                   # Application-wide constants
+│   │   └── constants_test.go              # Constants tests
+│   ├── display/                           # Terminal output formatting
+│   │   ├── display.go                     # Display with io.Writer injection for testability
+│   │   └── display_test.go                # Display output tests
+│   ├── oauth/                             # OAuth 2.0 authentication
+│   │   ├── oauth.go                       # Token management & refresh
+│   │   ├── setup.go                       # Interactive OAuth wizard
+│   │   ├── oauth_test.go                  # Basic unit tests
+│   │   ├── setup_test.go                  # OAuth setup wizard tests
+│   │   ├── oauth_functional_test.go       # Integration tests with mock servers
+│   │   └── oauth_edge_cases_test.go       # Edge case and error path tests
+│   ├── parser/                            # JSON telemetry parsing
+│   │   ├── parser.go                      # Response parsing utilities
+│   │   └── parser_test.go                 # Parser tests
+│   ├── timezone/                          # Timezone handling
+│   │   ├── timezone.go                    # Timezone utilities
+│   │   └── timezone_test.go               # Timezone tests
+│   ├── types/                             # Shared type definitions
+│   │   └── types.go                       # SystemConfig, APIConfig (breaks circular deps)
+│   ├── urlbuilder/                        # API URL construction
+│   │   └── urlbuilder.go                  # URL building helpers
+│   └── validation/                        # Test mode validation
+│       ├── validation.go                  # Metrics validation logic
+│       ├── validation_test.go             # Unit tests (tolerance calculations, edge cases)
+│       └── validation_integration_test.go # Integration tests (real expected values)
 │
-├── config.yaml          # User configuration (not in git)
-├── config.yaml.example  # Configuration template
-└── test-data/           # Cache files and validation data
+├── config.yaml                            # User configuration (not in git)
+├── config.yaml.example                    # Configuration template
+└── test-data/                             # Cache files and validation data
 ```
 
 ### Package Dependency Graph

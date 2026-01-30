@@ -1,3 +1,40 @@
+// Package aggregator - aggregator_test.go
+//
+// TEST SETUP
+// ----------
+// This test suite validates multi-system data aggregation logic using mock API clients.
+// Dependency injection allows testing without making real API calls.
+//
+// TEST PLAN
+// ---------
+// 1. Aggregation Logic Tests
+//    - Test single-system aggregation
+//    - Test multi-system aggregation (summing values)
+//    - Test net import calculation (import - export)
+//
+// 2. Error Handling Tests
+//    - Test API errors are propagated correctly
+//    - Test rate limit errors (429) are collected
+//    - Test context cancellation
+//
+// 3. Cache Tracking Tests
+//    - Test cache flag is set when any system uses cache
+//    - Test cache flag is false when all systems use live data
+//
+// TESTING APPROACH
+// ----------------
+// - Mock CloudClient implementation for controlled testing
+// - Factory function allows injecting mock client
+// - Test both success and error paths
+// - Verify calculations match expected formulas
+//
+// PATTERN USED
+// ------------
+// - Pattern 2: Mock Objects (MockCloudClient)
+// - Pattern 6: Test Fixtures (makeTestMetrics helper)
+// - Pattern 12: Context Cancellation Testing
+//
+// See TESTING.md for detailed pattern explanations.
 package aggregator
 
 import (

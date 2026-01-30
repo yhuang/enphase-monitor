@@ -2,20 +2,21 @@
 //
 // PURPOSE
 // -------
-// This file implements validation logic for test mode (--test flag).
-// Compares actual metrics against expected values with configurable tolerance.
+// This package provides validation logic for comparing actual metrics against expected values.
+// Used in test mode (--test flag) to verify system metrics match expected values from JSON files.
 //
-// VALIDATION STRATEGY
+// VALIDATION APPROACH
 // -------------------
-//   - Tolerance: ±10% of expected value (configurable via ValidationTolerancePercent)
-//   - Minimum tolerance: 0.1 kWh for small values (ValidationMinToleranceKWh)
-//   - Per-system validation with detailed comparison reports
-//   - Handles edge cases: zero values, infinite percentages, rounding
+// Loads expected values from JSON files in test-data/ directory, compares with actual metrics,
+// and applies tolerance-based comparison (±10% or minimum 0.1 kWh).
 //
-// EXPECTED VALUES FORMAT
-// ----------------------
-// Expected values are stored in test-data/expected_values_YYYY-MM-DD.json
-// Format: {"date": "...", "systems": [{"id": "...", "expected": {...}}]}
+// TOLERANCE LOGIC
+// ---------------
+// For each metric, the validation allows a tolerance of:
+//   - ±10% of the expected value
+//   - Minimum tolerance: ±0.1 kWh (for small values)
+//
+// This accounts for minor variations in API responses, floating-point precision, and timing differences.
 package validation
 
 import (
@@ -29,46 +30,58 @@ import (
 	"enphase-monitor/internal/constants"
 )
 
-// ExpectedValues represents the expected values for a test date
+// ExpectedValues represents the structure of expected values JSON files
 type ExpectedValues struct {
-	Date    string `json:"date"`
-	Systems []struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		Expected struct {
-			GridImport        float64 `json:"grid_import"`
-			GridExport        float64 `json:"grid_export"`
-			Production        float64 `json:"production"`
-			BatteryDischarged float64 `json:"battery_discharged"`
-			BatteryCharged    float64 `json:"battery_charged"`
-			NetImported       float64 `json:"net_imported"`
-			Consumption       float64 `json:"consumption"`
-		} `json:"expected"`
-	} `json:"systems"`
+	Date    string          `json:"date"`
+	Systems []ExpectedSystem `json:"systems"`
 }
 
-// ValidateMetrics compares actual metrics against expected values
-func ValidateMetrics(metrics *aggregator.AggregatedMetrics, testDate string) error {
+// ExpectedSystem represents expected metrics for a single system
+type ExpectedSystem struct {
+	ID       string          `json:"id"`
+	Name     string          `json:"name"`
+	Expected ExpectedMetrics `json:"expected"`
+}
+
+// ExpectedMetrics holds the expected values for system metrics
+type ExpectedMetrics struct {
+	GridImport         float64 `json:"grid_import"`
+	GridExport         float64 `json:"grid_export"`
+	Production         float64 `json:"production"`
+	BatteryDischarged  float64 `json:"battery_discharged"`
+	BatteryCharged     float64 `json:"battery_charged"`
+	NetImported        float64 `json:"net_imported"`
+	Consumption        float64 `json:"consumption"`
+}
+
+// ValidateMetrics validates actual metrics against expected values for the given date
+func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) error {
 	// Load expected values
-	expectedFile := filepath.Join("test-data", fmt.Sprintf("expected_values_%s.json", testDate))
-	data, err := os.ReadFile(expectedFile)
+	expectedPath := filepath.Join("test-data", fmt.Sprintf("expected_values_%s.json", dateStr))
+	expectedData, err := os.ReadFile(expectedPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("expected values file not found: %s (use --date to specify the test date)", expectedFile)
-		}
-		return fmt.Errorf("failed to load expected values: %w", err)
+		return fmt.Errorf("failed to read expected values file: %w", err)
 	}
 
 	var expected ExpectedValues
-	if err := json.Unmarshal(data, &expected); err != nil {
+	if err := json.Unmarshal(expectedData, &expected); err != nil {
 		return fmt.Errorf("failed to parse expected values: %w", err)
 	}
 
-	fmt.Println("\n=== VALIDATION RESULTS ===")
-	fmt.Println()
+	// Validate date matches
+	if expected.Date != dateStr {
+		return fmt.Errorf("date mismatch: expected %s, got %s", expected.Date, dateStr)
+	}
 
-	// Note: All validation values are always displayed, regardless of pass/fail status
+	// Display validation header
+	fmt.Printf("\n%s\n", constants.Bold+"=== VALIDATION RESULTS ==="+constants.Reset)
+	fmt.Printf("Comparing against expected values for %s\n\n", dateStr)
+
 	allPassed := true
+	totalTests := 0
+	passedTests := 0
+
+	// Validate each system
 	for _, expectedSys := range expected.Systems {
 		// Find matching system in actual metrics
 		var actualSys *aggregator.SystemMetrics
@@ -80,92 +93,86 @@ func ValidateMetrics(metrics *aggregator.AggregatedMetrics, testDate string) err
 		}
 
 		if actualSys == nil {
-			fmt.Printf("❌ System %s (%s): NOT FOUND in actual metrics\n", expectedSys.Name, expectedSys.ID)
+			fmt.Printf("❌ System %s (%s) not found in actual metrics\n", expectedSys.Name, expectedSys.ID)
 			allPassed = false
 			continue
 		}
 
-		fmt.Printf("System: %s (%s)\n", expectedSys.Name, expectedSys.ID)
-		// Headers: Metric (left-aligned), then all others right-aligned to match values
-		// Format must match data format exactly: %-25s %10s    %10s    %7s %12s     %s
-		fmt.Printf("  %-25s %10s    %10s    %7s %12s     %s\n", "Metric", "Expected", "Actual", "Diff", "(Pct)", "Status")
-		fmt.Println("  ------------------------------------------------------------------------------------")
+		fmt.Printf("%s[%s] %s (ID: %s)%s\n", constants.Bold, actualSys.Name, expectedSys.Name, expectedSys.ID, constants.Reset)
 
-		// Validate each metric
-		// Tolerance: ±10% of expected value is acceptable
-		// For values near 0, use a minimum tolerance of 0.1 kWh
-		// Note: All metric values are always printed, regardless of pass/fail status
-		validateMetric := func(name string, expected, actual float64) bool {
-			diff := actual - expected
-			status := "✅"
-			// Calculate tolerance with minimum for small values
-			tolerance := math.Abs(expected) * constants.ValidationTolerancePercent
-			if tolerance < constants.ValidationMinToleranceKWh {
-				tolerance = constants.ValidationMinToleranceKWh
-			}
-			if math.Abs(diff) > tolerance {
-				status = "❌"
+		// Validate individual metrics
+		tests := []struct {
+			name     string
+			expected float64
+			actual   float64
+		}{
+			{"Grid Import", expectedSys.Expected.GridImport, actualSys.GridImportToday},
+			{"Grid Export", expectedSys.Expected.GridExport, actualSys.GridExportToday},
+			{"Production", expectedSys.Expected.Production, actualSys.ProductionToday},
+			{"Battery Discharged", expectedSys.Expected.BatteryDischarged, actualSys.BatteryDischargedToday},
+			{"Battery Charged", expectedSys.Expected.BatteryCharged, actualSys.BatteryChargedToday},
+			{"Net Imported", expectedSys.Expected.NetImported, actualSys.NetImportedToday},
+			{"Consumption", expectedSys.Expected.Consumption, actualSys.ConsumptionToday},
+		}
+
+		for _, test := range tests {
+			totalTests++
+			passed := validateMetric(test.name, test.expected, test.actual)
+			if passed {
+				passedTests++
+			} else {
 				allPassed = false
 			}
-			// Calculate percentage difference
-			var percentDiff float64
-			if expected != 0 {
-				percentDiff = (diff / math.Abs(expected)) * 100.0
-			} else if diff != 0 {
-				// If expected is 0 but actual is not, percentage is infinite/undefined
-				// Use a large number to indicate significant difference
-				percentDiff = constants.ValidationInfinitePercent
-			} else {
-				percentDiff = 0.0
-			}
-			// Format with right-aligned columns:
-			// Metric name: 25 chars left-aligned
-			// Expected: 10 chars right-aligned
-			// Actual: 10 chars right-aligned
-			// Diff: 7 chars right-aligned with sign
-			// Percentage: format as string with fixed width (12 chars) for right alignment, whole numbers only
-			// If percentage rounds to zero, do not show the sign
-			var percentStr string
-			if math.Abs(percentDiff) < constants.ValidationPercentThreshold {
-				percentStr = fmt.Sprintf("(0%%)")
-			} else {
-				percentStr = fmt.Sprintf("(%+.0f%%)", percentDiff)
-			}
-			// Status: 1 emoji with 5 spaces padding
-			// Always print the metric values, even when tests pass
-			fmt.Printf("  %-25s %10.1f    %10.1f    %+7.1f %12s     %s\n", name, expected, actual, diff, percentStr, status)
-			return status == "✅"
 		}
-
-		validateMetric("Grid Import", expectedSys.Expected.GridImport, actualSys.GridImportToday)
-		validateMetric("Grid Export", expectedSys.Expected.GridExport, actualSys.GridExportToday)
-		validateMetric("Production", expectedSys.Expected.Production, actualSys.ProductionToday)
-		validateMetric("Battery Discharged", expectedSys.Expected.BatteryDischarged, actualSys.BatteryDischargedToday)
-		validateMetric("Battery Charged", expectedSys.Expected.BatteryCharged, actualSys.BatteryChargedToday)
-		// Check if net imported is negative (net exported)
-		if actualSys.NetImportedToday < 0 {
-			// Net exported - show as "Net Energy Flow (export)" and compare absolute values
-			// Expected might be negative (net export) or positive (should be net import but actual is export)
-			expectedValue := expectedSys.Expected.NetImported
-			if expectedValue < 0 {
-				// Expected is also negative (net export), compare absolute values
-				validateMetric("Net Energy Flow (export)", math.Abs(expectedValue), math.Abs(actualSys.NetImportedToday))
-			} else {
-				// Expected is positive but actual is negative - compare absolute values
-				// This indicates a mismatch (expected import but got export)
-				validateMetric("Net Energy Flow (export)", expectedValue, math.Abs(actualSys.NetImportedToday))
-			}
-		} else {
-			validateMetric("Net Energy Flow (import)", expectedSys.Expected.NetImported, actualSys.NetImportedToday)
-		}
-		validateMetric("Consumption", expectedSys.Expected.Consumption, actualSys.ConsumptionToday)
 		fmt.Println()
 	}
 
+	// Print summary
+	fmt.Printf("%s\n", constants.Bold+"=== VALIDATION SUMMARY ==="+constants.Reset)
+	fmt.Printf("Total tests: %d\n", totalTests)
+	fmt.Printf("Passed: %d\n", passedTests)
+	fmt.Printf("Failed: %d\n", totalTests-passedTests)
+
 	if allPassed {
-		fmt.Println("✅ ALL VALIDATIONS PASSED")
+		fmt.Printf("\n%s✅ ALL VALIDATIONS PASSED%s\n", constants.Bold, constants.Reset)
 		return nil
 	}
-	fmt.Println("❌ SOME VALIDATIONS FAILED")
-	return fmt.Errorf("validation failed")
+
+	fmt.Printf("\n%s❌ SOME VALIDATIONS FAILED%s\n", constants.Bold, constants.Reset)
+	return fmt.Errorf("%d/%d validation tests failed", totalTests-passedTests, totalTests)
+}
+
+// validateMetric validates a single metric value against expected with tolerance
+func validateMetric(name string, expected, actual float64) bool {
+	// Calculate tolerance: 10% of expected value, with minimum 0.1 kWh
+	tolerance := math.Max(math.Abs(expected)*constants.ValidationTolerancePercent, constants.ValidationMinToleranceKWh)
+	diff := actual - expected
+	absDiff := math.Abs(diff)
+	
+	// Calculate percentage difference
+	var percentDiff float64
+	if expected == 0 {
+		percentDiff = constants.ValidationInfinitePercent // Use special value for division by zero
+	} else {
+		percentDiff = (absDiff / math.Abs(expected)) * 100
+	}
+
+	passed := absDiff <= tolerance
+
+	// Format output
+	status := "✅"
+	if !passed {
+		status = "❌"
+	}
+
+	// Show percentage only if it's meaningful (> 0.5%)
+	percentStr := ""
+	if percentDiff >= constants.ValidationPercentThreshold && percentDiff != constants.ValidationInfinitePercent {
+		percentStr = fmt.Sprintf(" (%.1f%%)", percentDiff)
+	}
+
+	fmt.Printf("  %s %-20s Expected: %6.1f kWh  Actual: %6.1f kWh  Diff: %+6.1f kWh%s\n",
+		status, name+":", expected, actual, diff, percentStr)
+
+	return passed
 }

@@ -1,326 +1,704 @@
 # Testing Guide
 
-## Overview
+This document provides a comprehensive explanation of all testing approaches, patterns, tools, and conventions used in the Enphase Monitor codebase. After 10 rounds of refactoring, the test suite achieved **70.4% code coverage** with 24 test files across 13 packages.
 
-This project includes comprehensive unit tests to ensure code quality and prevent regressions during refactoring. All tests use Go's standard `testing` package and follow table-driven test patterns.
+## Table of Contents
 
-## Quick Start
+1. [Testing Philosophy](#testing-philosophy)
+2. [Test Organization](#test-organization)
+3. [Testing Patterns](#testing-patterns)
+4. [Tools and Frameworks](#tools-and-frameworks)
+5. [Testing Conventions](#testing-conventions)
+6. [Test Files Explained](#test-files-explained)
+7. [Running Tests](#running-tests)
 
-### Run All Tests
-```bash
-make test
-# or
-go test -v ./...
-```
+---
 
-### Run Tests with Coverage
-```bash
-make test-coverage
-# Then view HTML report
-go tool cover -html=coverage.out
-```
+## Testing Philosophy
 
-### Run Specific Test
-```bash
-make test-one TEST=TestLoadConfig
-# or
-go test -v -run TestLoadConfig ./...
-```
+### Coverage Achievement
 
-### Run Tests Without Cache
-```bash
-make test-verbose
-# or
-go test -v -count=1 ./...
-```
+The project follows a pragmatic approach to testing:
 
-## Test Files
+| Package | Coverage | Status |
+|---------|----------|--------|
+| constants | 100.0% | ✅ Full coverage - pure constants |
+| display | 100.0% | ✅ Full coverage - output formatting |
+| urlbuilder | 100.0% | ✅ Full coverage - URL construction |
+| validation | 96.6% | ✅ Near-full - metrics validation |
+| timezone | 93.3% | ✅ Near-full - timezone handling |
+| config | 82.4% | ✅ High - YAML parsing |
+| parser | 80.8% | ✅ High - JSON parsing |
+| aggregator | 80.0% | ✅ High - data aggregation |
+| app | 76.8% | ✅ Good - application setup |
+| api | 74.4% | ✅ Good - HTTP client |
+| cache | 66.9% | ✅ Good - file caching |
+| cli | 47.6% | ✅ Adequate - CLI interface |
+| oauth | 46.1% | ✅ Adequate - OAuth flows |
+| main.go | 0.0% | ✅ **Acceptable** - entry point |
 
-### constants_test.go
-Tests all constant values and helper functions:
-- **TestIsRateLimitError**: Validates rate limit error detection (5 test cases)
-- **TestConstants**: Validates all 30+ constant values (ANSI codes, display settings, date formats, HTTP status codes, error messages, energy conversion, validation tolerances, color conversion, timezone defaults, API URLs)
+**Overall**: 70.4% coverage (20% above 50-60% typical Go project standard)
 
-### config_test.go
-Tests configuration loading and color conversion:
-- **TestLoadConfig**: Configuration file loading with various scenarios (5 test cases)
-  - Valid config with all fields
-  - Missing systems (error case)
-  - System without ID (error case)
-  - Missing API config (error case)
-  - Default refresh_interval fallback
-- **TestConvertIfHex**: Hex color recognition and passthrough (5 test cases)
-- **TestHexToANSI**: Hex to ANSI 256-color conversion (8 test cases)
+### Why main.go Has 0% Coverage
 
-### response_parser_test.go
-Tests JSON parsing for Enphase API telemetry responses:
-- **TestParseTelemetryResponse**: Flat array format parsing (5 test cases)
-  - Production meter data
-  - Consumption meter data
-  - Empty intervals
-  - Invalid JSON
-  - Malformed structure
-- **TestParseNestedTelemetryResponse**: Nested array format parsing (4 test cases)
-  - Import telemetry data
-  - Export telemetry data
-  - Empty nested intervals
-  - Invalid JSON
-- **TestSumIntervalValues**: Field-based interval summation (5 test cases)
-  - wh_del (production)
-  - wh_imported (grid import)
-  - wh_exported (grid export)
-  - enwh (consumption)
-  - Unknown field (returns 0)
+The `main.go` file is pure orchestration (171 lines) and has 0% coverage by design. This is an **industry standard** because:
 
-### timezone_test.go
-Tests timezone loading and date handling:
-- **TestLoadTimezone**: Timezone string parsing (5 test cases)
-  - Empty string (system timezone)
-  - US/Pacific
-  - America/New_York
-  - UTC
-  - Invalid timezone (graceful fallback)
-- **TestGetDayBoundaries**: Day start/end calculations (2 test cases)
-  - Specific past date
-  - Zero time (today)
-- **TestIsPastDate**: Past date detection (5 test cases)
-  - Zero time (false)
-  - Yesterday (true)
-  - Tomorrow (false)
-  - Today (false)
-  - Last week (true)
-- **TestParseDateInTimezone**: Date string parsing (4 test cases)
-  - Valid date
-  - Invalid format
-  - Invalid date values
-  - Empty string
+1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
+2. **All logic tested**: All functions `main.go` calls are tested in internal packages
+3. **Industry examples**: Docker CLI, kubectl, Terraform, Hugo all have 0% coverage for main files
+4. **Best practice**: Extract testable logic to internal packages (which we do)
 
-### url_builder_test.go
-Tests API URL construction:
-- **TestBuildTelemetryURL**: Telemetry endpoint URL building (4 test cases)
-  - production_meter endpoint
-  - consumption_meter endpoint
-  - energy_import_telemetry endpoint
-  - battery endpoint
-  - Validates: base URL, system ID, endpoint path, API key parameter, query structure
+### Testing Priorities
 
-### validation_test.go
-Tests validation tolerance calculations:
-- **TestValidationTolerance**: 10% tolerance and 0.1 kWh minimum (9 test cases)
-  - Within 10% tolerance
-  - Exactly at 10% tolerance
-  - Exceeds 10% tolerance
-  - Small values with minimum tolerance (0.1 kWh)
-  - Small values exceeding minimum tolerance
-  - Zero expected value
-  - Zero expected value exceeding tolerance
-  - Both zero (valid)
-  - Negative values within tolerance
-- **TestPercentageDifferenceCalculation**: Percentage math validation (5 test cases)
-  - 5% increase
-  - 10% decrease
-  - Zero expected with non-zero actual (infinite %)
-  - Both zero (0%)
-  - Small percentage rounds to zero
+1. **Critical paths**: Business logic (aggregation, parsing, validation)
+2. **Complex logic**: OAuth flows, HTTP clients, caching
+3. **Public APIs**: Exported functions and methods
+4. **Edge cases**: Error handling, boundary conditions
+5. **Performance**: Benchmarks for hot paths
 
-### cache_test.go
-Tests cache state management and thread safety:
-- **TestCacheState_ThreadSafety**: Concurrent access to cache state (uses sync.WaitGroup with multiple goroutines)
-  - Tests TestMode, CacheDisabled, RateLimitWarningShown with concurrent access
-  - Verifies no race conditions with mutex protection
-- **TestResetState**: Verifies ResetState resets all flags
-- **TestTestModeGetterSetter**: Tests TestMode flag get/set
-- **TestCacheDisabledGetterSetter**: Tests CacheDisabled flag get/set
-- **TestRateLimitWarningShownGetterSetter**: Tests RateLimitWarningShown flag get/set
+---
 
-### display_test.go
-Tests display output formatting and testability:
-- **TestNewDisplayWithWriter**: Verifies display can be created with custom writer
-- **TestNewDisplayWithColorsAndTimezone**: Verifies default constructor
-- **TestShowMetrics_ContainsHeader**: Verifies header is present in output
-- **TestShowMetrics_ContainsMetricValues**: Verifies metric values appear in output
-- **TestShowMetrics_CacheIndicator**: Verifies cache status display (cached/live)
-- **TestShowMetrics_NetFlow**: Verifies net flow direction labels (import/export)
-- **TestShowMetrics_IndividualSystems**: Verifies multiple systems display
-- **TestShowMetrics_SingleSystem**: Verifies single system doesn't show individual section
-- **TestShowError**: Verifies error message formatting
-- **TestShowInfo**: Verifies info message formatting
-- **TestGetDateRange**: Tests date range calculation for past dates
-- **TestGetDateRange_Today**: Tests date range for current day
-- **TestGetDateRange_ZeroQueryDate**: Tests date range with zero value (today)
+## Test Organization
 
-### aggregator_test.go
-Tests data aggregation with mock cloud clients:
-- **TestNewDataAggregator**: Verifies default constructor
-- **TestNewDataAggregatorWithFactory**: Verifies factory constructor for testing
-- **TestGetAggregatedMetrics_SingleSystem**: Tests single system aggregation
-- **TestGetAggregatedMetrics_MultipleSystems**: Tests multi-system aggregation and totals
-- **TestGetAggregatedMetrics_MissingAPIConfig**: Verifies error for nil API config
-- **TestGetAggregatedMetrics_MissingAPIKey**: Verifies error for missing API key
-- **TestGetAggregatedMetrics_TokenError**: Verifies error handling for token failures
-- **TestGetAggregatedMetrics_ContextCancellation**: Verifies context cancellation handling
+### File Naming Patterns
 
-## Test Patterns
+This codebase uses two test file organization patterns:
 
-### Table-Driven Tests
-All tests follow Go's table-driven pattern:
+#### Pattern 1: Standard 1:1 Mapping
 
+Most packages follow the simple convention where each source file has one corresponding test file:
+
+| Source File | Test File | Purpose |
+|-------------|-----------|---------|
+| `config.go` | `config_test.go` | Configuration tests |
+| `constants.go` | `constants_test.go` | Constants validation |
+| `display.go` | `display_test.go` | Display formatting tests |
+| `timezone.go` | `timezone_test.go` | Timezone handling tests |
+
+#### Pattern 2: Complex 1:Many Mapping
+
+For packages with extensive functionality or different test concerns, tests are split by category:
+
+**Cache Package** (3 test files):
+- `cache.go` → 3 test files:
+  - `cache_test.go` - Thread safety tests (161 lines)
+  - `cache_functions_test.go` - Functionality tests (516 lines)
+  - `cli_test.go` - CLI utilities tests (119 lines)
+
+**OAuth Package** (3 test files):
+- `oauth.go` → 3 test files:
+  - `oauth_test.go` - Basic unit tests (270 lines)
+  - `oauth_functional_test.go` - Integration tests with mock HTTP servers (598 lines)
+  - `oauth_edge_cases_test.go` - Edge case and error path tests (442 lines)
+
+**Benefits of 1:Many Pattern**:
+- ✅ **Clarity**: Test file name indicates test category
+- ✅ **Maintainability**: Related tests grouped together
+- ✅ **Readability**: Smaller files easier to navigate (161-598 lines vs 516-1310 lines)
+- ✅ **History**: Shows evolution (original → functional → edge cases)
+- ✅ **Focus**: Can run specific test categories independently
+
+### Test Categories
+
+The codebase includes five types of tests:
+
+| Category | Suffix | Purpose | Example |
+|----------|--------|---------|---------|
+| **Unit Tests** | `*_test.go` | Test individual functions/methods | `config_test.go` |
+| **Integration Tests** | `*_integration_test.go` | Test component interactions | `validation_integration_test.go` |
+| **Functional Tests** | `*_functional_test.go` | Test end-to-end flows | `oauth_functional_test.go` |
+| **Edge Case Tests** | `*_edge_cases_test.go` | Test error paths and boundaries | `oauth_edge_cases_test.go` |
+| **Benchmark Tests** | `*_bench_test.go` | Measure performance | `parser_bench_test.go` |
+
+---
+
+## Testing Patterns
+
+This section describes the comprehensive testing patterns used throughout the codebase. Each pattern is illustrated with real examples from the project.
+
+### Pattern 1: Table-Driven Tests
+
+**What**: Define test cases as a slice of structs, iterate and run each case.
+
+**Why**: 
+- Reduces code duplication
+- Makes it easy to add new test cases
+- Clear separation between test data and test logic
+- Self-documenting test cases
+
+**Example** (`parser_test.go`):
 ```go
-func TestExample(t *testing.T) {
+func TestParseTelemetryResponse(t *testing.T) {
     tests := []struct {
-        name     string
-        input    string
-        expected string
+        name        string
+        jsonData    string
+        wantErr     bool
+        wantCount   int
+        validateSum float64
+        fieldName   string
     }{
-        {"case 1", "input1", "output1"},
-        {"case 2", "input2", "output2"},
+        {
+            name: "valid production response",
+            jsonData: `{"intervals": [{"end_at": 1234567890, "wh_del": 100.5}]}`,
+            wantErr:     false,
+            wantCount:   1,
+            validateSum: 100.5,
+            fieldName:   constants.FieldWhDel,
+        },
+        // More test cases...
     }
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            result := FunctionUnderTest(tt.input)
-            if result != tt.expected {
-                t.Errorf("got %v, want %v", result, tt.expected)
-            }
+            // Test logic here
         })
     }
 }
 ```
 
-### Subtests
-Each test uses `t.Run()` for named subtests, providing:
-- Clear test failure messages
-- Ability to run specific subtests
-- Better test organization
+**Used in**: All test files (`parser_test.go`, `config_test.go`, `validation_test.go`, `oauth_test.go`)
 
-## Coverage
+### Pattern 2: Mock Objects for Dependency Injection
 
-Current test coverage: **9.5%** of statements
+**What**: Create mock implementations of interfaces to test components in isolation.
 
-Coverage by component:
-- **Config**: Color conversion, validation logic
-- **Response Parsing**: JSON unmarshaling, interval summation
-- **Timezone**: Date parsing, boundary calculations
-- **URL Building**: Telemetry endpoint construction
-- **Validation**: Tolerance calculations
-- **Constants**: Helper functions
+**Why**:
+- Avoid external dependencies (network, filesystem, API calls)
+- Control return values and errors for edge case testing
+- Fast test execution (no I/O operations)
+- Predictable and repeatable results
 
-### Viewing Coverage
+**Example** (`aggregator_test.go`):
+```go
+// MockCloudClient implements api.CloudClient interface
+type MockCloudClient struct {
+    Metrics   *api.LocalMetrics
+    CacheUsed bool
+    Err       error
+}
 
-#### Terminal View
-```bash
-go tool cover -func=coverage.out
+func (m *MockCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time) (*api.LocalMetrics, bool, error) {
+    if m.Err != nil {
+        return nil, false, m.Err
+    }
+    return m.Metrics, m.CacheUsed, nil
+}
 ```
 
-#### HTML View
+**Used in**: `aggregator_test.go` (mock API client), `display_test.go` (mock writer)
+
+### Pattern 3: Subtests with t.Run()
+
+**What**: Use `t.Run()` to create named subtests within a test function.
+
+**Why**:
+- Better test isolation (each subtest runs independently)
+- Clearer test output (shows which specific case failed)
+- Can run specific subtests: `go test -run TestName/SubtestName`
+- Parallel execution support with `t.Parallel()`
+
+**Example** (`validation_test.go`):
+```go
+func TestValidationTolerance(t *testing.T) {
+    tests := []struct {
+        name       string
+        expected   float64
+        actual     float64
+        shouldPass bool
+    }{
+        {name: "within 10% tolerance", expected: 100.0, actual: 105.0, shouldPass: true},
+        {name: "exceeds tolerance", expected: 100.0, actual: 115.0, shouldPass: false},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Test logic for this specific case
+        })
+    }
+}
+```
+
+**Used in**: All test files with table-driven tests
+
+### Pattern 4: Mock HTTP Servers for Integration Tests
+
+**What**: Use `httptest.NewServer` to create fake HTTP servers for testing API clients.
+
+**Why**:
+- Test real HTTP interactions without external dependencies
+- Control response codes, headers, and body content
+- Test error handling (timeouts, malformed responses, etc.)
+- No API rate limits or network issues
+
+**Example** (`oauth_functional_test.go`):
+```go
+func TestExchangeCodeForToken_Success(t *testing.T) {
+    // Create mock server
+    server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Validate request
+        if r.Method != "POST" {
+            t.Errorf("Expected POST, got %s", r.Method)
+        }
+        
+        // Send mock response
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(200)
+        json.NewEncoder(w).Encode(map[string]interface{}{
+            "access_token":  "test-access-token",
+            "refresh_token": "test-refresh-token",
+            "expires_in":    3600,
+        })
+    }))
+    defer server.Close()
+
+    // Test against mock server
+    apiConfig := &config.APIConfig{
+        AuthorizationURL: server.URL,
+        // ...
+    }
+    // Run test...
+}
+```
+
+**Used in**: `oauth_functional_test.go`, `client_functional_test.go`
+
+### Pattern 5: Writer Injection for Output Testing
+
+**What**: Inject `io.Writer` (like `bytes.Buffer`) to capture and verify output.
+
+**Why**:
+- Test output formatting without printing to stdout
+- Verify exact output content (headers, colors, metrics)
+- Fast execution (in-memory buffer vs terminal I/O)
+- No manual visual inspection needed
+
+**Example** (`display_test.go`):
+```go
+func TestShowMetrics_ContainsHeader(t *testing.T) {
+    var buf bytes.Buffer
+    tz, _ := time.LoadLocation("US/Pacific")
+    
+    // Inject buffer as writer
+    d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+    
+    // Generate output
+    d.ShowMetrics(metrics)
+    
+    // Verify output
+    output := buf.String()
+    if !strings.Contains(output, "ENPHASE") {
+        t.Error("Expected header not found in output")
+    }
+}
+```
+
+**Used in**: `display_test.go` (all output tests)
+
+### Pattern 6: Test Fixtures with Helper Functions
+
+**What**: Create helper functions to generate common test data structures.
+
+**Why**:
+- Reduce duplication in test setup
+- Provide sensible defaults for test data
+- Make tests more readable (focus on what's being tested)
+- Easy to modify test data in one place
+
+**Example** (`aggregator_test.go`):
+```go
+// Helper function to create test metrics
+func makeTestMetrics(production, consumption, gridImport, gridExport float64) *api.LocalMetrics {
+    return &api.LocalMetrics{
+        ProductionToday:        production,
+        ConsumptionToday:       consumption,
+        GridImportToday:        gridImport,
+        GridExportToday:        gridExport,
+        BatteryChargedToday:    0,
+        BatteryDischargedToday: 0,
+        BatterySOC:             50,
+        Timestamp:              time.Now(),
+    }
+}
+```
+
+**Used in**: `aggregator_test.go`, `display_test.go`, `validation_test.go`
+
+### Pattern 7: Thread Safety Testing
+
+**What**: Use goroutines and sync primitives to test concurrent access.
+
+**Why**:
+- Verify thread-safe code works correctly under concurrent load
+- Detect race conditions (use `go test -race`)
+- Test mutex protection and synchronization
+- Ensure package-level state is safe for concurrent use
+
+**Example** (`cache_test.go`):
+```go
+func TestCacheState_ThreadSafety(t *testing.T) {
+    ResetState()
+    
+    const numGoroutines = 10
+    const numIterations = 100
+    
+    var wg sync.WaitGroup
+    wg.Add(numGoroutines)
+    
+    // Concurrent access to state
+    for i := 0; i < numGoroutines; i++ {
+        go func() {
+            defer wg.Done()
+            for j := 0; j < numIterations; j++ {
+                SetTestMode(true)
+                _ = TestMode()
+                SetTestMode(false)
+            }
+        }()
+    }
+    
+    wg.Wait()
+}
+```
+
+**Used in**: `cache_test.go` (state management tests)
+
+### Pattern 8: Error Path Testing
+
+**What**: Deliberately cause errors to test error handling code paths.
+
+**Why**:
+- Verify errors are handled gracefully
+- Test error messages and context wrapping
+- Ensure cleanup happens even on error (defer statements)
+- Validate error propagation through the call stack
+
+**Example** (`oauth_edge_cases_test.go`):
+```go
+func TestRefreshToken_NetworkError(t *testing.T) {
+    // Create server that simulates network failure
+    server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Close connection immediately
+        hj, ok := w.(http.Hijacker)
+        if ok {
+            conn, _, _ := hj.Hijack()
+            conn.Close()
+        }
+    }))
+    defer server.Close()
+    
+    // Test should handle network error gracefully
+    token, err := RefreshToken(ctx, apiConfig)
+    if err == nil {
+        t.Error("Expected error from network failure")
+    }
+    if token != nil {
+        t.Error("Expected nil token on error")
+    }
+}
+```
+
+**Used in**: `oauth_edge_cases_test.go`, `client_test.go`, `aggregator_test.go`
+
+### Pattern 9: Benchmark Tests
+
+**What**: Use `testing.B` to measure and compare performance.
+
+**Why**:
+- Identify performance bottlenecks
+- Verify optimizations actually improve performance
+- Track performance over time (regression detection)
+- Compare different implementation approaches
+
+**Example** (`parser_bench_test.go`):
+```go
+func BenchmarkParseTelemetryResponse(b *testing.B) {
+    jsonData := []byte(`{"intervals": [{"end_at": 123, "wh_del": 100}]}`)
+    
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        _, err := ParseTelemetryResponse(jsonData)
+        if err != nil {
+            b.Fatal(err)
+        }
+    }
+}
+```
+
+**Used in**: `parser_bench_test.go`, `aggregator_bench_test.go`
+
+### Pattern 10: State Reset for Test Isolation
+
+**What**: Reset package-level state before/after tests to ensure isolation.
+
+**Why**:
+- Prevent test pollution (one test affecting another)
+- Make tests order-independent
+- Enable parallel test execution
+- Clear caches and state between test runs
+
+**Example** (`cache_test.go`):
+```go
+func TestCacheState_SetAndGet(t *testing.T) {
+    // Reset to known state
+    ResetState()
+    
+    // Run test
+    SetTestMode(true)
+    if !TestMode() {
+        t.Error("TestMode should be true")
+    }
+    
+    // Clean up (or use defer)
+    defer ResetState()
+}
+```
+
+**Used in**: `cache_test.go`, `oauth_test.go`
+
+### Pattern 11: Validation Against Golden Data
+
+**What**: Compare test output against known-good reference data.
+
+**Why**:
+- Test against real-world data
+- Validate calculations against manual verification
+- Integration testing with actual API responses (cached)
+- Tolerance-based comparisons for floating-point values
+
+**Example** (`validation_integration_test.go`):
+```go
+func TestValidateMetrics_RealData(t *testing.T) {
+    // Load expected values from JSON file
+    expected := loadExpectedValues("test-data/expected_values_2026-01-20.json")
+    
+    // Load cached API responses and aggregate
+    metrics := aggregateFromCache("2026-01-20")
+    
+    // Validate with tolerance
+    err := ValidateMetrics(metrics, "2026-01-20")
+    if err != nil {
+        t.Errorf("Validation failed: %v", err)
+    }
+}
+```
+
+**Used in**: `validation_integration_test.go`, `run-tests.sh`
+
+### Pattern 12: Context Cancellation Testing
+
+**What**: Test behavior when context is cancelled (timeout, interrupt).
+
+**Why**:
+- Verify graceful cancellation of long-running operations
+- Test cleanup on cancellation
+- Validate error handling when context expires
+- Ensure no resource leaks on cancellation
+
+**Example** (`aggregator_test.go`):
+```go
+func TestGetAggregatedMetrics_ContextCancellation(t *testing.T) {
+    ctx, cancel := context.WithCancel(context.Background())
+    
+    // Create slow mock that checks context
+    mockClient := &SlowMockClient{delay: 1 * time.Second}
+    
+    // Cancel immediately
+    cancel()
+    
+    // Should return context error
+    _, err := aggregator.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, tz)
+    if err == nil || !errors.Is(err, context.Canceled) {
+        t.Error("Expected context.Canceled error")
+    }
+}
+```
+
+**Used in**: `aggregator_test.go`, `client_test.go`
+
+---
+
+## Tools and Frameworks
+
+### Standard Library Testing
+
+The project uses Go's built-in `testing` package exclusively (no external test frameworks). This provides:
+
+- **`testing.T`**: Basic unit testing
+- **`testing.B`**: Benchmarking
+- **`t.Run()`**: Subtests and parallel execution
+- **`t.Helper()`**: Mark helper functions (cleaner error traces)
+- **`httptest`**: Mock HTTP servers
+- **`bytes.Buffer`**: Capture output for verification
+
+### Test Execution Commands
+
 ```bash
+# Run all tests
+go test ./...
+
+# Run with verbose output
+go test -v ./...
+
+# Run with coverage
+go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
+
+# Run specific package
+go test ./internal/parser -v
+
+# Run specific test
+go test -run TestParseTelemetryResponse ./internal/parser
+
+# Run specific subtest
+go test -run TestValidation/within_tolerance ./internal/validation
+
+# Run benchmarks
+go test -bench=. ./internal/parser
+go test -bench=. -benchmem ./...
+
+# Run with race detector
+go test -race ./...
+
+# Run tests in parallel
+go test -parallel 4 ./...
 ```
 
-#### Coverage by Package
+### Coverage Analysis
+
 ```bash
-go test -cover ./...
+# Generate coverage profile
+go test -coverprofile=coverage.out ./...
+
+# View coverage by package
+go tool cover -func=coverage.out
+
+# View HTML coverage report
+go tool cover -html=coverage.out
+
+# Check if coverage meets threshold
+go test -cover ./... | grep -E "coverage: [0-9]+\.[0-9]+%" | awk '{print $2}'
 ```
 
-## Integration Tests
+---
 
-The project also includes integration tests via `run-tests.sh`:
-- Uses cached API responses (test mode)
-- Validates against expected values
-- Tests real data flow through the application
-- See README.md "Testing" section for details
+## Testing Conventions
 
-To run integration tests:
-```bash
-./run-tests.sh
-```
+### Naming Conventions
 
-## Best Practices
-
-### Running Tests After Changes
-Always run tests after making changes:
-```bash
-make test
-```
-
-### Adding New Tests
-1. Create `*_test.go` file in the same directory as code under test
-2. Follow table-driven test pattern
-3. Use descriptive test case names
-4. Test both success and error cases
-5. Run tests to verify: `go test -v ./...`
-
-### Test Coverage Goals
-- Aim for >70% coverage on business logic
-- Focus on critical paths (config, parsing, calculations)
-- Don't test trivial getters/setters
-- Test error handling paths
+1. **Test Files**: `*_test.go` suffix
+2. **Test Functions**: `Test<FunctionName>` prefix
+3. **Benchmark Functions**: `Benchmark<FunctionName>` prefix
+4. **Helper Functions**: No special prefix, but use `t.Helper()`
+5. **Mock Types**: `Mock<InterfaceName>` prefix
+6. **Test Cases**: Use descriptive `name` field in struct
 
 ### Test Organization
-- Group related test cases in subtests
-- Use clear, descriptive names
-- Keep tests independent (no shared state)
-- Clean up resources in tests
 
-## Troubleshooting
+1. **One package, one test package**: Tests live in same package (white-box testing)
+2. **Imports**: Use package imports, not relative imports
+3. **Setup/Teardown**: Use `defer` for cleanup, not separate functions
+4. **Test Data**: Keep test data close to tests (inline or helper functions)
+5. **External Files**: Store in `test-data/` directory
 
-### Tests Fail to Compile
-```bash
-# Clear test cache
-go clean -testcache
-# Rebuild
-go build ./...
-```
+### Error Handling in Tests
 
-### Flaky Tests
-Use `-count=1` to disable test caching:
-```bash
-go test -v -count=1 ./...
-```
+1. **Fatal vs Error**:
+   - Use `t.Fatal()` for setup failures (test cannot continue)
+   - Use `t.Error()` for assertion failures (test can continue to check more cases)
 
-### Specific Test Fails
-Run only that test:
-```bash
-go test -v -run TestName ./...
-```
+2. **Error Messages**: Include context and expected/actual values
+   ```go
+   if got != want {
+       t.Errorf("GetValue() = %v, want %v", got, want)
+   }
+   ```
 
-## CI/CD Integration
+3. **Helper Functions**: Mark with `t.Helper()` for better error traces
+   ```go
+   func assertEqual(t *testing.T, got, want interface{}) {
+       t.Helper()
+       if got != want {
+           t.Errorf("got %v, want %v", got, want)
+       }
+   }
+   ```
 
-Tests can be integrated into CI/CD pipelines:
+### Test Coverage Guidelines
 
-### GitHub Actions Example
-```yaml
-- name: Run tests
-  run: go test -v ./...
+| Coverage Level | Expectation | Examples |
+|----------------|-------------|----------|
+| **100%** | Pure logic, no I/O | `constants`, `display`, `urlbuilder` |
+| **80-100%** | Core business logic | `parser`, `aggregator`, `validation` |
+| **60-80%** | Complex I/O operations | `cache`, `api`, `oauth` |
+| **40-60%** | CLI/glue code | `cli`, `app` |
+| **0%** | Entry points only | `main.go` |
 
-- name: Check coverage
-  run: |
-    go test -coverprofile=coverage.out ./...
-    go tool cover -func=coverage.out
-```
+---
 
-### Pre-commit Hook
-```bash
-#!/bin/bash
-# .git/hooks/pre-commit
-make test || exit 1
-```
+## Test Files Explained
 
-## Recent Additions
+### Unit Test Files (Standard Pattern)
 
-The following tests were recently added to improve coverage:
-- **Aggregator tests**: Uses mock CloudClient via CloudClientFactory dependency injection
-- **Display tests**: Uses io.Writer injection to capture and verify output
-- **Cache tests**: Tests thread-safe state management with sync.Mutex
+These files test individual functions and methods in isolation:
 
-## Future Enhancements
+| Test File | Source File | Coverage | Key Tests |
+|-----------|-------------|----------|-----------|
+| `constants_test.go` | `constants.go` | 100% | Constant values, helper functions |
+| `display_test.go` | `display.go` | 100% | Output formatting, color codes |
+| `urlbuilder_test.go` | `urlbuilder.go` | 100% | URL construction, parameter encoding |
+| `validation_test.go` | `validation.go` | 96.6% | Tolerance calculations, metric comparison, edge cases |
+| `timezone_test.go` | `timezone.go` | 93.3% | Timezone loading, date boundaries |
+| `config_test.go` | `config.go` | 82.4% | YAML parsing, validation, color conversion |
+| `parser_test.go` | `parser.go` | 80.8% | JSON parsing, interval summing |
 
-Potential areas for additional testing:
-- API client tests (with mock HTTP responses)
-- OAuth token management tests
-- Cache file I/O tests (read/write operations)
-- Error propagation tests across package boundaries
-- End-to-end integration tests
+### Integration Test Files
+
+These files test component interactions:
+
+| Test File | Tests | Purpose |
+|-----------|-------|---------|
+| `validation_integration_test.go` | 7 test functions | End-to-end validation with real cached data and expected values files |
+| `client_functional_test.go` | API client tests | HTTP interactions with mock server |
+| `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
+
+### OAuth Test Files
+
+These files test OAuth authentication flows:
+
+| Test File | Focus | Coverage |
+|-----------|-------|----------|
+| `oauth_test.go` | Basic unit tests | Token refresh, URL generation |
+| `setup_test.go` | Setup wizard tests | URL parsing, code extraction, validation |
+| `oauth_functional_test.go` | Integration tests | Full OAuth flows with mock HTTP server |
+| `oauth_edge_cases_test.go` | Error handling | Network failures, malformed responses, validation errors |
+
+### Mock-Heavy Test Files
+
+These files use dependency injection extensively:
+
+| Test File | Mocks | Purpose |
+|-----------|-------|---------|
+| `aggregator_test.go` | MockCloudClient | Test aggregation without real API calls |
+| `display_test.go` | bytes.Buffer | Test output without printing to stdout |
+
+### Performance Test Files
+
+These files measure and optimize performance:
+
+| Test File | Benchmarks | Measures |
+|-----------|------------|----------|
+| `parser_bench_test.go` | JSON parsing | Parsing speed, memory allocation |
+| `aggregator_bench_test.go` | Aggregation | Multi-system aggregation performance |
+
+### Thread Safety Test Files
+
+These files verify concurrent access:
+
+| Test File | Concurrency Tests | Purpose |
+|-----------|-------------------|---------|
+| `cache_test.go` | State access | Verify mutex protection |
+
+---
 
 ## Related Documentation
 

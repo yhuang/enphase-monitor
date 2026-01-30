@@ -17,6 +17,7 @@ This document explains the intermediate Go concepts and coding conventions used 
 9. [Package-Level Variables](#package-level-variables)
 10. [Error Wrapping](#error-wrapping)
 11. [Time Handling](#time-handling)
+12. [Coding Conventions Used in This Codebase](#coding-conventions-used-in-this-codebase)
 
 ---
 
@@ -599,6 +600,64 @@ This section summarizes the coding conventions and best practices followed throu
 - **Test functions start with `Test`** - `func TestFunctionName(t *testing.T)`
 - **Use table-driven tests** - Test multiple cases in one function
 - **Validate against expected values** - This codebase uses `internal/validation/validation.go`
+
+#### Test File Organization
+
+This codebase uses two test file organization patterns:
+
+##### Standard Pattern (1:1 mapping)
+Most packages follow the simple convention:
+- `config.go` → `config_test.go`
+- `constants.go` → `constants_test.go`
+- `cli.go` → `cli_test.go`
+
+##### Complex Pattern (1:many mapping)
+For packages with many functions or complex logic, tests are split by **test category**:
+
+**Cache Package** (`cache.go`):
+1. **`cache_test.go`** - Thread safety & state management tests
+   - Tests concurrent access (mutex protection)
+   - Tests state flags (testMode, cacheDisabled, rateLimitWarning)
+   - Created in Round 9 to test thread-safe state after refactoring
+
+2. **`cache_functions_test.go`** - Core functionality tests
+   - Tests URL redaction, cache saving/loading, normalization
+   - Tests file operations, error handling
+   - Original functional tests
+
+**Why split?** Cache has two distinct concerns: thread-safe state (Round 9 addition) vs core caching functions (original).
+
+**OAuth Package** (`oauth.go`):
+1. **`oauth_test.go`** - Basic unit tests (270 lines)
+   - Tests GetAuthorizationURL validation
+   - Tests token refresh mechanics
+   - Original tests from early rounds
+
+2. **`oauth_functional_test.go`** - Integration/functional tests (598 lines)
+   - Uses mock HTTP servers (`httptest.NewServer`)
+   - Tests complete token exchange flows
+   - Tests real HTTP interactions with mocked backend
+   - Created in Rounds 4-6 for comprehensive coverage
+
+3. **`oauth_edge_cases_test.go`** - Edge case & error path tests (442 lines)
+   - Tests validation errors (missing config, empty fields)
+   - Tests network errors, timeouts, malformed responses
+   - Created in Round 10 Phase A to improve coverage
+
+**Why split?** OAuth is complex (270 lines of implementation):
+- Basic validation separate from integration tests
+- Happy path (functional) separate from error paths (edge cases)
+- Easier to maintain and understand test intent
+
+**Benefits of This Approach:**
+
+✅ **Clarity** - Test file name indicates test category
+✅ **Maintainability** - Related tests grouped together
+✅ **Readability** - Smaller files easier to navigate (161-598 lines vs 516-1310 lines)
+✅ **History** - Shows evolution (original → functional → edge cases)
+✅ **Focus** - Can run specific test categories independently
+
+**Bottom line:** The 1:many pattern emerged naturally during refactoring to keep test files organized and maintainable as coverage improved from 29.8% → 70.4%. It's a pragmatic choice, not a strict rule.
 
 ---
 

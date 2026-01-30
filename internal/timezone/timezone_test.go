@@ -1,3 +1,50 @@
+// Package timezone - timezone_test.go
+//
+// TEST SETUP
+// ----------
+// This test suite validates timezone handling and date boundary calculations.
+// Tests ensure consistent date/time handling across different timezones.
+//
+// TEST PLAN
+// ---------
+// 1. Timezone Loading Tests
+//    - Test valid IANA timezone identifiers (US/Pacific, America/New_York, etc.)
+//    - Test empty string uses system timezone
+//    - Test UTC timezone fallback logic
+//    - Test invalid timezone returns error
+//
+// 2. Date Boundary Tests
+//    - Test GetDayBoundaries returns correct start/end times
+//    - Test boundaries respect timezone (not UTC)
+//    - Test daylight saving time transitions
+//    - Test zero time value (use today)
+//
+// 3. Past Date Detection Tests
+//    - Test IsPastDate correctly identifies historical dates
+//    - Test today returns false
+//    - Test future dates return false
+//
+// TESTING APPROACH
+// ----------------
+// - Table-driven tests with various timezone strings
+// - Use known dates for predictable results
+// - Verify boundaries are in specified timezone, not UTC
+// - Test edge cases (UTC, empty string, invalid timezone)
+//
+// WHY TIMEZONE MATTERS
+// --------------------
+// Timezone handling is critical for:
+// - Accurate day boundaries (midnight to midnight in local time)
+// - Cache key generation (dates must be consistent)
+// - Display formatting (show times in user's timezone)
+// - API queries (request data for correct 24-hour period)
+//
+// PATTERN USED
+// ------------
+// - Pattern 1: Table-Driven Tests
+// - Pattern 3: Subtests with t.Run()
+//
+// See TESTING.md for detailed pattern explanations.
 package timezone
 
 import (

@@ -882,41 +882,46 @@ Go projects use the `internal/` directory for packages that should not be import
 
 ```
 internal/
-├── aggregator/           # Multi-system data aggregation
-│   ├── aggregator.go     # Core aggregation logic
-│   └── types.go          # Data types (AggregatedMetrics, SystemMetrics)
-├── api/                  # API client for Enphase Cloud API
-│   ├── client.go         # HTTP client implementation
-│   ├── interface.go      # CloudClient interface definition
-│   └── types.go          # LocalMetrics type
-├── app/                  # Application setup and execution
-│   ├── setup.go          # Configuration and initialization
-│   └── runner.go         # Execution modes (once/continuous)
-├── cache/                # Disk-based API response caching
-│   ├── cache.go          # Core caching logic
-│   └── cli.go            # Cache inspection utilities
-├── cli/                  # Command-line interface
-│   ├── flags.go          # Flag parsing
-│   └── cache_commands.go # Cache management commands
-├── config/               # Configuration loading and validation
-│   └── config.go         # YAML config parsing
-├── constants/            # Application-wide constants
-│   └── constants.go      # All magic numbers and strings
-├── display/              # Terminal output formatting
-│   └── display.go        # Colored output with metrics
-├── oauth/                # OAuth 2.0 authentication
-│   ├── oauth.go          # Token acquisition/refresh
-│   └── setup.go          # Interactive setup wizard
-├── parser/               # JSON response parsing
-│   └── parser.go         # Telemetry data parsing
-├── timezone/             # Timezone handling
-│   └── timezone.go       # Day boundaries calculation
-├── types/                # Shared type definitions
-│   └── types.go          # Types used across packages (SystemConfig, APIConfig)
-├── urlbuilder/           # API URL construction
-│   └── urlbuilder.go     # URL building utilities
-└── validation/           # Test mode validation
-    └── validation.go     # Metrics comparison
+├── aggregator/                  # Multi-system data aggregation
+│   ├── aggregator.go            # Core aggregation logic
+│   └── types.go                 # Data types (AggregatedMetrics, SystemMetrics)
+├── api/                         # API client for Enphase Cloud API
+│   ├── client.go                # HTTP client implementation
+│   ├── interface.go             # CloudClient interface definition
+│   └── types.go                 # LocalMetrics type
+├── app/                         # Application setup and execution
+│   ├── setup.go                 # Configuration and initialization
+│   └── runner.go                # Execution modes (once/continuous)
+├── cache/                       # Disk-based API response caching
+│   ├── cache.go                 # Core caching logic
+│   ├── cli.go                   # Cache inspection utilities
+│   ├── cache_test.go            # Thread safety tests
+│   └── cache_functions_test.go  # Functionality tests
+├── cli/                         # Command-line interface
+│   ├── flags.go                 # Flag parsing
+│   └── cache_commands.go        # Cache management commands
+├── config/                      # Configuration loading and validation
+│   └── config.go                # YAML config parsing
+├── constants/                   # Application-wide constants
+│   └── constants.go             # All magic numbers and strings
+├── display/                     # Terminal output formatting
+│   └── display.go               # Colored output with metrics
+├── oauth/                       # OAuth 2.0 authentication
+│   ├── oauth.go                 # Token acquisition/refresh
+│   ├── setup.go                 # Interactive setup wizard
+│   ├── oauth_test.go            # Basic unit tests
+│   ├── oauth_functional_test.go # Integration tests
+│   └── oauth_edge_cases_test.go # Edge case tests
+├── parser/                      # JSON response parsing
+│   └── parser.go                # Telemetry data parsing
+├── timezone/                    # Timezone handling
+│   └── timezone.go              # Day boundaries calculation
+├── types/                       # Shared type definitions
+│   └── types.go                 # Types used across packages
+├── urlbuilder/                  # API URL construction
+│   └── urlbuilder.go            # URL building utilities
+└── validation/                  # Test mode validation
+    └── validation.go            # Metrics comparison
 ```
 
 ---
