@@ -123,6 +123,43 @@ Tests validation tolerance calculations:
   - Both zero (0%)
   - Small percentage rounds to zero
 
+### cache_test.go
+Tests cache state management and thread safety:
+- **TestCacheState_ThreadSafety**: Concurrent access to cache state (uses sync.WaitGroup with multiple goroutines)
+  - Tests TestMode, CacheDisabled, RateLimitWarningShown with concurrent access
+  - Verifies no race conditions with mutex protection
+- **TestResetState**: Verifies ResetState resets all flags
+- **TestTestModeGetterSetter**: Tests TestMode flag get/set
+- **TestCacheDisabledGetterSetter**: Tests CacheDisabled flag get/set
+- **TestRateLimitWarningShownGetterSetter**: Tests RateLimitWarningShown flag get/set
+
+### display_test.go
+Tests display output formatting and testability:
+- **TestNewDisplayWithWriter**: Verifies display can be created with custom writer
+- **TestNewDisplayWithColorsAndTimezone**: Verifies default constructor
+- **TestShowMetrics_ContainsHeader**: Verifies header is present in output
+- **TestShowMetrics_ContainsMetricValues**: Verifies metric values appear in output
+- **TestShowMetrics_CacheIndicator**: Verifies cache status display (cached/live)
+- **TestShowMetrics_NetFlow**: Verifies net flow direction labels (import/export)
+- **TestShowMetrics_IndividualSystems**: Verifies multiple systems display
+- **TestShowMetrics_SingleSystem**: Verifies single system doesn't show individual section
+- **TestShowError**: Verifies error message formatting
+- **TestShowInfo**: Verifies info message formatting
+- **TestGetDateRange**: Tests date range calculation for past dates
+- **TestGetDateRange_Today**: Tests date range for current day
+- **TestGetDateRange_ZeroQueryDate**: Tests date range with zero value (today)
+
+### aggregator_test.go
+Tests data aggregation with mock cloud clients:
+- **TestNewDataAggregator**: Verifies default constructor
+- **TestNewDataAggregatorWithFactory**: Verifies factory constructor for testing
+- **TestGetAggregatedMetrics_SingleSystem**: Tests single system aggregation
+- **TestGetAggregatedMetrics_MultipleSystems**: Tests multi-system aggregation and totals
+- **TestGetAggregatedMetrics_MissingAPIConfig**: Verifies error for nil API config
+- **TestGetAggregatedMetrics_MissingAPIKey**: Verifies error for missing API key
+- **TestGetAggregatedMetrics_TokenError**: Verifies error handling for token failures
+- **TestGetAggregatedMetrics_ContextCancellation**: Verifies context cancellation handling
+
 ## Test Patterns
 
 ### Table-Driven Tests
@@ -269,15 +306,21 @@ Tests can be integrated into CI/CD pipelines:
 make test || exit 1
 ```
 
+## Recent Additions
+
+The following tests were recently added to improve coverage:
+- **Aggregator tests**: Uses mock CloudClient via CloudClientFactory dependency injection
+- **Display tests**: Uses io.Writer injection to capture and verify output
+- **Cache tests**: Tests thread-safe state management with sync.Mutex
+
 ## Future Enhancements
 
 Potential areas for additional testing:
 - API client tests (with mock HTTP responses)
-- Aggregator logic tests (with mock clients)
-- Display formatting tests
 - OAuth token management tests
-- Cache behavior tests
-- Error propagation tests
+- Cache file I/O tests (read/write operations)
+- Error propagation tests across package boundaries
+- End-to-end integration tests
 
 ## Related Documentation
 

@@ -31,7 +31,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 - **Multi-System Monitoring**: Query and aggregate data from multiple independent Enphase systems
 - **Cloud API Integration**: Uses Enphase Enlighten Cloud API v4 exclusively (no local network access required)
 - **Intelligent Caching**: Disk-based response caching to respect API rate limits (10 calls/minute)
-- **Historical Data**: Query any past date with `--date` flag
+- **Historical Data**: Query any past date with `--date` flag (auto-runs once since data won't change)
 - **Real-time Monitoring**: Continuous mode with configurable refresh interval (default: 1 hour)
 - **Color Customization**: Customize terminal output colors via YAML configuration
 - **Validation Mode**: Test against expected values without making API calls
@@ -50,30 +50,36 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go              # Entry point (171 lines) - orchestration only
+├── main.go              # Entry point (~197 lines) - orchestration only
 ├── internal/
 │   ├── aggregator/      # Multi-system data aggregation
-│   │   ├── types.go     # Metric data structures
-│   │   └── aggregator.go # Aggregation logic with DI
+│   │   ├── types.go     # Metric data structures (AggregatedMetrics, SystemMetrics)
+│   │   ├── aggregator.go # Aggregation logic with dependency injection
+│   │   └── aggregator_test.go # Aggregator tests with mock clients
 │   ├── api/             # HTTP client for Cloud API v4
 │   │   ├── client.go    # Enlighten Cloud API client
 │   │   ├── types.go     # API request/response types
-│   │   ├── interface.go # API client interfaces
+│   │   ├── interface.go # CloudClient interface for testability
 │   │   └── client_test.go # API client tests
 │   ├── app/             # Application execution logic
 │   │   ├── setup.go     # App initialization & configuration
 │   │   └── runner.go    # Execution modes (once/continuous)
 │   ├── cache/           # Disk-based response caching
-│   │   ├── cache.go     # Cache implementation
-│   │   └── cli.go       # Cache utilities
+│   │   ├── cache.go     # Thread-safe cache implementation
+│   │   ├── cli.go       # Cache utilities
+│   │   └── cache_test.go # Cache state and thread safety tests
 │   ├── cli/             # Command-line interface
 │   │   ├── flags.go     # CLI flag parsing
 │   │   └── cache_commands.go # Cache management commands
 │   ├── config/          # Configuration types
-│   │   ├── config.go    # YAML loading & validation
+│   │   ├── config.go    # YAML loading & validation (uses type aliases)
 │   │   └── config_test.go # Configuration tests
+│   ├── constants/       # Centralized constants (20+)
+│   │   ├── constants.go # Application-wide constants
+│   │   └── constants_test.go # Constants tests
 │   ├── display/         # Terminal output formatting
-│   │   └── display.go   # Display with color customization
+│   │   ├── display.go   # Display with io.Writer injection for testability
+│   │   └── display_test.go # Display output tests
 │   ├── oauth/           # OAuth 2.0 authentication
 │   │   ├── oauth.go     # Token management & refresh
 │   │   ├── setup.go     # Interactive OAuth wizard
@@ -84,20 +90,39 @@ enphase-monitor/
 │   ├── timezone/        # Timezone handling
 │   │   ├── timezone.go  # Timezone utilities
 │   │   └── timezone_test.go # Timezone tests
+│   ├── types/           # Shared type definitions
+│   │   └── types.go     # SystemConfig, APIConfig (breaks circular deps)
 │   ├── urlbuilder/      # API URL construction
 │   │   └── urlbuilder.go # URL building helpers
-│   ├── validation/      # Test mode validation
-│   │   ├── validation.go # Metrics validation logic
-│   │   ├── validation_test.go # Unit tests
-│   │   └── validation_integration_test.go # Integration tests
-│   └── constants/       # Centralized constants (20+)
-│       ├── constants.go # Application-wide constants
-│       └── constants_test.go # Constants tests
+│   └── validation/      # Test mode validation
+│       ├── validation.go # Metrics validation logic
+│       ├── validation_test.go # Unit tests
+│       └── validation_integration_test.go # Integration tests
 │
 ├── config.yaml          # User configuration (not in git)
 ├── config.yaml.example  # Configuration template
 └── test-data/           # Cache files and validation data
 ```
+
+### Package Dependency Graph
+
+The `internal/types/` package provides shared type definitions that break circular dependencies:
+
+```
+                    types
+                   /  |  \
+                  /   |   \
+               config aggregator oauth
+                  \   |   /
+                   \  |  /
+                    app
+```
+
+Types defined in `internal/types/types.go`:
+- `SystemConfig` - Configuration for a single Enphase system
+- `APIConfig` - API credentials and OAuth settings
+
+These types are re-exported as type aliases in `config` and `aggregator` packages for backward compatibility.
 
 ---
 
@@ -438,18 +463,32 @@ Go convention is PascalCase; JSON convention is often snake_case.
 ### 8. Package-Level Variables (Use Sparingly)
 
 ```go
-// oauth.go - Caching tokens at package level
-var (
-    tokenCache     *TokenCache  // Shared token cache (singleton)
-    // Note: In this codebase, token cache is accessed from main goroutine only,
-    // so explicit mutex locking is not needed. If accessed from multiple goroutines,
-    // you would add: tokenCacheLock sync.Mutex
-)
+// oauth.go - Caching tokens at package level (single-goroutine access)
+var tokenCache *TokenCache  // Shared token cache (singleton)
+
+// cache.go - Thread-safe state with mutex protection
+type cacheState struct {
+    mu                    sync.Mutex
+    testMode              bool
+    cacheDisabled         bool
+    rateLimitWarningShown bool
+}
+var state = &cacheState{}
+
+func TestMode() bool {
+    state.mu.Lock()
+    defer state.mu.Unlock()
+    return state.testMode
+}
 ```
 
 **Why:** Sometimes necessary for caching, but prefer dependency injection
-when possible to improve testability. In this codebase, the token cache is
-only accessed from the main goroutine, so no mutex is needed.
+when possible to improve testability.
+
+**Thread Safety Considerations:**
+- OAuth token cache: Accessed from main goroutine only, no mutex needed
+- Cache state flags: Protected by `sync.Mutex` for safe concurrent access
+- Use `ResetState()` in tests to ensure clean state between test cases
 
 ---
 
@@ -497,23 +536,11 @@ only accessed from the main goroutine, so no mutex is needed.
 | [internal/timezone/*](internal/timezone/)         | Timezone handling and date boundaries             | Multiple     |
 | [internal/validation/*](internal/validation/)     | Test mode validation with tolerance checks        | Multiple     |
 | [internal/constants/*](internal/constants/)       | Centralized constants (20+ constants)             | Multiple     |
-| [config.go](config.go)             | YAML loading, validation, color conversion | Lines 159-260|
-| [oauth.go](oauth.go)               | OAuth 2.0 token refresh, caching           | Lines 73-200 |
-| [setup_oauth.go](setup_oauth.go)   | Interactive browser-based OAuth setup      | Full file    |
-| [validation.go](validation.go)     | Test mode validation (--test flag)         | Lines 30-150 |
-
-### Internal Packages - Business Logic
+### Internal Packages - Shared Types
 
 | Package/File                                      | Responsibility                                    | Key Info     |
 |---------------------------------------------------|---------------------------------------------------|--------------|
-| [internal/aggregator/types.go](internal/aggregator/types.go)         | Metric data structures                            | 41 lines     |
-| [internal/aggregator/aggregator.go](internal/aggregator/aggregator.go) | Multi-system aggregation with DI                  | 163 lines    |
-| [internal/display/display.go](internal/display/display.go)           | Terminal output formatting with colors            | 197 lines    |
-| [internal/api/*](internal/api/)                   | HTTP client for Enphase Cloud API v4              | Multiple     |
-| [internal/cache/*](internal/cache/)               | Disk-based response caching                       | Multiple     |
-| [internal/parser/*](internal/parser/)             | JSON telemetry response parsing                   | Multiple     |
-| [internal/config/*](internal/config/)             | Configuration types and utilities                 | Multiple     |
-| [internal/timezone/*](internal/timezone/)         | Timezone handling and date boundaries             | Multiple     |
+| [internal/types/types.go](internal/types/types.go)     | Shared type definitions (SystemConfig, APIConfig) | Breaks circular deps |
 
 ---
 

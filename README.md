@@ -252,6 +252,11 @@ Query a specific historical date:
 ./enphase-monitor --once --date 2026-01-15
 ```
 
+> **Note:** When querying a past date, the program automatically runs once (even without `--once` flag) since historical data doesn't change over time. You'll see a message like:
+> ```
+> Note: Running once for historical date 2026-01-15 (data won't change)
+> ```
+
 ### Continuous Monitoring
 
 Monitor with auto-refresh (uses `refresh_interval` from config):
@@ -529,26 +534,32 @@ enphase-monitor/
 ├── internal/                   # Internal packages
 │   ├── aggregator/             # Multi-system data aggregation
 │   │   ├── types.go            # Metric data structures
-│   │   └── aggregator.go       # Aggregation logic with dependency injection
+│   │   ├── aggregator.go       # Aggregation logic with dependency injection
+│   │   └── aggregator_test.go  # Aggregator tests with mock clients
 │   ├── api/                    # HTTP client for Cloud API v4
 │   │   ├── client.go           # Enlighten Cloud API client
 │   │   ├── types.go            # API request/response types
-│   │   ├── interface.go        # API client interfaces
+│   │   ├── interface.go        # CloudClient interface for testability
 │   │   └── client_test.go      # API client tests
 │   ├── app/                    # Application execution logic
 │   │   ├── setup.go            # App initialization & configuration
 │   │   └── runner.go           # Execution modes (once/continuous)
 │   ├── cache/                  # Disk-based response caching
-│   │   ├── cache.go            # Cache implementation
-│   │   └── cli.go              # Cache utilities
+│   │   ├── cache.go            # Thread-safe cache implementation
+│   │   ├── cli.go              # Cache utilities
+│   │   └── cache_test.go       # Cache state and thread safety tests
 │   ├── cli/                    # Command-line interface
 │   │   ├── flags.go            # CLI flag parsing
-│   │   └── cache_commands.go  # Cache management commands
+│   │   └── cache_commands.go   # Cache management commands
 │   ├── config/                 # Configuration types
-│   │   ├── config.go           # YAML loading & validation
+│   │   ├── config.go           # YAML loading & validation (uses type aliases)
 │   │   └── config_test.go      # Configuration tests
+│   ├── constants/              # Centralized constants
+│   │   ├── constants.go        # Application-wide constants
+│   │   └── constants_test.go   # Constants tests
 │   ├── display/                # Terminal output formatting
-│   │   └── display.go          # Display with color customization
+│   │   ├── display.go          # Display with io.Writer injection
+│   │   └── display_test.go     # Display output tests
 │   ├── oauth/                  # OAuth 2.0 authentication
 │   │   ├── oauth.go            # Token management & refresh
 │   │   ├── setup.go            # Interactive OAuth wizard
@@ -559,15 +570,14 @@ enphase-monitor/
 │   ├── timezone/               # Timezone handling
 │   │   ├── timezone.go         # Timezone utilities
 │   │   └── timezone_test.go    # Timezone tests
+│   ├── types/                  # Shared type definitions
+│   │   └── types.go            # SystemConfig, APIConfig (breaks circular deps)
 │   ├── urlbuilder/             # API URL construction
 │   │   └── urlbuilder.go       # URL building helpers
-│   ├── validation/             # Test mode validation
-│   │   ├── validation.go       # Metrics validation logic
-│   │   ├── validation_test.go  # Unit tests
-│   │   └── validation_integration_test.go  # Integration tests
-│   └── constants/              # Centralized constants
-│       ├── constants.go        # Application-wide constants
-│       └── constants_test.go   # Constants tests
+│   └── validation/             # Test mode validation
+│       ├── validation.go       # Metrics validation logic
+│       ├── validation_test.go  # Unit tests
+│       └── validation_integration_test.go  # Integration tests
 ├── config.yaml.example         # Example configuration with all options
 ├── config.yaml                 # Your actual configuration (create from example)
 ├── test-data/                  # Test data and cache directory

@@ -21,6 +21,7 @@ This document explains all the intermediate Go concepts that are used throughout
 10. [Hash Functions](#hash-functions)
 11. [Variable Declarations](#variable-declarations)
 12. [Multiple Return Values](#multiple-return-values)
+13. [File Organization Patterns](#file-organization-patterns) - includes shared types, interfaces for dependency breaking, and type aliases
 
 ---
 
@@ -324,6 +325,8 @@ var total float64
 
 ## Interfaces
 
+> **📚 Advanced Topic:** For how interfaces can break circular dependencies (duck typing), see [Why Interfaces Can Avoid Shared Types](#why-interfaces-can-avoid-shared-types) in the File Organization Patterns section.
+
 ### Interface Types
 
 **Location**: `response_parser.go:67`
@@ -502,7 +505,7 @@ for {
 │ 1. Program Starts (main.go)                                     │
 │    └─► Create context with signal handling:                     │
 │        ctx, stop := signal.NotifyContext(...)                   │
-│        defer stop()                                              │
+│        defer stop()                                             │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -525,7 +528,7 @@ for {
 ┌─────────────────────────────────────────────────────────────┐
 │ 4. Main Loop Starts                                         │
 │    └─► for { select { ... } }                               │
-│        • Blocks waiting for ticker.C or ctx.Done()         │
+│        • Blocks waiting for ticker.C or ctx.Done()          │
 └─────────────────────────────────────────────────────────────┘
                             │
         ┌───────────────────┴───────────────────┐
@@ -536,8 +539,8 @@ for {
 │ <-ticker.C            │          │ <-ctx.Done()            │
 │                       │          │                         │
 │ • Fetch metrics       │          │ • Print shutdown msg    │
-│ • Display results     │          │ • return (exits loop)  │
-│ • Loop continues      │          │ • defer ticker.Stop()  │
+│ • Display results     │          │ • return (exits loop)   │
+│ • Loop continues      │          │ • defer ticker.Stop()   │
 │                       │          │   executes              │
 └───────────────────────┘          └─────────────────────────┘
         │                                       │
@@ -826,22 +829,18 @@ var (
 
 **Location**: `api_cache.go:87`
 
-`sha256.Sum256()` returns a `[32]byte` array (fixed size). We convert it to a string using hex encoding for a readable cache key.
+`sha256.Sum256()` computes a SHA-256 hash and returns a `[32]byte` array (fixed size). We convert it to a string using hex encoding for a readable cache key.
 
 ```go
 hash := sha256.Sum256([]byte(normalizedURL))
 return hex.EncodeToString(hash[:])
+//                        ^^^^^ Converts [32]byte array to []byte slice
 ```
 
-### Hash Function
-
-**Location**: `api_cache.go:94`
-
-`sha256.Sum256()` computes SHA-256 hash, returns `[32]byte` array.
-
-```go
-hash := sha256.Sum256([]byte(normalizedURL))
-```
+**Key Points:**
+- `sha256.Sum256()` returns a fixed-size array `[32]byte`, not a slice
+- `hash[:]` converts the array to a slice (required by `hex.EncodeToString`)
+- The resulting hex string is 64 characters (2 hex chars per byte × 32 bytes)
 
 ---
 
@@ -883,41 +882,41 @@ Go projects use the `internal/` directory for packages that should not be import
 
 ```
 internal/
-├── aggregator/     # Multi-system data aggregation
-│   ├── aggregator.go   # Core aggregation logic
-│   └── types.go        # Data types (AggregatedMetrics, SystemMetrics)
-├── api/            # API client for Enphase Cloud API
-│   ├── client.go       # HTTP client implementation
-│   ├── interface.go    # CloudClient interface definition
-│   └── types.go        # LocalMetrics type
-├── app/            # Application setup and execution
-│   ├── setup.go        # Configuration and initialization
-│   └── runner.go       # Execution modes (once/continuous)
-├── cache/          # Disk-based API response caching
-│   ├── cache.go        # Core caching logic
-│   └── cli.go          # Cache inspection utilities
-├── cli/            # Command-line interface
-│   ├── flags.go        # Flag parsing
+├── aggregator/           # Multi-system data aggregation
+│   ├── aggregator.go     # Core aggregation logic
+│   └── types.go          # Data types (AggregatedMetrics, SystemMetrics)
+├── api/                  # API client for Enphase Cloud API
+│   ├── client.go         # HTTP client implementation
+│   ├── interface.go      # CloudClient interface definition
+│   └── types.go          # LocalMetrics type
+├── app/                  # Application setup and execution
+│   ├── setup.go          # Configuration and initialization
+│   └── runner.go         # Execution modes (once/continuous)
+├── cache/                # Disk-based API response caching
+│   ├── cache.go          # Core caching logic
+│   └── cli.go            # Cache inspection utilities
+├── cli/                  # Command-line interface
+│   ├── flags.go          # Flag parsing
 │   └── cache_commands.go # Cache management commands
-├── config/         # Configuration loading and validation
-│   └── config.go       # YAML config parsing
-├── constants/      # Application-wide constants
-│   └── constants.go    # All magic numbers and strings
-├── display/        # Terminal output formatting
-│   └── display.go      # Colored output with metrics
-├── oauth/          # OAuth 2.0 authentication
-│   ├── oauth.go        # Token acquisition/refresh
-│   └── setup.go        # Interactive setup wizard
-├── parser/         # JSON response parsing
-│   └── parser.go       # Telemetry data parsing
-├── timezone/       # Timezone handling
-│   └── timezone.go     # Day boundaries calculation
-├── types/          # Shared type definitions
-│   └── types.go        # Types used across packages (SystemConfig, APIConfig)
-├── urlbuilder/     # API URL construction
-│   └── urlbuilder.go   # URL building utilities
-└── validation/     # Test mode validation
-    └── validation.go   # Metrics comparison
+├── config/               # Configuration loading and validation
+│   └── config.go         # YAML config parsing
+├── constants/            # Application-wide constants
+│   └── constants.go      # All magic numbers and strings
+├── display/              # Terminal output formatting
+│   └── display.go        # Colored output with metrics
+├── oauth/                # OAuth 2.0 authentication
+│   ├── oauth.go          # Token acquisition/refresh
+│   └── setup.go          # Interactive setup wizard
+├── parser/               # JSON response parsing
+│   └── parser.go         # Telemetry data parsing
+├── timezone/             # Timezone handling
+│   └── timezone.go       # Day boundaries calculation
+├── types/                # Shared type definitions
+│   └── types.go          # Types used across packages (SystemConfig, APIConfig)
+├── urlbuilder/           # API URL construction
+│   └── urlbuilder.go     # URL building utilities
+└── validation/           # Test mode validation
+    └── validation.go     # Metrics comparison
 ```
 
 ---
@@ -978,7 +977,228 @@ type CloudClient interface {
 
 **Cross-Package Type Sharing:**
 
-When multiple packages need the same types, a shared types package prevents circular dependencies:
+When multiple packages need the same types, a shared types package prevents circular dependencies.
+
+---
+
+### Package-Specific vs Shared Types
+
+This codebase has TWO different patterns for `types.go` files, and understanding the distinction is important:
+
+**The Problem:**
+
+You might notice there are multiple `types.go` files in this codebase:
+- `internal/api/types.go`
+- `internal/aggregator/types.go`
+- `internal/types/types.go`
+
+Why have `internal/types/types.go` when we already have package-specific `types.go` files?
+
+**The Answer: They Serve Different Purposes**
+
+| Pattern | Location | Purpose | Example Types |
+|---------|----------|---------|---------------|
+| **Package-specific types** | `internal/api/types.go` | Types used ONLY within that package | `LocalMetrics` |
+| **Package-specific types** | `internal/aggregator/types.go` | Types used ONLY within that package | `AggregatedMetrics`, `SystemMetrics` |
+| **Shared types package** | `internal/types/types.go` | Types used by MULTIPLE packages | `SystemConfig`, `APIConfig` |
+
+**Why Package-Specific Types Stay in Their Package:**
+
+```go
+// internal/api/types.go - Used only by the api package
+type LocalMetrics struct {
+    ProductionToday float64
+    // ... only api/client.go uses this
+}
+
+// internal/aggregator/types.go - Used only by the aggregator package
+type AggregatedMetrics struct {
+    ProductionToday float64
+    Systems         []SystemMetrics
+    // ... only aggregator package uses this
+}
+```
+
+These types are implementation details of their respective packages. No other package needs to import them directly.
+
+**Why Some Types Need a Shared Package:**
+
+```go
+// The Problem: Circular Dependency
+// --------------------------------
+// config package defines SystemConfig
+// aggregator package needs SystemConfig to know which systems to query
+// BUT if aggregator imports config, and config imports aggregator...
+// Go compiler error: "import cycle not allowed"
+
+// The Solution: Extract shared types
+// ----------------------------------
+// internal/types/types.go
+type SystemConfig struct {
+    Name string
+    ID   string
+}
+
+// Now both packages can import from internal/types without circular dependency:
+//   config     → imports types
+//   aggregator → imports types
+//   oauth      → imports types
+//   app        → imports types
+```
+
+**Visual Representation:**
+
+```
+BEFORE (circular dependency problem):
+    config ←──────→ aggregator
+         ↖       ↗
+           oauth
+    ERROR: import cycle not allowed
+
+AFTER (shared types solution):
+                types
+               /  |  \
+              /   |   \
+           config aggregator oauth
+              \   |   /
+               \  |  /
+                 app
+    OK: No circular dependencies
+```
+
+**Summary:**
+
+- `internal/api/types.go` → Package-specific types (LocalMetrics for API responses)
+- `internal/aggregator/types.go` → Package-specific types (AggregatedMetrics for results)
+- `internal/types/types.go` → Shared types (SystemConfig, APIConfig used everywhere)
+
+The key question to ask: "Does more than one package need this type?" If yes, it belongs in `internal/types/`. If no, it stays in the package-specific `types.go`.
+
+---
+
+### When to Move a Type to internal/types/
+
+If a package-specific type later needs to be used by another package, use this decision flowchart:
+
+```
+Does package B need a type from package A?
+    │
+    ▼
+Does package A also need something from package B?
+    │
+    ├── NO  → Just import A from B (direct import works)
+    │         Example: display imports aggregator.AggregatedMetrics
+    │
+    └── YES → Would create circular dependency
+              │
+              ├── Can you use an interface instead?
+              │   └── YES → Define interface in the consuming package
+              │
+              └── Need the concrete type?
+                  └── Move type to internal/types/
+```
+
+**Three Possible Solutions:**
+
+| Scenario | Solution | Example in Codebase |
+|----------|----------|---------------------|
+| B needs A's type, A doesn't need B | Direct import | `display` imports `aggregator.AggregatedMetrics` |
+| Mutual dependency, behavior needed | Define interface | `api.CloudClient` interface for mocking |
+| Mutual dependency, concrete type needed | Move to `internal/types/` | `SystemConfig`, `APIConfig` |
+
+**Current Type Locations:**
+
+| Type | Location | Reason |
+|------|----------|--------|
+| `AggregatedMetrics` | `aggregator/types.go` | Only `display` imports it; no cycle |
+| `LocalMetrics` | `api/types.go` | Only `aggregator` imports it; no cycle |
+| `SystemConfig` | `types/types.go` | `config`, `aggregator`, `oauth`, `app` all need it; would create cycles |
+| `APIConfig` | `types/types.go` | `config`, `aggregator`, `oauth`, `app` all need it; would create cycles |
+
+**Why Interfaces Can Avoid Shared Types:**
+
+Interfaces can break circular dependencies because of Go's implicit interface satisfaction (duck typing). If you only need to call methods on a type (not access its fields), you can define an interface in the consuming package:
+
+```go
+// Package A defines a concrete type
+package api
+
+type EnlightenCloudClient struct {
+    // fields...
+}
+
+func (c *EnlightenCloudClient) GetMetrics() (*LocalMetrics, error) {
+    // implementation
+}
+```
+
+```go
+// Package B defines what behavior it NEEDS (not what A provides)
+package aggregator
+
+// B defines its OWN interface - doesn't need to import A's type
+type CloudClient interface {
+    GetMetrics() (*LocalMetrics, error)
+}
+
+// B accepts the interface, not the concrete type
+func (d *DataAggregator) fetchData(client CloudClient) {
+    // works with ANY type that has GetMetrics()
+}
+```
+
+**Why This Works:**
+
+```
+Package A                          Package B
+─────────                          ─────────
+EnlightenCloudClient               CloudClient (interface)
+  └─ GetMetrics()                    └─ GetMetrics()
+
+A satisfies B's interface automatically (duck typing).
+B never imports A. A never imports B.
+No circular dependency!
+```
+
+**Interfaces vs Shared Types - When to Use Each:**
+
+| Need | Solution | Why |
+|------|----------|-----|
+| Call methods on a type | Define interface in consumer | Behavior only, no fields needed |
+| Access struct fields | Move to `internal/types/` | Must have concrete type |
+| Construct/embed the type | Move to `internal/types/` | Must have concrete type |
+
+**Example - Why `SystemConfig` Can't Use an Interface:**
+
+```go
+// This WON'T work with an interface - need struct fields:
+func ProcessConfig(cfg SystemConfig) {
+    name := cfg.Name    // Accessing field - need concrete type
+    id := cfg.ID        // Accessing field - need concrete type
+}
+
+// This WILL work with an interface - only calling methods:
+func FetchData(client CloudClient) {
+    metrics, _ := client.GetMetrics()  // Method call only
+}
+```
+
+That's why `SystemConfig` and `APIConfig` are in `internal/types/` (multiple packages need struct fields), while `CloudClient` is an interface in `internal/api/` (consumers only call methods).
+
+---
+
+### Why `internal/types/` instead of `internal/shared/`?
+
+The Go convention is to name packages after WHAT they contain, not HOW they are used:
+- `types` describes content: type definitions
+- `shared` describes usage: used by multiple packages
+
+This follows established Go ecosystem patterns:
+- `go/types` (Go compiler's type system)
+- `k8s.io/apimachinery/pkg/types` (Kubernetes common types)
+- `database/sql` (not `database/shared_sql`)
+
+The `internal/` prefix already signals these are implementation details, and documentation explains the sharing purpose.
 
 ```go
 // internal/types/types.go - Shared types
@@ -987,10 +1207,10 @@ type SystemConfig struct {
     ID   string
 }
 
-// internal/config/config.go - Uses type alias
+// internal/config/config.go - Uses type alias for backward compatibility
 type SystemConfig = types.SystemConfig
 
-// internal/aggregator/aggregator.go - Uses type alias
+// internal/aggregator/aggregator.go - Uses type alias for backward compatibility
 type SystemConfig = types.SystemConfig
 ```
 
@@ -1010,7 +1230,7 @@ type SystemConfig = types.SystemConfig
 |------|-------------|---------|
 | **Package-per-feature** | Each package handles one domain concept | `cache/`, `oauth/`, `display/` |
 | **Type extraction** | Moving types to dedicated files | `types.go`, `interface.go` |
-| **Shared types package** | Common types in separate package | `internal/types/types.go` |
+| **Shared types package** | Common types in separate package (named `types` by convention, not `shared`) | `internal/types/types.go` |
 | **Interface files** | Defining contracts separate from implementation | `api/interface.go` |
 | **Internal packages** | Compiler-enforced encapsulation | `internal/*` |
 | **Type alias** | Re-exporting a type under a new name | `type Foo = pkg.Foo` |

@@ -83,6 +83,8 @@
 //     - Display formatted report via internal/display
 //
 // For continuous mode, step 8 repeats at the configured refresh interval.
+// Note: If a past date is supplied via --date, the program automatically runs once
+// since historical data doesn't change over time.
 package main
 
 import (
@@ -176,8 +178,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Determine run mode
+	// If querying a past date, always run once since historical data doesn't change
+	runOnce := flags.Once
+	if !testDateParsed.IsZero() && timezone.IsPastDate(testDateParsed, reportTZ) {
+		runOnce = true
+		if !flags.Once {
+			// Inform user why we're running once instead of continuous
+			fmt.Printf("Note: Running once for historical date %s (data won't change)\n\n",
+				testDateParsed.Format("2006-01-02"))
+		}
+	}
+
 	// Run once or continuous
-	if flags.Once {
+	if runOnce {
 		app.RunOnce(ctx, agg, disp, cfg, testDateParsed, flags.TestMode, reportTZ)
 	} else {
 		app.RunContinuous(ctx, agg, disp, cfg, testDateParsed, reportTZ)
