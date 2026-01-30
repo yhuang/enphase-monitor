@@ -2,6 +2,8 @@ package display
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -29,15 +31,28 @@ func GetDefaultColors() config.ColorConfig {
 }
 
 // Display handles formatting and presenting metrics to the user.
+//
+// GO PATTERN: Dependency Injection via io.Writer
+// By accepting an io.Writer, the Display struct becomes testable:
+//   - Production: pass os.Stdout for terminal output
+//   - Testing: pass bytes.Buffer to capture and verify output
 type Display struct {
 	colors        config.ColorConfig
 	timezone      *time.Location
 	separatorLine string
 	subSeparator  string
+	writer        io.Writer // Output destination (os.Stdout for production, bytes.Buffer for testing)
 }
 
 // NewDisplayWithColorsAndTimezone creates a new display instance with custom colors and timezone.
+// Uses os.Stdout as the default output writer for production use.
 func NewDisplayWithColorsAndTimezone(colors config.ColorConfig, tz *time.Location) *Display {
+	return NewDisplayWithWriter(colors, tz, os.Stdout)
+}
+
+// NewDisplayWithWriter creates a display instance with a custom writer.
+// This is primarily used for testing to capture output.
+func NewDisplayWithWriter(colors config.ColorConfig, tz *time.Location, w io.Writer) *Display {
 	defaultColors := GetDefaultColors()
 	colors.MergeWithDefaults(defaultColors)
 
@@ -46,6 +61,7 @@ func NewDisplayWithColorsAndTimezone(colors config.ColorConfig, tz *time.Locatio
 		timezone:      tz,
 		separatorLine: strings.Repeat("=", constants.SeparatorWidth),
 		subSeparator:  strings.Repeat("-", constants.SeparatorWidth),
+		writer:        w,
 	}
 }
 
@@ -57,53 +73,58 @@ func (d *Display) ShowMetrics(metrics *aggregator.AggregatedMetrics) {
 	d.printSeparator()
 }
 
+// getDateRange calculates the display date range for a query.
+// Returns the start time (midnight) and end time for display purposes.
+func (d *Display) getDateRange(queryDate, nowLocal time.Time) (start, end time.Time) {
+	// Determine which date to use
+	targetDate := nowLocal
+	if !queryDate.IsZero() {
+		targetDate = queryDate
+	}
+
+	// Calculate midnight of the target date
+	start = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, d.timezone)
+
+	// Calculate end time: if querying today, use current time; otherwise use end of day
+	todayMidnight := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, d.timezone)
+	if start.Equal(todayMidnight) {
+		end = nowLocal
+	} else {
+		end = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 23, 59, 59, 0, d.timezone)
+	}
+
+	return start, end
+}
+
 func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate time.Time) {
-	fmt.Println("\n" + d.colors.Headers + d.separatorLine + constants.Reset)
-	fmt.Printf("  %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
-	fmt.Println(d.colors.Headers + d.separatorLine + constants.Reset)
+	fmt.Fprintln(d.writer, "\n"+d.colors.Headers+d.separatorLine+constants.Reset)
+	fmt.Fprintf(d.writer, "  %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
+	fmt.Fprintln(d.writer, d.colors.Headers+d.separatorLine+constants.Reset)
 
 	nowLocal := time.Now().In(d.timezone)
 
-	if !queryDate.IsZero() {
-		queryDayLocal := time.Date(queryDate.Year(), queryDate.Month(), queryDate.Day(), 0, 0, 0, 0, d.timezone)
-		todayLocal := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, d.timezone)
+	// Use helper to calculate date range (eliminates duplicate logic)
+	dayStart, dayEnd := d.getDateRange(queryDate, nowLocal)
 
-		var dayEndLocal time.Time
-		if queryDayLocal.Equal(todayLocal) {
-			dayEndLocal = nowLocal
-		} else {
-			dayEndLocal = time.Date(queryDate.Year(), queryDate.Month(), queryDate.Day(), 23, 59, 59, 0, d.timezone)
-		}
-
-		dayStartLocal := time.Date(queryDate.Year(), queryDate.Month(), queryDate.Day(), 0, 0, 0, 0, d.timezone)
-
-		fmt.Printf("  %s%-16s%s%s 12:00 AM\n                          to\n                  %s%s\n\n",
-			d.colors.SecondaryText, "Query Range:   ", d.colors.PrimaryText,
-			dayStartLocal.Format("Mon Jan 2, 2006"),
-			dayEndLocal.Format("Mon Jan 2, 2006 03:04 PM"), constants.Reset)
-	} else {
-		todayStartLocal := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, d.timezone)
-
-		fmt.Printf("  %s%-16s%s%s 12:00 AM\n                          to\n                  %s%s\n\n",
-			d.colors.SecondaryText, "Query Range:   ", d.colors.PrimaryText,
-			todayStartLocal.Format("Mon Jan 2, 2006"),
-			nowLocal.Format("Mon Jan 2, 2006 03:04 PM"), constants.Reset)
-	}
+	fmt.Fprintf(d.writer, "  %s%-16s%s%s 12:00 AM\n                          to\n                  %s%s\n\n",
+		d.colors.SecondaryText, "Query Range:   ", d.colors.PrimaryText,
+		dayStart.Format("Mon Jan 2, 2006"),
+		dayEnd.Format("Mon Jan 2, 2006 03:04 PM"), constants.Reset)
 
 	timestampLocal := timestamp.In(d.timezone)
-	fmt.Printf("  %s%-16s%s%s", d.colors.SecondaryText, "Last Updated:   ", d.colors.PrimaryText, timestampLocal.Format("Mon Jan 2, 2006 03:04:05 PM"))
+	fmt.Fprintf(d.writer, "  %s%-16s%s%s", d.colors.SecondaryText, "Last Updated:   ", d.colors.PrimaryText, timestampLocal.Format("Mon Jan 2, 2006 03:04:05 PM"))
 	if cacheUsed {
-		fmt.Printf(" %s(cached)%s", d.colors.SecondaryText, constants.Reset)
+		fmt.Fprintf(d.writer, " %s(cached)%s", d.colors.SecondaryText, constants.Reset)
 	} else {
-		fmt.Printf(" %s(live)%s", d.colors.Discharge, constants.Reset)
+		fmt.Fprintf(d.writer, " %s(live)%s", d.colors.Discharge, constants.Reset)
 	}
-	fmt.Println()
-	fmt.Println(d.colors.Headers + d.separatorLine + constants.Reset)
+	fmt.Fprintln(d.writer)
+	fmt.Fprintln(d.writer, d.colors.Headers+d.separatorLine+constants.Reset)
 }
 
 func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
-	fmt.Printf("\n %s%sCOMBINED ENERGY REPORT (kWh)%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
-	fmt.Println(d.colors.SecondaryText + d.subSeparator + constants.Reset)
+	fmt.Fprintf(d.writer, "\n %s%sCOMBINED ENERGY REPORT (kWh)%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
+	fmt.Fprintln(d.writer, d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
 	d.printMetric("Produced", metrics.ProductionToday, d.colors.Production, "  ")
 	d.printMetric("Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "  ")
@@ -116,13 +137,13 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		return
 	}
 
-	fmt.Printf("\n %s%sINDIVIDUAL SYSTEMS REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
-	fmt.Println(d.colors.SecondaryText + d.subSeparator + constants.Reset)
+	fmt.Fprintf(d.writer, "\n %s%sINDIVIDUAL SYSTEMS REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
+	fmt.Fprintln(d.writer, d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
 	for i, sys := range metrics.Systems {
 		displayName := sys.Name
 		identifier := sys.ID
-		fmt.Printf("\n  %s[%d]%s %s%s%s %s(%s)%s\n",
+		fmt.Fprintf(d.writer, "\n  %s[%d]%s %s%s%s %s(%s)%s\n",
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
@@ -132,43 +153,50 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "      ")
 		d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "      ")
 		d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "      ")
-		fmt.Printf("      %sBattery Charge Percentage:%s      %s%7d%%%s\n",
+		fmt.Fprintf(d.writer, "      %sBattery Charge Percentage:%s      %s%7d%%%s\n",
 			d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		d.printMetric("Total Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "      ")
 	}
 }
 
 func (d *Display) printSeparator() {
-	fmt.Println("\n" + d.colors.Headers + d.separatorLine + constants.Reset + "\n")
+	fmt.Fprintln(d.writer, "\n"+d.colors.Headers+d.separatorLine+constants.Reset+"\n")
 }
 
 func (d *Display) printMetric(label string, value float64, valueColor string, indent string) {
-	fmt.Printf("%s%s%s:%s%s%8.1f kWh%s\n",
+	fmt.Fprintf(d.writer, "%s%s%s:%s%s%8.1f kWh%s\n",
 		indent, d.colors.SecondaryText, label, constants.Reset,
 		valueColor, value, constants.Reset)
 }
 
 func (d *Display) printNetFlow(label string, netValue float64, indent string) {
+	// Consolidate duplicate format logic using direction variable
+	var color, direction string
+	var displayValue float64
+
 	if netValue < 0 {
-		fmt.Printf("%s%s%s:%s%s%8.1f kWh%s %s(export)%s\n",
-			indent, d.colors.SecondaryText, label, constants.Reset,
-			d.colors.NetExport, -netValue, constants.Reset,
-			d.colors.NetExport, constants.Reset)
+		color = d.colors.NetExport
+		direction = "export"
+		displayValue = -netValue
 	} else {
-		fmt.Printf("%s%s%s:%s%s%8.1f kWh%s %s(import)%s\n",
-			indent, d.colors.SecondaryText, label, constants.Reset,
-			d.colors.NetImport, netValue, constants.Reset,
-			d.colors.NetImport, constants.Reset)
+		color = d.colors.NetImport
+		direction = "import"
+		displayValue = netValue
 	}
+
+	fmt.Fprintf(d.writer, "%s%s%s:%s%s%8.1f kWh%s %s(%s)%s\n",
+		indent, d.colors.SecondaryText, label, constants.Reset,
+		color, displayValue, constants.Reset,
+		color, direction, constants.Reset)
 }
 
 // ShowError displays an error message.
 func (d *Display) ShowError(err error) {
-	fmt.Printf("\n%s%sERROR:%s\n", constants.Bold, d.colors.Error, constants.Reset)
-	fmt.Printf("   %s%v%s\n\n", d.colors.Error, err, constants.Reset)
+	fmt.Fprintf(d.writer, "\n%s%sERROR:%s\n", constants.Bold, d.colors.Error, constants.Reset)
+	fmt.Fprintf(d.writer, "   %s%v%s\n\n", d.colors.Error, err, constants.Reset)
 }
 
 // ShowInfo displays an informational message.
 func (d *Display) ShowInfo(message string) {
-	fmt.Printf("\n%s%s%s\n", d.colors.SecondaryText, message, constants.Reset)
+	fmt.Fprintf(d.writer, "\n%s%s%s\n", d.colors.SecondaryText, message, constants.Reset)
 }

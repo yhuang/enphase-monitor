@@ -29,7 +29,7 @@ import (
 
 // RunOnce executes a single query, displays results, and exits
 func RunOnce(ctx context.Context, agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, testDate time.Time, testMode bool, reportTZ *time.Location) {
-	aggSystems, aggAPIConfig := ConvertToAggregatorTypes(cfg)
+	aggSystems, aggAPIConfig := GetAggregatorTypes(cfg)
 
 	metrics, err := agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, testDate, reportTZ)
 	if err != nil {
@@ -85,7 +85,7 @@ func RunContinuous(ctx context.Context, agg *aggregator.DataAggregator, disp *di
 
 // fetchAndDisplay fetches metrics and displays them to the terminal
 func fetchAndDisplay(ctx context.Context, agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, testDate time.Time, reportTZ *time.Location) {
-	aggSystems, aggAPIConfig := ConvertToAggregatorTypes(cfg)
+	aggSystems, aggAPIConfig := GetAggregatorTypes(cfg)
 
 	metrics, err := agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, testDate, reportTZ)
 	if err != nil {

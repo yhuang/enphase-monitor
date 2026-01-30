@@ -58,8 +58,8 @@ import (
 	"net/url"
 	"time"
 
-	"enphase-monitor/internal/config"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/types"
 )
 
 // Token timing constants
@@ -94,7 +94,7 @@ var oauthHTTPClient = &http.Client{
 }
 
 // GetAuthorizationURL generates the authorization URL for the user to visit (one-time setup)
-func GetAuthorizationURL(apiConfig *config.APIConfig) (string, error) {
+func GetAuthorizationURL(apiConfig *types.APIConfig) (string, error) {
 	if apiConfig == nil {
 		return "", fmt.Errorf("API configuration is required")
 	}
@@ -116,7 +116,7 @@ func GetAuthorizationURL(apiConfig *config.APIConfig) (string, error) {
 }
 
 // ExchangeAuthorizationCode exchanges an authorization code for access and refresh tokens
-func ExchangeAuthorizationCode(ctx context.Context, apiConfig *config.APIConfig, code string) (*OAuthTokenResponse, error) {
+func ExchangeAuthorizationCode(ctx context.Context, apiConfig *types.APIConfig, code string) (*OAuthTokenResponse, error) {
 	if apiConfig == nil {
 		return nil, fmt.Errorf("API configuration is required")
 	}
@@ -170,7 +170,7 @@ func ExchangeAuthorizationCode(ctx context.Context, apiConfig *config.APIConfig,
 }
 
 // GetAccessToken retrieves an OAuth access token using refresh token or other available methods
-func GetAccessToken(ctx context.Context, apiConfig *config.APIConfig) (string, error) {
+func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, error) {
 	// Check cache first - refresh if within buffer window of expiration
 	if tokenCache != nil && time.Now().Before(tokenCache.ExpiresAt.Add(-tokenRefreshBuffer)) {
 		return tokenCache.Token, nil

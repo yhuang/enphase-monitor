@@ -28,21 +28,13 @@ import (
 	"enphase-monitor/internal/timezone"
 )
 
-// CreateOAuthAdapter creates an adapter function that converts between main and aggregator OAuth types
+// CreateOAuthAdapter creates an adapter function for OAuth token retrieval.
+// Since config.APIConfig and aggregator.APIConfig are now type aliases to
+// the same underlying types.APIConfig, no conversion is needed.
 func CreateOAuthAdapter() aggregator.OAuthTokenGetter {
 	return func(ctx context.Context, apiConfig *aggregator.APIConfig) (string, error) {
-		// Convert aggregator.APIConfig to config.APIConfig
-		mainAPIConfig := &config.APIConfig{
-			Key:              apiConfig.Key,
-			ClientID:         apiConfig.ClientID,
-			ClientSecret:     apiConfig.ClientSecret,
-			AuthorizationURL: apiConfig.AuthorizationURL,
-			RedirectURI:      apiConfig.RedirectURI,
-			RefreshToken:     apiConfig.RefreshToken,
-			Username:         apiConfig.Username,
-			Password:         apiConfig.Password,
-		}
-		return oauth.GetAccessToken(ctx, mainAPIConfig)
+		// No conversion needed - both are aliases to types.APIConfig
+		return oauth.GetAccessToken(ctx, apiConfig)
 	}
 }
 
@@ -95,30 +87,12 @@ func ParseTestDate(dateStr string, reportTZ *time.Location) (time.Time, error) {
 	return parsed, nil
 }
 
-// ConvertToAggregatorTypes converts main package config types to aggregator package types
-func ConvertToAggregatorTypes(cfg *config.Config) ([]aggregator.SystemConfig, *aggregator.APIConfig) {
-	// Convert SystemConfig to aggregator.SystemConfig
-	aggSystems := make([]aggregator.SystemConfig, len(cfg.Systems))
-	for i, sys := range cfg.Systems {
-		aggSystems[i] = aggregator.SystemConfig{
-			Name: sys.Name,
-			ID:   sys.ID,
-		}
-	}
-
-	// Convert APIConfig to aggregator.APIConfig
-	aggAPIConfig := &aggregator.APIConfig{
-		Key:              cfg.API.Key,
-		ClientID:         cfg.API.ClientID,
-		ClientSecret:     cfg.API.ClientSecret,
-		AuthorizationURL: cfg.API.AuthorizationURL,
-		RedirectURI:      cfg.API.RedirectURI,
-		RefreshToken:     cfg.API.RefreshToken,
-		Username:         cfg.API.Username,
-		Password:         cfg.API.Password,
-	}
-
-	return aggSystems, aggAPIConfig
+// GetAggregatorTypes extracts systems and API config from the main config.
+// Since config.SystemConfig and config.APIConfig are now type aliases to
+// the same underlying types, no conversion is needed - we just return them directly.
+func GetAggregatorTypes(cfg *config.Config) ([]aggregator.SystemConfig, *aggregator.APIConfig) {
+	// No conversion needed - both config and aggregator use type aliases to types.APIConfig/SystemConfig
+	return cfg.Systems, cfg.API
 }
 
 // ExitWithError prints an error message and exits with code 1

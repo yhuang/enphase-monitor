@@ -13,49 +13,62 @@ import (
 
 	"enphase-monitor/internal/api"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/types"
 )
 
-// SystemConfig represents configuration for a single Enphase system.
-// This is a mirror of the main package's SystemConfig to avoid circular dependencies.
-type SystemConfig struct {
-	Name string
-	ID   string
-}
+// SystemConfig is an alias for types.SystemConfig.
+// This maintains backward compatibility while using the shared type definition.
+type SystemConfig = types.SystemConfig
 
-// APIConfig represents API configuration.
-// This is a mirror of the main package's APIConfig to avoid circular dependencies.
-type APIConfig struct {
-	Key              string
-	ClientID         string
-	ClientSecret     string
-	AuthorizationURL string
-	RedirectURI      string
-	RefreshToken     string
-	Username         string
-	Password         string
-}
+// APIConfig is an alias for types.APIConfig.
+// This maintains backward compatibility while using the shared type definition.
+type APIConfig = types.APIConfig
 
 // OAuthTokenGetter is a function type for getting OAuth access tokens.
 // This allows the aggregator to work with any OAuth implementation.
 type OAuthTokenGetter func(ctx context.Context, apiConfig *APIConfig) (string, error)
 
-// DataAggregator handles combining data from multiple systems
-//
-// GO PATTERN: Stateless Service Object (empty struct with methods)
-// The empty struct stores no data, but this pattern provides:
-//   - Method grouping: organizes related functions under one namespace
-//   - Interface readiness: can implement interfaces for mocking/testing
-//   - Future extensibility: fields can be added later without changing call sites
-//
-// Alternative: plain package-level functions (simpler but harder to mock/extend)
-type DataAggregator struct {
-	getAccessToken OAuthTokenGetter
+// CloudClientFactory is a function type for creating cloud clients.
+// This allows dependency injection for testing purposes.
+type CloudClientFactory func(systemID, apiKey, accessToken string, timezone *time.Location) api.CloudClient
+
+// defaultCloudClientFactory creates the default production cloud client.
+func defaultCloudClientFactory(systemID, apiKey, accessToken string, tz *time.Location) api.CloudClient {
+	return api.NewEnlightenCloudClient(systemID, apiKey, accessToken, tz)
 }
 
-// NewDataAggregator creates a new aggregator instance with the specified OAuth token getter
+// DataAggregator handles combining data from multiple systems
+//
+// GO PATTERN: Service Object with Dependency Injection
+// This struct uses dependency injection for:
+//   - getAccessToken: OAuth token retrieval (injected at construction)
+//   - createCloudClient: Cloud client creation (injectable for testing)
+//
+// Benefits:
+//   - Method grouping: organizes related functions under one namespace
+//   - Interface readiness: can implement interfaces for mocking/testing
+//   - Testability: dependencies can be mocked via factory functions
+//   - Future extensibility: fields can be added later without changing call sites
+type DataAggregator struct {
+	getAccessToken    OAuthTokenGetter
+	createCloudClient CloudClientFactory
+}
+
+// NewDataAggregator creates a new aggregator instance with the specified OAuth token getter.
+// Uses the default cloud client factory for production use.
 func NewDataAggregator(getAccessToken OAuthTokenGetter) *DataAggregator {
 	return &DataAggregator{
-		getAccessToken: getAccessToken,
+		getAccessToken:    getAccessToken,
+		createCloudClient: defaultCloudClientFactory,
+	}
+}
+
+// NewDataAggregatorWithFactory creates an aggregator with a custom cloud client factory.
+// This is primarily used for testing to inject mock cloud clients.
+func NewDataAggregatorWithFactory(getAccessToken OAuthTokenGetter, factory CloudClientFactory) *DataAggregator {
+	return &DataAggregator{
+		getAccessToken:    getAccessToken,
+		createCloudClient: factory,
 	}
 }
 
@@ -92,7 +105,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 
 		// Use the report timezone for all systems (from config, system, or US/Pacific fallback)
 		// Create Cloud API client with API key, access token, and report timezone
-		cloudClient := api.NewEnlightenCloudClient(sys.ID, apiConfig.Key, accessToken, reportTimezone)
+		cloudClient := a.createCloudClient(sys.ID, apiConfig.Key, accessToken, reportTimezone)
 
 		var cacheUsed bool
 		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate)

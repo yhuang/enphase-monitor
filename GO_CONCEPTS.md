@@ -873,6 +873,179 @@ localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate)
 
 ---
 
+## File Organization Patterns
+
+### Internal Package Structure
+
+**Location**: `/internal/` directory
+
+Go projects use the `internal/` directory for packages that should not be imported by external code. This is enforced by the Go compiler - code outside the module cannot import packages under `internal/`.
+
+```
+internal/
+├── aggregator/     # Multi-system data aggregation
+│   ├── aggregator.go   # Core aggregation logic
+│   └── types.go        # Data types (AggregatedMetrics, SystemMetrics)
+├── api/            # API client for Enphase Cloud API
+│   ├── client.go       # HTTP client implementation
+│   ├── interface.go    # CloudClient interface definition
+│   └── types.go        # LocalMetrics type
+├── app/            # Application setup and execution
+│   ├── setup.go        # Configuration and initialization
+│   └── runner.go       # Execution modes (once/continuous)
+├── cache/          # Disk-based API response caching
+│   ├── cache.go        # Core caching logic
+│   └── cli.go          # Cache inspection utilities
+├── cli/            # Command-line interface
+│   ├── flags.go        # Flag parsing
+│   └── cache_commands.go # Cache management commands
+├── config/         # Configuration loading and validation
+│   └── config.go       # YAML config parsing
+├── constants/      # Application-wide constants
+│   └── constants.go    # All magic numbers and strings
+├── display/        # Terminal output formatting
+│   └── display.go      # Colored output with metrics
+├── oauth/          # OAuth 2.0 authentication
+│   ├── oauth.go        # Token acquisition/refresh
+│   └── setup.go        # Interactive setup wizard
+├── parser/         # JSON response parsing
+│   └── parser.go       # Telemetry data parsing
+├── timezone/       # Timezone handling
+│   └── timezone.go     # Day boundaries calculation
+├── types/          # Shared type definitions
+│   └── types.go        # Types used across packages (SystemConfig, APIConfig)
+├── urlbuilder/     # API URL construction
+│   └── urlbuilder.go   # URL building utilities
+└── validation/     # Test mode validation
+    └── validation.go   # Metrics comparison
+```
+
+---
+
+### Why Some Packages Have *_test.go Files and Others Do Not
+
+Test files in Go follow the pattern `*_test.go`. The Go tooling automatically excludes these files from production builds.
+
+**Packages WITH Tests:**
+- `api/client_test.go` - Tests HTTP client logic
+- `config/config_test.go` - Tests YAML parsing and validation
+- `constants/constants_test.go` - Tests constant values
+- `oauth/oauth_test.go` - Tests token handling
+- `parser/parser_test.go` - Tests JSON parsing
+- `timezone/timezone_test.go` - Tests timezone calculations
+- `validation/validation_test.go` - Tests metrics validation
+- `cache/cache_test.go` - Tests thread-safe state management
+- `display/display_test.go` - Tests output formatting
+- `aggregator/aggregator_test.go` - Tests data aggregation with mocks
+
+**Why Test Coverage Varies:**
+
+A package typically has tests when:
+1. **The functionality is critical** - API client, config parsing, validation
+2. **The logic is complex** - OAuth token handling, timezone calculations
+3. **The code is easy to unit test** - Pure functions, injectable dependencies
+
+Packages may lack tests when:
+- **High coupling to external systems** - Requires mocking infrastructure
+- **Primarily orchestration code** - Better suited for integration tests
+- **Simple pass-through logic** - Low risk of bugs
+
+---
+
+### Why Types Are in Separate Files
+
+This pattern is called **"Type Separation"** or **"Type Extraction"** in Go:
+
+**Single-Package Type Separation:**
+
+```go
+// types.go - Contains data structures
+type LocalMetrics struct {
+    ProductionToday float64
+    // ...
+}
+
+// client.go - Contains implementation
+func (c *Client) GetMetrics() (*LocalMetrics, error) {
+    // ...
+}
+
+// interface.go - Contains interface definitions
+type CloudClient interface {
+    GetMetricsFromCloud(ctx context.Context, date time.Time) (*LocalMetrics, bool, error)
+}
+```
+
+**Cross-Package Type Sharing:**
+
+When multiple packages need the same types, a shared types package prevents circular dependencies:
+
+```go
+// internal/types/types.go - Shared types
+type SystemConfig struct {
+    Name string
+    ID   string
+}
+
+// internal/config/config.go - Uses type alias
+type SystemConfig = types.SystemConfig
+
+// internal/aggregator/aggregator.go - Uses type alias
+type SystemConfig = types.SystemConfig
+```
+
+**Benefits of Type Separation:**
+
+1. **Clarity** - Easy to find type definitions in one place
+2. **Reduced file size** - Avoids 500+ line files
+3. **Import optimization** - Other packages can reference just the types
+4. **Interface segregation** - Contracts separate from implementation
+5. **Circular dependency avoidance** - Shared types can be imported by any package
+
+---
+
+### Go File Organization Terminology
+
+| Term | Description | Example |
+|------|-------------|---------|
+| **Package-per-feature** | Each package handles one domain concept | `cache/`, `oauth/`, `display/` |
+| **Type extraction** | Moving types to dedicated files | `types.go`, `interface.go` |
+| **Shared types package** | Common types in separate package | `internal/types/types.go` |
+| **Interface files** | Defining contracts separate from implementation | `api/interface.go` |
+| **Internal packages** | Compiler-enforced encapsulation | `internal/*` |
+| **Type alias** | Re-exporting a type under a new name | `type Foo = pkg.Foo` |
+
+---
+
+### Type Aliases vs Type Definitions
+
+Go provides two ways to create named types:
+
+**Type Alias (used in this codebase):**
+```go
+// Type alias - SystemConfig IS types.SystemConfig (identical types)
+type SystemConfig = types.SystemConfig
+
+// Can be used interchangeably with types.SystemConfig
+// No conversion needed when passing between packages
+```
+
+**Type Definition (creates new type):**
+```go
+// Type definition - MyConfig is a NEW type based on types.SystemConfig
+type MyConfig types.SystemConfig
+
+// NOT interchangeable - requires explicit conversion
+// var cfg MyConfig = MyConfig(types.SystemConfig{...})
+```
+
+This codebase uses **type aliases** to:
+1. Maintain backward compatibility when refactoring
+2. Allow direct assignment without conversion
+3. Keep code simple while eliminating duplication
+
+---
+
 ## Related Documentation
 
 - **[GO_BEST_PRACTICES.md](GO_BEST_PRACTICES.md)** - Comprehensive guide to Go patterns and best practices

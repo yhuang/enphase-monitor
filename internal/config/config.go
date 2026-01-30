@@ -56,6 +56,7 @@ package config
 
 import (
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/types"
 	"fmt"
 	"math"
 	"os"
@@ -65,23 +66,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// SystemConfig represents configuration for a single Enphase system
-type SystemConfig struct {
-	Name string `yaml:"name"`
-	ID   string `yaml:"id"` // Enlighten system ID (required for Cloud API)
-}
+// SystemConfig is an alias for types.SystemConfig.
+// This maintains backward compatibility while using the shared type definition.
+// See internal/types/types.go for the type definition.
+type SystemConfig = types.SystemConfig
 
-// APIConfig represents API configuration
-type APIConfig struct {
-	Key              string `yaml:"key"`                     // API Key
-	ClientID         string `yaml:"client_id"`               // OAuth Client ID
-	ClientSecret     string `yaml:"client_secret"`           // OAuth Client Secret
-	AuthorizationURL string `yaml:"authorization_url"`       // OAuth authorization URL
-	RedirectURI      string `yaml:"redirect_uri,omitempty"`  // OAuth redirect URI (for authorization code flow)
-	RefreshToken     string `yaml:"refresh_token,omitempty"` // OAuth refresh token (obtained from initial authorization)
-	Username         string `yaml:"username,omitempty"`      // Enlighten username (for password grant - Partner/Installer only)
-	Password         string `yaml:"password,omitempty"`      // Enlighten password (for password grant - Partner/Installer only)
-}
+// APIConfig is an alias for types.APIConfig.
+// This maintains backward compatibility while using the shared type definition.
+// See internal/types/types.go for the type definition.
+type APIConfig = types.APIConfig
 
 // ColorConfig represents color customization settings
 // Note: Reset and Bold are defined as constants in constants.go and cannot be customized
