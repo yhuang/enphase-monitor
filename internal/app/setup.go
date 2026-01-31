@@ -100,3 +100,35 @@ func ExitWithError(msg string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, msg, args...)
 	os.Exit(1)
 }
+
+// ValidateTestModeCache checks if cache exists for the target date when in test mode.
+// Returns an error with a helpful message if no cache exists for the date.
+// This prevents confusing errors when running --test without populated cache.
+func ValidateTestModeCache(targetDate time.Time, reportTZ *time.Location) error {
+	// Determine the date string to check
+	var dateStr string
+	if targetDate.IsZero() {
+		// No date specified, check for today
+		dateStr = time.Now().In(reportTZ).Format("2006-01-02")
+	} else {
+		dateStr = targetDate.Format("2006-01-02")
+	}
+
+	// Check if cache exists for this date
+	hasCache, err := cache.HasCacheForDate(dateStr)
+	if err != nil {
+		return fmt.Errorf("failed to check cache: %w", err)
+	}
+
+	if !hasCache {
+		return fmt.Errorf("--test flag requires cached data, but no cache exists for %s.\n\n"+
+			"To populate the cache, run:\n"+
+			"  ./enphase-monitor --once\n\n"+
+			"Then retry with --test.\n\n"+
+			"For historical dates with expected values, use:\n"+
+			"  ./enphase-monitor --once --date %s\n"+
+			"  ./enphase-monitor --test --date %s", dateStr, dateStr, dateStr)
+	}
+
+	return nil
+}

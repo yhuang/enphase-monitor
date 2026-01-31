@@ -174,13 +174,10 @@ This application uses OAuth 2.0 for authentication. You must complete a one-time
 
 ### Quick Setup
 
-Run the interactive setup wizard:
-
 ```bash
 ./enphase-monitor --setup-oauth
 ```
-
-This will guide you through:
+Run the interactive setup wizard that will guid you through:
 1. Generating an authorization URL
 2. Authorizing the application in your browser
 3. Exchanging the authorization code for tokens
@@ -443,14 +440,14 @@ The `refresh_interval` setting controls how often the application queries the AP
 
 To respect these limits, the application implements intelligent caching:
 
-- **Automatic Disk Caching**: All API responses are cached in `test-data/cache/` directory
+- **Automatic Disk Caching**: All API responses are cached in `cache/` directory
 - **Cache-First for Past Dates**: When querying historical dates, cached data is used if available (no API call)
 - **Default Refresh Interval**: 1 hour (3600 seconds) - queries each system once per hour
 - **429 Error Handling**: If rate limited, the program displays wait time and exits gracefully
 
 ### Cache File Format and Naming
 
-Cache files are stored in the `test-data/cache/` directory with the following structure:
+Cache files are stored in the `cache/` directory with the following structure:
 
 **File Naming Scheme:**
 - Each cached API response is stored as a JSON file
@@ -565,7 +562,6 @@ enphase-monitor/
 │   │   ├── oauth.go                       # Token management & refresh
 │   │   ├── setup.go                       # Interactive OAuth wizard
 │   │   ├── oauth_test.go                  # Basic unit tests
-│   │   ├── setup_test.go                  # OAuth setup wizard tests
 │   │   ├── oauth_functional_test.go       # Integration tests with mock servers
 │   │   └── oauth_edge_cases_test.go       # Edge case tests
 │   ├── parser/                            # JSON telemetry parsing
@@ -584,8 +580,8 @@ enphase-monitor/
 │       └── validation_integration_test.go # Integration tests (real expected values)
 ├── config.yaml.example                    # Example configuration with all options
 ├── config.yaml                            # Your actual configuration (create from example)
-├── test-data/                             # Test data and cache directory
-│   ├── cache/                             # Cached API responses
+├── cache/                                 # Cached API responses (created at runtime)
+├── test-data/                             # Test validation data
 │   └── expected_values_*.json             # Expected values for validation
 ├── go.mod                                 # Go module definition
 ├── go.sum                                 # Go module checksums
@@ -656,6 +652,34 @@ This will:
 2. Validate results against expected values
 3. Show a detailed comparison report
 
+#### Early Validation
+
+The `--test` flag includes early validation to prevent confusing errors:
+
+**Missing cache:**
+```
+ERROR: --test flag requires cached data, but no cache exists for 2026-01-30.
+
+To populate the cache, run:
+  ./enphase-monitor --once
+
+Then retry with --test.
+```
+
+**Missing expected values file:**
+```
+Validation failed: no expected values file found for 2026-01-01.
+
+To run validation, create the file:
+  test-data/expected_values_2026-01-01.json
+
+Example format:
+  { "date": "2026-01-01", "systems": [...] }
+
+To skip validation and just use cache-only mode, omit the --test flag:
+  ./enphase-monitor --once --date 2026-01-01
+```
+
 ### Setting Up Test Data
 
 **IMPORTANT:** The cache must contain data for the specific test date. Old cache files from different dates will cause incorrect results.
@@ -674,7 +698,7 @@ This will:
    ```bash
    ./enphase-monitor --once --date 2026-01-20
    ```
-   This will make live API calls and cache the responses in `test-data/cache/`
+   This will make live API calls and cache the responses in `cache/`
 
 3. **Update `expected_values_YYYY-MM-DD.json`** with the correct values from the Enphase app
 
@@ -683,7 +707,7 @@ This will:
    ./enphase-monitor --once --test --date 2026-01-20
    ```
 
-**Note:** Test mode uses the cache from `test-data/cache/`. The `run-tests.sh` script ensures all test dates have cached responses available.
+**Note:** Test mode uses the cache from `cache/`. The `run-tests.sh` script ensures all test dates have cached responses available.
 
 ### Expected Values Format
 

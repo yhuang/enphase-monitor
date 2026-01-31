@@ -85,7 +85,6 @@ enphase-monitor/
 │   │   ├── oauth.go                       # Token management & refresh
 │   │   ├── setup.go                       # Interactive OAuth wizard
 │   │   ├── oauth_test.go                  # Basic unit tests
-│   │   ├── setup_test.go                  # OAuth setup wizard tests
 │   │   ├── oauth_functional_test.go       # Integration tests with mock servers
 │   │   └── oauth_edge_cases_test.go       # Edge case and error path tests
 │   ├── parser/                            # JSON telemetry parsing
@@ -105,7 +104,8 @@ enphase-monitor/
 │
 ├── config.yaml                            # User configuration (not in git)
 ├── config.yaml.example                    # Configuration template
-└── test-data/                             # Cache files and validation data
+├── cache/                                 # Cached API responses (created at runtime)
+└── test-data/                             # Test validation data (expected values)
 ```
 
 ### Package Dependency Graph

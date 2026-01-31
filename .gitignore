@@ -1,8 +1,7 @@
 enphase-monitor
 *.yaml
 .claude/
-test-data/cache/
-.cache
+cache/
 .github/
 *.out
 *.coverprofile

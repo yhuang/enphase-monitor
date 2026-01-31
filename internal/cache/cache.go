@@ -3,7 +3,7 @@
 // PURPOSE
 // -------
 // Implements disk-based caching to reduce API calls and enable offline testing.
-// Cache files are stored in test-data/cache/ with SHA256 hashed filenames.
+// Cache files are stored in cache/ with SHA256 hashed filenames.
 //
 // For details on the caching strategy and rate limiting, see:
 //   - ARCHITECTURE.md: "Intelligent Caching" section
@@ -31,6 +31,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,25 +39,25 @@ import (
 )
 
 // getCacheDir returns the cache directory path, resolving it relative to the project root.
-// This ensures cache files are always stored in test-data/cache/ at the project root,
+// This ensures cache files are always stored in cache/ at the project root,
 // regardless of where tests or the application are run from.
 func getCacheDir() string {
 	// Try to find the project root by looking for go.mod
 	dir, err := os.Getwd()
 	if err != nil {
-		return "test-data/cache" // fallback to relative path
+		return "cache" // fallback to relative path
 	}
-	
+
 	// Walk up the directory tree to find go.mod
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return filepath.Join(dir, "test-data", "cache")
+			return filepath.Join(dir, "cache")
 		}
-		
+
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			// Reached root without finding go.mod, use relative path
-			return "test-data/cache"
+			return "cache"
 		}
 		dir = parent
 	}
@@ -317,4 +318,51 @@ func SaveCachedResponseFromBytes(url string, resp *http.Response, bodyBytes []by
 	}
 
 	return nil
+}
+
+// HasCacheForDate checks if any cached responses exist for the specified date.
+// Returns true if at least one cache file exists with a matching queried_date.
+// This is used to validate that --test mode has data available before running.
+func HasCacheForDate(targetDate string) (bool, error) {
+	cacheDir := getCacheDir()
+
+	// Check if cache directory exists
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		return false, nil
+	}
+
+	// Read all files in cache directory
+	entries, err := os.ReadDir(cacheDir)
+	if err != nil {
+		return false, fmt.Errorf("failed to read cache directory: %w", err)
+	}
+
+	// Check each JSON file for matching queried_date
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), constants.JSONExtension) {
+			continue
+		}
+
+		filePath := filepath.Join(cacheDir, entry.Name())
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			continue // Skip files we can't read
+		}
+
+		var cached CachedResponse
+		if err := json.Unmarshal(data, &cached); err != nil {
+			continue // Skip files we can't parse
+		}
+
+		if cached.QueriedDate == targetDate {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// GetCacheDir returns the cache directory path for external use (e.g., error messages).
+func GetCacheDir() string {
+	return getCacheDir()
 }

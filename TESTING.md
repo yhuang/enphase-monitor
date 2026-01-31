@@ -1,6 +1,6 @@
 # Testing Guide
 
-This document provides a comprehensive explanation of all testing approaches, patterns, tools, and conventions used in the Enphase Monitor codebase. After 10 rounds of refactoring, the test suite achieved **70.4% code coverage** with 24 test files across 13 packages.
+This document provides a comprehensive explanation of all testing approaches, patterns, tools, and conventions used in the Enphase Monitor codebase.
 
 ## Table of Contents
 
@@ -597,8 +597,7 @@ go test -cover ./... | grep -E "coverage: [0-9]+\.[0-9]+%" | awk '{print $2}'
 1. **One package, one test package**: Tests live in same package (white-box testing)
 2. **Imports**: Use package imports, not relative imports
 3. **Setup/Teardown**: Use `defer` for cleanup, not separate functions
-4. **Test Data**: Keep test data close to tests (inline or helper functions)
-5. **External Files**: Store in `test-data/` directory
+4. **Test Data**: Keep test data close to tests (inline or helper functions) or under the `test-data/` directory
 
 ### Error Handling in Tests
 
@@ -668,7 +667,6 @@ These files test OAuth authentication flows:
 | Test File | Focus | Coverage |
 |-----------|-------|----------|
 | `oauth_test.go` | Basic unit tests | Token refresh, URL generation |
-| `setup_test.go` | Setup wizard tests | URL parsing, code extraction, validation |
 | `oauth_functional_test.go` | Integration tests | Full OAuth flows with mock HTTP server |
 | `oauth_edge_cases_test.go` | Error handling | Network failures, malformed responses, validation errors |
 
@@ -697,6 +695,86 @@ These files verify concurrent access:
 | Test File | Concurrency Tests | Purpose |
 |-----------|-------------------|---------|
 | `cache_test.go` | State access | Verify mutex protection |
+
+---
+
+## Running Tests
+
+### Unit Tests
+
+Run all unit tests with coverage:
+
+```bash
+# Run all tests
+make test
+
+# Run tests for a specific package
+go test -v ./internal/cache/
+
+# Run a specific test
+go test -v ./internal/app/ -run TestValidateTestModeCache
+```
+
+### Integration Testing with --test Flag
+
+The `--test` flag enables cache-only mode with validation against expected values. This requires:
+
+1. **Cached API responses** - Run `./enphase-monitor --once` first to populate the cache
+2. **Expected values file** - Create `test-data/expected_values_YYYY-MM-DD.json`
+
+#### Early Cache Validation
+
+The application validates cache existence before running in test mode:
+
+```bash
+# If cache doesn't exist for today:
+$ ./enphase-monitor --test --once
+ERROR: --test flag requires cached data, but no cache exists for 2026-01-30.
+
+To populate the cache, run:
+  ./enphase-monitor --once
+
+Then retry with --test.
+```
+
+#### Missing Expected Values File
+
+If cache exists but expected values file is missing, a helpful error is displayed:
+
+```bash
+$ ./enphase-monitor --test --date 2026-01-01 --once
+Validation failed: no expected values file found for 2026-01-01.
+
+To run validation, create the file:
+  test-data/expected_values_2026-01-01.json
+
+Example format:
+  {
+    "date": "2026-01-01",
+    "systems": [
+      {
+        "id": "SYSTEM_ID",
+        "name": "System Name",
+        "expected": {
+          "grid_import": 10.0,
+          "grid_export": 5.0,
+          "production": 20.0,
+          ...
+        }
+      }
+    ]
+  }
+```
+
+#### Testing the Test Mode Itself
+
+The test mode validation behavior is tested in:
+
+| Test File | Test Functions | Purpose |
+|-----------|----------------|---------|
+| `cache_functions_test.go` | `TestHasCacheForDate` | Cache existence check |
+| `setup_test.go` | `TestValidateTestModeCache` | Early validation with helpful errors |
+| `validation_test.go` | `TestValidateMetrics_MissingFile_HelpfulError` | Improved error messages |
 
 ---
 

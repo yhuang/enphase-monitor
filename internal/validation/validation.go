@@ -60,6 +60,32 @@ func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) erro
 	expectedPath := filepath.Join("test-data", fmt.Sprintf("expected_values_%s.json", dateStr))
 	expectedData, err := os.ReadFile(expectedPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("no expected values file found for %s.\n\n"+
+				"To run validation, create the file:\n"+
+				"  %s\n\n"+
+				"Example format:\n"+
+				"  {\n"+
+				"    \"date\": \"%s\",\n"+
+				"    \"systems\": [\n"+
+				"      {\n"+
+				"        \"id\": \"SYSTEM_ID\",\n"+
+				"        \"name\": \"System Name\",\n"+
+				"        \"expected\": {\n"+
+				"          \"grid_import\": 10.0,\n"+
+				"          \"grid_export\": 5.0,\n"+
+				"          \"production\": 20.0,\n"+
+				"          \"battery_discharged\": 2.0,\n"+
+				"          \"battery_charged\": 3.0,\n"+
+				"          \"net_imported\": 5.0,\n"+
+				"          \"consumption\": 15.0\n"+
+				"        }\n"+
+				"      }\n"+
+				"    ]\n"+
+				"  }\n\n"+
+				"To skip validation and just use cache-only mode, omit the --test flag:\n"+
+				"  ./enphase-monitor --once --date %s", dateStr, expectedPath, dateStr, dateStr)
+		}
 		return fmt.Errorf("failed to read expected values file: %w", err)
 	}
 

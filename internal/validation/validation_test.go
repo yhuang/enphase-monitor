@@ -17,9 +17,10 @@
 //
 // 2. Expected Values Loading Tests
 //    - Test loading valid expected values JSON
-//    - Test handling missing JSON files
+//    - Test handling missing JSON files with helpful error message
 //    - Test handling malformed JSON
 //    - Test date mismatch detection
+//    - Test error message contains file path and JSON example
 //
 // 3. System Matching Tests
 //    - Test finding systems by ID
@@ -284,6 +285,64 @@ func TestValidateMetrics_MissingFile(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for missing file, got nil")
 	}
+}
+
+// TestValidateMetrics_MissingFile_HelpfulError tests that missing file error is helpful
+func TestValidateMetrics_MissingFile_HelpfulError(t *testing.T) {
+	metrics := &aggregator.AggregatedMetrics{
+		Systems: []aggregator.SystemMetrics{
+			{ID: "test-system", Name: "Test System"},
+		},
+	}
+
+	testDate := "2050-06-15" // Date that definitely won't exist
+	err := ValidateMetrics(metrics, testDate)
+
+	if err == nil {
+		t.Fatal("Expected error for missing file, got nil")
+	}
+
+	errMsg := err.Error()
+
+	t.Run("contains target date", func(t *testing.T) {
+		if !containsString(errMsg, testDate) {
+			t.Errorf("Error message should contain date %q", testDate)
+		}
+	})
+
+	t.Run("contains file path", func(t *testing.T) {
+		if !containsString(errMsg, "test-data/expected_values_") {
+			t.Error("Error message should contain expected file path")
+		}
+	})
+
+	t.Run("contains JSON format example", func(t *testing.T) {
+		if !containsString(errMsg, "\"date\":") {
+			t.Error("Error message should contain JSON format example")
+		}
+		if !containsString(errMsg, "\"systems\":") {
+			t.Error("Error message should contain systems field in example")
+		}
+		if !containsString(errMsg, "\"expected\":") {
+			t.Error("Error message should contain expected field in example")
+		}
+	})
+
+	t.Run("contains skip validation hint", func(t *testing.T) {
+		if !containsString(errMsg, "skip validation") || !containsString(errMsg, "omit the --test flag") {
+			t.Error("Error message should contain hint about skipping validation")
+		}
+	})
+}
+
+// containsString is a helper for string containment check
+func containsString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // TestValidateMetrics_InvalidJSON tests handling of malformed JSON

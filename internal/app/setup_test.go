@@ -27,6 +27,11 @@
 //    - Test ParseTestDate with empty string returns zero time
 //    - Test ParseTestDate with invalid format returns error
 //
+// 5. Test Mode Cache Validation Tests
+//    - Test ValidateTestModeCache returns error for missing cache
+//    - Test error message contains target date
+//    - Test error message contains helpful instructions
+//
 // TESTING APPROACH
 // ----------------
 // - Create minimal config structures for testing
@@ -54,6 +59,7 @@ package app
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -309,4 +315,69 @@ func TestConfigureModes(t *testing.T) {
 			_ = cache // Use the mock struct to avoid unused variable
 		})
 	}
+}
+
+// TestValidateTestModeCache tests the cache validation for test mode.
+// This function provides early detection when --test is used without cached data.
+func TestValidateTestModeCache(t *testing.T) {
+	tz := time.UTC
+
+	t.Run("returns error when cache does not exist for date", func(t *testing.T) {
+		// Use a date that definitely won't have cache
+		testDate := time.Date(1999, 1, 1, 0, 0, 0, 0, tz)
+
+		err := ValidateTestModeCache(testDate, tz)
+
+		if err == nil {
+			t.Error("ValidateTestModeCache() should return error when no cache exists")
+		}
+
+		// Verify error message contains helpful information
+		errMsg := err.Error()
+		if !strings.Contains(errMsg, "1999-01-01") {
+			t.Error("Error message should contain the date")
+		}
+		if !strings.Contains(errMsg, "./enphase-monitor --once") {
+			t.Error("Error message should contain instructions to populate cache")
+		}
+	})
+
+	t.Run("returns error when cache does not exist for today", func(t *testing.T) {
+		// Zero time means "today" - but we can't guarantee cache exists
+		// So we test with a date far in the future that won't have cache
+		futureDate := time.Date(2099, 12, 31, 0, 0, 0, 0, tz)
+
+		err := ValidateTestModeCache(futureDate, tz)
+
+		if err == nil {
+			t.Error("ValidateTestModeCache() should return error for future date with no cache")
+		}
+	})
+
+	t.Run("error message contains helpful instructions", func(t *testing.T) {
+		testDate := time.Date(2050, 6, 15, 0, 0, 0, 0, tz)
+
+		err := ValidateTestModeCache(testDate, tz)
+
+		if err == nil {
+			t.Fatal("Expected error but got nil")
+		}
+
+		errMsg := err.Error()
+
+		// Should contain the date
+		if !strings.Contains(errMsg, "2050-06-15") {
+			t.Error("Error should contain the target date")
+		}
+
+		// Should contain instructions to populate cache
+		if !strings.Contains(errMsg, "--once") {
+			t.Error("Error should contain --once flag instruction")
+		}
+
+		// Should contain instructions for historical dates
+		if !strings.Contains(errMsg, "--date") {
+			t.Error("Error should contain --date flag instruction")
+		}
+	})
 }

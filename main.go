@@ -168,15 +168,23 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Configure test mode and cache mode
-	app.ConfigureModes(flags.TestMode, flags.NoCache)
-
 	// Parse test date
 	testDateParsed, err := app.ParseTestDate(flags.TestDate, reportTZ)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Validate cache exists when in test mode (before configuring modes)
+	if flags.TestMode {
+		if err := app.ValidateTestModeCache(testDateParsed, reportTZ); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// Configure test mode and cache mode
+	app.ConfigureModes(flags.TestMode, flags.NoCache)
 
 	// Determine run mode
 	// If querying a past date, always run once since historical data doesn't change
