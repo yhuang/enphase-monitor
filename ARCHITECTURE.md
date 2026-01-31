@@ -65,9 +65,9 @@ enphase-monitor/
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   └── runner.go                      # Execution modes (once/continuous)
 │   ├── cache/                             # Disk-based response caching
-│   │   ├── cache.go                       # Thread-safe cache implementation
+│   │   ├── cache.go                       # Cache implementation
 │   │   ├── cli.go                         # Cache inspection utilities
-│   │   ├── cache_test.go                  # Cache state and thread safety tests
+│   │   ├── cache_test.go                  # Cache state management tests
 │   │   └── cache_functions_test.go        # Cache functionality tests
 │   ├── cli/                               # Command-line interface
 │   │   ├── flags.go                       # CLI flag parsing
@@ -470,28 +470,24 @@ Go convention is PascalCase; JSON convention is often snake_case.
 // oauth.go - Caching tokens at package level (single-goroutine access)
 var tokenCache *TokenCache  // Shared token cache (singleton)
 
-// cache.go - Thread-safe state with mutex protection
-type cacheState struct {
-    mu                    sync.Mutex
+// cache.go - Package-level state (set at startup, read-only during execution)
+var (
     testMode              bool
     cacheDisabled         bool
     rateLimitWarningShown bool
-}
-var state = &cacheState{}
+)
 
 func TestMode() bool {
-    state.mu.Lock()
-    defer state.mu.Unlock()
-    return state.testMode
+    return testMode
 }
 ```
 
 **Why:** Sometimes necessary for caching, but prefer dependency injection
 when possible to improve testability.
 
-**Thread Safety Considerations:**
-- OAuth token cache: Accessed from main goroutine only, no mutex needed
-- Cache state flags: Protected by `sync.Mutex` for safe concurrent access
+**State Management:**
+- OAuth token cache: Accessed from main goroutine only
+- Cache state flags: Set once at startup, read-only during execution
 - Use `ResetState()` in tests to ensure clean state between test cases
 
 ---

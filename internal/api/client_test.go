@@ -46,7 +46,7 @@
 // PATTERN USED
 // ------------
 // - Pattern 4: Mock HTTP Servers (httptest.NewServer)
-// - Pattern 8: Error Path Testing
+// - Pattern 7: Error Path Testing
 //
 // See TESTING.md for detailed pattern explanations.
 package api

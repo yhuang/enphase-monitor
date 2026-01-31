@@ -52,7 +52,7 @@
 //
 // PATTERN USED
 // ------------
-// - Pattern 8: Error Path Testing
+// - Pattern 7: Error Path Testing
 // - Pattern 4: Mock HTTP Servers (for failure scenarios)
 // - Pattern 1: Table-Driven Tests
 //

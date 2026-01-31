@@ -40,7 +40,7 @@
 // ------------
 // - Pattern 1: Table-Driven Tests
 // - Pattern 3: Subtests with t.Run()
-// - Pattern 10: State Reset (token cache)
+// - Pattern 9: State Reset (token cache)
 //
 // See TESTING.md for detailed pattern explanations.
 package oauth

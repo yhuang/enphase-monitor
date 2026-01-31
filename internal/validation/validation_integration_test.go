@@ -34,7 +34,7 @@
 // ------------
 // - Pattern 3: Subtests with t.Run()
 // - Pattern 6: Test Fixtures (expected values JSON files)
-// - Pattern 8: Error Path Testing
+// - Pattern 7: Error Path Testing
 // - Pattern 11: Golden Data Validation (expected values files)
 //
 // See TESTING.md for detailed pattern explanations.

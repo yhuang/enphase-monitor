@@ -81,7 +81,7 @@ For packages with extensive functionality or different test concerns, tests are 
 
 **Cache Package** (3 test files):
 - `cache.go` → 3 test files:
-  - `cache_test.go` - Thread safety tests (161 lines)
+  - `cache_test.go` - State management tests
   - `cache_functions_test.go` - Functionality tests (516 lines)
   - `cli_test.go` - CLI utilities tests (119 lines)
 
@@ -323,46 +323,7 @@ func makeTestMetrics(production, consumption, gridImport, gridExport float64) *a
 
 **Used in**: `aggregator_test.go`, `display_test.go`, `validation_test.go`
 
-### Pattern 7: Thread Safety Testing
-
-**What**: Use goroutines and sync primitives to test concurrent access.
-
-**Why**:
-- Verify thread-safe code works correctly under concurrent load
-- Detect race conditions (use `go test -race`)
-- Test mutex protection and synchronization
-- Ensure package-level state is safe for concurrent use
-
-**Example** (`cache_test.go`):
-```go
-func TestCacheState_ThreadSafety(t *testing.T) {
-    ResetState()
-    
-    const numGoroutines = 10
-    const numIterations = 100
-    
-    var wg sync.WaitGroup
-    wg.Add(numGoroutines)
-    
-    // Concurrent access to state
-    for i := 0; i < numGoroutines; i++ {
-        go func() {
-            defer wg.Done()
-            for j := 0; j < numIterations; j++ {
-                SetTestMode(true)
-                _ = TestMode()
-                SetTestMode(false)
-            }
-        }()
-    }
-    
-    wg.Wait()
-}
-```
-
-**Used in**: `cache_test.go` (state management tests)
-
-### Pattern 8: Error Path Testing
+### Pattern 7: Error Path Testing
 
 **What**: Deliberately cause errors to test error handling code paths.
 
@@ -399,7 +360,7 @@ func TestRefreshToken_NetworkError(t *testing.T) {
 
 **Used in**: `oauth_edge_cases_test.go`, `client_test.go`, `aggregator_test.go`
 
-### Pattern 9: Benchmark Tests
+### Pattern 8: Benchmark Tests
 
 **What**: Use `testing.B` to measure and compare performance.
 
@@ -426,7 +387,7 @@ func BenchmarkParseTelemetryResponse(b *testing.B) {
 
 **Used in**: `parser_bench_test.go`, `aggregator_bench_test.go`
 
-### Pattern 10: State Reset for Test Isolation
+### Pattern 9: State Reset for Test Isolation
 
 **What**: Reset package-level state before/after tests to ensure isolation.
 
@@ -687,14 +648,6 @@ These files measure and optimize performance:
 |-----------|------------|----------|
 | `parser_bench_test.go` | JSON parsing | Parsing speed, memory allocation |
 | `aggregator_bench_test.go` | Aggregation | Multi-system aggregation performance |
-
-### Thread Safety Test Files
-
-These files verify concurrent access:
-
-| Test File | Concurrency Tests | Purpose |
-|-----------|-------------------|---------|
-| `cache_test.go` | State access | Verify mutex protection |
 
 ---
 

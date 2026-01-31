@@ -32,7 +32,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"enphase-monitor/internal/constants"
@@ -80,72 +79,51 @@ func RedactURLKey(rawURL string) string {
 // MinRequestInterval is the minimum time between API requests (used for cache staleness)
 const MinRequestInterval = 1 * time.Minute
 
-// cacheState holds mutable cache configuration with thread-safe access.
-// Uses sync.Mutex to protect concurrent access from multiple goroutines.
-//
-// GO PATTERN: Thread-Safe State with Mutex
-// Instead of bare global variables, we encapsulate state in a struct with a mutex.
-// This ensures safe concurrent access and provides a clean reset mechanism for testing.
-type cacheState struct {
-	mu                    sync.Mutex
+// Package-level state for cache configuration.
+// These flags are set once at startup before any concurrent operations begin,
+// so no mutex protection is needed.
+var (
 	testMode              bool
 	cacheDisabled         bool
 	rateLimitWarningShown bool
-}
+)
 
-// state is the package-level cache state, protected by mutex.
-var state = &cacheState{}
-
-// TestMode returns whether test mode is enabled (thread-safe).
+// TestMode returns whether test mode is enabled.
 func TestMode() bool {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	return state.testMode
+	return testMode
 }
 
-// SetTestMode enables or disables test mode (thread-safe).
+// SetTestMode enables or disables test mode.
 func SetTestMode(enabled bool) {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	state.testMode = enabled
+	testMode = enabled
 }
 
-// CacheDisabled returns whether cache is disabled (thread-safe).
+// CacheDisabled returns whether cache is disabled.
 func CacheDisabled() bool {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	return state.cacheDisabled
+	return cacheDisabled
 }
 
-// SetCacheDisabled enables or disables cache bypass (thread-safe).
+// SetCacheDisabled enables or disables cache bypass.
 func SetCacheDisabled(disabled bool) {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	state.cacheDisabled = disabled
+	cacheDisabled = disabled
 }
 
-// RateLimitWarningShown returns whether a rate limit warning has been shown (thread-safe).
+// RateLimitWarningShown returns whether a rate limit warning has been shown.
 func RateLimitWarningShown() bool {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	return state.rateLimitWarningShown
+	return rateLimitWarningShown
 }
 
-// SetRateLimitWarningShown sets the rate limit warning flag (thread-safe).
+// SetRateLimitWarningShown sets the rate limit warning flag.
 func SetRateLimitWarningShown(shown bool) {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	state.rateLimitWarningShown = shown
+	rateLimitWarningShown = shown
 }
 
-// ResetState resets all cache state flags to their default values (thread-safe).
+// ResetState resets all cache state flags to their default values.
 // This is primarily used for testing to ensure clean state between tests.
 func ResetState() {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	state.testMode = false
-	state.cacheDisabled = false
-	state.rateLimitWarningShown = false
+	testMode = false
+	cacheDisabled = false
+	rateLimitWarningShown = false
 }
 
 // CachedResponse stores a cached API response

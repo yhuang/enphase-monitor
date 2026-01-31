@@ -542,9 +542,9 @@ enphase-monitor/
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   └── runner.go                      # Execution modes (once/continuous)
 │   ├── cache/                             # Disk-based response caching
-│   │   ├── cache.go                       # Thread-safe cache implementation
+│   │   ├── cache.go                       # Cache implementation
 │   │   ├── cli.go                         # Cache inspection utilities
-│   │   ├── cache_test.go                  # Cache state and thread safety tests
+│   │   ├── cache_test.go                  # Cache state management tests
 │   │   └── cache_functions_test.go        # Cache functionality tests
 │   ├── cli/                               # Command-line interface
 │   │   ├── flags.go                       # CLI flag parsing

@@ -57,7 +57,7 @@
 //
 // PATTERN USED
 // ------------
-// - Pattern 9: Benchmark Tests (testing.B)
+// - Pattern 8: Benchmark Tests (testing.B)
 //
 // See TESTING.md for detailed pattern explanations.
 package parser

@@ -615,17 +615,16 @@ Most packages follow the simple convention:
 For packages with many functions or complex logic, tests are split by **test category**:
 
 **Cache Package** (`cache.go`):
-1. **`cache_test.go`** - Thread safety & state management tests
-   - Tests concurrent access (mutex protection)
+1. **`cache_test.go`** - State management tests
    - Tests state flags (testMode, cacheDisabled, rateLimitWarning)
-   - Created in Round 9 to test thread-safe state after refactoring
+   - Tests ResetState() for test isolation
 
 2. **`cache_functions_test.go`** - Core functionality tests
    - Tests URL redaction, cache saving/loading, normalization
    - Tests file operations, error handling
    - Original functional tests
 
-**Why split?** Cache has two distinct concerns: thread-safe state (Round 9 addition) vs core caching functions (original).
+**Why split?** Cache has two distinct concerns: state management vs core caching functions.
 
 **OAuth Package** (`oauth.go`):
 1. **`oauth_test.go`** - Basic unit tests (270 lines)

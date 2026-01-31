@@ -2,18 +2,12 @@
 //
 // TEST SETUP
 // ----------
-// This test suite validates thread-safe cache state management.
-// Tests use goroutines to simulate concurrent access patterns.
+// This test suite validates cache state management functions.
+// Tests verify getter/setter behavior and state reset functionality.
 //
 // TEST PLAN
 // ---------
-// 1. Thread Safety Tests
-//    - Test concurrent TestMode access (10 goroutines × 100 iterations)
-//    - Test concurrent CacheDisabled access
-//    - Test concurrent RateLimitWarningShown access
-//    - Run with -race flag to detect data races
-//
-// 2. State Management Tests
+// 1. State Management Tests
 //    - Test SetTestMode/TestMode
 //    - Test SetCacheDisabled/CacheDisabled
 //    - Test SetRateLimitWarningShown/RateLimitWarningShown
@@ -21,103 +15,78 @@
 //
 // TESTING APPROACH
 // ----------------
-// - Use sync.WaitGroup to coordinate goroutines
-// - Each goroutine performs many rapid set/get operations
 // - ResetState() called before each test for isolation
-// - Run with `go test -race` to verify no data races
-//
-// WHY THREAD SAFETY MATTERS
-// -------------------------
-// The cache state is accessed from multiple parts of the codebase:
-// - Test mode flag checked before every API call
-// - Cache disabled flag checked in cache lookup
-// - Rate limit warning ensures message printed only once
-//
-// Mutex protection (sync.Mutex) ensures safe concurrent access.
+// - Verify initial state is false for all flags
+// - Verify setters correctly update state
 //
 // TEST ORGANIZATION
 // -----------------
 // This package has 3 test files (1:many pattern):
-// - cache_test.go (this file): Thread safety tests (161 lines)
-// - cache_functions_test.go: Core functionality tests (516 lines)
-// - cli_test.go: CLI utilities tests (119 lines)
+// - cache_test.go (this file): State management tests
+// - cache_functions_test.go: Core functionality tests
+// - cli_test.go: CLI utilities tests
 //
 // PATTERN USED
 // ------------
-// - Pattern 7: Thread Safety Testing (goroutines, sync.WaitGroup)
-// - Pattern 10: State Reset (ResetState before each test)
+// - Pattern 9: State Reset (ResetState before each test)
 //
 // See TESTING.md for detailed pattern explanations.
 package cache
 
 import (
-	"sync"
 	"testing"
 )
 
-// TestCacheState_ThreadSafety tests concurrent access to cache state.
-// This verifies that the mutex-protected state can be accessed from multiple goroutines
-// without race conditions.
-func TestCacheState_ThreadSafety(t *testing.T) {
-	// Reset to known state
-	ResetState()
-
-	const numGoroutines = 10
-	const numIterations = 100
-
-	var wg sync.WaitGroup
-	wg.Add(numGoroutines * 3) // 3 types of operations
-
-	// Concurrent TestMode access
-	for i := 0; i < numGoroutines; i++ {
-		go func() {
-			defer wg.Done()
-			for j := 0; j < numIterations; j++ {
-				SetTestMode(true)
-				_ = TestMode()
-				SetTestMode(false)
-			}
-		}()
-	}
-
-	// Concurrent CacheDisabled access
-	for i := 0; i < numGoroutines; i++ {
-		go func() {
-			defer wg.Done()
-			for j := 0; j < numIterations; j++ {
-				SetCacheDisabled(true)
-				_ = CacheDisabled()
-				SetCacheDisabled(false)
-			}
-		}()
-	}
-
-	// Concurrent RateLimitWarningShown access
-	for i := 0; i < numGoroutines; i++ {
-		go func() {
-			defer wg.Done()
-			for j := 0; j < numIterations; j++ {
-				SetRateLimitWarningShown(true)
-				_ = RateLimitWarningShown()
-				SetRateLimitWarningShown(false)
-			}
-		}()
-	}
-
-	// Wait for all goroutines to complete
-	wg.Wait()
-
-	// If we get here without deadlock or race detector errors, the test passes
-}
+// =============================================================================
+// PATTERN 9: STATE RESET
+// =============================================================================
+//
+// WHAT IS THE STATE RESET PATTERN?
+// --------------------------------
+// When testing code that uses package-level variables (global state), tests
+// can interfere with each other. If Test A sets a flag to true, Test B might
+// fail because it expected the flag to be false.
+//
+// The State Reset pattern solves this by:
+// 1. Providing a ResetState() function that clears all state
+// 2. Calling ResetState() at the START of each test (not the end)
+//
+// WHY RESET AT THE START, NOT THE END?
+// -------------------------------------
+// If you reset at the end and a test crashes/panics before cleanup,
+// the next test gets dirty state. Resetting at the START guarantees
+// each test begins with clean state regardless of what happened before.
+//
+// WHEN TO USE THIS PATTERN
+// ------------------------
+// - Testing code with package-level variables
+// - Testing singletons or cached state
+// - Any test that modifies shared mutable state
+//
+// =============================================================================
 
 // TestResetState verifies that ResetState properly resets all flags.
+//
+// WALKTHROUGH: Testing the Reset Function Itself
+// -----------------------------------------------
+// This test verifies our cleanup mechanism actually works. It's the
+// foundation for all other tests - if ResetState() is broken, no
+// other test can be trusted.
+//
+// The testing strategy is:
+// 1. Set ALL flags to non-default values (true)
+// 2. Verify they were actually set (sanity check)
+// 3. Call ResetState()
+// 4. Verify ALL flags are back to defaults (false)
 func TestResetState(t *testing.T) {
-	// Set all flags to true
+	// STEP 1: Dirty the state intentionally
+	// We set all flags to true (the non-default value)
 	SetTestMode(true)
 	SetCacheDisabled(true)
 	SetRateLimitWarningShown(true)
 
-	// Verify they are set
+	// STEP 2: Sanity check - verify our setters worked
+	// This catches bugs where setters silently fail
 	if !TestMode() {
 		t.Error("TestMode should be true before reset")
 	}
@@ -128,10 +97,11 @@ func TestResetState(t *testing.T) {
 		t.Error("RateLimitWarningShown should be true before reset")
 	}
 
-	// Reset state
+	// STEP 3: Call the function under test
 	ResetState()
 
-	// Verify all flags are false
+	// STEP 4: Verify all flags are back to false (default)
+	// Each assertion checks one piece of state
 	if TestMode() {
 		t.Error("TestMode should be false after reset")
 	}
@@ -143,22 +113,48 @@ func TestResetState(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// GETTER/SETTER TESTS WITH STATE RESET
+// =============================================================================
+//
+// WALKTHROUGH: Testing Getter/Setter Pairs
+// -----------------------------------------
+// These tests validate that each getter/setter pair works correctly.
+// They all follow the same structure:
+//
+// 1. ResetState() - ensure clean starting point (Pattern 9)
+// 2. Verify initial value is false (the default)
+// 3. Set to true, verify getter returns true
+// 4. Set to false, verify getter returns false
+//
+// WHY TEST BOTH DIRECTIONS?
+// -------------------------
+// A buggy setter might only work one way. For example:
+//   func SetTestMode(enabled bool) { testMode = true }  // Bug: ignores parameter
+// This would pass "set to true" but fail "set to false".
+//
+// =============================================================================
+
 // TestTestModeGetterSetter verifies TestMode getter and setter.
 func TestTestModeGetterSetter(t *testing.T) {
+	// PATTERN 9: Always reset at the start of each test
+	// This ensures previous tests don't affect this one
 	ResetState()
 
-	// Initial state should be false
+	// STEP 1: Verify initial state (after reset)
+	// The default for all boolean flags should be false
 	if TestMode() {
 		t.Error("TestMode should be false initially")
 	}
 
-	// Set to true
+	// STEP 2: Test setting to true
 	SetTestMode(true)
 	if !TestMode() {
 		t.Error("TestMode should be true after SetTestMode(true)")
 	}
 
-	// Set back to false
+	// STEP 3: Test setting back to false
+	// This catches bugs where the setter ignores the parameter
 	SetTestMode(false)
 	if TestMode() {
 		t.Error("TestMode should be false after SetTestMode(false)")
@@ -166,6 +162,10 @@ func TestTestModeGetterSetter(t *testing.T) {
 }
 
 // TestCacheDisabledGetterSetter verifies CacheDisabled getter and setter.
+//
+// Note: This test is structurally identical to TestTestModeGetterSetter.
+// In a larger codebase, you might use a table-driven test to reduce
+// duplication. Here, explicit tests are clearer for a small number of flags.
 func TestCacheDisabledGetterSetter(t *testing.T) {
 	ResetState()
 

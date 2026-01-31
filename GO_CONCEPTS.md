@@ -895,7 +895,7 @@ internal/
 ├── cache/                       # Disk-based API response caching
 │   ├── cache.go                 # Core caching logic
 │   ├── cli.go                   # Cache inspection utilities
-│   ├── cache_test.go            # Thread safety tests
+│   ├── cache_test.go            # State management tests
 │   └── cache_functions_test.go  # Functionality tests
 ├── cli/                         # Command-line interface
 │   ├── flags.go                 # Flag parsing
@@ -938,7 +938,7 @@ Test files in Go follow the pattern `*_test.go`. The Go tooling automatically ex
 - `parser/parser_test.go` - Tests JSON parsing
 - `timezone/timezone_test.go` - Tests timezone calculations
 - `validation/validation_test.go` - Tests metrics validation
-- `cache/cache_test.go` - Tests thread-safe state management
+- `cache/cache_test.go` - Tests state management
 - `display/display_test.go` - Tests output formatting
 - `aggregator/aggregator_test.go` - Tests data aggregation with mocks
 
