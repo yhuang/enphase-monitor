@@ -33,6 +33,7 @@
 // PATTERN USED
 // ------------
 // - Pattern 3: Subtests with t.Run()
+// - Pattern 5: Writer Injection (bytes.Buffer for output capture and verification)
 // - Pattern 6: Test Fixtures (expected values JSON files)
 // - Pattern 7: Error Path Testing
 // - Pattern 11: Golden Data Validation (expected values files)
@@ -41,7 +42,9 @@
 package validation
 
 import (
+	"bytes"
 	"os"
+	"strings"
 	"testing"
 
 	"enphase-monitor/internal/aggregator"
@@ -96,9 +99,14 @@ func TestValidateMetrics_FullFlow_Success(t *testing.T) {
 		}
 	}()
 
-	err := ValidateMetrics(metrics, "2026-01-20")
+	var buf bytes.Buffer
+	err := ValidateMetrics(&buf, metrics, "2026-01-20")
 	if err != nil {
 		t.Errorf("Validation failed with matching metrics: %v", err)
+	}
+	// Verify output contains success indicator
+	if !strings.Contains(buf.String(), "ALL VALIDATIONS PASSED") {
+		t.Error("Expected output to contain 'ALL VALIDATIONS PASSED'")
 	}
 }
 
@@ -151,9 +159,14 @@ func TestValidateMetrics_FullFlow_WithinTolerance(t *testing.T) {
 		}
 	}()
 
-	err := ValidateMetrics(metrics, "2026-01-20")
+	var buf bytes.Buffer
+	err := ValidateMetrics(&buf, metrics, "2026-01-20")
 	if err != nil {
 		t.Errorf("Validation failed with metrics within tolerance: %v", err)
+	}
+	// Verify output contains success indicator
+	if !strings.Contains(buf.String(), "ALL VALIDATIONS PASSED") {
+		t.Error("Expected output to contain 'ALL VALIDATIONS PASSED'")
 	}
 }
 
@@ -206,9 +219,18 @@ func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
 		}
 	}()
 
-	err := ValidateMetrics(metrics, "2026-01-20")
+	var buf bytes.Buffer
+	err := ValidateMetrics(&buf, metrics, "2026-01-20")
 	if err == nil {
 		t.Error("Expected validation to fail with metrics outside tolerance, but it passed")
+	}
+	// Verify output contains failure indicator for Grid Import
+	output := buf.String()
+	if !strings.Contains(output, "SOME VALIDATIONS FAILED") {
+		t.Error("Expected output to contain 'SOME VALIDATIONS FAILED'")
+	}
+	if !strings.Contains(output, "❌") && !strings.Contains(output, "Grid Import") {
+		t.Error("Expected output to show Grid Import failure")
 	}
 }
 
@@ -251,9 +273,14 @@ func TestValidateMetrics_MissingSystem(t *testing.T) {
 		}
 	}()
 
-	err := ValidateMetrics(metrics, "2026-01-20")
+	var buf bytes.Buffer
+	err := ValidateMetrics(&buf, metrics, "2026-01-20")
 	if err == nil {
 		t.Error("Expected validation to fail with missing system, but it passed")
+	}
+	// Verify output indicates missing system
+	if !strings.Contains(buf.String(), "not found in actual metrics") {
+		t.Error("Expected output to indicate missing system")
 	}
 }
 
@@ -291,7 +318,8 @@ func TestValidateMetrics_DateMismatch(t *testing.T) {
 	}()
 
 	// Try to validate with a date that doesn't exist in test-data
-	err := ValidateMetrics(metrics, "2026-01-99")
+	var buf bytes.Buffer
+	err := ValidateMetrics(&buf, metrics, "2026-01-99")
 	if err == nil {
 		t.Error("Expected error for non-existent date file, got nil")
 	}
@@ -341,7 +369,8 @@ func TestValidateMetrics_MultipleExpectedValuesFiles(t *testing.T) {
 
 			// We expect this to fail because metrics are empty, but it should
 			// successfully load the expected values file first
-			err := ValidateMetrics(metrics, tt.date)
+			var buf bytes.Buffer
+			err := ValidateMetrics(&buf, metrics, tt.date)
 
 			// We expect an error because metrics are empty, but not a file loading error
 			if err == nil {
@@ -404,8 +433,13 @@ func TestValidateMetrics_RealWorldScenario(t *testing.T) {
 		}
 	}()
 
-	err := ValidateMetrics(metrics, "2026-01-20")
+	var buf bytes.Buffer
+	err := ValidateMetrics(&buf, metrics, "2026-01-20")
 	if err != nil {
 		t.Errorf("Validation failed with realistic variations: %v", err)
+	}
+	// Verify output contains success indicator
+	if !strings.Contains(buf.String(), "ALL VALIDATIONS PASSED") {
+		t.Error("Expected output to contain 'ALL VALIDATIONS PASSED'")
 	}
 }

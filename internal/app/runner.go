@@ -13,6 +13,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"enphase-monitor/internal/aggregator"
@@ -40,7 +41,7 @@ func RunOnce(ctx context.Context, agg *aggregator.DataAggregator, disp *display.
 			return fmt.Errorf("--test flag requires --date flag to specify which date to validate")
 		}
 		testDateStr := testDate.Format(constants.DateFormat)
-		if err := validation.ValidateMetrics(metrics, testDateStr); err != nil {
+		if err := validation.ValidateMetrics(os.Stdout, metrics, testDateStr); err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
 	}

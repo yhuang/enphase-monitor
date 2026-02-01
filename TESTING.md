@@ -292,7 +292,26 @@ func TestShowMetrics_ContainsHeader(t *testing.T) {
 }
 ```
 
-**Used in**: `display_test.go` (all output tests)
+**Used in**: `display_test.go` (all output tests), `validation_test.go`, `validation_integration_test.go`
+
+**Additional Example** (`validation_integration_test.go`):
+```go
+func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
+    metrics := &aggregator.AggregatedMetrics{...}
+
+    var buf bytes.Buffer
+    err := ValidateMetrics(&buf, metrics, "2026-01-20")
+
+    // Verify expected failure in output
+    output := buf.String()
+    if !strings.Contains(output, "SOME VALIDATIONS FAILED") {
+        t.Error("Expected output to contain 'SOME VALIDATIONS FAILED'")
+    }
+    if !strings.Contains(output, "❌") {
+        t.Error("Expected output to show failure indicator")
+    }
+}
+```
 
 ### Pattern 6: Test Fixtures with Helper Functions
 
@@ -431,14 +450,19 @@ func TestCacheState_SetAndGet(t *testing.T) {
 func TestValidateMetrics_RealData(t *testing.T) {
     // Load expected values from JSON file
     expected := loadExpectedValues("test-data/expected_values_2026-01-20.json")
-    
+
     // Load cached API responses and aggregate
     metrics := aggregateFromCache("2026-01-20")
-    
-    // Validate with tolerance
-    err := ValidateMetrics(metrics, "2026-01-20")
+
+    // Validate with tolerance - capture output in buffer for verification
+    var buf bytes.Buffer
+    err := ValidateMetrics(&buf, metrics, "2026-01-20")
     if err != nil {
         t.Errorf("Validation failed: %v", err)
+    }
+    // Verify output contains expected success indicator
+    if !strings.Contains(buf.String(), "ALL VALIDATIONS PASSED") {
+        t.Error("Expected validation success message in output")
     }
 }
 ```

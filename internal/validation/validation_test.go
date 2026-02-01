@@ -9,6 +9,7 @@
 // ---------------------
 // - Pattern 1: Table-Driven Tests (multiple inputs, one test function)
 // - Pattern 3: Subtests with t.Run() (named, independently runnable tests)
+// - Pattern 5: Writer Injection (io.Writer/io.Discard for testable output)
 // - Pattern 7: Error Path Testing (deliberately cause errors to test handling)
 //
 // HOW TO RUN THESE TESTS
@@ -31,6 +32,8 @@
 package validation
 
 import (
+	"bytes"
+	"io"
 	"math"
 	"testing"
 
@@ -87,7 +90,7 @@ func TestValidateMetric_ExactMatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// STEP 4: Call the function we're testing
 			// validateMetric is defined in validation.go (same package, so we can call it)
-			got := validateMetric("Test Metric", tt.expected, tt.actual)
+			got := validateMetric(io.Discard, "Test Metric", tt.expected, tt.actual)
 
 			// STEP 5: Compare the result with what we expected
 			// If they don't match, report an error with helpful context
@@ -159,7 +162,7 @@ func TestValidateMetric_WithinTolerance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateMetric("Test Metric", tt.expected, tt.actual)
+			got := validateMetric(io.Discard, "Test Metric", tt.expected, tt.actual)
 			if got != tt.want {
 				// RICH ERROR MESSAGE: When test fails, show all relevant info
 				// This makes debugging much easier - you can see exactly what went wrong
@@ -217,7 +220,7 @@ func TestValidateMetric_OutsideTolerance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateMetric("Test Metric", tt.expected, tt.actual)
+			got := validateMetric(io.Discard, "Test Metric", tt.expected, tt.actual)
 			if got != tt.want {
 				diff := math.Abs(tt.actual - tt.expected)
 				tolerance := math.Max(math.Abs(tt.expected)*constants.ValidationTolerancePercent, constants.ValidationMinToleranceKWh)
@@ -272,7 +275,7 @@ func TestValidateMetric_ZeroValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateMetric("Test Metric", tt.expected, tt.actual)
+			got := validateMetric(io.Discard, "Test Metric", tt.expected, tt.actual)
 			if got != tt.want {
 				t.Errorf("validateMetric() = %v, want %v (expected: %.2f, actual: %.2f)",
 					got, tt.want, tt.expected, tt.actual)
@@ -314,7 +317,7 @@ func TestValidateMetric_NegativeValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateMetric("Test Metric", tt.expected, tt.actual)
+			got := validateMetric(io.Discard, "Test Metric", tt.expected, tt.actual)
 			if got != tt.want {
 				t.Errorf("validateMetric() = %v, want %v (expected: %.2f, actual: %.2f)",
 					got, tt.want, tt.expected, tt.actual)
@@ -361,7 +364,8 @@ func TestValidateMetrics_MissingFile(t *testing.T) {
 	}
 
 	// STEP 2: Call function with input that SHOULD cause an error
-	err := ValidateMetrics(metrics, "9999-99-99") // Non-existent date
+	var buf bytes.Buffer
+	err := ValidateMetrics(&buf, metrics, "9999-99-99") // Non-existent date
 
 	// STEP 3: Verify we got an error (not nil)
 	if err == nil {
@@ -393,7 +397,8 @@ func TestValidateMetrics_MissingFile_HelpfulError(t *testing.T) {
 	}
 
 	testDate := "2050-06-15" // Date that definitely won't exist
-	err := ValidateMetrics(metrics, testDate)
+	var buf bytes.Buffer
+	err := ValidateMetrics(&buf, metrics, testDate)
 
 	// STEP 1: First verify we got an error at all
 	if err == nil {
@@ -625,7 +630,7 @@ func TestRunMetricTests(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			total, passed, anyFailed := runMetricTests(tt.cases)
+			total, passed, anyFailed := runMetricTests(io.Discard, tt.cases)
 			if total != tt.wantTotal {
 				t.Errorf("runMetricTests() total = %d, want %d", total, tt.wantTotal)
 			}
@@ -659,7 +664,8 @@ func TestValidateMetrics_EmptyMetrics(t *testing.T) {
 	}
 
 	// This should fail because expected values will have systems but metrics don't
-	err := ValidateMetrics(metrics, "2026-01-20")
+	var buf bytes.Buffer
+	err := ValidateMetrics(&buf, metrics, "2026-01-20")
 	if err == nil {
 		t.Error("Expected error for empty metrics, got nil")
 	}
@@ -681,7 +687,8 @@ func TestValidateMetrics_SystemIDMismatch(t *testing.T) {
 	}
 
 	// This should fail because system IDs won't match
-	err := ValidateMetrics(metrics, "2026-01-20")
+	var buf bytes.Buffer
+	err := ValidateMetrics(&buf, metrics, "2026-01-20")
 	if err == nil {
 		t.Error("Expected error for system ID mismatch, got nil")
 	}

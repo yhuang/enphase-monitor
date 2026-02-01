@@ -16,11 +16,18 @@
 //   - Minimum tolerance: ±0.1 kWh (for small values)
 //
 // This accounts for minor variations in API responses, floating-point precision, and timing differences.
+//
+// TESTABILITY
+// -----------
+// Functions accept an io.Writer parameter for output, following the Go idiom for testable I/O.
+// Production code passes os.Stdout; tests pass bytes.Buffer to capture and verify output.
+// This keeps test output clean and enables explicit assertions on validation results.
 package validation
 
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -54,7 +61,8 @@ type ExpectedMetrics struct {
 }
 
 // ValidateMetrics validates actual metrics against expected values for the given date.
-func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) error {
+// Output is written to w, allowing tests to capture and verify the output.
+func ValidateMetrics(w io.Writer, metrics *aggregator.AggregatedMetrics, dateStr string) error {
 	// Load expected values
 	expectedPath := filepath.Join("test-data", fmt.Sprintf("expected_values_%s.json", dateStr))
 	expectedData, err := os.ReadFile(expectedPath)
@@ -99,8 +107,8 @@ func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) erro
 	}
 
 	// Display validation header
-	fmt.Printf("\n%s\n", constants.Bold+"=== VALIDATION RESULTS ==="+constants.Reset)
-	fmt.Printf("Comparing against expected values for %s\n\n", dateStr)
+	fmt.Fprintf(w, "\n%s\n", constants.Bold+"=== VALIDATION RESULTS ==="+constants.Reset)
+	fmt.Fprintf(w, "Comparing against expected values for %s\n\n", dateStr)
 
 	allPassed := true
 	totalTests := 0
@@ -110,12 +118,12 @@ func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) erro
 	for _, expectedSys := range expected.Systems {
 		actualSys := findSystemByID(metrics.Systems, expectedSys.ID)
 		if actualSys == nil {
-			fmt.Printf("❌ System %s (%s) not found in actual metrics\n", expectedSys.Name, expectedSys.ID)
+			fmt.Fprintf(w, "❌ System %s (%s) not found in actual metrics\n", expectedSys.Name, expectedSys.ID)
 			allPassed = false
 			continue
 		}
 
-		fmt.Printf("%s[%s] %s (ID: %s)%s\n", constants.Bold, actualSys.Name, expectedSys.Name, expectedSys.ID, constants.Reset)
+		fmt.Fprintf(w, "%s[%s] %s (ID: %s)%s\n", constants.Bold, actualSys.Name, expectedSys.Name, expectedSys.ID, constants.Reset)
 
 		tests := []metricTestCase{
 			{"Grid Import", expectedSys.Expected.GridImport, actualSys.GridImportToday},
@@ -126,27 +134,27 @@ func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) erro
 			{"Net Imported", expectedSys.Expected.NetImported, actualSys.NetImportedToday},
 			{"Consumption", expectedSys.Expected.Consumption, actualSys.ConsumptionToday},
 		}
-		total, passed, anyFailed := runMetricTests(tests)
+		total, passed, anyFailed := runMetricTests(w, tests)
 		totalTests += total
 		passedTests += passed
 		if anyFailed {
 			allPassed = false
 		}
-		fmt.Println()
+		fmt.Fprintln(w)
 	}
 
 	// Print summary
-	fmt.Printf("%s\n", constants.Bold+"=== VALIDATION SUMMARY ==="+constants.Reset)
-	fmt.Printf("Total tests: %d\n", totalTests)
-	fmt.Printf("Passed: %d\n", passedTests)
-	fmt.Printf("Failed: %d\n", totalTests-passedTests)
+	fmt.Fprintf(w, "%s\n", constants.Bold+"=== VALIDATION SUMMARY ==="+constants.Reset)
+	fmt.Fprintf(w, "Total tests: %d\n", totalTests)
+	fmt.Fprintf(w, "Passed: %d\n", passedTests)
+	fmt.Fprintf(w, "Failed: %d\n", totalTests-passedTests)
 
 	if allPassed {
-		fmt.Printf("\n%s✅ ALL VALIDATIONS PASSED%s\n", constants.Bold, constants.Reset)
+		fmt.Fprintf(w, "\n%s✅ ALL VALIDATIONS PASSED%s\n", constants.Bold, constants.Reset)
 		return nil
 	}
 
-	fmt.Printf("\n%s❌ SOME VALIDATIONS FAILED%s\n", constants.Bold, constants.Reset)
+	fmt.Fprintf(w, "\n%s❌ SOME VALIDATIONS FAILED%s\n", constants.Bold, constants.Reset)
 	return fmt.Errorf("%d/%d validation tests failed", totalTests-passedTests, totalTests)
 }
 
@@ -168,10 +176,10 @@ type metricTestCase struct {
 }
 
 // runMetricTests runs the given metric tests and returns total count, passed count, and whether any failed.
-func runMetricTests(tests []metricTestCase) (total, passed int, anyFailed bool) {
+func runMetricTests(w io.Writer, tests []metricTestCase) (total, passed int, anyFailed bool) {
 	for _, test := range tests {
 		total++
-		p := validateMetric(test.name, test.expected, test.actual)
+		p := validateMetric(w, test.name, test.expected, test.actual)
 		if p {
 			passed++
 		}
@@ -183,7 +191,7 @@ func runMetricTests(tests []metricTestCase) (total, passed int, anyFailed bool) 
 }
 
 // validateMetric validates a single metric value against expected with tolerance.
-func validateMetric(name string, expected, actual float64) bool {
+func validateMetric(w io.Writer, name string, expected, actual float64) bool {
 	// Calculate tolerance: 10% of expected value, with minimum 0.1 kWh
 	tolerance := math.Max(math.Abs(expected)*constants.ValidationTolerancePercent, constants.ValidationMinToleranceKWh)
 	diff := actual - expected
@@ -209,7 +217,7 @@ func validateMetric(name string, expected, actual float64) bool {
 		percentStr = fmt.Sprintf(" (%.1f%%)", percentDiff)
 	}
 
-	fmt.Printf("  %s %-20s Expected: %6.1f kWh  Actual: %6.1f kWh  Diff: %+6.1f kWh%s\n",
+	fmt.Fprintf(w, "  %s %-20s Expected: %6.1f kWh  Actual: %6.1f kWh  Diff: %+6.1f kWh%s\n",
 		status, name+":", expected, actual, diff, percentStr)
 
 	return passed
