@@ -66,10 +66,10 @@ func TestNewDisplayWithWriter(t *testing.T) {
 		t.Fatal("NewDisplayWithWriter returned nil")
 	}
 	if d.writer != &buf {
-		t.Error("Display writer was not set correctly")
+		t.Errorf("NewDisplayWithWriter(..., &buf): writer = %p, want %p", d.writer, &buf)
 	}
 	if d.timezone != tz {
-		t.Error("Display timezone was not set correctly")
+		t.Errorf("NewDisplayWithWriter(..., tz): timezone = %v, want %v", d.timezone, tz)
 	}
 }
 
@@ -84,7 +84,7 @@ func TestNewDisplayWithColorsAndTimezone(t *testing.T) {
 	}
 	// Should use os.Stdout as default writer
 	if d.writer == nil {
-		t.Error("Display writer should not be nil")
+		t.Error("NewDisplayWithColorsAndTimezone(...): writer = nil, want non-nil")
 	}
 }
 

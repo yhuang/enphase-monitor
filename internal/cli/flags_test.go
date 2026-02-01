@@ -71,13 +71,13 @@ func TestParseFlags_Defaults(t *testing.T) {
 	flags := ParseFlags()
 
 	if flags.ConfigFile != "config.yaml" {
-		t.Errorf("ConfigFile = %v, want config.yaml", flags.ConfigFile)
+		t.Errorf("ParseFlags() ConfigFile = %v, want config.yaml", flags.ConfigFile)
 	}
 	if flags.Once {
-		t.Error("Once should be false by default")
+		t.Errorf("ParseFlags() Once = %v, want false", flags.Once)
 	}
 	if flags.TestMode {
-		t.Error("TestMode should be false by default")
+		t.Errorf("ParseFlags() TestMode = %v, want false", flags.TestMode)
 	}
 }
 
@@ -90,7 +90,7 @@ func TestParseFlags_ConfigFile(t *testing.T) {
 	flags := ParseFlags()
 
 	if flags.ConfigFile != "custom.yaml" {
-		t.Errorf("ConfigFile = %v, want custom.yaml", flags.ConfigFile)
+		t.Errorf("ParseFlags() ConfigFile = %v, want custom.yaml", flags.ConfigFile)
 	}
 }
 

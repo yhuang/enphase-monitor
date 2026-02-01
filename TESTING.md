@@ -544,6 +544,31 @@ go test -cover ./... | grep -E "coverage: [0-9]+\.[0-9]+%" | awk '{print $2}'
 
 ## Testing Conventions
 
+### Go testing practices (go-testing skill)
+
+Tests in this repo follow the [go-testing](https://github.com/golang/go/wiki/CodeReviewComments#useful-test-failures) style so that failures are diagnosable without reading the test source:
+
+1. **Failure message format**  
+   Include: what failed, function inputs, **got**, **want**. Prefer:  
+   `YourFunc(%v) = %v, want %v`  
+   Always print **got before want**.
+
+2. **No assertion libraries**  
+   Use `t.Error`/`t.Fatalf` and standard comparisons. For structs/slices use `cmp.Diff(want, got)` and report:  
+   `t.Errorf("Func() mismatch (-want +got):\n%s", diff)`.
+
+3. **t.Error vs t.Fatal**  
+   Use `t.Error` to report and continue (e.g. multiple checks in one test). Use `t.Fatal` only when continuing is meaningless (e.g. setup failure, nil dependency).
+
+4. **Test helpers**  
+   Helpers that take `*testing.T` must call `t.Helper()` first so failures point to the caller. Use `t.Fatal` for setup failures in helpers; use `t.Cleanup()` for teardown.
+
+5. **Error semantics**  
+   Prefer testing error semantics (e.g. `errors.Is(err, ErrX)`) over comparing `err.Error()` strings.
+
+6. **Environments that block network**  
+   Some tests use `httptest.NewServer` and need to bind a port. In sandboxes or restricted CI you may see "bind: operation not permitted". Run `go test ./...` where binding is allowed (see [Environment note](#environment-note-tests-that-need-a-network-listener) above).
+
 ### Naming Conventions
 
 1. **Test Files**: `*_test.go` suffix
@@ -652,6 +677,16 @@ These files measure and optimize performance:
 ---
 
 ## Running Tests
+
+### Environment note: tests that need a network listener
+
+Some tests use `httptest.NewServer` (e.g. `internal/api`, `internal/oauth`) and must be able to bind a local port. In restricted environments (e.g. sandboxes, some CI) you may see:
+
+```text
+panic: httptest: failed to listen on a port: listen tcp6 [::1]:0: bind: operation not permitted
+```
+
+Run `go test ./...` in an environment that allows binding (e.g. your machine or CI with network permissions). There is no build tag or skip for these tests; they are standard unit/integration tests.
 
 ### Unit Tests
 
