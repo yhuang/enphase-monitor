@@ -201,13 +201,15 @@ func TestExchangeAuthorizationCode_Errors(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Error("Expected error but got nil")
+					return
 				}
-			} else {
-				// Note: Will fail with network error since we don't mock HTTP
-				// This tests error validation only
-				if err != nil && !strings.Contains(err.Error(), "failed") {
-					t.Logf("Got expected error: %v", err)
-				}
+				t.Logf("Got expected error: %v", err)
+				return
+			}
+			// Note: Will fail with network error since we don't mock HTTP
+			// This tests error validation only
+			if err != nil && !strings.Contains(err.Error(), "failed") {
+				t.Logf("Got expected error: %v", err)
 			}
 		})
 	}
@@ -270,9 +272,9 @@ func TestGetAccessToken_Errors(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Error("Expected error but got nil")
-				} else {
-					t.Logf("Got expected error: %v", err)
+					return
 				}
+				t.Logf("Got expected error: %v", err)
 			}
 		})
 	}

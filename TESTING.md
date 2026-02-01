@@ -276,7 +276,7 @@ func TestExchangeCodeForToken_Success(t *testing.T) {
 ```go
 func TestShowMetrics_ContainsHeader(t *testing.T) {
     var buf bytes.Buffer
-    tz, _ := time.LoadLocation("US/Pacific")
+    tz := mustLoadLocation(t, "US/Pacific")  // test helper; fails test if timezone invalid
     
     // Inject buffer as writer
     d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
@@ -687,6 +687,10 @@ panic: httptest: failed to listen on a port: listen tcp6 [::1]:0: bind: operatio
 ```
 
 Run `go test ./...` in an environment that allows binding (e.g. your machine or CI with network permissions). There is no build tag or skip for these tests; they are standard unit/integration tests.
+
+### Test helpers (timezone and errors)
+
+Tests that need a timezone use a helper so invalid timezones fail the test instead of being ignored: `tz := mustLoadLocation(t, "US/Pacific")`. The helper is defined in each test file that needs it (e.g. `internal/api/client_functional_test.go`, `internal/display/display_test.go`, `internal/aggregator/aggregator_test.go`). This follows the go-code-review guideline to avoid discarding errors in tests.
 
 ### Unit Tests
 

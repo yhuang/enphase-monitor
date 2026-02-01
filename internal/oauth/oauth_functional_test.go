@@ -538,11 +538,12 @@ func TestGetAccessToken_UnauthorizedError(t *testing.T) {
 				ClientSecret:     "test-client-secret",
 			}
 
-			if tt.hasRefreshToken {
-				config.RefreshToken = "invalid-refresh-token"
-			} else {
+			if !tt.hasRefreshToken {
 				config.Username = "test-user"
 				config.Password = "wrong-password"
+			}
+			if tt.hasRefreshToken {
+				config.RefreshToken = "invalid-refresh-token"
 			}
 
 			_, err := GetAccessToken(ctx, config)

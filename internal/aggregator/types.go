@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// AggregatedMetrics represents combined data from all Enphase systems
+// AggregatedMetrics represents combined data from all Enphase systems.
 type AggregatedMetrics struct {
 	Timestamp time.Time
 	QueryDate time.Time // The date being queried (zero value means today)
@@ -23,7 +23,7 @@ type AggregatedMetrics struct {
 	CacheUsed bool // Indicates if any cached data was used
 }
 
-// SystemMetrics represents metrics for a single system
+// SystemMetrics represents metrics for a single system.
 type SystemMetrics struct {
 	Name             string
 	ID               string // System ID (for Cloud API)

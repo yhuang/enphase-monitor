@@ -113,3 +113,7 @@ type CloudClient interface {
 	//   - error: Any error encountered
 	GetBatteryDataForDate(ctx context.Context, testDate time.Time) (charged float64, discharged float64, soc int, err error)
 }
+
+// Compile-time check that *EnlightenCloudClient implements CloudClient.
+// If the interface or the implementation changes, this file fails to build.
+var _ CloudClient = (*EnlightenCloudClient)(nil)

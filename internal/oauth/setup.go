@@ -1,8 +1,8 @@
-// Package oauth - setup.go
+// setup.go implements the interactive OAuth setup wizard for first-time configuration.
+// Package comment and token/refresh logic are in oauth.go.
 //
 // PURPOSE
 // -------
-// This file implements the interactive OAuth setup wizard for first-time configuration.
 // Guides users through the OAuth 2.0 authorization flow to obtain a refresh token.
 //
 // SETUP FLOW
@@ -53,8 +53,9 @@ func openBrowser(url string) error {
 	return cmd.Start()
 }
 
-// Setup helps users complete the one-time OAuth authorization flow
-func Setup(cfg *config.Config) error {
+// Setup helps users complete the one-time OAuth authorization flow.
+// ctx is used for cancellation (e.g. Ctrl+C during token exchange).
+func Setup(ctx context.Context, cfg *config.Config) error {
 	if cfg.API == nil {
 		return fmt.Errorf("API configuration is required")
 	}
@@ -168,7 +169,7 @@ func Setup(cfg *config.Config) error {
 
 	// Exchange code for tokens
 	fmt.Println("\nExchanging authorization code for tokens...")
-	tokenResp, err := ExchangeAuthorizationCode(context.Background(), cfg.API, code)
+	tokenResp, err := ExchangeAuthorizationCode(ctx, cfg.API, code)
 	if err != nil {
 		return fmt.Errorf("failed to exchange authorization code: %w", err)
 	}

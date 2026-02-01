@@ -27,20 +27,20 @@ import (
 	"enphase-monitor/internal/constants"
 )
 
-// TelemetryResponse represents the response from telemetry endpoints
-// Note: production_meter, consumption_meter, battery return a single array
+// TelemetryResponse represents the response from telemetry endpoints.
+// Note: production_meter, consumption_meter, battery return a single array.
 type TelemetryResponse struct {
 	LastReportedAggregateSOC string              `json:"last_reported_aggregate_soc,omitempty"` // Battery state of charge percentage as string (e.g., "97%")
 	Intervals                []TelemetryInterval `json:"intervals"`
 }
 
-// TelemetryResponseNested represents the response from energy_import_telemetry and energy_export_telemetry
-// which return intervals as an array of arrays
+// TelemetryResponseNested represents the response from energy_import_telemetry and energy_export_telemetry,
+// which return intervals as an array of arrays.
 type TelemetryResponseNested struct {
 	Intervals [][]TelemetryInterval `json:"intervals"`
 }
 
-// TelemetryInterval represents a single 15-minute interval
+// TelemetryInterval represents a single 15-minute interval.
 type TelemetryInterval struct {
 	EndAt      int64   `json:"end_at"`      // Unix timestamp
 	WhDel      float64 `json:"wh_del"`      // Energy delivered (for production_meter)

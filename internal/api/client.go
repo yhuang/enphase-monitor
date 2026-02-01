@@ -1,8 +1,8 @@
-// Package api - client.go
+// Package api provides the HTTP client and types for the Enphase Enlighten Cloud API v4.
 //
 // PURPOSE
 // -------
-// This file implements the HTTP client for the Enphase Enlighten Cloud API v4.
+// This package implements the HTTP client for the Enphase Enlighten Cloud API v4.
 // It handles all communication with Enphase's cloud servers to fetch energy metrics
 // for a specific solar system.
 //
@@ -135,8 +135,8 @@ type EnlightenCloudClient struct {
 	cacheUsed   bool // Tracks if cache was used for the last request
 }
 
-// NewEnlightenCloudClient creates a new client for Enlighten Cloud API with API key and OAuth token
-// Uses the production Enphase API URL
+// NewEnlightenCloudClient creates a new client for Enlighten Cloud API with API key and OAuth token.
+// Uses the production Enphase API URL.
 func NewEnlightenCloudClient(systemID, apiKey, accessToken string, timezone *time.Location) *EnlightenCloudClient {
 	return &EnlightenCloudClient{
 		baseURL:     constants.EnphaseAPIv4SystemsURL,
@@ -150,8 +150,8 @@ func NewEnlightenCloudClient(systemID, apiKey, accessToken string, timezone *tim
 	}
 }
 
-// NewEnlightenCloudClientWithBaseURL creates a client with a custom base URL (for testing)
-// This constructor enables dependency injection for testing with mock HTTP servers
+// NewEnlightenCloudClientWithBaseURL creates a client with a custom base URL (for testing).
+// This constructor enables dependency injection for testing with mock HTTP servers.
 func NewEnlightenCloudClientWithBaseURL(baseURL, systemID, apiKey, accessToken string, timezone *time.Location) *EnlightenCloudClient {
 	return &EnlightenCloudClient{
 		baseURL:     baseURL,
@@ -187,12 +187,9 @@ func (c *EnlightenCloudClient) fetchTelemetryData(ctx context.Context, endpoint 
 // This method uses the injected baseURL for testability
 func (c *EnlightenCloudClient) buildTelemetryURL(endpoint string, dayStart, dayEnd time.Time) string {
 	baseURL := fmt.Sprintf("%s/%s/%s", c.baseURL, c.systemID, endpoint)
-	return fmt.Sprintf("%s?key=%s&start_at=%d&end_at=%d",
-		baseURL,
-		c.apiKey,
-		dayStart.Unix(),
-		dayEnd.Unix(),
-	)
+	return baseURL + "?key=" + c.apiKey +
+		"&start_at=" + strconv.FormatInt(dayStart.Unix(), 10) +
+		"&end_at=" + strconv.FormatInt(dayEnd.Unix(), 10)
 }
 
 // LocalMetrics is exported in types.go
@@ -343,9 +340,9 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	return chargeWh / constants.WhToKWh, dischargeWh / constants.WhToKWh, socPercent, nil // Convert Wh to kWh
 }
 
-// GetMetricsFromCloud fetches all today's metrics from the Cloud API
-// If testDate is provided, uses that date instead of today
-// Returns metrics and a boolean indicating if any cache was used
+// GetMetricsFromCloud fetches all today's metrics from the Cloud API.
+// If testDate is provided, uses that date instead of today.
+// Returns metrics and a boolean indicating if any cache was used.
 func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time) (*LocalMetrics, bool, error) {
 	metrics := &LocalMetrics{
 		Timestamp: time.Now(),
@@ -564,7 +561,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		// In test mode, provide more detailed error about missing cache
 		cachePath := cache.GetCachePath(url, c.timezone)
 		normalizedURL := cache.NormalizeURLForCache(url, c.timezone)
-		return nil, false, fmt.Errorf("test mode: no cached response available. Cache path: %s, Normalized URL: %s", cachePath, cache.RedactURLKey(normalizedURL))
+		return nil, false, fmt.Errorf("test mode: no cached response available; cache path: %s, normalized URL: %s", cachePath, cache.RedactURLKey(normalizedURL))
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
@@ -606,6 +603,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		}
 		resp.Body.Close()
 		tempResp := &http.Response{StatusCode: resp.StatusCode, Header: resp.Header}
+		// Save to cache (ignore errors - caching is best effort)
 		_ = cache.SaveCachedResponseFromBytes(url, tempResp, bodyBytes, c.timezone)
 		return &http.Response{
 			StatusCode: resp.StatusCode,
@@ -662,8 +660,11 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 
 	// Handle other non-OK status codes: try cache as fallback, then return error
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		if err != nil {
+			return nil, false, fmt.Errorf("API request failed with status %d: failed to read body: %w", resp.StatusCode, err)
+		}
 		if isDateInPast && cacheErr == nil && !isCacheStale {
 			return cached.ToHTTPResponse(), true, nil
 		}

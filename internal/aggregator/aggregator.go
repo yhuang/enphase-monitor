@@ -38,7 +38,7 @@ func defaultCloudClientFactory(systemID, apiKey, accessToken string, tz *time.Lo
 	return api.NewEnlightenCloudClient(systemID, apiKey, accessToken, tz)
 }
 
-// DataAggregator handles combining data from multiple systems
+// DataAggregator handles combining data from multiple systems.
 //
 // GO PATTERN: Service Object with Dependency Injection
 // This struct uses dependency injection for:

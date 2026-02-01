@@ -1,12 +1,5 @@
-// Package api - types.go
-//
-// PURPOSE
-// -------
-// Defines types used by the CloudClient interface, particularly LocalMetrics
-// which is the return type for GetMetricsFromCloud.
-//
-// These types are exported to allow consumers of the api package to work with
-// the data structures without needing to import implementation details.
+// types.go defines types used by the CloudClient interface (e.g. LocalMetrics).
+// Package comment is in client.go.
 package api
 
 import "time"

@@ -82,6 +82,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -130,7 +131,7 @@ func TestSetupDisplay(t *testing.T) {
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
 		},
-		RefreshInterval: 3600,
+		RefreshIntervalSeconds: 3600,
 	}
 
 	tz := time.UTC
@@ -173,7 +174,7 @@ func TestSetupDisplay_WithCustomColors(t *testing.T) {
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
 		},
-		RefreshInterval: 3600,
+		RefreshIntervalSeconds: 3600,
 		Colors: &config.ColorConfig{
 			Production: "#FF0000",
 			Import:     "#00FF00",
@@ -343,20 +344,14 @@ func TestRunOnce_ContextCancelled(t *testing.T) {
 	disp := SetupDisplay(cfg, tz)
 	testDate := time.Time{}
 
-	// This should exit early due to cancelled context
-	// We can't easily test os.Exit, but we can verify the function doesn't panic
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("RunOnce() panicked: %v", r)
-		}
-	}()
-
-	// Note: In a real test, we'd mock os.Exit to verify it's called
-	// For now, we just ensure the function can handle a cancelled context
-	_ = agg
-	_ = disp
-	_ = testDate
-	_ = ctx
+	// RunOnce with cancelled context should return error (no os.Exit)
+	err := RunOnce(ctx, agg, disp, cfg, testDate, false, tz)
+	if err == nil {
+		t.Fatal("RunOnce() with cancelled context: error = nil, want non-nil")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("RunOnce() error = %v, want context.Canceled", err)
+	}
 }
 
 // =============================================================================

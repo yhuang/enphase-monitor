@@ -1,9 +1,5 @@
-// Package app - setup.go
-//
-// PURPOSE
-// -------
-// This file contains application setup and initialization functions.
-// Handles configuration loading, OAuth adapter creation, display setup, and mode configuration.
+// setup.go contains application setup and initialization for the app package.
+// Package comment and execution modes are in runner.go.
 //
 // SETUP FUNCTIONS
 // ---------------
@@ -17,7 +13,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"enphase-monitor/internal/aggregator"
@@ -59,7 +54,7 @@ func SetupDisplay(cfg *config.Config, reportTZ *time.Location) *display.Display 
 	return display.NewDisplayWithColorsAndTimezone(colors, reportTZ)
 }
 
-// ConfigureModes sets up test mode and cache mode based on flags
+// ConfigureModes sets up test mode and cache mode based on flags.
 func ConfigureModes(testMode, noCache bool) {
 	if testMode {
 		cache.SetTestMode(true)
@@ -82,23 +77,22 @@ func ParseTestDate(dateStr string, reportTZ *time.Location) (time.Time, error) {
 	// Parse date using the reporting timezone
 	parsed, err := timezone.ParseDateInTimezone(dateStr, reportTZ)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("invalid date format. Use YYYY-MM-DD (e.g. 2026-01-19): %w", err)
+		return time.Time{}, fmt.Errorf("invalid date format: use YYYY-MM-DD (e.g. 2026-01-19): %w", err)
 	}
 	return parsed, nil
 }
 
 // GetAggregatorTypes extracts systems and API config from the main config.
-// Since config.SystemConfig and config.APIConfig are now type aliases to
-// the same underlying types, no conversion is needed - we just return them directly.
+// Returns a copy of the systems slice so callers cannot mutate the config.
+// Since config.SystemConfig and config.APIConfig are type aliases to the same
+// underlying types, no conversion is needed for the API config.
 func GetAggregatorTypes(cfg *config.Config) ([]aggregator.SystemConfig, *aggregator.APIConfig) {
-	// No conversion needed - both config and aggregator use type aliases to types.APIConfig/SystemConfig
-	return cfg.Systems, cfg.API
-}
-
-// ExitWithError prints an error message and exits with code 1
-func ExitWithError(msg string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, msg, args...)
-	os.Exit(1)
+	if len(cfg.Systems) == 0 {
+		return nil, cfg.API
+	}
+	systems := make([]aggregator.SystemConfig, len(cfg.Systems))
+	copy(systems, cfg.Systems)
+	return systems, cfg.API
 }
 
 // ValidateTestModeCache checks if cache exists for the target date when in test mode.
@@ -117,14 +111,14 @@ func ValidateTestModeCache(targetDate time.Time, reportTZ *time.Location) error 
 		return fmt.Errorf("failed to check cache for %s: %w\n\n"+
 			"To populate the cache, run:\n"+
 			"  ./enphase-monitor --once\n\n"+
-			"Then retry with --test.", dateStr, err)
+			"Then retry with --test", dateStr, err)
 	}
 
 	if !hasCache {
-		return fmt.Errorf("--test flag requires cached data, but no cache exists for %s.\n\n"+
+		return fmt.Errorf("--test flag requires cached data, but no cache exists for %s\n\n"+
 			"To populate the cache, run:\n"+
 			"  ./enphase-monitor --once\n\n"+
-			"Then retry with --test.\n\n"+
+			"Then retry with --test\n\n"+
 			"For historical dates with expected values, use:\n"+
 			"  ./enphase-monitor --once --date %s\n"+
 			"  ./enphase-monitor --test --date %s", dateStr, dateStr, dateStr)

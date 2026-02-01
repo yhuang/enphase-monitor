@@ -1,23 +1,10 @@
-// Package cli - flags.go
-//
-// PURPOSE
-// -------
-// This file handles command-line interface (CLI) flag parsing and definitions.
-// Centralizes all CLI flag declarations in one place for better maintainability.
-//
-// CLI FLAGS
-// ---------
-// The application supports various flags for different operational modes:
-//   - Configuration: --config
-//   - Execution modes: --once, --test
-//   - OAuth setup: --setup-oauth
-//   - Cache management: --clear-cache, --clear-all-cache, --list-cache, --inspect-cache
-//   - Query options: --date, --no-cache
+// flags.go handles command-line flag parsing and definitions for the cli package.
+// Package comment and supported flags are documented in cache_commands.go.
 package cli
 
 import "flag"
 
-// Flags holds all command-line flag values
+// Flags holds all command-line flag values.
 type Flags struct {
 	ConfigFile    string
 	Once          bool

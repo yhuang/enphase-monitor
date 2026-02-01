@@ -501,12 +501,12 @@ for {
 ### Detailed Flow Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ 1. Program Starts (main.go)                                     │
-│    └─► Create context with signal handling:                     │
-│        ctx, stop := signal.NotifyContext(...)                   │
-│        defer stop()                                             │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Program Starts (main.go)                                 │
+│    └─► Create context with signal handling:                 │
+│        ctx, stop := signal.NotifyContext(...)               │
+│        defer stop()                                         │
+└─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -530,23 +530,23 @@ for {
 │    └─► for { select { ... } }                               │
 │        • Blocks waiting for ticker.C or ctx.Done()          │
 └─────────────────────────────────────────────────────────────┘
-                            │
-        ┌───────────────────┴───────────────────┐
+                             │
+        ┌────────────────────┴──────────────────┐
         │                                       │
         ▼                                       ▼
-┌───────────────────────┐          ┌─────────────────────────┐
-│ Case 1: Timer Ticked  │          │ Case 2: Signal Received │
-│ <-ticker.C            │          │ <-ctx.Done()            │
-│                       │          │                         │
-│ • Fetch metrics       │          │ • Print shutdown msg    │
-│ • Display results     │          │ • return (exits loop)   │
-│ • Loop continues      │          │ • defer ticker.Stop()   │
-│                       │          │   executes              │
-└───────────────────────┘          └─────────────────────────┘
-        │                                       │
-        └───────────────────┬───────────────────┘
-                            │
-                            ▼
+┌───────────────────────┐           ┌─────────────────────────┐
+│ Case 1: Timer Ticked  │           │ Case 2: Signal Received │
+│ <-ticker.C            │           │ <-ctx.Done()            │
+│                       │           │                         │
+│ • Fetch metrics       │           │ • Print shutdown msg    │
+│ • Display results     │           │ • return (exits loop)   │
+│ • Loop continues      │           │ • defer ticker.Stop()   │
+│                       │           │   executes              │
+└───────────────────────┘           └─────────────────────────┘
+        │                                        │
+        └────────────────────┬───────────────────┘
+                             │
+                             ▼
                     [Loop continues or exits]
 ```
 
@@ -1061,13 +1061,13 @@ BEFORE (circular dependency problem):
     ERROR: import cycle not allowed
 
 AFTER (shared types solution):
-                types
-               /  |  \
-              /   |   \
-           config aggregator oauth
-              \   |   /
-               \  |  /
-                 app
+                types ─
+               /  |     \
+              /   |      \
+        config aggregator oauth
+              \   |      /
+               \  |     /
+                 app ──
     OK: No circular dependencies
 ```
 

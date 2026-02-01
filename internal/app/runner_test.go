@@ -84,7 +84,7 @@ func TestRunOnce_Success(t *testing.T) {
 			ClientSecret: "test-secret",
 			RefreshToken: "test-refresh",
 		},
-		RefreshInterval: 3600,
+		RefreshIntervalSeconds: 3600,
 	}
 
 	// Create display with buffer
@@ -95,9 +95,10 @@ func TestRunOnce_Success(t *testing.T) {
 	// Run once
 	testDate := time.Time{} // Use zero time for "today"
 
-	// Note: RunOnce calls os.Exit on error, so we test the success path
-	// We can't easily test os.Exit without mocking it
-	RunOnce(ctx, agg, disp, cfg, testDate, false, tz)
+	err := RunOnce(ctx, agg, disp, cfg, testDate, false, tz)
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v, want nil", err)
+	}
 
 	// Verify output contains expected metrics
 	output := buf.String()
@@ -135,7 +136,7 @@ func TestFetchAndDisplay_Success(t *testing.T) {
 			ClientSecret: "test-secret",
 			RefreshToken: "test-refresh",
 		},
-		RefreshInterval: 3600,
+		RefreshIntervalSeconds: 3600,
 	}
 
 	// Create display with buffer
@@ -145,7 +146,9 @@ func TestFetchAndDisplay_Success(t *testing.T) {
 
 	// Test fetchAndDisplay
 	testDate := time.Time{}
-	fetchAndDisplay(ctx, agg, disp, cfg, testDate, tz)
+	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, tz); err != nil {
+		t.Fatalf("fetchAndDisplay: %v", err)
+	}
 
 	// Verify output
 	output := buf.String()
@@ -186,7 +189,9 @@ func TestFetchAndDisplay_ContextCancelled(t *testing.T) {
 
 	// Test fetchAndDisplay with cancelled context
 	testDate := time.Time{}
-	fetchAndDisplay(ctx, agg, disp, cfg, testDate, tz)
+	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, tz); err != nil {
+		t.Fatalf("fetchAndDisplay: %v", err)
+	}
 
 	// Should return silently (no error displayed)
 	output := buf.String()
@@ -223,7 +228,9 @@ func TestFetchAndDisplay_Error(t *testing.T) {
 
 	// Test fetchAndDisplay with error
 	testDate := time.Time{}
-	fetchAndDisplay(ctx, agg, disp, cfg, testDate, tz)
+	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, tz); err != nil {
+		t.Fatalf("fetchAndDisplay: %v", err)
+	}
 
 	// Should display error
 	output := buf.String()
@@ -260,7 +267,7 @@ func TestRunContinuous_ImmediateExecution(t *testing.T) {
 			ClientSecret: "test-secret",
 			RefreshToken: "test-refresh",
 		},
-		RefreshInterval: 1, // 1 second (won't actually fire in 100ms test)
+		RefreshIntervalSeconds: 1, // 1 second (won't actually fire in 100ms test)
 	}
 
 	// Create display with buffer
@@ -270,7 +277,10 @@ func TestRunContinuous_ImmediateExecution(t *testing.T) {
 
 	// Run continuous (will exit after 100ms due to context timeout)
 	testDate := time.Time{}
-	RunContinuous(ctx, agg, disp, cfg, testDate, tz)
+	err := RunContinuous(ctx, agg, disp, cfg, testDate, tz)
+	if err != nil {
+		t.Fatalf("RunContinuous() error = %v, want nil", err)
+	}
 
 	// Verify output shows immediate execution
 	output := buf.String()
@@ -312,7 +322,7 @@ func TestRunContinuous_GracefulShutdown(t *testing.T) {
 			ClientSecret: "test-secret",
 			RefreshToken: "test-refresh",
 		},
-		RefreshInterval: 3600,
+		RefreshIntervalSeconds: 3600,
 	}
 
 	// Create display with buffer
@@ -320,15 +330,21 @@ func TestRunContinuous_GracefulShutdown(t *testing.T) {
 	buf := &bytes.Buffer{}
 	disp := display.NewDisplayWithWriter(display.GetDefaultColors(), tz, buf)
 
-	// Cancel context after a short delay
+	// Cancel context after a short delay (done channel so we can wait for goroutine exit)
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
 
 	// Run continuous
 	testDate := time.Time{}
-	RunContinuous(ctx, agg, disp, cfg, testDate, tz)
+	err := RunContinuous(ctx, agg, disp, cfg, testDate, tz)
+	if err != nil {
+		t.Fatalf("RunContinuous() error = %v, want nil", err)
+	}
+	<-done // Wait for cancel goroutine to exit before test ends
 
 	// Verify shutdown message
 	output := buf.String()

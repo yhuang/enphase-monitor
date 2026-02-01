@@ -119,7 +119,7 @@ The `internal/types/` package provides shared type definitions that break circul
                config aggregator oauth
                   \   |   /
                    \  |  /
-                    app
+                     app
 ```
 
 Types defined in `internal/types/types.go`:
@@ -135,61 +135,65 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ### Primary Path: Report Generation
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│  1. ENTRY POINT (main.go)                                         │
-│     └─► cli.ParseFlags() from internal/cli                        │
-│         └─► Handle cache commands (internal/cli)                  │
-│             └─► Or continue to application setup                  │
-└───────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  1. ENTRY POINT (main.go)                                          │
+│     └─► cli.ParseFlags() from internal/cli                         │
+│     └─► Handle cache commands (internal/cli) or continue           │
+│     └─► If --setup-oauth: signal context, then oauth.Setup(ctx,    │
+│         cfg) so Ctrl+C cancels token exchange                      │
+└────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-┌───────────────────────────────────────────────────────────────────┐
-│  2. SETUP (internal/app)                                          │
-│     └─► config.LoadConfig() reads YAML file                       │
-│         └─► app.CreateOAuthAdapter() for token management         │
-│             └─► app.SetupDisplay() with colors                    │
-└───────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  2. SETUP (internal/app)                                           │
+│     └─► config.LoadConfig() reads YAML file                        │
+│         └─► app.CreateOAuthAdapter() for token management          │
+│             └─► app.SetupDisplay() with colors                     │
+└────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-┌───────────────────────────────────────────────────────────────────┐
-│  3. EXECUTION (internal/app)                                      │
-│     └─► app.RunOnce() or app.RunContinuous()                      │
-│         └─► fetchAndDisplay() calls aggregator                    │
-└───────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  3. EXECUTION (internal/app)                                       │
+│     └─► main creates signal context (SIGINT/SIGTERM), passes ctx   │
+│     └─► app.RunOnce(ctx, ...) or app.RunContinuous(ctx, ...)       │
+│     └─► RunContinuous: synchronous for/select (ticker.C, ctx.Done) │
+│         (no goroutines spawned)                                    │
+│     └─► fetchAndDisplay(ctx, ...) calls aggregator                 │
+└────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-┌───────────────────────────────────────────────────────────────────┐
-│  4. AGGREGATION (internal/aggregator)                             │
-│     └─► GetAggregatedMetrics() loops through systems              │
-│         └─► Uses internal/api for HTTP requests                   │
-│             └─► Fetches production, consumption, grid, battery    │
-└───────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  4. AGGREGATION (internal/aggregator)                              │
+│     └─► GetAggregatedMetrics() loops through systems               │
+│         └─► Uses internal/api for HTTP requests                    │
+│             └─► Fetches production, consumption, grid, battery     │
+└────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-┌───────────────────────────────────────────────────────────────────┐
-│  5. API CALLS (internal/api)                                      │
-│     └─► Each call goes through caching layer (internal/cache)     │
-│         ├─► Check cache first (for rate limit protection)         │
-│         ├─► Make HTTP request if cache miss                       │
-│         └─► Save response to cache                                │
-└───────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  5. API CALLS (internal/api)                                       │
+│     └─► Each call goes through caching layer (internal/cache)      │
+│         ├─► Check cache first (for rate limit protection)          │
+│         ├─► Make HTTP request if cache miss                        │
+│         └─► Save response to cache                                 │
+└────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-┌───────────────────────────────────────────────────────────────────┐
-│  6. RESPONSE PARSING (internal/parser)                            │
-│     └─► Parse JSON telemetry data                                 │
-│         └─► Sum interval values for daily totals                  │
-│             └─► Convert Wh to kWh                                 │
-└───────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  6. RESPONSE PARSING (internal/parser)                             │
+│     └─► Parse JSON telemetry data                                  │
+│         └─► Sum interval values for daily totals                   │
+│             └─► Convert Wh to kWh                                  │
+└────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-┌───────────────────────────────────────────────────────────────────┐
-│  7. DISPLAY (internal/display)                                    │
-│     └─► ShowMetrics() formats output                              │
-│         ├─► printHeader() - Query range and timestamp             │
-│         ├─► printTodayEnergy() - Combined totals                  │
-│         └─► printIndividualSystems() - Per-system breakdown       │
-└───────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  7. DISPLAY (internal/display)                                     │
+│     └─► ShowMetrics() formats output                               │
+│         ├─► printHeader() - Query range and timestamp              │
+│         ├─► printTodayEnergy() - Combined totals                   │
+│         └─► printIndividualSystems() - Per-system breakdown        │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -202,46 +206,46 @@ These types are re-exported as type aliases in `config` and `aggregator` package
                     └────────┬─────────┘
                              │
                              ▼
-┌───────────────────────────────────────────────────────────────────┐
-│                  internal/config/LoadConfig()                     │
-│   Parses YAML, validates systems, converts colors                 │
-└────────────────────────────┬──────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                  internal/config/LoadConfig()                      │
+│   Parses YAML, validates systems, converts colors                  │
+└────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
-┌───────────────────────────────────────────────────────────────────┐
-│                     Cloud Systems                                 │
-│              (system.ID required)                                 │
-└────────────────────────────┬──────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                     Cloud Systems                                  │
+│              (system.ID required)                                  │
+└────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
-┌───────────────────────────────────────────────────────────────────┐
-│              internal/api/EnlightenCloudClient                    │
-│  - OAuth authentication (internal/oauth)                          │
-│  - Telemetry endpoints                                            │
-│  - 15-min intervals                                               │
-└────────────────────────────┬──────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│              internal/api/EnlightenCloudClient                     │
+│  - OAuth authentication (internal/oauth)                           │
+│  - Telemetry endpoints                                             │
+│  - 15-min intervals                                                │
+└────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
-┌───────────────────────────────────────────────────────────────────┐
-│                  internal/cache/Cache Layer                       │
-│  - Rate limit tracking                                            │
-│  - Disk-based storage                                             │
-└────────────────────────────┬──────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                  internal/cache/Cache Layer                        │
+│  - Rate limit tracking                                             │
+│  - Disk-based storage                                              │
+└────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
-┌───────────────────────────────────────────────────────────────────┐
-│              internal/aggregator/AggregatedMetrics                │
-│   - Sums production, consumption across systems                   │
-│   - Aggregates battery charge/discharge across systems            │
-│   - Tracks cache usage flag                                       │
-└──────────────────────────┬────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│              internal/aggregator/AggregatedMetrics                 │
+│   - Sums production, consumption across systems                    │
+│   - Aggregates battery charge/discharge across systems             │
+│   - Tracks cache usage flag                                        │
+└──────────────────────────┬─────────────────────────────────────────┘
                            │
                            ▼
-┌───────────────────────────────────────────────────────────────────┐
-│                  internal/display/Display                         │
-│   - ANSI color formatting                                         │
-│   - Structured report output                                      │
-└───────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                  internal/display/Display                          │
+│   - ANSI color formatting                                          │
+│   - Structured report output                                       │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -591,6 +595,15 @@ Each file has package-level documentation explaining its purpose and design deci
 3. **Follow function calls** - Trace execution from `main()` through the call stack
 4. **Study error handling** - See how errors are wrapped and propagated
 5. **Understand data structures** - See how structs are designed and used
+
+### Quality and CI
+
+Before committing, run the linter and tests:
+
+- **make lint** — Runs golangci-lint (errcheck, goimports, revive, govet, staticcheck). See [.golangci.yml](.golangci.yml).
+- **CI** — [.github/workflows/ci.yml](.github/workflows/ci.yml) runs on push and pull requests: build, `go vet`, tests, and golangci-lint.
+
+See [README.md#lint-and-ci](README.md#lint-and-ci) for details.
 
 ### Related Documentation
 

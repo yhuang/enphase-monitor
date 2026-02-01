@@ -1,9 +1,4 @@
-// Package cli - cache_commands.go
-//
-// PURPOSE
-// -------
-// This file implements CLI command handlers for cache management operations.
-// Provides user-facing commands for inspecting, clearing, and managing cached API responses.
+// Package cli provides command-line flag parsing and cache management for the enphase-monitor application.
 //
 // CACHE COMMANDS
 // --------------
@@ -13,7 +8,7 @@
 //   - --list-cache: List all cached responses with metadata
 //   - --inspect-cache <hash|date>: Inspect specific cached responses
 //
-// These commands are implemented as separate functions to keep main() clean and focused.
+// Flag parsing lives in flags.go; command handlers are in this file to keep main clean and focused.
 package cli
 
 import (
@@ -28,7 +23,7 @@ import (
 	"enphase-monitor/internal/timezone"
 )
 
-// HandleClearCache clears cached API responses for today's date only
+// HandleClearCache clears cached API responses for today's date only.
 func HandleClearCache() error {
 	if err := cache.ClearTodayCache(); err != nil {
 		return fmt.Errorf("failed to clear today's cache: %w", err)
@@ -36,7 +31,7 @@ func HandleClearCache() error {
 	return nil
 }
 
-// HandleClearAllCache clears all cached API responses (all dates)
+// HandleClearAllCache clears all cached API responses (all dates).
 func HandleClearAllCache() error {
 	if err := cache.ClearAllCache(); err != nil {
 		return fmt.Errorf("failed to clear all cache: %w", err)
@@ -45,7 +40,7 @@ func HandleClearAllCache() error {
 	return nil
 }
 
-// HandleListCache lists all cached API responses
+// HandleListCache lists all cached API responses.
 func HandleListCache() error {
 	entries, err := cache.ListCacheEntries()
 	if err != nil {
@@ -80,7 +75,7 @@ func HandleListCache() error {
 	return nil
 }
 
-// HandleInspectCache inspects cached responses by hash or date
+// HandleInspectCache inspects cached responses by hash or date.
 func HandleInspectCache(inspectValue, configFile string) error {
 	// Check if it is a date (YYYY-MM-DD format) or a hash
 	if date, err := time.Parse(constants.DateFormat, inspectValue); err == nil {
@@ -97,7 +92,8 @@ func HandleInspectCache(inspectValue, configFile string) error {
 
 // handleInspectCacheByDate inspects all cache entries for a specific date
 func handleInspectCacheByDate(date time.Time, dateStr, configFile string) error {
-	// Load config to get timezone: default to system timezone, override if config available
+	// Timezone is best-effort for display only: system default, then config if loadable.
+	// We ignore LoadTimezone errors so inspect works even with invalid/missing timezone in config.
 	tz, _ := timezone.LoadTimezone("")
 	if cfg, err := config.LoadConfig(configFile); err == nil {
 		tz, _ = timezone.LoadTimezone(cfg.Timezone)
@@ -138,8 +134,8 @@ func showAvailableDates() {
 		return
 	}
 
-	// Collect unique dates
-	dateSet := make(map[string]bool)
+	// Collect unique dates (capacity hint: at most len(allEntries) unique dates)
+	dateSet := make(map[string]bool, len(allEntries))
 	for _, entry := range allEntries {
 		if entry.Date != "" {
 			dateSet[entry.Date] = true
@@ -147,7 +143,7 @@ func showAvailableDates() {
 	}
 
 	if len(dateSet) > 0 {
-		var dates []string
+		dates := make([]string, 0, len(dateSet))
 		for d := range dateSet {
 			dates = append(dates, d)
 		}

@@ -1,8 +1,7 @@
-// Package validation - validation.go
+// Package validation provides validation logic for comparing actual metrics against expected values.
 //
 // PURPOSE
 // -------
-// This package provides validation logic for comparing actual metrics against expected values.
 // Used in test mode (--test flag) to verify system metrics match expected values from JSON files.
 //
 // VALIDATION APPROACH
@@ -30,20 +29,20 @@ import (
 	"enphase-monitor/internal/constants"
 )
 
-// ExpectedValues represents the structure of expected values JSON files
+// ExpectedValues represents the structure of expected values JSON files.
 type ExpectedValues struct {
 	Date    string           `json:"date"`
 	Systems []ExpectedSystem `json:"systems"`
 }
 
-// ExpectedSystem represents expected metrics for a single system
+// ExpectedSystem represents expected metrics for a single system.
 type ExpectedSystem struct {
 	ID       string          `json:"id"`
 	Name     string          `json:"name"`
 	Expected ExpectedMetrics `json:"expected"`
 }
 
-// ExpectedMetrics holds the expected values for system metrics
+// ExpectedMetrics holds the expected values for system metrics.
 type ExpectedMetrics struct {
 	GridImport        float64 `json:"grid_import"`
 	GridExport        float64 `json:"grid_export"`
@@ -61,7 +60,7 @@ func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) erro
 	expectedData, err := os.ReadFile(expectedPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("no expected values file found for %s.\n\n"+
+			return fmt.Errorf("no expected values file found for %s\n\n"+
 				"To run validation, create the file:\n"+
 				"  %s\n\n"+
 				"Example format:\n"+
@@ -183,7 +182,7 @@ func runMetricTests(tests []metricTestCase) (total, passed int, anyFailed bool) 
 	return total, passed, anyFailed
 }
 
-// validateMetric validates a single metric value against expected with tolerance
+// validateMetric validates a single metric value against expected with tolerance.
 func validateMetric(name string, expected, actual float64) bool {
 	// Calculate tolerance: 10% of expected value, with minimum 0.1 kWh
 	tolerance := math.Max(math.Abs(expected)*constants.ValidationTolerancePercent, constants.ValidationMinToleranceKWh)

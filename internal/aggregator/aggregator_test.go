@@ -46,6 +46,16 @@ import (
 	"enphase-monitor/internal/api"
 )
 
+// mustLoadLocation loads a timezone for tests; fails the test if the timezone is invalid.
+func mustLoadLocation(t *testing.T, name string) *time.Location {
+	t.Helper()
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return loc
+}
+
 // MockCloudClient implements api.CloudClient for testing.
 type MockCloudClient struct {
 	Metrics   *api.LocalMetrics
@@ -178,7 +188,7 @@ func TestGetAggregatedMetrics_SingleSystem(t *testing.T) {
 
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
 	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, tz)
 
@@ -242,7 +252,7 @@ func TestGetAggregatedMetrics_MultipleSystems(t *testing.T) {
 		{Name: "System 2", ID: "456"},
 	}
 	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, tz)
 
@@ -302,7 +312,7 @@ func TestGetAggregatedMetrics_MissingAPIConfig(t *testing.T) {
 	agg := NewDataAggregator(mockTokenGetter)
 
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	_, err := agg.GetAggregatedMetrics(context.Background(), systems, nil, time.Time{}, tz)
 
@@ -321,7 +331,7 @@ func TestGetAggregatedMetrics_MissingAPIKey(t *testing.T) {
 
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
 	apiConfig := &APIConfig{ClientID: "test-client", ClientSecret: "test-secret"} // No Key
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	_, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, tz)
 
@@ -340,7 +350,7 @@ func TestGetAggregatedMetrics_TokenError(t *testing.T) {
 
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
 	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	_, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, tz)
 
@@ -359,7 +369,7 @@ func TestGetAggregatedMetrics_ContextCancellation(t *testing.T) {
 
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
 	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	// Create a cancelled context
 	ctx, cancel := context.WithCancel(context.Background())

@@ -77,8 +77,8 @@ type SystemConfig = types.SystemConfig
 // See internal/types/types.go for the type definition.
 type APIConfig = types.APIConfig
 
-// ColorConfig represents color customization settings
-// Note: Reset and Bold are defined as constants in constants.go and cannot be customized
+// ColorConfig represents color customization settings.
+// Note: Reset and Bold are defined as constants in constants.go and cannot be customized.
 type ColorConfig struct {
 	Production    string `yaml:"production,omitempty"`     // Solar Production
 	Discharge     string `yaml:"discharge,omitempty"`      // Battery Discharge
@@ -146,13 +146,13 @@ func (c *ColorConfig) convertHexFields() {
 	}
 }
 
-// Config represents the application configuration
+// Config represents the application configuration.
 type Config struct {
-	API             *APIConfig     `yaml:"api,omitempty"` // API configuration
-	Systems         []SystemConfig `yaml:"systems"`
-	RefreshInterval int            `yaml:"refresh_interval"`
-	Colors          *ColorConfig   `yaml:"colors,omitempty"`   // Color customization
-	Timezone        string         `yaml:"timezone,omitempty"` // Timezone for reporting/display (e.g., "US/Pacific"). If not set, uses system timezone.
+	API                    *APIConfig     `yaml:"api,omitempty"` // API configuration
+	Systems                []SystemConfig `yaml:"systems"`
+	RefreshIntervalSeconds int            `yaml:"refresh_interval"`   // How often to query API (seconds)
+	Colors                 *ColorConfig   `yaml:"colors,omitempty"`   // Color customization
+	Timezone               string         `yaml:"timezone,omitempty"` // Timezone for reporting/display (e.g., "US/Pacific"). If not set, uses system timezone.
 }
 
 // LoadConfig reads and parses the configuration file.
@@ -187,8 +187,8 @@ func LoadConfig(filename string) (*Config, error) {
 	}
 
 	// Default refresh interval to 1 hour if not specified or invalid
-	if config.RefreshInterval <= 0 {
-		config.RefreshInterval = 3600
+	if config.RefreshIntervalSeconds <= 0 {
+		config.RefreshIntervalSeconds = 3600
 	}
 
 	// Trim whitespace from refresh token (common issue with copy/paste)
@@ -280,6 +280,6 @@ func hexToANSI(hex string) string {
 	// Calculate ANSI color code (16-231 for color cube)
 	ansiCode := constants.ANSIColorCubeBase + 36*r6 + constants.ANSIColorCubeLevels*g6 + b6
 
-	// Return ANSI escape code
-	return fmt.Sprintf("\033[38;5;%dm", ansiCode)
+	// Return ANSI escape code (strconv.Itoa is faster than fmt.Sprintf for single int)
+	return "\033[38;5;" + strconv.Itoa(ansiCode) + "m"
 }

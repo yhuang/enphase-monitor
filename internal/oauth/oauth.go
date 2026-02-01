@@ -81,7 +81,7 @@ type OAuthTokenResponse struct {
 	Scope        string `json:"scope,omitempty"`
 }
 
-// TokenCache stores a cached access token and refresh token
+// TokenCache stores a cached access token and refresh token.
 type TokenCache struct {
 	Token        string    // OAuth access token (short-lived, ~1 hour)
 	RefreshToken string    // OAuth refresh token (long-lived, does not expire)
@@ -95,7 +95,7 @@ var oauthHTTPClient = &http.Client{
 	Timeout: oauthRequestTimeout,
 }
 
-// GetAuthorizationURL generates the authorization URL for the user to visit (one-time setup)
+// GetAuthorizationURL generates the authorization URL for the user to visit (one-time setup).
 func GetAuthorizationURL(apiConfig *types.APIConfig) (string, error) {
 	if apiConfig == nil {
 		return "", fmt.Errorf("API configuration is required")
@@ -117,7 +117,7 @@ func GetAuthorizationURL(apiConfig *types.APIConfig) (string, error) {
 	return fmt.Sprintf("%s?%s", authURL, params.Encode()), nil
 }
 
-// ExchangeAuthorizationCode exchanges an authorization code for access and refresh tokens
+// ExchangeAuthorizationCode exchanges an authorization code for access and refresh tokens.
 func ExchangeAuthorizationCode(ctx context.Context, apiConfig *types.APIConfig, code string) (*OAuthTokenResponse, error) {
 	if apiConfig == nil {
 		return nil, fmt.Errorf("API configuration is required")
@@ -159,7 +159,10 @@ func ExchangeAuthorizationCode(ctx context.Context, apiConfig *types.APIConfig, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != constants.HTTPStatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("token request failed with status %d: failed to read body: %w", resp.StatusCode, err)
+		}
 		return nil, fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -171,7 +174,7 @@ func ExchangeAuthorizationCode(ctx context.Context, apiConfig *types.APIConfig, 
 	return &tokenResp, nil
 }
 
-// GetAccessToken retrieves an OAuth access token using refresh token or other available methods
+// GetAccessToken retrieves an OAuth access token using refresh token or other available methods.
 func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, error) {
 	// Check cache first - refresh if within buffer window of expiration
 	if tokenCache != nil && time.Now().Before(tokenCache.ExpiresAt.Add(-tokenRefreshBuffer)) {
@@ -229,7 +232,10 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 	defer resp.Body.Close()
 
 	if resp.StatusCode != constants.HTTPStatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("token request failed with status %d: failed to read body: %w", resp.StatusCode, err)
+		}
 		errorMsg := string(body)
 
 		// Provide helpful error message for common OAuth errors (go-style-core: early return, max 2 levels)

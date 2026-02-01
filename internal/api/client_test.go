@@ -85,7 +85,7 @@ func TestEnlightenCloudClient_GetProductionForDate(t *testing.T) {
 	defer server.Close()
 
 	// Create client with injected mock server URL (NEW!)
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(
 		server.URL, // Inject mock server URL for testing!
 		"12345",
@@ -121,7 +121,7 @@ func TestEnlightenCloudClient_RateLimitHandling(t *testing.T) {
 	defer server.Close()
 
 	// Create client with injected mock server URL
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(
 		server.URL,
 		"12345",
@@ -148,7 +148,7 @@ func TestEnlightenCloudClient_RateLimitHandling(t *testing.T) {
 
 // TestEnlightenCloudClient_CacheUsedFlag tests cache usage tracking
 func TestEnlightenCloudClient_CacheUsedFlag(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClient("12345", "test-api-key", "test-token", tz)
 
 	// Note: cacheUsed field is now internal to the api package
@@ -162,7 +162,7 @@ func TestEnlightenCloudClient_CacheUsedFlag(t *testing.T) {
 // TestTryLoadPastDateCache_* test the tryLoadPastDateCache helper
 // (past-date cache fallback when primary cache lookup fails).
 func TestTryLoadPastDateCache_InvalidURL(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL("http://test", "12345", "key", "token", tz)
 	targetDate := time.Date(2026, 1, 15, 0, 0, 0, 0, tz)
 
@@ -177,7 +177,7 @@ func TestTryLoadPastDateCache_InvalidURL(t *testing.T) {
 
 // TestTryLoadPastDateCache_NoMatch verifies (nil, false) when no cache entry matches system/endpoint/date.
 func TestTryLoadPastDateCache_NoMatch(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL("http://test", "12345", "key", "token", tz)
 	targetDate := time.Date(2026, 1, 15, 0, 0, 0, 0, tz)
 

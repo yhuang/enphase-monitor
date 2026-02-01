@@ -55,10 +55,20 @@ import (
 	"enphase-monitor/internal/config"
 )
 
+// mustLoadLocation loads a timezone for tests; fails the test if the timezone is invalid.
+func mustLoadLocation(t *testing.T, name string) *time.Location {
+	t.Helper()
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return loc
+}
+
 // TestNewDisplayWithWriter verifies that the display can be created with a custom writer.
 func TestNewDisplayWithWriter(t *testing.T) {
 	var buf bytes.Buffer
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
@@ -75,7 +85,7 @@ func TestNewDisplayWithWriter(t *testing.T) {
 
 // TestNewDisplayWithColorsAndTimezone verifies the default constructor.
 func TestNewDisplayWithColorsAndTimezone(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	d := NewDisplayWithColorsAndTimezone(config.ColorConfig{}, tz)
 
@@ -91,7 +101,7 @@ func TestNewDisplayWithColorsAndTimezone(t *testing.T) {
 // TestShowMetrics_ContainsHeader verifies that ShowMetrics outputs the header.
 func TestShowMetrics_ContainsHeader(t *testing.T) {
 	var buf bytes.Buffer
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
@@ -117,7 +127,7 @@ func TestShowMetrics_ContainsHeader(t *testing.T) {
 // TestShowMetrics_ContainsMetricValues verifies that ShowMetrics outputs metric values.
 func TestShowMetrics_ContainsMetricValues(t *testing.T) {
 	var buf bytes.Buffer
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
@@ -142,7 +152,7 @@ func TestShowMetrics_ContainsMetricValues(t *testing.T) {
 
 // TestShowMetrics_CacheIndicator verifies that cache status is displayed.
 func TestShowMetrics_CacheIndicator(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	tests := []struct {
 		name      string
@@ -175,7 +185,7 @@ func TestShowMetrics_CacheIndicator(t *testing.T) {
 
 // TestShowMetrics_NetFlow verifies that net flow displays correctly.
 func TestShowMetrics_NetFlow(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	tests := []struct {
 		name           string
@@ -210,7 +220,7 @@ func TestShowMetrics_NetFlow(t *testing.T) {
 // TestShowMetrics_IndividualSystems verifies that individual systems are displayed when there are multiple.
 func TestShowMetrics_IndividualSystems(t *testing.T) {
 	var buf bytes.Buffer
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
@@ -241,7 +251,7 @@ func TestShowMetrics_IndividualSystems(t *testing.T) {
 // TestShowMetrics_SingleSystem verifies that individual systems section is not shown for single system.
 func TestShowMetrics_SingleSystem(t *testing.T) {
 	var buf bytes.Buffer
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
@@ -265,7 +275,7 @@ func TestShowMetrics_SingleSystem(t *testing.T) {
 // TestShowError verifies that ShowError outputs error messages.
 func TestShowError(t *testing.T) {
 	var buf bytes.Buffer
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
@@ -285,7 +295,7 @@ func TestShowError(t *testing.T) {
 // TestShowInfo verifies that ShowInfo outputs informational messages.
 func TestShowInfo(t *testing.T) {
 	var buf bytes.Buffer
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
@@ -300,7 +310,7 @@ func TestShowInfo(t *testing.T) {
 
 // TestGetDateRange verifies the date range calculation helper.
 func TestGetDateRange(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &bytes.Buffer{})
 
 	// Test case: query date in the past
@@ -324,7 +334,7 @@ func TestGetDateRange(t *testing.T) {
 
 // TestGetDateRange_Today verifies date range for today.
 func TestGetDateRange_Today(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &bytes.Buffer{})
 
 	// Test case: query date is today
@@ -347,7 +357,7 @@ func TestGetDateRange_Today(t *testing.T) {
 
 // TestGetDateRange_ZeroQueryDate verifies date range when query date is zero (today).
 func TestGetDateRange_ZeroQueryDate(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &bytes.Buffer{})
 
 	// Test case: zero query date (means today)

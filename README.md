@@ -639,6 +639,16 @@ go test -bench=. ./internal/parser
 go test -bench=. ./internal/aggregator
 ```
 
+### Lint and CI
+
+Run the linter (errcheck, goimports, revive, govet, staticcheck) before committing:
+
+```bash
+make lint
+```
+
+CI (GitHub Actions) runs on push and pull requests: it builds the project, runs `go vet` and tests, and runs `golangci-lint`. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
+
 ### Test Mode (Cache Only)
 
 Run in test mode using only cached responses (no live API calls):
@@ -791,4 +801,3 @@ This project follows Go best practices and coding standards:
 ## License
 
 This is a personal utility project. Use and modify as needed for your own Enphase monitoring needs.
-# enphase-monitor

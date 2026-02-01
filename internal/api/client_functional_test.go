@@ -12,6 +12,16 @@ import (
 	"enphase-monitor/internal/constants"
 )
 
+// mustLoadLocation loads a timezone for tests; fails the test if the timezone is invalid.
+func mustLoadLocation(t *testing.T, name string) *time.Location {
+	t.Helper()
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return loc
+}
+
 // TestGetEnergyImportForDate tests grid import data fetching
 func TestGetEnergyImportForDate(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +44,7 @@ func TestGetEnergyImportForDate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
@@ -73,7 +83,7 @@ func TestGetEnergyExportForDate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
@@ -110,7 +120,7 @@ func TestGetConsumptionForDate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
@@ -129,7 +139,7 @@ func TestGetConsumptionForDate(t *testing.T) {
 
 // TestGetBatteryDataForDate tests battery data fetching with SOC
 func TestGetBatteryDataForDate(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	// Use yesterday to avoid current time capping issue
 	// (GetDayBoundaries caps dayEnd to current time for "today")
@@ -196,7 +206,7 @@ func TestGetBatteryDataForDate(t *testing.T) {
 
 // TestGetBatteryDataForDate_NoSOC tests battery data when SOC field is missing
 func TestGetBatteryDataForDate_NoSOC(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	// Get current day boundaries
 	now := time.Now().In(tz)
@@ -243,7 +253,7 @@ func TestGetBatteryDataForDate_NoSOC(t *testing.T) {
 
 // TestGetMetricsFromCloud tests fetching all metrics in one call
 func TestGetMetricsFromCloud(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	// Get current day boundaries
 	now := time.Now().In(tz)
@@ -263,13 +273,14 @@ func TestGetMetricsFromCloud(t *testing.T) {
 		path := r.URL.Path
 		w.WriteHeader(http.StatusOK)
 
-		if path == "/12345/energy_import_telemetry" {
+		switch path {
+		case "/12345/energy_import_telemetry":
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_imported":1000.0}]]}`, ts1)))
-		} else if path == "/12345/energy_export_telemetry" {
+		case "/12345/energy_export_telemetry":
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_exported":500.0}]]}`, ts1)))
-		} else if path == "/12345/telemetry/production_meter" {
+		case "/12345/telemetry/production_meter":
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[{"end_at":%d,"wh_del":2000.0}]}`, ts1)))
-		} else if path == "/12345/telemetry/battery" {
+		case "/12345/telemetry/battery":
 			_, _ = w.Write([]byte(fmt.Sprintf(`{
 				"last_reported_aggregate_soc":"90%%",
 				"intervals":[{
@@ -278,7 +289,7 @@ func TestGetMetricsFromCloud(t *testing.T) {
 					"discharge":{"enwh":400.0}
 				}]
 			}`, ts1)))
-		} else if path == "/12345/telemetry/consumption_meter" {
+		case "/12345/telemetry/consumption_meter":
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[{"end_at":%d,"enwh":1500.0}]}`, ts1)))
 		}
 	}))
@@ -331,23 +342,24 @@ func TestGetMetricsFromCloud_PartialFailure(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
-		if path == "/12345/energy_import_telemetry" {
+		switch path {
+		case "/12345/energy_import_telemetry":
 			// Simulate import endpoint failure (optional)
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"error":"server error"}`))
-		} else if path == "/12345/energy_export_telemetry" {
+		case "/12345/energy_export_telemetry":
 			// Simulate export endpoint failure (optional)
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"error":"server error"}`))
-		} else if path == "/12345/telemetry/production_meter" {
+		case "/12345/telemetry/production_meter":
 			// Production succeeds (required)
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"intervals":[{"end_at":1737676800,"wh_del":2000.0}]}`))
-		} else if path == "/12345/telemetry/battery" {
+		case "/12345/telemetry/battery":
 			// Battery fails (optional)
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"error":"server error"}`))
-		} else if path == "/12345/telemetry/consumption_meter" {
+		case "/12345/telemetry/consumption_meter":
 			// Consumption succeeds
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"intervals":[{"end_at":1737676800,"enwh":1500.0}]}`))
@@ -355,7 +367,7 @@ func TestGetMetricsFromCloud_PartialFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
@@ -391,13 +403,14 @@ func TestGetMetricsFromCloud_ProductionFailure(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
-		if path == "/12345/energy_import_telemetry" {
+		switch path {
+		case "/12345/energy_import_telemetry":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"intervals":[[{"end_at":1737676800,"wh_imported":1000.0}]]}`))
-		} else if path == "/12345/energy_export_telemetry" {
+		case "/12345/energy_export_telemetry":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"intervals":[[{"end_at":1737676800,"wh_exported":500.0}]]}`))
-		} else if path == "/12345/telemetry/production_meter" {
+		case "/12345/telemetry/production_meter":
 			// Production fails (required - should cause overall failure)
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"error":"server error"}`))
@@ -405,7 +418,7 @@ func TestGetMetricsFromCloud_ProductionFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
@@ -431,7 +444,7 @@ func TestGetMetricsFromCloud_ContextCancellation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	// Create context that cancels immediately
@@ -459,7 +472,7 @@ func TestGetProductionForDate_EmptyIntervals(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
@@ -483,7 +496,7 @@ func TestGetEnergyImportForDate_EmptyIntervals(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
@@ -507,7 +520,7 @@ func TestGetProductionForDate_InvalidJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
@@ -526,7 +539,7 @@ func TestGetBatteryDataForDate_InvalidJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
@@ -543,7 +556,7 @@ func TestGetBatteryDataForDate_InvalidJSON(t *testing.T) {
 
 // TestGetMetricsFromCloud_ConsumptionFallback tests consumption calculation fallback
 func TestGetMetricsFromCloud_ConsumptionFallback(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 
 	// Get current day boundaries
 	now := time.Now().In(tz)
@@ -553,16 +566,17 @@ func TestGetMetricsFromCloud_ConsumptionFallback(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
-		if path == "/12345/energy_import_telemetry" {
+		switch path {
+		case "/12345/energy_import_telemetry":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_imported":2000.0}]]}`, ts1)))
-		} else if path == "/12345/energy_export_telemetry" {
+		case "/12345/energy_export_telemetry":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_exported":500.0}]]}`, ts1)))
-		} else if path == "/12345/telemetry/production_meter" {
+		case "/12345/telemetry/production_meter":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[{"end_at":%d,"wh_del":3000.0}]}`, ts1)))
-		} else if path == "/12345/telemetry/battery" {
+		case "/12345/telemetry/battery":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(fmt.Sprintf(`{
 				"intervals":[{
@@ -571,7 +585,7 @@ func TestGetMetricsFromCloud_ConsumptionFallback(t *testing.T) {
 					"discharge":{"enwh":500.0}
 				}]
 			}`, ts1)))
-		} else if path == "/12345/telemetry/consumption_meter" {
+		case "/12345/telemetry/consumption_meter":
 			// Consumption endpoint fails - should fall back to calculation
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"error":"server error"}`))
@@ -598,7 +612,7 @@ func TestGetMetricsFromCloud_ConsumptionFallback(t *testing.T) {
 
 // TestBuildTelemetryURL tests URL construction
 func TestBuildTelemetryURL(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL("https://api.test.com/api/v4/systems", "12345", "test-key", "test-token", tz)
 
 	// Create test timestamps
@@ -624,7 +638,7 @@ func TestBuildTelemetryURL(t *testing.T) {
 
 // TestNewEnlightenCloudClient tests client constructor
 func TestNewEnlightenCloudClient(t *testing.T) {
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClient("12345", "test-key", "test-token", tz)
 
 	if client == nil {
@@ -659,7 +673,7 @@ func TestNewEnlightenCloudClient(t *testing.T) {
 // TestNewEnlightenCloudClientWithBaseURL tests client constructor with custom base URL
 func TestNewEnlightenCloudClientWithBaseURL(t *testing.T) {
 	customURL := "https://custom.api.com/v4/systems"
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(customURL, "12345", "test-key", "test-token", tz)
 
 	if client == nil {
@@ -696,7 +710,7 @@ func TestCacheUsedTracking(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tz, _ := time.LoadLocation("US/Pacific")
+	tz := mustLoadLocation(t, "US/Pacific")
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()

@@ -2,6 +2,8 @@
 
 Review date: 2026-01-31. Criteria: go-documentation (doc comments, package comments, godoc formatting, complete sentences, cleanup/errors where relevant). **Context:** Documentation and comments are intentionally detailed (code walkthroughs, deep Go concept discussions) to support onboarding of engineers unfamiliar with Go.
 
+**2026-01-31 (second pass):** Aligned cli package with "exactly one package comment" and added Go Documentation Conventions to GO_BEST_PRACTICES.md. See §1.4 and §2.1.
+
 ---
 
 ## 1. Normative fixes applied
@@ -30,6 +32,11 @@ Doc comments must be complete sentences and end with punctuation (go-documentati
   - Doc comments: start with the name of the thing, full sentences with punctuation.
   - **Onboarding:** GO_BEST_PRACTICES, GO_CONCEPTS, ARCHITECTURE, and TESTING.md are intentionally detailed (walkthroughs, patterns, examples) to help engineers new to Go; new docs should follow that style.
 
+### 1.4 Second pass (2026-01-31)
+
+- **cli package:** One canonical package comment. cache_commands.go now has the single package comment starting with "Package cli provides command-line flag parsing and cache management...". flags.go comment was reduced to a short file-purpose line ("flags.go handles command-line flag parsing...") so the package has exactly one package comment.
+- **GO_BEST_PRACTICES.md:** Added section **"Go Documentation Conventions"** summarizing package comments, doc comments (name-first, full sentences), and a pointer to this review.
+
 ---
 
 ## 2. What was reviewed (and left as-is)
@@ -37,7 +44,8 @@ Doc comments must be complete sentences and end with punctuation (go-documentati
 ### 2.1 Package comments
 
 - **main:** "Package main implements the Enphase Monitor application." — Valid; describes the binary. Optionally you could add "The enphase-monitor command" or "Run as: enphase-monitor [flags]." for discoverability; not required.
-- **api:** interface.go has a strong package comment ("Package api provides abstractions...") with PURPOSE, ARCHITECTURE, USAGE and code examples. client.go and types.go use "Package api - client.go" / "Package api - types.go" style. Having one canonical package comment in interface.go is fine; the file-oriented lines in other files are acceptable as file intros and do not conflict with the normative "one package comment" when treated as file-level context.
+- **api:** client.go holds the main package comment (ERROR HANDLING, etc.); types.go and interface.go use "Package api - types.go" / file-oriented intros. Godoc uses the first file by name; file intros are acceptable and do not conflict with "one package comment."
+- **cli:** After second pass, cache_commands.go holds the single package comment ("Package cli provides..."); flags.go has a one-line file intro only.
 - **parser, config, oauth, timezone, types, urlbuilder, constants:** Package comments describe the package and often include PURPOSE, structure, or cross-links. Kept as-is; they align with go-documentation and support onboarding.
 
 ### 2.2 Exported names

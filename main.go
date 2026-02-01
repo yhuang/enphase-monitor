@@ -99,6 +99,7 @@ import (
 	"enphase-monitor/internal/app"
 	"enphase-monitor/internal/cli"
 	"enphase-monitor/internal/config"
+	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/oauth"
 	"enphase-monitor/internal/timezone"
 )
@@ -110,28 +111,32 @@ func main() {
 	// Handle cache management commands
 	if flags.ClearCache {
 		if err := cli.HandleClearCache(); err != nil {
-			app.ExitWithError("Failed to clear cache: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to clear cache: %v\n", err)
+			os.Exit(1)
 		}
 		return
 	}
 
 	if flags.ClearAllCache {
 		if err := cli.HandleClearAllCache(); err != nil {
-			app.ExitWithError("%v\n", err)
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
 		}
 		return
 	}
 
 	if flags.ListCache {
 		if err := cli.HandleListCache(); err != nil {
-			app.ExitWithError("%v\n", err)
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
 		}
 		return
 	}
 
 	if flags.InspectCache != "" {
 		if err := cli.HandleInspectCache(flags.InspectCache, flags.ConfigFile); err != nil {
-			app.ExitWithError("%v\n", err)
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
 		}
 		return
 	}
@@ -139,13 +144,17 @@ func main() {
 	// Load configuration
 	cfg, err := config.LoadConfig(flags.ConfigFile)
 	if err != nil {
-		app.ExitWithError("Failed to load configuration: %v\n\nPlease copy config.yaml.example to config.yaml and fill in your details.\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n\nPlease copy config.yaml.example to config.yaml and fill in your details.\n", err)
+		os.Exit(1)
 	}
 
-	// Handle OAuth setup
+	// Handle OAuth setup (use signal context so Ctrl+C cancels token exchange)
 	if flags.SetupOAuth {
-		if err := oauth.Setup(cfg); err != nil {
-			app.ExitWithError("OAuth setup failed: %v\n", err)
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+		if err := oauth.Setup(ctx, cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "OAuth setup failed: %v\n", err)
+			os.Exit(1)
 		}
 		return
 	}
@@ -198,10 +207,19 @@ func main() {
 		}
 	}
 
-	// Run once or continuous
+	// Run once or continuous (exit only from main; app returns errors)
 	if runOnce {
-		app.RunOnce(ctx, agg, disp, cfg, testDateParsed, flags.TestMode, reportTZ)
+		if err := app.RunOnce(ctx, agg, disp, cfg, testDateParsed, flags.TestMode, reportTZ); err != nil {
+			if !constants.IsRateLimitError(err) {
+				disp.ShowError(err)
+			}
+			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+			os.Exit(1)
+		}
 		return
 	}
-	app.RunContinuous(ctx, agg, disp, cfg, testDateParsed, reportTZ)
+	if err := app.RunContinuous(ctx, agg, disp, cfg, testDateParsed, reportTZ); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+		os.Exit(1)
+	}
 }

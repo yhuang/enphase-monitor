@@ -88,8 +88,8 @@ timezone: US/Pacific
 				if len(cfg.Systems) != 2 {
 					t.Errorf("len(Systems) = %d, want 2", len(cfg.Systems))
 				}
-				if cfg.RefreshInterval != 3600 {
-					t.Errorf("RefreshInterval = %d, want 3600", cfg.RefreshInterval)
+				if cfg.RefreshIntervalSeconds != 3600 {
+					t.Errorf("RefreshIntervalSeconds = %d, want 3600", cfg.RefreshIntervalSeconds)
 				}
 			},
 		},
@@ -141,8 +141,8 @@ systems:
 `,
 			wantErr: false,
 			validate: func(t *testing.T, cfg *Config) {
-				if cfg.RefreshInterval != 3600 {
-					t.Errorf("RefreshInterval = %d, want 3600 (default)", cfg.RefreshInterval)
+				if cfg.RefreshIntervalSeconds != 3600 {
+					t.Errorf("RefreshIntervalSeconds = %d, want 3600 (default)", cfg.RefreshIntervalSeconds)
 				}
 			},
 		},
@@ -160,8 +160,8 @@ refresh_interval: -1
 `,
 			wantErr: false,
 			validate: func(t *testing.T, cfg *Config) {
-				if cfg.RefreshInterval != 3600 {
-					t.Errorf("RefreshInterval = %d, want 3600 (should default)", cfg.RefreshInterval)
+				if cfg.RefreshIntervalSeconds != 3600 {
+					t.Errorf("RefreshIntervalSeconds = %d, want 3600 (should default)", cfg.RefreshIntervalSeconds)
 				}
 			},
 		},

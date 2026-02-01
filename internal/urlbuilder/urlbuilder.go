@@ -15,6 +15,7 @@ package urlbuilder
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"enphase-monitor/internal/constants"
@@ -24,10 +25,7 @@ import (
 // This centralizes URL construction logic and ensures consistent parameter formatting.
 func BuildTelemetryURL(systemID, endpoint, apiKey string, dayStart, dayEnd time.Time) string {
 	baseURL := fmt.Sprintf("%s/%s/%s", constants.EnphaseAPIv4SystemsURL, systemID, endpoint)
-	return fmt.Sprintf("%s?key=%s&start_at=%d&end_at=%d",
-		baseURL,
-		apiKey,
-		dayStart.Unix(),
-		dayEnd.Unix(),
-	)
+	return baseURL + "?key=" + apiKey +
+		"&start_at=" + strconv.FormatInt(dayStart.Unix(), 10) +
+		"&end_at=" + strconv.FormatInt(dayEnd.Unix(), 10)
 }
