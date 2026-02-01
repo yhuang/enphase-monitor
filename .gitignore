@@ -1,6 +1,5 @@
 enphase-monitor
 *.yaml
-.claude/
 cache/
 .github/
 *.out
