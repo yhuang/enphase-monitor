@@ -85,12 +85,11 @@ func (d *Display) getDateRange(queryDate, nowLocal time.Time) (start, end time.T
 	// Calculate midnight of the target date
 	start = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, d.timezone)
 
-	// Calculate end time: if querying today, use current time; otherwise use end of day
+	// Calculate end time: default to end of day, override to now if querying today
 	todayMidnight := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, d.timezone)
+	end = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 23, 59, 59, 0, d.timezone)
 	if start.Equal(todayMidnight) {
 		end = nowLocal
-	} else {
-		end = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 23, 59, 59, 0, d.timezone)
 	}
 
 	return start, end
@@ -170,18 +169,15 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 }
 
 func (d *Display) printNetFlow(label string, netValue float64, indent string) {
-	// Consolidate duplicate format logic using direction variable
-	var color, direction string
-	var displayValue float64
+	// Default to import (positive), override for export (negative)
+	color := d.colors.NetImport
+	direction := "import"
+	displayValue := netValue
 
 	if netValue < 0 {
 		color = d.colors.NetExport
 		direction = "export"
 		displayValue = -netValue
-	} else {
-		color = d.colors.NetImport
-		direction = "import"
-		displayValue = netValue
 	}
 
 	fmt.Fprintf(d.writer, "%s%s%s:%s%s%8.1f kWh%s %s(%s)%s\n",

@@ -65,7 +65,7 @@ func ConfigureModes(testMode, noCache bool) {
 		cache.SetTestMode(true)
 		fmt.Println("TEST MODE: Using cache only, no live API calls")
 	}
-	
+
 	if noCache {
 		cache.SetCacheDisabled(true)
 		fmt.Println("NO-CACHE MODE: Bypassing cache, making live API calls")
@@ -78,7 +78,7 @@ func ParseTestDate(dateStr string, reportTZ *time.Location) (time.Time, error) {
 	if dateStr == "" {
 		return time.Time{}, nil
 	}
-	
+
 	// Parse date using the reporting timezone
 	parsed, err := timezone.ParseDateInTimezone(dateStr, reportTZ)
 	if err != nil {
@@ -105,13 +105,10 @@ func ExitWithError(msg string, args ...interface{}) {
 // Returns an error with a helpful message if no cache exists for the date.
 // This prevents confusing errors when running --test without populated cache.
 func ValidateTestModeCache(targetDate time.Time, reportTZ *time.Location) error {
-	// Determine the date string to check
-	var dateStr string
+	// Determine the date string to check: default to specified date, override for today if none
+	dateStr := targetDate.Format("2006-01-02")
 	if targetDate.IsZero() {
-		// No date specified, check for today
 		dateStr = time.Now().In(reportTZ).Format("2006-01-02")
-	} else {
-		dateStr = targetDate.Format("2006-01-02")
 	}
 
 	// Check if cache exists for this date

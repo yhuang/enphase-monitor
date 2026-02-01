@@ -8,25 +8,25 @@
 // TEST PLAN
 // ---------
 // 1. Validation Error Tests
-//    - Test nil config
-//    - Test missing/empty required fields
-//    - Test invalid URLs
+//   - Test nil config
+//   - Test missing/empty required fields
+//   - Test invalid URLs
 //
 // 2. Network Error Tests
-//    - Test connection failures
-//    - Test timeouts
-//    - Test connection reset (simulated with hijacking)
+//   - Test connection failures
+//   - Test timeouts
+//   - Test connection reset (simulated with hijacking)
 //
 // 3. Response Error Tests
-//    - Test malformed JSON
-//    - Test missing required response fields
-//    - Test invalid token format
+//   - Test malformed JSON
+//   - Test missing required response fields
+//   - Test invalid token format
 //
 // 4. HTTP Status Code Tests
-//    - Test 400 Bad Request
-//    - Test 401 Unauthorized
-//    - Test 403 Forbidden
-//    - Test 500 Internal Server Error
+//   - Test 400 Bad Request
+//   - Test 401 Unauthorized
+//   - Test 403 Forbidden
+//   - Test 500 Internal Server Error
 //
 // TESTING APPROACH
 // ----------------
@@ -87,7 +87,7 @@ func TestExchangeAuthorizationCode_MissingAuthURL(t *testing.T) {
 		ClientSecret: "test_secret",
 		RedirectURI:  "http://localhost:8080/callback",
 	}
-	
+
 	_, err := ExchangeAuthorizationCode(context.Background(), apiConfig, "test_code")
 	if err == nil {
 		t.Error("Expected error for missing authorization URL")
@@ -124,7 +124,7 @@ func TestExchangeAuthorizationCode_MissingClientCredentials(t *testing.T) {
 			wantError:    "client_id and client_secret are required in API configuration",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			apiConfig := &types.APIConfig{
@@ -133,7 +133,7 @@ func TestExchangeAuthorizationCode_MissingClientCredentials(t *testing.T) {
 				ClientSecret:     tt.clientSecret,
 				RedirectURI:      "http://localhost:8080/callback",
 			}
-			
+
 			_, err := ExchangeAuthorizationCode(context.Background(), apiConfig, "test_code")
 			if err == nil {
 				t.Error("Expected error for missing credentials")
@@ -153,7 +153,7 @@ func TestExchangeAuthorizationCode_MissingRedirectURI(t *testing.T) {
 		ClientSecret:     "test_secret",
 		RedirectURI:      "", // Missing
 	}
-	
+
 	_, err := ExchangeAuthorizationCode(context.Background(), apiConfig, "test_code")
 	if err == nil {
 		t.Error("Expected error for missing redirect URI")
@@ -171,7 +171,7 @@ func TestExchangeAuthorizationCode_EmptyCode(t *testing.T) {
 		ClientSecret:     "test_secret",
 		RedirectURI:      "http://localhost:8080/callback",
 	}
-	
+
 	_, err := ExchangeAuthorizationCode(context.Background(), apiConfig, "")
 	if err == nil {
 		t.Error("Expected error for empty authorization code")
@@ -190,7 +190,7 @@ func TestExchangeAuthorizationCode_NetworkError(t *testing.T) {
 		RedirectURI:      "http://localhost:8080/callback",
 		Key:              "test_key",
 	}
-	
+
 	_, err := ExchangeAuthorizationCode(context.Background(), apiConfig, "test_code")
 	if err == nil {
 		t.Error("Expected error for network failure")
@@ -209,14 +209,14 @@ func TestExchangeAuthorizationCode_NonOKStatus(t *testing.T) {
 		w.Write([]byte(`{"error": "invalid_grant"}`))
 	}))
 	defer server.Close()
-	
+
 	apiConfig := &types.APIConfig{
 		AuthorizationURL: server.URL,
 		ClientID:         "test_client",
 		ClientSecret:     "test_secret",
 		RedirectURI:      "http://localhost:8080/callback",
 	}
-	
+
 	_, err := ExchangeAuthorizationCode(context.Background(), apiConfig, "test_code")
 	if err == nil {
 		t.Error("Expected error for 400 status")
@@ -234,14 +234,14 @@ func TestExchangeAuthorizationCode_MalformedJSON(t *testing.T) {
 		w.Write([]byte(`not valid json {{{`))
 	}))
 	defer server.Close()
-	
+
 	apiConfig := &types.APIConfig{
 		AuthorizationURL: server.URL,
 		ClientID:         "test_client",
 		ClientSecret:     "test_secret",
 		RedirectURI:      "http://localhost:8080/callback",
 	}
-	
+
 	_, err := ExchangeAuthorizationCode(context.Background(), apiConfig, "test_code")
 	if err == nil {
 		t.Error("Expected error for invalid JSON")
@@ -265,7 +265,7 @@ func TestGetAccessToken_MissingAuthURL(t *testing.T) {
 		ClientID:     "test_client",
 		ClientSecret: "test_secret",
 	}
-	
+
 	_, err := GetAccessToken(context.Background(), apiConfig)
 	if err == nil {
 		t.Error("Expected error for missing authorization URL")
@@ -286,7 +286,7 @@ func TestGetAccessToken_MissingCredentials(t *testing.T) {
 		{"missing client_id", "", "secret"},
 		{"missing client_secret", "client", ""},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			apiConfig := &types.APIConfig{
@@ -294,7 +294,7 @@ func TestGetAccessToken_MissingCredentials(t *testing.T) {
 				ClientID:         tt.clientID,
 				ClientSecret:     tt.clientSecret,
 			}
-			
+
 			_, err := GetAccessToken(context.Background(), apiConfig)
 			if err == nil {
 				t.Error("Expected error for missing credentials")
@@ -311,7 +311,7 @@ func TestGetAccessToken_NoAuthMethod(t *testing.T) {
 		ClientSecret:     "test_secret",
 		// No refresh_token, no username/password
 	}
-	
+
 	_, err := GetAccessToken(context.Background(), apiConfig)
 	if err == nil {
 		t.Error("Expected error for no auth method")
@@ -326,14 +326,14 @@ func TestGetAccessToken_NoAuthMethod(t *testing.T) {
 func TestGetAccessToken_NetworkError(t *testing.T) {
 	// Clear token cache to force new request
 	tokenCache = nil
-	
+
 	apiConfig := &types.APIConfig{
 		AuthorizationURL: "http://invalid-host-12345.com/token",
 		ClientID:         "test_client",
 		ClientSecret:     "test_secret",
 		RefreshToken:     "test_refresh_token",
 	}
-	
+
 	_, err := GetAccessToken(context.Background(), apiConfig)
 	if err == nil {
 		t.Error("Expected error for network failure")
@@ -344,31 +344,31 @@ func TestGetAccessToken_NetworkError(t *testing.T) {
 func TestGetAccessToken_PasswordGrant(t *testing.T) {
 	// Clear token cache
 	tokenCache = nil
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify password grant parameters
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		
+
 		if r.Form.Get("grant_type") != "password" {
 			t.Errorf("Expected grant_type=password, got %s", r.Form.Get("grant_type"))
 		}
-		
+
 		if r.Form.Get("username") != "test_user" {
 			t.Errorf("Expected username=test_user, got %s", r.Form.Get("username"))
 		}
-		
+
 		if r.Form.Get("password") != "test_pass" {
 			t.Errorf("Expected password=test_pass, got %s", r.Form.Get("password"))
 		}
-		
+
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"access_token": "test_access", "expires_in": 3600}`))
 	}))
 	defer server.Close()
-	
+
 	apiConfig := &types.APIConfig{
 		AuthorizationURL: server.URL,
 		ClientID:         "test_client",
@@ -377,12 +377,12 @@ func TestGetAccessToken_PasswordGrant(t *testing.T) {
 		Password:         "test_pass",
 		// No refresh_token - should use password grant
 	}
-	
+
 	token, err := GetAccessToken(context.Background(), apiConfig)
 	if err != nil {
 		t.Errorf("GetAccessToken() failed: %v", err)
 	}
-	
+
 	if token != "test_access" {
 		t.Errorf("Token = %s, want test_access", token)
 	}
@@ -396,23 +396,23 @@ func TestGetAccessToken_CacheValid(t *testing.T) {
 		RefreshToken: "cached_refresh",
 		ExpiresAt:    time.Now().Add(1 * time.Hour), // Valid for 1 hour
 	}
-	
+
 	apiConfig := &types.APIConfig{
 		AuthorizationURL: "http://example.com/token",
 		ClientID:         "test_client",
 		ClientSecret:     "test_secret",
 		RefreshToken:     "test_refresh",
 	}
-	
+
 	token, err := GetAccessToken(context.Background(), apiConfig)
 	if err != nil {
 		t.Errorf("GetAccessToken() failed: %v", err)
 	}
-	
+
 	if token != "cached_token" {
 		t.Errorf("Expected cached token, got: %s", token)
 	}
-	
+
 	// Clean up
 	tokenCache = nil
 }
@@ -425,29 +425,29 @@ func TestGetAccessToken_CacheExpired(t *testing.T) {
 		RefreshToken: "expired_refresh",
 		ExpiresAt:    time.Now().Add(-1 * time.Hour), // Expired 1 hour ago
 	}
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"access_token": "new_token", "refresh_token": "new_refresh", "expires_in": 3600}`))
 	}))
 	defer server.Close()
-	
+
 	apiConfig := &types.APIConfig{
 		AuthorizationURL: server.URL,
 		ClientID:         "test_client",
 		ClientSecret:     "test_secret",
 		RefreshToken:     "test_refresh",
 	}
-	
+
 	token, err := GetAccessToken(context.Background(), apiConfig)
 	if err != nil {
 		t.Errorf("GetAccessToken() failed: %v", err)
 	}
-	
+
 	if token != "new_token" {
 		t.Errorf("Expected new token, got: %s", token)
 	}
-	
+
 	// Clean up
 	tokenCache = nil
 }
@@ -455,18 +455,18 @@ func TestGetAccessToken_CacheExpired(t *testing.T) {
 // TestGetAccessToken_ContextCancellation tests context cancellation
 func TestGetAccessToken_ContextCancellation(t *testing.T) {
 	tokenCache = nil
-	
+
 	// Create a context that's already cancelled
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
-	
+
 	apiConfig := &types.APIConfig{
 		AuthorizationURL: "http://example.com/token",
 		ClientID:         "test_client",
 		ClientSecret:     "test_secret",
 		RefreshToken:     "test_refresh",
 	}
-	
+
 	_, err := GetAccessToken(ctx, apiConfig)
 	if err == nil {
 		t.Error("Expected error for cancelled context")
@@ -479,7 +479,7 @@ func TestGetAuthorizationURL_EmptyClientID(t *testing.T) {
 		ClientID:    "", // Empty
 		RedirectURI: "http://localhost:8080/callback",
 	}
-	
+
 	_, err := GetAuthorizationURL(apiConfig)
 	if err == nil {
 		t.Error("Expected error for empty client_id")
@@ -492,7 +492,7 @@ func TestGetAuthorizationURL_EmptyRedirectURI(t *testing.T) {
 		ClientID:    "test_client",
 		RedirectURI: "", // Empty
 	}
-	
+
 	_, err := GetAuthorizationURL(apiConfig)
 	if err == nil {
 		t.Error("Expected error for empty redirect_uri")

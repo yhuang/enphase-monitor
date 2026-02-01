@@ -8,10 +8,10 @@
 // TEST PLAN
 // ---------
 // 1. State Management Tests
-//    - Test SetTestMode/TestMode
-//    - Test SetCacheDisabled/CacheDisabled
-//    - Test SetRateLimitWarningShown/RateLimitWarningShown
-//    - Test ResetState clears all flags
+//   - Test SetTestMode/TestMode
+//   - Test SetCacheDisabled/CacheDisabled
+//   - Test SetRateLimitWarningShown/RateLimitWarningShown
+//   - Test ResetState clears all flags
 //
 // TESTING APPROACH
 // ----------------

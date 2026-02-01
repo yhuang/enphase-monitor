@@ -32,7 +32,7 @@ import (
 
 // ExpectedValues represents the structure of expected values JSON files
 type ExpectedValues struct {
-	Date    string          `json:"date"`
+	Date    string           `json:"date"`
 	Systems []ExpectedSystem `json:"systems"`
 }
 
@@ -45,13 +45,13 @@ type ExpectedSystem struct {
 
 // ExpectedMetrics holds the expected values for system metrics
 type ExpectedMetrics struct {
-	GridImport         float64 `json:"grid_import"`
-	GridExport         float64 `json:"grid_export"`
-	Production         float64 `json:"production"`
-	BatteryDischarged  float64 `json:"battery_discharged"`
-	BatteryCharged     float64 `json:"battery_charged"`
-	NetImported        float64 `json:"net_imported"`
-	Consumption        float64 `json:"consumption"`
+	GridImport        float64 `json:"grid_import"`
+	GridExport        float64 `json:"grid_export"`
+	Production        float64 `json:"production"`
+	BatteryDischarged float64 `json:"battery_discharged"`
+	BatteryCharged    float64 `json:"battery_charged"`
+	NetImported       float64 `json:"net_imported"`
+	Consumption       float64 `json:"consumption"`
 }
 
 // ValidateMetrics validates actual metrics against expected values for the given date
@@ -174,7 +174,7 @@ func validateMetric(name string, expected, actual float64) bool {
 	tolerance := math.Max(math.Abs(expected)*constants.ValidationTolerancePercent, constants.ValidationMinToleranceKWh)
 	diff := actual - expected
 	absDiff := math.Abs(diff)
-	
+
 	// Calculate percentage difference
 	var percentDiff float64
 	if expected == 0 {

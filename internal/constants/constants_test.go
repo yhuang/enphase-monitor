@@ -8,15 +8,15 @@
 // TEST PLAN
 // ---------
 // 1. Helper Function Tests
-//    - Test IsRateLimitError() correctly identifies 429 errors
-//    - Test nil error returns false
-//    - Test non-rate-limit errors return false
-//    - Test error message substring matching
+//   - Test IsRateLimitError() correctly identifies 429 errors
+//   - Test nil error returns false
+//   - Test non-rate-limit errors return false
+//   - Test error message substring matching
 //
 // 2. Constant Value Tests (Optional)
-//    - Test ANSI codes are correct
-//    - Test numeric constants (timeouts, tolerances)
-//    - Test string constants (error messages, field names)
+//   - Test ANSI codes are correct
+//   - Test numeric constants (timeouts, tolerances)
+//   - Test string constants (error messages, field names)
 //
 // TESTING APPROACH
 // ----------------

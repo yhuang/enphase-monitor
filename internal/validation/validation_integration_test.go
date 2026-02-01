@@ -9,19 +9,19 @@
 // TEST PLAN
 // ---------
 // 1. Full Validation Flow Tests
-//    - Test complete validation with real expected values files
-//    - Test validation with all metrics matching
-//    - Test validation with some metrics outside tolerance
-//    - Test validation with multiple systems
+//   - Test complete validation with real expected values files
+//   - Test validation with all metrics matching
+//   - Test validation with some metrics outside tolerance
+//   - Test validation with multiple systems
 //
 // 2. JSON File Loading Tests
-//    - Test loading actual expected values files
-//    - Test date matching
-//    - Test system matching by ID
+//   - Test loading actual expected values files
+//   - Test date matching
+//   - Test system matching by ID
 //
 // 3. Error Reporting Tests
-//    - Test validation failure reporting
-//    - Test summary statistics (passed/failed counts)
+//   - Test validation failure reporting
+//   - Test summary statistics (passed/failed counts)
 //
 // TESTING APPROACH
 // ----------------
@@ -106,13 +106,13 @@ func TestValidateMetrics_FullFlow_WithinTolerance(t *testing.T) {
 			{
 				ID:                     "5525881",
 				Name:                   "Right Subpanel",
-				GridImportToday:        23.2,  // Within tolerance of 23.4
-				GridExportToday:        3.8,   // Within tolerance of 3.9
-				ProductionToday:        14.5,  // Within tolerance of 14.6
-				BatteryDischargedToday: 6.7,   // Within tolerance of 6.8
-				BatteryChargedToday:    8.5,   // Within tolerance of 8.6
-				NetImportedToday:       19.5,  // Within tolerance of 19.6
-				ConsumptionToday:       32.2,  // Within tolerance of 32.3
+				GridImportToday:        23.2, // Within tolerance of 23.4
+				GridExportToday:        3.8,  // Within tolerance of 3.9
+				ProductionToday:        14.5, // Within tolerance of 14.6
+				BatteryDischargedToday: 6.7,  // Within tolerance of 6.8
+				BatteryChargedToday:    8.5,  // Within tolerance of 8.6
+				NetImportedToday:       19.5, // Within tolerance of 19.6
+				ConsumptionToday:       32.2, // Within tolerance of 32.3
 			},
 			{
 				ID:                     "5392556",
@@ -152,13 +152,13 @@ func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
 			{
 				ID:                     "5525881",
 				Name:                   "Right Subpanel",
-				GridImportToday:        30.0,  // Far from 23.4 (28% difference)
-				GridExportToday:        3.9,   // Match
-				ProductionToday:        14.6,  // Match
-				BatteryDischargedToday: 6.8,   // Match
-				BatteryChargedToday:    8.6,   // Match
-				NetImportedToday:       19.6,  // Match
-				ConsumptionToday:       32.3,  // Match
+				GridImportToday:        30.0, // Far from 23.4 (28% difference)
+				GridExportToday:        3.9,  // Match
+				ProductionToday:        14.6, // Match
+				BatteryDischargedToday: 6.8,  // Match
+				BatteryChargedToday:    8.6,  // Match
+				NetImportedToday:       19.6, // Match
+				ConsumptionToday:       32.3, // Match
 			},
 			{
 				ID:                     "5392556",
@@ -225,7 +225,7 @@ func TestValidateMetrics_MissingSystem(t *testing.T) {
 func TestValidateMetrics_DateMismatch(t *testing.T) {
 	// This test verifies that date validation works
 	// The expected values file has date "2026-01-20" but we query with a different date
-	
+
 	// Check if expected values file exists
 	if _, err := os.Stat("../../test-data/expected_values_2026-01-20.json"); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
@@ -288,7 +288,7 @@ func TestValidateMetrics_MultipleExpectedValuesFiles(t *testing.T) {
 			// We expect this to fail because metrics are empty, but it should
 			// successfully load the expected values file first
 			err := ValidateMetrics(metrics, tt.date)
-			
+
 			// We expect an error because metrics are empty, but not a file loading error
 			if err == nil {
 				t.Error("Expected error for empty metrics, got nil")

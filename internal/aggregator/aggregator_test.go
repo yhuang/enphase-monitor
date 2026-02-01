@@ -8,18 +8,18 @@
 // TEST PLAN
 // ---------
 // 1. Aggregation Logic Tests
-//    - Test single-system aggregation
-//    - Test multi-system aggregation (summing values)
-//    - Test net import calculation (import - export)
+//   - Test single-system aggregation
+//   - Test multi-system aggregation (summing values)
+//   - Test net import calculation (import - export)
 //
 // 2. Error Handling Tests
-//    - Test API errors are propagated correctly
-//    - Test rate limit errors (429) are collected
-//    - Test context cancellation
+//   - Test API errors are propagated correctly
+//   - Test rate limit errors (429) are collected
+//   - Test context cancellation
 //
 // 3. Cache Tracking Tests
-//    - Test cache flag is set when any system uses cache
-//    - Test cache flag is false when all systems use live data
+//   - Test cache flag is set when any system uses cache
+//   - Test cache flag is false when all systems use live data
 //
 // TESTING APPROACH
 // ----------------

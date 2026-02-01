@@ -26,27 +26,30 @@
 // BENCHMARK PLAN
 // --------------
 // 1. JSON Parsing Benchmarks
-//    - Benchmark flat array parsing (production, consumption)
-//    - Benchmark nested array parsing (grid import/export)
-//    - Measure memory allocations (bytes/op, allocs/op)
+//   - Benchmark flat array parsing (production, consumption)
+//   - Benchmark nested array parsing (grid import/export)
+//   - Measure memory allocations (bytes/op, allocs/op)
 //
 // 2. Interval Summing Benchmarks
-//    - Benchmark summing across different field names
-//    - Test with varying interval counts (1, 10, 96 intervals)
+//   - Benchmark summing across different field names
+//   - Test with varying interval counts (1, 10, 96 intervals)
 //
 // RUNNING BENCHMARKS
 // ------------------
 // Run all benchmarks:
-//   go test -bench=. ./internal/parser
+//
+//	go test -bench=. ./internal/parser
 //
 // Run with memory stats:
-//   go test -bench=. -benchmem ./internal/parser
+//
+//	go test -bench=. -benchmem ./internal/parser
 //
 // Compare before/after optimization:
-//   go test -bench=. -benchmem > before.txt
-//   # Make optimization changes
-//   go test -bench=. -benchmem > after.txt
-//   benchcmp before.txt after.txt
+//
+//	go test -bench=. -benchmem > before.txt
+//	# Make optimization changes
+//	go test -bench=. -benchmem > after.txt
+//	benchcmp before.txt after.txt
 //
 // PERFORMANCE TARGETS
 // -------------------

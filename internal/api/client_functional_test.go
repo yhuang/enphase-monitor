@@ -130,17 +130,17 @@ func TestGetConsumptionForDate(t *testing.T) {
 // TestGetBatteryDataForDate tests battery data fetching with SOC
 func TestGetBatteryDataForDate(t *testing.T) {
 	tz, _ := time.LoadLocation("US/Pacific")
-	
+
 	// Use yesterday to avoid current time capping issue
 	// (GetDayBoundaries caps dayEnd to current time for "today")
 	now := time.Now().In(tz)
 	yesterday := now.AddDate(0, 0, -1)
 	dayStart := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, tz)
-	
+
 	// Create timestamps within yesterday's boundaries (guaranteed to be within 00:00-23:59:59)
 	ts1 := dayStart.Add(8 * time.Hour).Unix()  // 8 AM yesterday
 	ts2 := dayStart.Add(12 * time.Hour).Unix() // 12 PM yesterday
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify authorization
 		if r.Header.Get("Authorization") != "Bearer test-token" {
@@ -197,12 +197,12 @@ func TestGetBatteryDataForDate(t *testing.T) {
 // TestGetBatteryDataForDate_NoSOC tests battery data when SOC field is missing
 func TestGetBatteryDataForDate_NoSOC(t *testing.T) {
 	tz, _ := time.LoadLocation("US/Pacific")
-	
+
 	// Get current day boundaries
 	now := time.Now().In(tz)
 	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
 	ts1 := dayStart.Add(8 * time.Hour).Unix()
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return battery telemetry without SOC field
 		w.WriteHeader(http.StatusOK)
@@ -244,12 +244,12 @@ func TestGetBatteryDataForDate_NoSOC(t *testing.T) {
 // TestGetMetricsFromCloud tests fetching all metrics in one call
 func TestGetMetricsFromCloud(t *testing.T) {
 	tz, _ := time.LoadLocation("US/Pacific")
-	
+
 	// Get current day boundaries
 	now := time.Now().In(tz)
 	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
 	ts1 := dayStart.Add(8 * time.Hour).Unix()
-	
+
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
@@ -544,12 +544,12 @@ func TestGetBatteryDataForDate_InvalidJSON(t *testing.T) {
 // TestGetMetricsFromCloud_ConsumptionFallback tests consumption calculation fallback
 func TestGetMetricsFromCloud_ConsumptionFallback(t *testing.T) {
 	tz, _ := time.LoadLocation("US/Pacific")
-	
+
 	// Get current day boundaries
 	now := time.Now().In(tz)
 	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
 	ts1 := dayStart.Add(8 * time.Hour).Unix()
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
@@ -714,7 +714,7 @@ func TestCacheUsedTracking(t *testing.T) {
 
 // Helper function to check if string contains substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
 		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
 }
 

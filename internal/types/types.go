@@ -32,17 +32,17 @@
 // This codebase has TWO different patterns for types.go files:
 //
 // 1. PACKAGE-SPECIFIC types.go (e.g., internal/aggregator/types.go, internal/api/types.go)
-//    - Contains types used ONLY within that package
-//    - Example: internal/api/types.go defines LocalMetrics (only used by api package)
-//    - Example: internal/aggregator/types.go defines AggregatedMetrics, SystemMetrics
-//    - These are standard Go file organization - separating types from implementation
+//   - Contains types used ONLY within that package
+//   - Example: internal/api/types.go defines LocalMetrics (only used by api package)
+//   - Example: internal/aggregator/types.go defines AggregatedMetrics, SystemMetrics
+//   - These are standard Go file organization - separating types from implementation
 //
 // 2. SHARED types package (this file: internal/types/types.go)
-//    - Contains types used by MULTIPLE packages
-//    - Created specifically to break circular dependencies
-//    - Example: SystemConfig is needed by config, aggregator, oauth, and app packages
-//    - Without this package, config would import aggregator, aggregator would import
-//      config, creating a circular dependency that Go does not allow
+//   - Contains types used by MULTIPLE packages
+//   - Created specifically to break circular dependencies
+//   - Example: SystemConfig is needed by config, aggregator, oauth, and app packages
+//   - Without this package, config would import aggregator, aggregator would import
+//     config, creating a circular dependency that Go does not allow
 //
 // The key distinction:
 //   - internal/api/types.go      → types for api package only
@@ -53,13 +53,13 @@
 // ------------------------
 // Use this decision process when a package-specific type needs cross-package use:
 //
-//   Does package B need a type from package A?
-//   └─► Does A also need something from B? (circular dependency?)
-//       ├─► NO:  Just import A from B (direct import works)
-//       │        Example: display imports aggregator.AggregatedMetrics
-//       └─► YES: Would create circular dependency
-//           ├─► Can you use an interface? → Define interface in consumer
-//           └─► Need concrete type? → Move to internal/types/
+//	Does package B need a type from package A?
+//	└─► Does A also need something from B? (circular dependency?)
+//	    ├─► NO:  Just import A from B (direct import works)
+//	    │        Example: display imports aggregator.AggregatedMetrics
+//	    └─► YES: Would create circular dependency
+//	        ├─► Can you use an interface? → Define interface in consumer
+//	        └─► Need concrete type? → Move to internal/types/
 //
 // See GO_CONCEPTS.md for detailed flowchart and examples.
 //
@@ -80,8 +80,8 @@ package types
 // SystemConfig represents configuration for a single Enphase system.
 // Used by config, aggregator, and app packages.
 type SystemConfig struct {
-	Name string `yaml:"name"`        // Human-readable name for the system
-	ID   string `yaml:"id"`          // Enlighten system ID (required for Cloud API)
+	Name string `yaml:"name"` // Human-readable name for the system
+	ID   string `yaml:"id"`   // Enlighten system ID (required for Cloud API)
 }
 
 // APIConfig represents API configuration for Enphase Cloud API.

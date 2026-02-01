@@ -114,9 +114,9 @@ import (
 	"time"
 
 	"enphase-monitor/internal/cache"
+	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/parser"
 	"enphase-monitor/internal/timezone"
-	"enphase-monitor/internal/constants"
 )
 
 // EnlightenCloudClient handles communication with Enphase Enlighten Cloud API v4.
@@ -126,7 +126,7 @@ import (
 // TESTABILITY: The baseURL field allows dependency injection for testing.
 // Production code uses EnphaseAPIv4SystemsURL constant, tests can inject mock server URL.
 type EnlightenCloudClient struct {
-	baseURL     string         // Base URL for API requests (injectable for testing)
+	baseURL     string // Base URL for API requests (injectable for testing)
 	systemID    string
 	apiKey      string
 	accessToken string

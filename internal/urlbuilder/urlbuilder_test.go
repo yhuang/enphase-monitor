@@ -8,22 +8,22 @@
 // TEST PLAN
 // ---------
 // 1. Telemetry URL Construction
-//    - Test production endpoint URL
-//    - Test consumption endpoint URL
-//    - Test battery endpoint URL
-//    - Test grid import/export endpoint URLs
+//   - Test production endpoint URL
+//   - Test consumption endpoint URL
+//   - Test battery endpoint URL
+//   - Test grid import/export endpoint URLs
 //
 // 2. URL Component Validation
-//    - Test base URL is present
-//    - Test system ID is included
-//    - Test endpoint path is correct
-//    - Test API key query parameter
-//    - Test start_at and end_at timestamps
+//   - Test base URL is present
+//   - Test system ID is included
+//   - Test endpoint path is correct
+//   - Test API key query parameter
+//   - Test start_at and end_at timestamps
 //
 // 3. Parameter Encoding
-//    - Test timestamps are Unix format (seconds since epoch)
-//    - Test special characters are URL-encoded
-//    - Test query parameters are properly formatted
+//   - Test timestamps are Unix format (seconds since epoch)
+//   - Test special characters are URL-encoded
+//   - Test query parameters are properly formatted
 //
 // TESTING APPROACH
 // ----------------

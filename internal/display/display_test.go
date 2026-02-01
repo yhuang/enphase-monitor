@@ -8,19 +8,19 @@
 // TEST PLAN
 // ---------
 // 1. Constructor Tests
-//    - Test NewDisplayWithWriter (custom writer)
-//    - Test NewDisplayWithColorsAndTimezone (default writer)
+//   - Test NewDisplayWithWriter (custom writer)
+//   - Test NewDisplayWithColorsAndTimezone (default writer)
 //
 // 2. Output Content Tests
-//    - Test header contains "ENPHASE MULTI-SYSTEM MONITOR"
-//    - Test query range formatting (date/time display)
-//    - Test combined energy report section
-//    - Test individual systems section
-//    - Test net import/export formatting (positive vs negative)
+//   - Test header contains "ENPHASE MULTI-SYSTEM MONITOR"
+//   - Test query range formatting (date/time display)
+//   - Test combined energy report section
+//   - Test individual systems section
+//   - Test net import/export formatting (positive vs negative)
 //
 // 3. Color Application Tests (Optional)
-//    - Verify ANSI color codes are present in output
-//    - Test color customization via config
+//   - Verify ANSI color codes are present in output
+//   - Test color customization via config
 //
 // TESTING APPROACH
 // ----------------

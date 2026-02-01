@@ -8,21 +8,21 @@
 // TEST PLAN
 // ---------
 // 1. Timezone Loading Tests
-//    - Test valid IANA timezone identifiers (US/Pacific, America/New_York, etc.)
-//    - Test empty string uses system timezone
-//    - Test UTC timezone fallback logic
-//    - Test invalid timezone returns error
+//   - Test valid IANA timezone identifiers (US/Pacific, America/New_York, etc.)
+//   - Test empty string uses system timezone
+//   - Test UTC timezone fallback logic
+//   - Test invalid timezone returns error
 //
 // 2. Date Boundary Tests
-//    - Test GetDayBoundaries returns correct start/end times
-//    - Test boundaries respect timezone (not UTC)
-//    - Test daylight saving time transitions
-//    - Test zero time value (use today)
+//   - Test GetDayBoundaries returns correct start/end times
+//   - Test boundaries respect timezone (not UTC)
+//   - Test daylight saving time transitions
+//   - Test zero time value (use today)
 //
 // 3. Past Date Detection Tests
-//    - Test IsPastDate correctly identifies historical dates
-//    - Test today returns false
-//    - Test future dates return false
+//   - Test IsPastDate correctly identifies historical dates
+//   - Test today returns false
+//   - Test future dates return false
 //
 // TESTING APPROACH
 // ----------------

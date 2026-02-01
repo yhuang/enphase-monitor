@@ -8,29 +8,29 @@
 // TEST PLAN
 // ---------
 // 1. OAuth Adapter Tests
-//    - Test CreateOAuthAdapter returns non-nil function
-//    - Test adapter can be called (basic smoke test)
+//   - Test CreateOAuthAdapter returns non-nil function
+//   - Test adapter can be called (basic smoke test)
 //
 // 2. Display Setup Tests
-//    - Test SetupDisplay creates Display with correct colors
-//    - Test default colors are applied when config has no colors
-//    - Test custom colors override defaults
-//    - Test timezone is set correctly
+//   - Test SetupDisplay creates Display with correct colors
+//   - Test default colors are applied when config has no colors
+//   - Test custom colors override defaults
+//   - Test timezone is set correctly
 //
 // 3. Mode Configuration Tests
-//    - Test ConfigureModes sets test mode flag
-//    - Test ConfigureModes sets cache disabled flag
-//    - Test mode flags are mutually independent
+//   - Test ConfigureModes sets test mode flag
+//   - Test ConfigureModes sets cache disabled flag
+//   - Test mode flags are mutually independent
 //
 // 4. Date Parsing Tests
-//    - Test ParseTestDate with valid date string
-//    - Test ParseTestDate with empty string returns zero time
-//    - Test ParseTestDate with invalid format returns error
+//   - Test ParseTestDate with valid date string
+//   - Test ParseTestDate with empty string returns zero time
+//   - Test ParseTestDate with invalid format returns error
 //
 // 5. Test Mode Cache Validation Tests
-//    - Test ValidateTestModeCache returns error for missing cache
-//    - Test error message contains target date
-//    - Test error message contains helpful instructions
+//   - Test ValidateTestModeCache returns error for missing cache
+//   - Test error message contains target date
+//   - Test error message contains helpful instructions
 //
 // TESTING APPROACH
 // ----------------
@@ -62,20 +62,20 @@
 //
 // This file demonstrates several key testing patterns:
 //
-// 1. SMOKE TESTS - Quick tests that verify basic functionality
-//    (TestCreateOAuthAdapter, TestSetupDisplay)
+//  1. SMOKE TESTS - Quick tests that verify basic functionality
+//     (TestCreateOAuthAdapter, TestSetupDisplay)
 //
-// 2. CONFIGURATION VARIANTS - Testing the same function with different configs
-//    (TestSetupDisplay vs TestSetupDisplay_WithCustomColors)
+//  2. CONFIGURATION VARIANTS - Testing the same function with different configs
+//     (TestSetupDisplay vs TestSetupDisplay_WithCustomColors)
 //
-// 3. BOUNDARY VALUE TESTING - Testing edge cases like empty strings, zero values
-//    (TestParseTestDate_EmptyString, TestParseTestDate_InvalidDate)
+//  3. BOUNDARY VALUE TESTING - Testing edge cases like empty strings, zero values
+//     (TestParseTestDate_EmptyString, TestParseTestDate_InvalidDate)
 //
-// 4. SUBTESTS WITH t.Run() - Grouping related assertions
-//    (TestValidateTestModeCache uses t.Run for each scenario)
+//  4. SUBTESTS WITH t.Run() - Grouping related assertions
+//     (TestValidateTestModeCache uses t.Run for each scenario)
 //
-// 5. TABLE-DRIVEN TESTS - Testing multiple cases with same logic
-//    (TestConfigureModes uses a test table)
+//  5. TABLE-DRIVEN TESTS - Testing multiple cases with same logic
+//     (TestConfigureModes uses a test table)
 //
 // =============================================================================
 package app
@@ -285,9 +285,9 @@ func TestGetAggregatorTypes(t *testing.T) {
 			ClientSecret: "test-secret",
 		},
 	}
-	
+
 	systems, apiConfig := GetAggregatorTypes(cfg)
-	
+
 	if len(systems) != 2 {
 		t.Errorf("GetAggregatorTypes() returned %d systems, want 2", len(systems))
 	}
@@ -306,9 +306,9 @@ func TestGetAggregatorTypes_EmptySystems(t *testing.T) {
 			Key: "test-key",
 		},
 	}
-	
+
 	systems, apiConfig := GetAggregatorTypes(cfg)
-	
+
 	if len(systems) != 0 {
 		t.Errorf("GetAggregatorTypes() returned %d systems, want 0", len(systems))
 	}
@@ -321,13 +321,13 @@ func TestRunOnce_ContextCancelled(t *testing.T) {
 	// Create a cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	
+
 	// Create mock aggregator that returns error due to cancelled context
 	mockGetter := func(ctx context.Context, apiConfig *aggregator.APIConfig) (string, error) {
 		return "", context.Canceled
 	}
 	agg := aggregator.NewDataAggregator(mockGetter)
-	
+
 	cfg := &config.Config{
 		Systems: []types.SystemConfig{
 			{Name: "Test", ID: "12345"},
@@ -338,11 +338,11 @@ func TestRunOnce_ContextCancelled(t *testing.T) {
 			ClientSecret: "test-secret",
 		},
 	}
-	
+
 	tz := time.UTC
 	disp := SetupDisplay(cfg, tz)
 	testDate := time.Time{}
-	
+
 	// This should exit early due to cancelled context
 	// We can't easily test os.Exit, but we can verify the function doesn't panic
 	defer func() {
@@ -350,7 +350,7 @@ func TestRunOnce_ContextCancelled(t *testing.T) {
 			t.Errorf("RunOnce() panicked: %v", r)
 		}
 	}()
-	
+
 	// Note: In a real test, we'd mock os.Exit to verify it's called
 	// For now, we just ensure the function can handle a cancelled context
 	_ = agg

@@ -13,17 +13,19 @@
 //
 // HOW TO RUN THESE TESTS
 // ----------------------
-//   go test -v ./internal/validation/                    # Run all tests in package
-//   go test -v ./internal/validation/ -run ExactMatch    # Run tests matching "ExactMatch"
-//   go test -v ./internal/validation/ -run "WithinTolerance/small"  # Run specific subtest
+//
+//	go test -v ./internal/validation/                    # Run all tests in package
+//	go test -v ./internal/validation/ -run ExactMatch    # Run tests matching "ExactMatch"
+//	go test -v ./internal/validation/ -run "WithinTolerance/small"  # Run specific subtest
 //
 // UNDERSTANDING TEST OUTPUT
 // -------------------------
 // When you run `go test -v`, you'll see:
-//   === RUN   TestValidateMetric_ExactMatch           <- Test function started
-//   === RUN   TestValidateMetric_ExactMatch/zero_values  <- Subtest started
-//   --- PASS: TestValidateMetric_ExactMatch/zero_values  <- Subtest passed
-//   --- PASS: TestValidateMetric_ExactMatch (0.00s)      <- All subtests passed
+//
+//	=== RUN   TestValidateMetric_ExactMatch           <- Test function started
+//	=== RUN   TestValidateMetric_ExactMatch/zero_values  <- Subtest started
+//	--- PASS: TestValidateMetric_ExactMatch/zero_values  <- Subtest passed
+//	--- PASS: TestValidateMetric_ExactMatch (0.00s)      <- All subtests passed
 //
 // See TESTING.md for detailed pattern explanations.
 package validation
@@ -257,13 +259,13 @@ func TestValidateMetric_ZeroValues(t *testing.T) {
 		{
 			name:     "zero expected, small actual (within min tolerance)",
 			expected: 0.0,
-			actual:   0.1, // at minimum tolerance boundary
+			actual:   0.1,  // at minimum tolerance boundary
 			want:     true, // 0.1 kWh diff <= 0.1 kWh tolerance
 		},
 		{
 			name:     "zero expected, actual outside min tolerance",
 			expected: 0.0,
-			actual:   0.2, // exceeds 0.1 kWh minimum tolerance
+			actual:   0.2,   // exceeds 0.1 kWh minimum tolerance
 			want:     false, // 0.2 kWh diff > 0.1 kWh tolerance
 		},
 	}
@@ -491,7 +493,9 @@ func TestValidateMetrics_InvalidJSON(t *testing.T) {
 //
 // WALKTHROUGH:
 // This test verifies the tolerance formula directly:
-//   tolerance = max(expected * 10%, 0.1 kWh)
+//
+//	tolerance = max(expected * 10%, 0.1 kWh)
+//
 // By testing the formula separately, we can verify the math is correct
 // independent of the validateMetric function.
 func TestToleranceCalculation(t *testing.T) {

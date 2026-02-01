@@ -75,9 +75,9 @@
 //  7. Configure modes (test/cache) via internal/app
 //  8. Run execution mode via internal/app:
 //     - For each system in config:
-//       a. Get OAuth access token via internal/oauth (cached or refreshed)
-//       b. Create API client via internal/api for the system
-//       c. Fetch metrics via Cloud API (with caching from internal/cache)
+//     a. Get OAuth access token via internal/oauth (cached or refreshed)
+//     b. Create API client via internal/api for the system
+//     c. Fetch metrics via Cloud API (with caching from internal/cache)
 //     - Aggregate metrics via internal/aggregator
 //     - Validate if in test mode via internal/validation
 //     - Display formatted report via internal/display

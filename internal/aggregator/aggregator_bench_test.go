@@ -8,29 +8,32 @@
 // BENCHMARK PLAN
 // --------------
 // 1. Single-System Aggregation
-//    - Benchmark aggregating metrics from one system
-//    - Baseline performance measurement
+//   - Benchmark aggregating metrics from one system
+//   - Baseline performance measurement
 //
 // 2. Multi-System Aggregation
-//    - Benchmark 2 systems (typical use case)
-//    - Benchmark 5 systems (large deployment)
-//    - Verify linear scaling with system count
+//   - Benchmark 2 systems (typical use case)
+//   - Benchmark 5 systems (large deployment)
+//   - Verify linear scaling with system count
 //
 // 3. Memory Usage
-//    - Measure allocations per aggregation
-//    - Verify slice capacity pre-allocation works
+//   - Measure allocations per aggregation
+//   - Verify slice capacity pre-allocation works
 //
 // RUNNING BENCHMARKS
 // ------------------
 // Run aggregator benchmarks:
-//   go test -bench=. ./internal/aggregator
+//
+//	go test -bench=. ./internal/aggregator
 //
 // Run with memory profiling:
-//   go test -bench=. -benchmem -memprofile=mem.prof ./internal/aggregator
-//   go tool pprof mem.prof
+//
+//	go test -bench=. -benchmem -memprofile=mem.prof ./internal/aggregator
+//	go tool pprof mem.prof
 //
 // Compare different system counts:
-//   go test -bench=BenchmarkGetAggregatedMetrics ./internal/aggregator
+//
+//	go test -bench=BenchmarkGetAggregatedMetrics ./internal/aggregator
 //
 // PERFORMANCE EXPECTATIONS
 // ------------------------
@@ -72,19 +75,21 @@
 //
 // RUNNING BENCHMARKS:
 // -------------------
-//   go test -bench=.                    # Run all benchmarks
-//   go test -bench=BenchmarkNetImport   # Run specific benchmark
-//   go test -bench=. -benchmem          # Also show memory allocations
-//   go test -bench=. -count=5           # Run 5 times for consistency
+//
+//	go test -bench=.                    # Run all benchmarks
+//	go test -bench=BenchmarkNetImport   # Run specific benchmark
+//	go test -bench=. -benchmem          # Also show memory allocations
+//	go test -bench=. -count=5           # Run 5 times for consistency
 //
 // INTERPRETING OUTPUT:
 // --------------------
-//   BenchmarkNetImportCalculation-8   1000000000   0.3150 ns/op
-//   │                            │   │            │
-//   │                            │   │            └─ Time per operation
-//   │                            │   └─ Number of iterations
-//   │                            └─ Number of CPU cores
-//   └─ Benchmark name
+//
+//	BenchmarkNetImportCalculation-8   1000000000   0.3150 ns/op
+//	│                            │   │            │
+//	│                            │   │            └─ Time per operation
+//	│                            │   └─ Number of iterations
+//	│                            └─ Number of CPU cores
+//	└─ Benchmark name
 //
 // =============================================================================
 package aggregator

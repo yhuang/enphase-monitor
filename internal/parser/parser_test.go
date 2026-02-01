@@ -8,21 +8,21 @@
 // TEST PLAN
 // ---------
 // 1. Flat Array Format Tests (production, consumption, battery)
-//    - Test valid responses with multiple intervals
-//    - Test empty intervals array
-//    - Test malformed JSON
-//    - Test missing required fields
+//   - Test valid responses with multiple intervals
+//   - Test empty intervals array
+//   - Test malformed JSON
+//   - Test missing required fields
 //
 // 2. Nested Array Format Tests (grid import/export)
-//    - Test nested array structure
-//    - Test array flattening logic
-//    - Test mixed interval counts
+//   - Test nested array structure
+//   - Test array flattening logic
+//   - Test mixed interval counts
 //
 // 3. Interval Summing Tests
-//    - Test summing wh_del (production)
-//    - Test summing enwh (consumption)
-//    - Test summing wh_imported (grid import)
-//    - Test summing wh_exported (grid export)
+//   - Test summing wh_del (production)
+//   - Test summing enwh (consumption)
+//   - Test summing wh_imported (grid import)
+//   - Test summing wh_exported (grid export)
 //
 // TESTING APPROACH
 // ----------------

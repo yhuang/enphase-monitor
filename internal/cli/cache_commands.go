@@ -51,12 +51,12 @@ func HandleListCache() error {
 	if err != nil {
 		return fmt.Errorf("failed to list cache entries: %w", err)
 	}
-	
+
 	if len(entries) == 0 {
 		fmt.Println("No cached responses found")
 		return nil
 	}
-	
+
 	fmt.Printf("Found %d cached responses:\n\n", len(entries))
 	for i, entry := range entries {
 		fmt.Printf("[%d] Hash: %s\n", i+1, entry.Key)
@@ -87,7 +87,7 @@ func HandleInspectCache(inspectValue, configFile string) error {
 		// It is a date - show all cache entries for this date
 		return handleInspectCacheByDate(date, inspectValue, configFile)
 	}
-	
+
 	// It is a hash - show single entry
 	if err := cache.InspectCacheEntry(inspectValue); err != nil {
 		return fmt.Errorf("failed to inspect cache entry: %w", err)
@@ -97,25 +97,23 @@ func HandleInspectCache(inspectValue, configFile string) error {
 
 // handleInspectCacheByDate inspects all cache entries for a specific date
 func handleInspectCacheByDate(date time.Time, dateStr, configFile string) error {
-	// Load config to get timezone, but use default if config not available
-	var tz *time.Location
+	// Load config to get timezone: default to system timezone, override if config available
+	tz, _ := timezone.LoadTimezone("")
 	if cfg, err := config.LoadConfig(configFile); err == nil {
 		tz, _ = timezone.LoadTimezone(cfg.Timezone)
-	} else {
-		tz, _ = timezone.LoadTimezone("")
 	}
-	
+
 	entries, err := cache.FindCacheEntriesByDate(date, tz)
 	if err != nil {
 		return fmt.Errorf("failed to find cache entries: %w", err)
 	}
-	
+
 	if len(entries) == 0 {
 		fmt.Printf("No cached responses found for date %s\n", dateStr)
 		showAvailableDates()
 		return nil
 	}
-	
+
 	fmt.Printf("Found %d cached responses for %s:\n\n", len(entries), dateStr)
 	for i, entry := range entries {
 		separator := strings.Repeat("=", 71)
@@ -139,7 +137,7 @@ func showAvailableDates() {
 	if err != nil || len(allEntries) == 0 {
 		return
 	}
-	
+
 	// Collect unique dates
 	dateSet := make(map[string]bool)
 	for _, entry := range allEntries {
@@ -147,7 +145,7 @@ func showAvailableDates() {
 			dateSet[entry.Date] = true
 		}
 	}
-	
+
 	if len(dateSet) > 0 {
 		var dates []string
 		for d := range dateSet {

@@ -22,9 +22,9 @@ import (
 
 	"enphase-monitor/internal/aggregator"
 	"enphase-monitor/internal/config"
+	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/display"
 	"enphase-monitor/internal/validation"
-	"enphase-monitor/internal/constants"
 )
 
 // RunOnce executes a single query, displays results, and exits
@@ -50,7 +50,7 @@ func RunOnce(ctx context.Context, agg *aggregator.DataAggregator, disp *display.
 			fmt.Fprintf(os.Stderr, "ERROR: --test flag requires --date flag to specify which date to validate\n")
 			os.Exit(1)
 		}
-			testDateStr := testDate.Format(constants.DateFormat)
+		testDateStr := testDate.Format(constants.DateFormat)
 		if err := validation.ValidateMetrics(metrics, testDateStr); err != nil {
 			fmt.Fprintf(os.Stderr, "\nValidation failed: %v\n", err)
 			os.Exit(1)

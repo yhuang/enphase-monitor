@@ -8,23 +8,23 @@
 // TEST PLAN
 // ---------
 // 1. Valid Configuration Tests
-//    - Test complete config with all fields
-//    - Test minimal config with required fields only
-//    - Test default values (refresh_interval, timezone)
+//   - Test complete config with all fields
+//   - Test minimal config with required fields only
+//   - Test default values (refresh_interval, timezone)
 //
 // 2. Validation Tests
-//    - Test missing required fields (API key, client_id, systems)
-//    - Test empty system ID (should fail)
-//    - Test invalid YAML syntax
+//   - Test missing required fields (API key, client_id, systems)
+//   - Test empty system ID (should fail)
+//   - Test invalid YAML syntax
 //
 // 3. Color Conversion Tests
-//    - Test hex color codes (e.g., #FF5733) are converted to ANSI
-//    - Test ANSI codes are preserved as-is
-//    - Test default colors are applied when not specified
+//   - Test hex color codes (e.g., #FF5733) are converted to ANSI
+//   - Test ANSI codes are preserved as-is
+//   - Test default colors are applied when not specified
 //
 // 4. Whitespace Handling Tests
-//    - Test leading/trailing whitespace is trimmed
-//    - Test refresh_token whitespace is cleaned
+//   - Test leading/trailing whitespace is trimmed
+//   - Test refresh_token whitespace is cleaned
 //
 // TESTING APPROACH
 // ----------------

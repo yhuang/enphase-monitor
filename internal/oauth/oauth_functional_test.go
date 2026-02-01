@@ -8,20 +8,20 @@
 // TEST PLAN
 // ---------
 // 1. Token Exchange Tests (Authorization Code Flow)
-//    - Test successful code exchange
-//    - Test HTTP method validation (must be POST)
-//    - Test request header validation (Content-Type, Authorization)
-//    - Test request body parsing
+//   - Test successful code exchange
+//   - Test HTTP method validation (must be POST)
+//   - Test request header validation (Content-Type, Authorization)
+//   - Test request body parsing
 //
 // 2. Token Refresh Tests
-//    - Test successful token refresh
-//    - Test expired token refresh
-//    - Test refresh token validation
+//   - Test successful token refresh
+//   - Test expired token refresh
+//   - Test refresh token validation
 //
 // 3. HTTP Error Tests
-//    - Test 401 Unauthorized response
-//    - Test 500 Server Error response
-//    - Test malformed JSON response
+//   - Test 401 Unauthorized response
+//   - Test 500 Server Error response
+//   - Test malformed JSON response
 //
 // TESTING APPROACH
 // ----------------
@@ -74,28 +74,28 @@ func TestExchangeAuthorizationCode_Success(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		
+
 		// Verify Basic Auth
 		username, password, ok := r.BasicAuth()
 		if !ok || username != "test-client-id" || password != "test-client-secret" {
 			t.Errorf("Invalid Basic Auth: username=%s, password=%s", username, password)
 		}
-		
+
 		// Verify Content-Type
 		if ct := r.Header.Get("Content-Type"); ct != "application/x-www-form-urlencoded" {
 			t.Errorf("Expected Content-Type application/x-www-form-urlencoded, got %s", ct)
 		}
-		
+
 		// Verify key header
 		if key := r.Header.Get("key"); key != "test-api-key" {
 			t.Errorf("Expected key header test-api-key, got %s", key)
 		}
-		
+
 		// Parse form data
 		if err := r.ParseForm(); err != nil {
 			t.Fatalf("Failed to parse form: %v", err)
 		}
-		
+
 		// Verify grant_type, code, redirect_uri
 		if gt := r.Form.Get("grant_type"); gt != "authorization_code" {
 			t.Errorf("Expected grant_type authorization_code, got %s", gt)
@@ -106,7 +106,7 @@ func TestExchangeAuthorizationCode_Success(t *testing.T) {
 		if ru := r.Form.Get("redirect_uri"); ru != "http://localhost:8080/callback" {
 			t.Errorf("Expected redirect_uri http://localhost:8080/callback, got %s", ru)
 		}
-		
+
 		// Return mock token response
 		resp := OAuthTokenResponse{
 			AccessToken:  "mock-access-token",
@@ -115,12 +115,12 @@ func TestExchangeAuthorizationCode_Success(t *testing.T) {
 			ExpiresIn:    3600,
 			Scope:        "read write",
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
-	
+
 	// Test with mock server
 	ctx := context.Background()
 	config := &types.APIConfig{
@@ -130,12 +130,12 @@ func TestExchangeAuthorizationCode_Success(t *testing.T) {
 		ClientSecret:     "test-client-secret",
 		RedirectURI:      "http://localhost:8080/callback",
 	}
-	
+
 	tokenResp, err := ExchangeAuthorizationCode(ctx, config, "test-auth-code")
 	if err != nil {
 		t.Fatalf("ExchangeAuthorizationCode() error = %v", err)
 	}
-	
+
 	// Verify response
 	if tokenResp.AccessToken != "mock-access-token" {
 		t.Errorf("AccessToken = %s, want mock-access-token", tokenResp.AccessToken)
@@ -178,7 +178,7 @@ func TestExchangeAuthorizationCode_HTTPError(t *testing.T) {
 			expectedErrMsg: "token request failed with status 500",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -186,7 +186,7 @@ func TestExchangeAuthorizationCode_HTTPError(t *testing.T) {
 				w.Write([]byte(tt.responseBody))
 			}))
 			defer server.Close()
-			
+
 			ctx := context.Background()
 			config := &types.APIConfig{
 				AuthorizationURL: server.URL,
@@ -194,12 +194,12 @@ func TestExchangeAuthorizationCode_HTTPError(t *testing.T) {
 				ClientSecret:     "test-client-secret",
 				RedirectURI:      "http://localhost:8080/callback",
 			}
-			
+
 			_, err := ExchangeAuthorizationCode(ctx, config, "test-code")
 			if err == nil {
 				t.Fatal("Expected error but got nil")
 			}
-			
+
 			if !strings.Contains(err.Error(), tt.expectedErrMsg) {
 				t.Errorf("Error = %v, want substring %s", err, tt.expectedErrMsg)
 			}
@@ -214,7 +214,7 @@ func TestExchangeAuthorizationCode_InvalidJSON(t *testing.T) {
 		w.Write([]byte(`{"invalid json`))
 	}))
 	defer server.Close()
-	
+
 	ctx := context.Background()
 	config := &types.APIConfig{
 		AuthorizationURL: server.URL,
@@ -222,12 +222,12 @@ func TestExchangeAuthorizationCode_InvalidJSON(t *testing.T) {
 		ClientSecret:     "test-client-secret",
 		RedirectURI:      "http://localhost:8080/callback",
 	}
-	
+
 	_, err := ExchangeAuthorizationCode(ctx, config, "test-code")
 	if err == nil {
 		t.Fatal("Expected error for invalid JSON")
 	}
-	
+
 	if !strings.Contains(err.Error(), "failed to decode") {
 		t.Errorf("Error should mention decode failure, got: %v", err)
 	}
@@ -241,14 +241,14 @@ func TestGetAccessToken_WithRefreshToken(t *testing.T) {
 	defer func() {
 		tokenCache = originalCache
 	}()
-	
+
 	// Create mock OAuth server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse form data
 		if err := r.ParseForm(); err != nil {
 			t.Fatalf("Failed to parse form: %v", err)
 		}
-		
+
 		// Verify refresh_token grant
 		if gt := r.Form.Get("grant_type"); gt != "refresh_token" {
 			t.Errorf("Expected grant_type refresh_token, got %s", gt)
@@ -256,19 +256,19 @@ func TestGetAccessToken_WithRefreshToken(t *testing.T) {
 		if rt := r.Form.Get("refresh_token"); rt != "test-refresh-token" {
 			t.Errorf("Expected refresh_token test-refresh-token, got %s", rt)
 		}
-		
+
 		// Return mock token response
 		resp := OAuthTokenResponse{
 			AccessToken: "new-access-token",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
-	
+
 	// Test with refresh token
 	ctx := context.Background()
 	config := &types.APIConfig{
@@ -278,16 +278,16 @@ func TestGetAccessToken_WithRefreshToken(t *testing.T) {
 		ClientSecret:     "test-client-secret",
 		RefreshToken:     "test-refresh-token",
 	}
-	
+
 	accessToken, err := GetAccessToken(ctx, config)
 	if err != nil {
 		t.Fatalf("GetAccessToken() error = %v", err)
 	}
-	
+
 	if accessToken != "new-access-token" {
 		t.Errorf("AccessToken = %s, want new-access-token", accessToken)
 	}
-	
+
 	// Verify token was cached
 	if tokenCache == nil {
 		t.Fatal("Token should be cached")
@@ -295,7 +295,7 @@ func TestGetAccessToken_WithRefreshToken(t *testing.T) {
 	if tokenCache.Token != "new-access-token" {
 		t.Errorf("Cached token = %s, want new-access-token", tokenCache.Token)
 	}
-	
+
 	// Verify expiration time is reasonable (should be ~1 hour from now)
 	expectedExpiry := time.Now().Add(3600 * time.Second)
 	if tokenCache.ExpiresAt.Before(time.Now()) || tokenCache.ExpiresAt.After(expectedExpiry.Add(1*time.Minute)) {
@@ -311,14 +311,14 @@ func TestGetAccessToken_WithPasswordGrant(t *testing.T) {
 	defer func() {
 		tokenCache = originalCache
 	}()
-	
+
 	// Create mock OAuth server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse form data
 		if err := r.ParseForm(); err != nil {
 			t.Fatalf("Failed to parse form: %v", err)
 		}
-		
+
 		// Verify password grant
 		if gt := r.Form.Get("grant_type"); gt != "password" {
 			t.Errorf("Expected grant_type password, got %s", gt)
@@ -329,19 +329,19 @@ func TestGetAccessToken_WithPasswordGrant(t *testing.T) {
 		if pw := r.Form.Get("password"); pw != "test-pass" {
 			t.Errorf("Expected password test-pass, got %s", pw)
 		}
-		
+
 		// Return mock token response
 		resp := OAuthTokenResponse{
 			AccessToken: "password-access-token",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
-	
+
 	// Test with username/password (no refresh token)
 	ctx := context.Background()
 	config := &types.APIConfig{
@@ -351,12 +351,12 @@ func TestGetAccessToken_WithPasswordGrant(t *testing.T) {
 		Username:         "test-user",
 		Password:         "test-pass",
 	}
-	
+
 	accessToken, err := GetAccessToken(ctx, config)
 	if err != nil {
 		t.Fatalf("GetAccessToken() error = %v", err)
 	}
-	
+
 	if accessToken != "password-access-token" {
 		t.Errorf("AccessToken = %s, want password-access-token", accessToken)
 	}
@@ -374,7 +374,7 @@ func TestGetAccessToken_CacheHit(t *testing.T) {
 	defer func() {
 		tokenCache = originalCache
 	}()
-	
+
 	// Mock server should NOT be called
 	serverCalled := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -382,7 +382,7 @@ func TestGetAccessToken_CacheHit(t *testing.T) {
 		t.Error("Server should not be called when token is cached")
 	}))
 	defer server.Close()
-	
+
 	ctx := context.Background()
 	config := &types.APIConfig{
 		AuthorizationURL: server.URL,
@@ -390,16 +390,16 @@ func TestGetAccessToken_CacheHit(t *testing.T) {
 		ClientSecret:     "test-client-secret",
 		RefreshToken:     "test-refresh-token",
 	}
-	
+
 	accessToken, err := GetAccessToken(ctx, config)
 	if err != nil {
 		t.Fatalf("GetAccessToken() error = %v", err)
 	}
-	
+
 	if accessToken != "cached-token" {
 		t.Errorf("AccessToken = %s, want cached-token", accessToken)
 	}
-	
+
 	if serverCalled {
 		t.Error("Server was called despite valid cached token")
 	}
@@ -417,23 +417,23 @@ func TestGetAccessToken_CacheMiss_NearExpiry(t *testing.T) {
 	defer func() {
 		tokenCache = originalCache
 	}()
-	
+
 	// Mock server should be called to refresh
 	serverCalled := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		serverCalled = true
-		
+
 		resp := OAuthTokenResponse{
 			AccessToken: "refreshed-token",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
-	
+
 	ctx := context.Background()
 	config := &types.APIConfig{
 		AuthorizationURL: server.URL,
@@ -441,16 +441,16 @@ func TestGetAccessToken_CacheMiss_NearExpiry(t *testing.T) {
 		ClientSecret:     "test-client-secret",
 		RefreshToken:     "test-refresh-token",
 	}
-	
+
 	accessToken, err := GetAccessToken(ctx, config)
 	if err != nil {
 		t.Fatalf("GetAccessToken() error = %v", err)
 	}
-	
+
 	if accessToken != "refreshed-token" {
 		t.Errorf("AccessToken = %s, want refreshed-token", accessToken)
 	}
-	
+
 	if !serverCalled {
 		t.Error("Server should be called to refresh token near expiry")
 	}
@@ -464,7 +464,7 @@ func TestGetAccessToken_EmptyAccessToken(t *testing.T) {
 	defer func() {
 		tokenCache = originalCache
 	}()
-	
+
 	// Mock server returns response without access_token
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := OAuthTokenResponse{
@@ -472,12 +472,12 @@ func TestGetAccessToken_EmptyAccessToken(t *testing.T) {
 			ExpiresIn: 3600,
 			// No AccessToken field
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
-	
+
 	ctx := context.Background()
 	config := &types.APIConfig{
 		AuthorizationURL: server.URL,
@@ -485,12 +485,12 @@ func TestGetAccessToken_EmptyAccessToken(t *testing.T) {
 		ClientSecret:     "test-client-secret",
 		RefreshToken:     "test-refresh-token",
 	}
-	
+
 	_, err := GetAccessToken(ctx, config)
 	if err == nil {
 		t.Fatal("Expected error for empty access_token")
 	}
-	
+
 	if !strings.Contains(err.Error(), "no access token") {
 		t.Errorf("Error should mention missing access token, got: %v", err)
 	}
@@ -504,7 +504,7 @@ func TestGetAccessToken_UnauthorizedError(t *testing.T) {
 	defer func() {
 		tokenCache = originalCache
 	}()
-	
+
 	tests := []struct {
 		name              string
 		hasRefreshToken   bool
@@ -521,7 +521,7 @@ func TestGetAccessToken_UnauthorizedError(t *testing.T) {
 			expectedErrSubstr: "check your credentials",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Mock server returns 401
@@ -530,26 +530,26 @@ func TestGetAccessToken_UnauthorizedError(t *testing.T) {
 				w.Write([]byte(`{"error": "invalid_token"}`))
 			}))
 			defer server.Close()
-			
+
 			ctx := context.Background()
 			config := &types.APIConfig{
 				AuthorizationURL: server.URL,
 				ClientID:         "test-client-id",
 				ClientSecret:     "test-client-secret",
 			}
-			
+
 			if tt.hasRefreshToken {
 				config.RefreshToken = "invalid-refresh-token"
 			} else {
 				config.Username = "test-user"
 				config.Password = "wrong-password"
 			}
-			
+
 			_, err := GetAccessToken(ctx, config)
 			if err == nil {
 				t.Fatal("Expected error for 401 status")
 			}
-			
+
 			if !strings.Contains(err.Error(), tt.expectedErrSubstr) {
 				t.Errorf("Error should contain %q, got: %v", tt.expectedErrSubstr, err)
 			}
@@ -565,7 +565,7 @@ func TestGetAccessToken_DefaultExpiresIn(t *testing.T) {
 	defer func() {
 		tokenCache = originalCache
 	}()
-	
+
 	// Mock server returns response without expires_in
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := OAuthTokenResponse{
@@ -573,12 +573,12 @@ func TestGetAccessToken_DefaultExpiresIn(t *testing.T) {
 			TokenType:   "Bearer",
 			// ExpiresIn is 0 (not set)
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
-	
+
 	ctx := context.Background()
 	config := &types.APIConfig{
 		AuthorizationURL: server.URL,
@@ -586,17 +586,17 @@ func TestGetAccessToken_DefaultExpiresIn(t *testing.T) {
 		ClientSecret:     "test-client-secret",
 		RefreshToken:     "test-refresh-token",
 	}
-	
+
 	_, err := GetAccessToken(ctx, config)
 	if err != nil {
 		t.Fatalf("GetAccessToken() error = %v", err)
 	}
-	
+
 	// Verify default expires_in of 3600 seconds (1 hour) was used
 	if tokenCache == nil {
 		t.Fatal("Token should be cached")
 	}
-	
+
 	expectedExpiry := time.Now().Add(3600 * time.Second)
 	// Allow 1 minute tolerance for test execution time
 	if tokenCache.ExpiresAt.Before(time.Now()) || tokenCache.ExpiresAt.After(expectedExpiry.Add(1*time.Minute)) {
@@ -616,7 +616,7 @@ func TestGetAccessToken_PreservesRefreshToken(t *testing.T) {
 	defer func() {
 		tokenCache = originalCache
 	}()
-	
+
 	// Mock server returns new access token but NO refresh token
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := OAuthTokenResponse{
@@ -625,12 +625,12 @@ func TestGetAccessToken_PreservesRefreshToken(t *testing.T) {
 			ExpiresIn:   3600,
 			// No RefreshToken in response
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
-	
+
 	ctx := context.Background()
 	config := &types.APIConfig{
 		AuthorizationURL: server.URL,
@@ -638,12 +638,12 @@ func TestGetAccessToken_PreservesRefreshToken(t *testing.T) {
 		ClientSecret:     "test-client-secret",
 		RefreshToken:     "config-refresh-token",
 	}
-	
+
 	_, err := GetAccessToken(ctx, config)
 	if err != nil {
 		t.Fatalf("GetAccessToken() error = %v", err)
 	}
-	
+
 	// Verify existing refresh token was preserved
 	if tokenCache.RefreshToken != "existing-refresh-token" {
 		t.Errorf("RefreshToken = %s, want existing-refresh-token (should be preserved)", tokenCache.RefreshToken)
