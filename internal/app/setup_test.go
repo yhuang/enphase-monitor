@@ -292,7 +292,7 @@ func TestGetAggregatorTypes(t *testing.T) {
 		t.Errorf("GetAggregatorTypes() returned %d systems, want 2", len(systems))
 	}
 	if apiConfig == nil {
-		t.Error("GetAggregatorTypes() returned nil API config")
+		t.Fatal("GetAggregatorTypes() returned nil API config")
 	}
 	if apiConfig.Key != "test-key" {
 		t.Errorf("GetAggregatorTypes() API key = %v, want test-key", apiConfig.Key)

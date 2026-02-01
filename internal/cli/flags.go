@@ -31,7 +31,7 @@ type Flags struct {
 	InspectCache  string
 }
 
-// ParseFlags parses command-line flags and returns the flag values
+// ParseFlags parses command-line flags and returns the flag values.
 func ParseFlags() *Flags {
 	flags := &Flags{}
 

@@ -197,8 +197,8 @@ func TestFindCacheEntriesByDate_NoDirectory(t *testing.T) {
 		t.Errorf("FindCacheEntriesByDate() should not error: %v", err)
 	}
 
-	// May be nil or empty slice when no directory exists
-	if entries != nil && len(entries) > 0 {
+	// May be empty when no cache directory or no entries for this date
+	if len(entries) > 0 {
 		t.Logf("Found %d entries (unexpected for future date)", len(entries))
 	}
 }

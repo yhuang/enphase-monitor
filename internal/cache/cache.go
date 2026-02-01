@@ -99,6 +99,8 @@ func SetTestMode(enabled bool) {
 }
 
 // CacheDisabled returns whether cache is disabled.
+//
+//nolint:revive // exported name clarifies package (cache.CacheDisabled)
 func CacheDisabled() bool {
 	return cacheDisabled
 }

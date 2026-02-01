@@ -34,7 +34,9 @@ func TestHandleClearAllCache_Success(t *testing.T) {
 
 	// Read output
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("io.Copy: %v", err)
+	}
 	output := buf.String()
 
 	if !strings.Contains(output, "All cache cleared successfully") {
@@ -59,7 +61,9 @@ func TestHandleListCache_Execution(t *testing.T) {
 
 	// Read output
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("io.Copy: %v", err)
+	}
 	output := buf.String()
 
 	// Should either show entries or "no cached responses found"
@@ -92,7 +96,9 @@ func TestHandleInspectCache_ByDate_NotFound(t *testing.T) {
 
 	// Read output
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("io.Copy: %v", err)
+	}
 	output := buf.String()
 
 	// Should show "No cached responses found" or show available dates
@@ -124,7 +130,9 @@ func TestHandleInspectCache_ByDate_WithConfig(t *testing.T) {
 
 	// Read output
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("io.Copy: %v", err)
+	}
 	// Output is context-dependent (may have cache or not), so just verify no crash
 }
 
@@ -158,7 +166,9 @@ func TestHandleInspectCache_WithInvalidConfig(t *testing.T) {
 
 	// Drain pipe
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("io.Copy: %v", err)
+	}
 
 	// Should not error - just use default timezone
 	if err != nil {
@@ -207,7 +217,9 @@ func TestHandleInspectCache_DateParsing(t *testing.T) {
 
 			// Drain pipe
 			var buf bytes.Buffer
-			io.Copy(&buf, r)
+			if _, copyErr := io.Copy(&buf, r); copyErr != nil {
+				t.Fatalf("io.Copy: %v", copyErr)
+			}
 
 			if tt.expectErr && err == nil {
 				t.Errorf("%s: expected error but got nil", tt.desc)
@@ -245,7 +257,7 @@ func TestHandleInspectCache_DateBoundaryValues(t *testing.T) {
 
 			// Drain pipe
 			var buf bytes.Buffer
-			io.Copy(&buf, r)
+			_, _ = io.Copy(&buf, r)
 			// Just verify no panic - output depends on actual cache
 		})
 	}
@@ -280,7 +292,7 @@ func TestHandleClearAllCache_Idempotent(t *testing.T) {
 
 	// Drain pipe
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 }
 
 func TestShowAvailableDates_NoOutput(t *testing.T) {
@@ -296,7 +308,7 @@ func TestShowAvailableDates_NoOutput(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	// Just verify no crash
 }
 
@@ -318,7 +330,7 @@ func TestHandleInspectCacheByDate_Integration(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	// Should handle date format properly (either show results or "no cache" message)

@@ -561,12 +561,14 @@ This section summarizes the coding conventions and best practices followed throu
 - **Prefer default + override over if/else** - When a variable is set in both branches, set a default then override in one branch (e.g. `x := default; if condition { x = other }`)
 - **Handle errors and edge cases first** - Return or continue early; keep the main logic at the top level
 
-### 5. Comments
+### 5. Comments and documentation
 
-- **Package comments** - Explain the package's purpose (first comment in file)
-- **Exported functions** - Doc comments starting with function name
-- **Complex logic** - Inline comments explaining the reasoning
-- **Go concepts** - See [GO_CONCEPTS.md](GO_CONCEPTS.md) for explanations of intermediate Go concepts used in the code
+- **Package comments** - Every package has exactly one package comment describing its purpose (e.g. "Package display provides terminal output formatting...").
+- **Doc comments** - Exported names have doc comments that begin with the name of the thing and use full sentences (capitalized, ending with a period).
+- **Complex logic** - Inline comments explain the reasoning ("why"), not just the code ("what").
+- **Go concepts** - See [GO_CONCEPTS.md](GO_CONCEPTS.md) for explanations of intermediate Go concepts used in the code.
+
+**Onboarding:** GO_BEST_PRACTICES, GO_CONCEPTS, ARCHITECTURE, and TESTING.md are intentionally detailed (walkthroughs, patterns, examples) to help engineers new to Go get up to speed. When adding docs, keep this style: explain the pattern, show an example, and point to where it appears in the codebase.
 
 ### 6. Struct Design
 

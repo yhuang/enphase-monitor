@@ -21,9 +21,10 @@ package parser
 
 import (
 	"encoding/json"
-	"enphase-monitor/internal/constants"
 	"fmt"
 	"io"
+
+	"enphase-monitor/internal/constants"
 )
 
 // TelemetryResponse represents the response from telemetry endpoints

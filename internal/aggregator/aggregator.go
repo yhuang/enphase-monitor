@@ -1,8 +1,9 @@
-// Package aggregator - aggregator.go
+// Package aggregator implements core aggregation logic for combining metrics
+// from multiple Enphase systems into a single report.
 //
-// This file implements the core aggregation logic for combining metrics from
-// multiple Enphase systems. For detailed metric derivation and calculation
-// documentation, see the original aggregator.go file in the main package.
+// DataAggregator uses dependency injection (OAuth token getter, cloud client
+// factory) for testability. Types such as AggregatedMetrics and SystemMetrics
+// are defined in types.go.
 package aggregator
 
 import (

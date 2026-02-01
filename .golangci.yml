@@ -1,0 +1,25 @@
+# golangci-lint configuration (see go-linting SKILL and https://github.com/golangci/golangci-lint)
+# Run: golangci-lint run
+# Install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+linters:
+  enable:
+    - errcheck      # Ensure errors are handled
+    - goimports     # Format code and manage imports
+    - revive        # Style (modern replacement for golint)
+    - govet         # Analyze code for common mistakes
+    - staticcheck   # Static analysis checks
+
+linters-settings:
+  goimports:
+    local-prefixes: enphase-monitor
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: error-return
+      - name: error-strings
+      - name: exported
+
+run:
+  timeout: 5m

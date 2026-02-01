@@ -1,5 +1,3 @@
-// Package aggregator provides data aggregation functionality for combining
-// metrics from multiple Enphase systems.
 package aggregator
 
 import (

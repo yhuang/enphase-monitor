@@ -1,3 +1,8 @@
+// Package display provides terminal output formatting and presentation of
+// aggregated energy metrics with customizable colors and timezone-aware dates.
+//
+// It uses dependency injection (io.Writer) so production code writes to
+// os.Stdout and tests can capture output with a bytes.Buffer.
 package display
 
 import (

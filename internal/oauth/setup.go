@@ -216,7 +216,9 @@ func Setup(cfg *config.Config) error {
 
 	// Wait for user to confirm, then wipe the credentials from the terminal
 	fmt.Print("Press Enter after you have copied the above into config.yaml...")
-	bufio.NewReader(os.Stdin).ReadString('\n')
+	if _, err := bufio.NewReader(os.Stdin).ReadString('\n'); err != nil {
+		return fmt.Errorf("reading stdin: %w", err)
+	}
 
 	// Erase the config block + surrounding lines from the terminal.
 	// Each \033[A moves the cursor up one line, \033[2K erases that line.

@@ -70,7 +70,9 @@ const (
 	oauthRequestTimeout = 30 * time.Second
 )
 
-// OAuthTokenResponse represents the OAuth token response
+// OAuthTokenResponse represents the OAuth token response.
+//
+//nolint:revive // exported name clarifies package (oauth.OAuthTokenResponse)
 type OAuthTokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type"`
@@ -205,7 +207,7 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 		formData.Set("password", apiConfig.Password)
 	}
 	if formData == nil {
-		return "", fmt.Errorf("no valid authentication method available. For developer plan: you need to complete one-time authorization to get a refresh_token. See README for instructions.")
+		return "", fmt.Errorf("no valid authentication method available: for developer plan run one-time authorization to get a refresh_token (see README)")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", apiConfig.AuthorizationURL, bytes.NewBufferString(formData.Encode()))

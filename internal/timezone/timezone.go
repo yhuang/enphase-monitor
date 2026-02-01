@@ -84,7 +84,7 @@ func IsPastDate(targetDate time.Time, tz *time.Location) bool {
 	return targetDay.Before(today)
 }
 
-// ParseDateInTimezone parses a date string in YYYY-MM-DD format in the specified timezone
+// ParseDateInTimezone parses a date string in YYYY-MM-DD format in the specified timezone.
 func ParseDateInTimezone(dateStr string, tz *time.Location) (time.Time, error) {
 	parsed, err := time.ParseInLocation(constants.DateFormat, dateStr, tz)
 	if err != nil {

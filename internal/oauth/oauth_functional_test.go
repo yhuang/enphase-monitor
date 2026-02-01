@@ -117,7 +117,7 @@ func TestExchangeAuthorizationCode_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -183,7 +183,7 @@ func TestExchangeAuthorizationCode_HTTPError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.responseBody))
+				_, _ = w.Write([]byte(tt.responseBody))
 			}))
 			defer server.Close()
 
@@ -211,7 +211,7 @@ func TestExchangeAuthorizationCode_HTTPError(t *testing.T) {
 func TestExchangeAuthorizationCode_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"invalid json`))
+		_, _ = w.Write([]byte(`{"invalid json`))
 	}))
 	defer server.Close()
 
@@ -265,7 +265,7 @@ func TestGetAccessToken_WithRefreshToken(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -338,7 +338,7 @@ func TestGetAccessToken_WithPasswordGrant(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -430,7 +430,7 @@ func TestGetAccessToken_CacheMiss_NearExpiry(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -474,7 +474,7 @@ func TestGetAccessToken_EmptyAccessToken(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -527,7 +527,7 @@ func TestGetAccessToken_UnauthorizedError(t *testing.T) {
 			// Mock server returns 401
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(401)
-				w.Write([]byte(`{"error": "invalid_token"}`))
+				_, _ = w.Write([]byte(`{"error": "invalid_token"}`))
 			}))
 			defer server.Close()
 
@@ -575,7 +575,7 @@ func TestGetAccessToken_DefaultExpiresIn(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -627,7 +627,7 @@ func TestGetAccessToken_PreservesRefreshToken(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 

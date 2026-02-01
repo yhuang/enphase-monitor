@@ -206,7 +206,7 @@ func TestExchangeAuthorizationCode_NonOKStatus(t *testing.T) {
 	// Create test server that returns error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error": "invalid_grant"}`))
+		_, _ = w.Write([]byte(`{"error": "invalid_grant"}`))
 	}))
 	defer server.Close()
 
@@ -231,7 +231,7 @@ func TestExchangeAuthorizationCode_NonOKStatus(t *testing.T) {
 func TestExchangeAuthorizationCode_MalformedJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`not valid json {{{`))
+		_, _ = w.Write([]byte(`not valid json {{{`))
 	}))
 	defer server.Close()
 
@@ -365,7 +365,7 @@ func TestGetAccessToken_PasswordGrant(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"access_token": "test_access", "expires_in": 3600}`))
+		_, _ = w.Write([]byte(`{"access_token": "test_access", "expires_in": 3600}`))
 	}))
 	defer server.Close()
 
@@ -428,7 +428,7 @@ func TestGetAccessToken_CacheExpired(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"access_token": "new_token", "refresh_token": "new_refresh", "expires_in": 3600}`))
+		_, _ = w.Write([]byte(`{"access_token": "new_token", "refresh_token": "new_refresh", "expires_in": 3600}`))
 	}))
 	defer server.Close()
 

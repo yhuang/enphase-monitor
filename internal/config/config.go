@@ -55,13 +55,14 @@
 package config
 
 import (
-	"enphase-monitor/internal/constants"
-	"enphase-monitor/internal/types"
 	"fmt"
 	"math"
 	"os"
 	"strconv"
 	"strings"
+
+	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/types"
 
 	"gopkg.in/yaml.v3"
 )
@@ -154,7 +155,7 @@ type Config struct {
 	Timezone        string         `yaml:"timezone,omitempty"` // Timezone for reporting/display (e.g., "US/Pacific"). If not set, uses system timezone.
 }
 
-// LoadConfig reads and parses the configuration file
+// LoadConfig reads and parses the configuration file.
 func LoadConfig(filename string) (*Config, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {

@@ -83,9 +83,18 @@ func TestValidateMetrics_FullFlow_Success(t *testing.T) {
 	}
 
 	// Change to project root for correct file path resolution
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	originalDir, getwdErr := os.Getwd()
+	if getwdErr != nil {
+		t.Fatal(getwdErr)
+	}
+	if err := os.Chdir("../.."); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Error("restore working directory:", err)
+		}
+	}()
 
 	err := ValidateMetrics(metrics, "2026-01-20")
 	if err != nil {
@@ -129,9 +138,18 @@ func TestValidateMetrics_FullFlow_WithinTolerance(t *testing.T) {
 	}
 
 	// Change to project root for correct file path resolution
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	originalDir, getwdErr := os.Getwd()
+	if getwdErr != nil {
+		t.Fatal(getwdErr)
+	}
+	if err := os.Chdir("../.."); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Error("restore working directory:", err)
+		}
+	}()
 
 	err := ValidateMetrics(metrics, "2026-01-20")
 	if err != nil {
@@ -175,9 +193,18 @@ func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
 	}
 
 	// Change to project root for correct file path resolution
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	originalDir, getwdErr := os.Getwd()
+	if getwdErr != nil {
+		t.Fatal(getwdErr)
+	}
+	if err := os.Chdir("../.."); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Error("restore working directory:", err)
+		}
+	}()
 
 	err := ValidateMetrics(metrics, "2026-01-20")
 	if err == nil {
@@ -211,9 +238,18 @@ func TestValidateMetrics_MissingSystem(t *testing.T) {
 	}
 
 	// Change to project root for correct file path resolution
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	originalDir, getwdErr := os.Getwd()
+	if getwdErr != nil {
+		t.Fatal(getwdErr)
+	}
+	if err := os.Chdir("../.."); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Error("restore working directory:", err)
+		}
+	}()
 
 	err := ValidateMetrics(metrics, "2026-01-20")
 	if err == nil {
@@ -241,9 +277,18 @@ func TestValidateMetrics_DateMismatch(t *testing.T) {
 	}
 
 	// Change to project root for correct file path resolution
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	originalDir, getwdErr := os.Getwd()
+	if getwdErr != nil {
+		t.Fatal(getwdErr)
+	}
+	if err := os.Chdir("../.."); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Error("restore working directory:", err)
+		}
+	}()
 
 	// Try to validate with a date that doesn't exist in test-data
 	err := ValidateMetrics(metrics, "2026-01-99")
@@ -268,9 +313,18 @@ func TestValidateMetrics_MultipleExpectedValuesFiles(t *testing.T) {
 	}
 
 	// Change to project root for correct file path resolution
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	originalDir, getwdErr := os.Getwd()
+	if getwdErr != nil {
+		t.Fatal(getwdErr)
+	}
+	if err := os.Chdir("../.."); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Error("restore working directory:", err)
+		}
+	}()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -337,9 +391,18 @@ func TestValidateMetrics_RealWorldScenario(t *testing.T) {
 	}
 
 	// Change to project root for correct file path resolution
-	originalDir, _ := os.Getwd()
-	os.Chdir("../..")
-	defer os.Chdir(originalDir)
+	originalDir, getwdErr := os.Getwd()
+	if getwdErr != nil {
+		t.Fatal(getwdErr)
+	}
+	if err := os.Chdir("../.."); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Error("restore working directory:", err)
+		}
+	}()
 
 	err := ValidateMetrics(metrics, "2026-01-20")
 	if err != nil {

@@ -38,7 +38,7 @@ func CreateOAuthAdapter() aggregator.OAuthTokenGetter {
 	}
 }
 
-// SetupDisplay creates a Display instance with colors from config
+// SetupDisplay creates a Display instance with colors from config.
 func SetupDisplay(cfg *config.Config, reportTZ *time.Location) *display.Display {
 	colors := display.GetDefaultColors()
 	if cfg.Colors != nil {
@@ -72,8 +72,8 @@ func ConfigureModes(testMode, noCache bool) {
 	}
 }
 
-// ParseTestDate parses the test date string and returns a time.Time value
-// Returns zero value if date string is empty (meaning use today)
+// ParseTestDate parses the test date string and returns a time.Time value.
+// Returns zero value if date string is empty (meaning use today).
 func ParseTestDate(dateStr string, reportTZ *time.Location) (time.Time, error) {
 	if dateStr == "" {
 		return time.Time{}, nil

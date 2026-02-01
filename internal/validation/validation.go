@@ -54,7 +54,7 @@ type ExpectedMetrics struct {
 	Consumption       float64 `json:"consumption"`
 }
 
-// ValidateMetrics validates actual metrics against expected values for the given date
+// ValidateMetrics validates actual metrics against expected values for the given date.
 func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) error {
 	// Load expected values
 	expectedPath := filepath.Join("test-data", fmt.Sprintf("expected_values_%s.json", dateStr))

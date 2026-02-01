@@ -1,4 +1,4 @@
-.PHONY: build run run-once install clean test test-coverage test-verbose test-one help
+.PHONY: build run run-once install clean test test-coverage test-verbose test-one fmt lint help
 
 # Binary name
 BINARY_NAME=enphase-monitor
@@ -73,6 +73,10 @@ test-one:
 fmt:
 	go fmt ./...
 
+# Run linters (uses go run; no global install required; first run downloads the tool)
+lint:
+	go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run ./...
+
 # Generate PDFs from markdown files
 pdfs:
 	@echo "Generating PDFs from markdown files..."
@@ -89,5 +93,6 @@ help:
 	@echo "  make clean     - Remove built binaries"
 	@echo "  make test      - Run tests"
 	@echo "  make fmt       - Format Go code"
+	@echo "  make lint      - Run golangci-lint (via go run; first run may download the tool)"
 	@echo "  make pdfs      - Generate PDF files from markdown documentation"
 	@echo "  make help      - Show this help message"

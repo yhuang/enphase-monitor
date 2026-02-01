@@ -29,12 +29,13 @@ package cache
 
 import (
 	"encoding/json"
-	"enphase-monitor/internal/constants"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"enphase-monitor/internal/constants"
 )
 
 // ClearTodayCache clears only cache files for today's date
@@ -134,7 +135,9 @@ func ClearAllCache() error {
 	return os.RemoveAll(getCacheDir())
 }
 
-// CacheEntry represents a cached API response with metadata
+// CacheEntry represents a cached API response with metadata.
+//
+//nolint:revive // exported name clarifies package (cache.CacheEntry)
 type CacheEntry struct {
 	Key      string
 	Path     string
@@ -259,7 +262,7 @@ func InspectCacheEntry(hash string) error {
 	if cached.QueriedDate != "" {
 		queriedDateLine = fmt.Sprintf("Queried Date: %s (date requested in API call via --date parameter)\n", cached.QueriedDate)
 	}
-	fmt.Printf(queriedDateLine)
+	fmt.Print(queriedDateLine)
 	if apiStartDate != "" {
 		fmt.Printf("API start_date: %s (system installation date)\n", apiStartDate)
 	}

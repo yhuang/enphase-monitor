@@ -69,13 +69,13 @@ func TestEnlightenCloudClient_GetProductionForDate(t *testing.T) {
 		// Check authorization header
 		if r.Header.Get("Authorization") != "Bearer test-token" {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error": "unauthorized"}`))
+			_, _ = w.Write([]byte(`{"error": "unauthorized"}`))
 			return
 		}
 
 		// Return mock telemetry data (production_meter format)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		_, _ = w.Write([]byte(`{
 			"intervals": [
 				{"end_at": 1737676800, "wh_del": 1500.5, "enwh": 1500.5},
 				{"end_at": 1737677700, "wh_del": 2000.0, "enwh": 2000.0}
@@ -116,7 +116,7 @@ func TestEnlightenCloudClient_RateLimitHandling(t *testing.T) {
 	// Create mock HTTP server that returns 429 rate limit error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"error": "rate limit exceeded"}`))
+		_, _ = w.Write([]byte(`{"error": "rate limit exceeded"}`))
 	}))
 	defer server.Close()
 

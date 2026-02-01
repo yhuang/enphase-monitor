@@ -23,7 +23,7 @@ func TestGetEnergyImportForDate(t *testing.T) {
 
 		// Return nested array format (energy_import_telemetry)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		_, _ = w.Write([]byte(`{
 			"intervals": [
 				[
 					{"end_at": 1737676800, "wh_imported": 1000.0},
@@ -62,7 +62,7 @@ func TestGetEnergyExportForDate(t *testing.T) {
 
 		// Return nested array format (energy_export_telemetry)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		_, _ = w.Write([]byte(`{
 			"intervals": [
 				[
 					{"end_at": 1737676800, "wh_exported": 500.0},
@@ -101,7 +101,7 @@ func TestGetConsumptionForDate(t *testing.T) {
 
 		// Return single array format (consumption_meter)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		_, _ = w.Write([]byte(`{
 			"intervals": [
 				{"end_at": 1737676800, "enwh": 2000.0},
 				{"end_at": 1737677700, "enwh": 2500.0}
@@ -150,7 +150,7 @@ func TestGetBatteryDataForDate(t *testing.T) {
 
 		// Return battery telemetry with SOC using timestamps within yesterday
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf(`{
+		_, _ = w.Write([]byte(fmt.Sprintf(`{
 			"last_reported_aggregate_soc": "85%%",
 			"intervals": [
 				{
@@ -206,7 +206,7 @@ func TestGetBatteryDataForDate_NoSOC(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return battery telemetry without SOC field
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf(`{
+		_, _ = w.Write([]byte(fmt.Sprintf(`{
 			"intervals": [
 				{
 					"end_at": %d,
@@ -264,13 +264,13 @@ func TestGetMetricsFromCloud(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 
 		if path == "/12345/energy_import_telemetry" {
-			w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_imported":1000.0}]]}`, ts1)))
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_imported":1000.0}]]}`, ts1)))
 		} else if path == "/12345/energy_export_telemetry" {
-			w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_exported":500.0}]]}`, ts1)))
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_exported":500.0}]]}`, ts1)))
 		} else if path == "/12345/telemetry/production_meter" {
-			w.Write([]byte(fmt.Sprintf(`{"intervals":[{"end_at":%d,"wh_del":2000.0}]}`, ts1)))
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[{"end_at":%d,"wh_del":2000.0}]}`, ts1)))
 		} else if path == "/12345/telemetry/battery" {
-			w.Write([]byte(fmt.Sprintf(`{
+			_, _ = w.Write([]byte(fmt.Sprintf(`{
 				"last_reported_aggregate_soc":"90%%",
 				"intervals":[{
 					"end_at":%d,
@@ -279,7 +279,7 @@ func TestGetMetricsFromCloud(t *testing.T) {
 				}]
 			}`, ts1)))
 		} else if path == "/12345/telemetry/consumption_meter" {
-			w.Write([]byte(fmt.Sprintf(`{"intervals":[{"end_at":%d,"enwh":1500.0}]}`, ts1)))
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[{"end_at":%d,"enwh":1500.0}]}`, ts1)))
 		}
 	}))
 	defer server.Close()
@@ -334,23 +334,23 @@ func TestGetMetricsFromCloud_PartialFailure(t *testing.T) {
 		if path == "/12345/energy_import_telemetry" {
 			// Simulate import endpoint failure (optional)
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error":"server error"}`))
+			_, _ = w.Write([]byte(`{"error":"server error"}`))
 		} else if path == "/12345/energy_export_telemetry" {
 			// Simulate export endpoint failure (optional)
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error":"server error"}`))
+			_, _ = w.Write([]byte(`{"error":"server error"}`))
 		} else if path == "/12345/telemetry/production_meter" {
 			// Production succeeds (required)
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"intervals":[{"end_at":1737676800,"wh_del":2000.0}]}`))
+			_, _ = w.Write([]byte(`{"intervals":[{"end_at":1737676800,"wh_del":2000.0}]}`))
 		} else if path == "/12345/telemetry/battery" {
 			// Battery fails (optional)
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error":"server error"}`))
+			_, _ = w.Write([]byte(`{"error":"server error"}`))
 		} else if path == "/12345/telemetry/consumption_meter" {
 			// Consumption succeeds
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"intervals":[{"end_at":1737676800,"enwh":1500.0}]}`))
+			_, _ = w.Write([]byte(`{"intervals":[{"end_at":1737676800,"enwh":1500.0}]}`))
 		}
 	}))
 	defer server.Close()
@@ -393,14 +393,14 @@ func TestGetMetricsFromCloud_ProductionFailure(t *testing.T) {
 
 		if path == "/12345/energy_import_telemetry" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"intervals":[[{"end_at":1737676800,"wh_imported":1000.0}]]}`))
+			_, _ = w.Write([]byte(`{"intervals":[[{"end_at":1737676800,"wh_imported":1000.0}]]}`))
 		} else if path == "/12345/energy_export_telemetry" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"intervals":[[{"end_at":1737676800,"wh_exported":500.0}]]}`))
+			_, _ = w.Write([]byte(`{"intervals":[[{"end_at":1737676800,"wh_exported":500.0}]]}`))
 		} else if path == "/12345/telemetry/production_meter" {
 			// Production fails (required - should cause overall failure)
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error":"server error"}`))
+			_, _ = w.Write([]byte(`{"error":"server error"}`))
 		}
 	}))
 	defer server.Close()
@@ -427,7 +427,7 @@ func TestGetMetricsFromCloud_ContextCancellation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"intervals":[]}`))
+		_, _ = w.Write([]byte(`{"intervals":[]}`))
 	}))
 	defer server.Close()
 
@@ -455,7 +455,7 @@ func TestGetMetricsFromCloud_ContextCancellation(t *testing.T) {
 func TestGetProductionForDate_EmptyIntervals(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"intervals":[]}`))
+		_, _ = w.Write([]byte(`{"intervals":[]}`))
 	}))
 	defer server.Close()
 
@@ -479,7 +479,7 @@ func TestGetProductionForDate_EmptyIntervals(t *testing.T) {
 func TestGetEnergyImportForDate_EmptyIntervals(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"intervals":[[]]}`)) // Nested empty array
+		_, _ = w.Write([]byte(`{"intervals":[[]]}`)) // Nested empty array
 	}))
 	defer server.Close()
 
@@ -503,7 +503,7 @@ func TestGetEnergyImportForDate_EmptyIntervals(t *testing.T) {
 func TestGetProductionForDate_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{invalid json`))
+		_, _ = w.Write([]byte(`{invalid json`))
 	}))
 	defer server.Close()
 
@@ -522,7 +522,7 @@ func TestGetProductionForDate_InvalidJSON(t *testing.T) {
 func TestGetBatteryDataForDate_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{invalid json`))
+		_, _ = w.Write([]byte(`{invalid json`))
 	}))
 	defer server.Close()
 
@@ -555,16 +555,16 @@ func TestGetMetricsFromCloud_ConsumptionFallback(t *testing.T) {
 
 		if path == "/12345/energy_import_telemetry" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_imported":2000.0}]]}`, ts1)))
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_imported":2000.0}]]}`, ts1)))
 		} else if path == "/12345/energy_export_telemetry" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_exported":500.0}]]}`, ts1)))
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[[{"end_at":%d,"wh_exported":500.0}]]}`, ts1)))
 		} else if path == "/12345/telemetry/production_meter" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(fmt.Sprintf(`{"intervals":[{"end_at":%d,"wh_del":3000.0}]}`, ts1)))
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"intervals":[{"end_at":%d,"wh_del":3000.0}]}`, ts1)))
 		} else if path == "/12345/telemetry/battery" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(fmt.Sprintf(`{
+			_, _ = w.Write([]byte(fmt.Sprintf(`{
 				"intervals":[{
 					"end_at":%d,
 					"charge":{"enwh":1000.0},
@@ -574,7 +574,7 @@ func TestGetMetricsFromCloud_ConsumptionFallback(t *testing.T) {
 		} else if path == "/12345/telemetry/consumption_meter" {
 			// Consumption endpoint fails - should fall back to calculation
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error":"server error"}`))
+			_, _ = w.Write([]byte(`{"error":"server error"}`))
 		}
 	}))
 	defer server.Close()
@@ -692,7 +692,7 @@ func TestCacheUsedTracking(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"intervals":[{"end_at":1737676800,"wh_del":1500.0}]}`))
+		_, _ = w.Write([]byte(`{"intervals":[{"end_at":1737676800,"wh_del":1500.0}]}`))
 	}))
 	defer server.Close()
 
