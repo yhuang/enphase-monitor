@@ -201,7 +201,7 @@ func main() {
 	// Run once or continuous
 	if runOnce {
 		app.RunOnce(ctx, agg, disp, cfg, testDateParsed, flags.TestMode, reportTZ)
-	} else {
-		app.RunContinuous(ctx, agg, disp, cfg, testDateParsed, reportTZ)
+		return
 	}
+	app.RunContinuous(ctx, agg, disp, cfg, testDateParsed, reportTZ)
 }

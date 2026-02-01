@@ -384,7 +384,7 @@ var (
     tokenCache *TokenCache  // Shared cache (accessed from main goroutine only)
 )
 
-// api_cache.go - configuration flags
+// internal/cache/cache.go - configuration flags
 var (
     testMode      bool  // When true, only use cached responses (no live API calls)
     cacheDisabled bool  // When true, always make live API calls
@@ -446,12 +446,12 @@ if err != nil {
 ### Error Chain Example
 
 ```go
-// api_cache.go
+// internal/cache/cache.go
 if err != nil {
     return nil, fmt.Errorf("failed to read cache file: %w", err)
 }
 
-// cloud_client.go
+// internal/api/client.go
 if err != nil {
     return nil, fmt.Errorf("failed to get metrics: %w", err)
 }
@@ -555,27 +555,33 @@ This section summarizes the coding conventions and best practices followed throu
 - **Exported functions have doc comments** - Explain purpose, parameters, return values
 - **Complex logic has inline comments** - Explain "why", not just "what"
 
-### 4. Comments
+### 4. Control Flow (Reduce Nesting)
+
+- **Keep nesting to at most 2 levels** - Use early returns and `continue` in loops so the happy path stays unindented
+- **Prefer default + override over if/else** - When a variable is set in both branches, set a default then override in one branch (e.g. `x := default; if condition { x = other }`)
+- **Handle errors and edge cases first** - Return or continue early; keep the main logic at the top level
+
+### 5. Comments
 
 - **Package comments** - Explain the package's purpose (first comment in file)
 - **Exported functions** - Doc comments starting with function name
 - **Complex logic** - Inline comments explaining the reasoning
 - **Go concepts** - See [GO_CONCEPTS.md](GO_CONCEPTS.md) for explanations of intermediate Go concepts used in the code
 
-### 5. Struct Design
+### 6. Struct Design
 
 - **Group related fields** - Logical organization
 - **Use meaningful field names** - Self-documenting code
 - **Add JSON tags for API structs** - Map to API field names
 - **Document exported structs** - Explain purpose and usage
 
-### 6. Resource Management
+### 7. Resource Management
 
 - **Always use `defer` for cleanup** - Files, HTTP bodies, timers
 - **Close resources explicitly** - Do not rely on garbage collection
 - **Stop timers and tickers** - Prevent resource leaks
 
-### 7. Pointers vs Values
+### 8. Pointers vs Values
 
 - **Use pointers for:**
   - Large structs (avoid copying)
@@ -588,18 +594,19 @@ This section summarizes the coding conventions and best practices followed throu
   - When you do not need to modify
   - When immutability is desired
 
-### 8. Error Wrapping
+### 9. Error Wrapping
 
 - **Always use `%w` verb** - Preserves error chain for debugging
 - **Add context at each level** - "failed to X: %w" pattern
 - **Do not wrap unnecessarily** - Only add context that is useful
 
-### 9. Testing
+### 10. Testing
 
 - **Test files end with `_test.go`** - Go test runner convention
 - **Test functions start with `Test`** - `func TestFunctionName(t *testing.T)`
 - **Use table-driven tests** - Test multiple cases in one function
 - **Validate against expected values** - This codebase uses `internal/validation/validation.go`
+- **Test refactor helpers** - Helpers introduced during go-style-core refactoring (e.g. `findSystemByID`, `runMetricTests`, `tryAppendEntryByCachedAt`, `tryLoadPastDateCache`) have dedicated unit tests; see [TESTING.md](TESTING.md) § Testing Refactor Helpers.
 
 #### Test File Organization
 

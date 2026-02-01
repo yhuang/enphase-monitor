@@ -233,11 +233,13 @@ func hexToANSI(hex string) string {
 	var r, g, b int64
 	var err error
 
+	if len(hex) != 6 && len(hex) != 3 {
+		return ""
+	}
 	if len(hex) == 6 {
-		// Full hex: #RRGGBB
 		r, err = strconv.ParseInt(hex[0:2], constants.HexBase, 64)
 		if err != nil {
-			return "" // Invalid hex, return empty
+			return ""
 		}
 		g, err = strconv.ParseInt(hex[2:4], constants.HexBase, 64)
 		if err != nil {
@@ -247,7 +249,8 @@ func hexToANSI(hex string) string {
 		if err != nil {
 			return ""
 		}
-	} else if len(hex) == 3 {
+	}
+	if len(hex) == 3 {
 		// Short hex: #RGB -> #RRGGBB
 		rVal, err1 := strconv.ParseInt(string(hex[0]), constants.HexBase, 64)
 		gVal, err2 := strconv.ParseInt(string(hex[1]), constants.HexBase, 64)
@@ -258,8 +261,6 @@ func hexToANSI(hex string) string {
 		r = rVal*16 + rVal
 		g = gVal*16 + gVal
 		b = bVal*16 + bVal
-	} else {
-		return "" // Invalid hex format
 	}
 
 	// Convert RGB (0-255) to ANSI 256-color code (16-231 for 6x6x6 cube)

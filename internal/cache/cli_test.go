@@ -266,6 +266,49 @@ func TestFindCacheEntriesByDate_DateMatching(t *testing.T) {
 	}
 }
 
+// TestTryAppendEntryByCachedAt tests the tryAppendEntryByCachedAt helper
+// (used when entry.Date is empty; fallback to CachedAt from file).
+func TestTryAppendEntryByCachedAt(t *testing.T) {
+	tempDir, cleanup := setupCacheDir(t)
+	defer cleanup()
+
+	tz, err := time.LoadLocation("US/Pacific")
+	if err != nil {
+		t.Fatalf("LoadLocation: %v", err)
+	}
+
+	// CachedAt in Pacific: 2026-01-15 00:00:00
+	cachedAt := time.Date(2026, 1, 15, 0, 0, 0, 0, tz)
+	createMockCacheFile(t, tempDir, "entry.json", 200, `{"intervals":[]}`, cachedAt, "")
+	entryPath := filepath.Join(tempDir, "entry.json")
+	entry := CacheEntry{Path: entryPath}
+
+	t.Run("match", func(t *testing.T) {
+		var matches []CacheEntry
+		tryAppendEntryByCachedAt(entry, tz, "2026-01-15", &matches)
+		if len(matches) != 1 {
+			t.Errorf("len(matches) = %d, want 1 (CachedAt date matches)", len(matches))
+		}
+	})
+
+	t.Run("no_match", func(t *testing.T) {
+		var matches []CacheEntry
+		tryAppendEntryByCachedAt(entry, tz, "2026-01-16", &matches)
+		if len(matches) != 0 {
+			t.Errorf("len(matches) = %d, want 0 (CachedAt date does not match)", len(matches))
+		}
+	})
+
+	t.Run("load_error", func(t *testing.T) {
+		badEntry := CacheEntry{Path: filepath.Join(tempDir, "nonexistent.json")}
+		var matches []CacheEntry
+		tryAppendEntryByCachedAt(badEntry, tz, "2026-01-15", &matches)
+		if len(matches) != 0 {
+			t.Errorf("len(matches) = %d, want 0 (LoadCachedResponseByPath fails)", len(matches))
+		}
+	})
+}
+
 func TestParseCacheResponse_TelemetryBattery(t *testing.T) {
 	// Test parsing battery telemetry response
 	batteryJSON := `{

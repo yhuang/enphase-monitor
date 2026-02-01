@@ -41,7 +41,7 @@ The project follows a pragmatic approach to testing:
 
 ### Why main.go Has 0% Coverage
 
-The `main.go` file is pure orchestration (171 lines) and has 0% coverage by design. This is an **industry standard** because:
+The `main.go` file is pure orchestration (~207 lines) and has 0% coverage by design. This is an **industry standard** because:
 
 1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
 2. **All logic tested**: All functions `main.go` calls are tested in internal packages
@@ -728,6 +728,16 @@ The test mode validation behavior is tested in:
 | `cache_functions_test.go` | `TestHasCacheForDate` | Cache existence check |
 | `setup_test.go` | `TestValidateTestModeCache` | Early validation with helpful errors |
 | `validation_test.go` | `TestValidateMetrics_MissingFile_HelpfulError` | Improved error messages |
+
+#### Testing Refactor Helpers
+
+Unit tests cover helpers introduced during go-style-core refactoring (reduce nesting, default+override):
+
+| Test File | Test(s) | Helper(s) | Purpose |
+|-----------|---------|-----------|---------|
+| `validation_test.go` | `TestFindSystemByID`, `TestRunMetricTests` | `findSystemByID`, `runMetricTests` | Validation loop helpers; table-driven cases. |
+| `cli_test.go` | `TestTryAppendEntryByCachedAt` | `tryAppendEntryByCachedAt` | FindCacheEntriesByDate fallback when `entry.Date` is empty (match / no match / load error). |
+| `client_test.go` | `TestTryLoadPastDateCache_InvalidURL`, `TestTryLoadPastDateCache_NoMatch` | `tryLoadPastDateCache` | Past-date cache fallback when primary lookup fails (invalid URL, no matching cache). |
 
 ---
 

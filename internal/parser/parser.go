@@ -1,12 +1,12 @@
-// Package main - response_parser.go
+// Package parser provides utilities for parsing Enphase Cloud API v4 telemetry responses.
 //
 // PURPOSE
 // -------
-// Utility functions for parsing Enphase Cloud API v4 telemetry responses.
-// Handles two different response formats returned by different API endpoints.
+// Handles two response formats returned by different API endpoints (nested arrays
+// for import/export, flat arrays for production/consumption/battery).
 //
 // For API endpoint details and response format documentation, see:
-//   - cloud_client.go: lines 67-82 for endpoint list and response format examples
+//   - internal/api/client.go: endpoint list and response format examples
 //   - ARCHITECTURE.md: "Data Flow Diagram" section
 //
 // RESPONSE FORMATS

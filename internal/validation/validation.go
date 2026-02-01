@@ -107,17 +107,9 @@ func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) erro
 	totalTests := 0
 	passedTests := 0
 
-	// Validate each system
+	// Validate each system (go-style-core: max 2 levels via helpers)
 	for _, expectedSys := range expected.Systems {
-		// Find matching system in actual metrics
-		var actualSys *aggregator.SystemMetrics
-		for i := range metrics.Systems {
-			if metrics.Systems[i].ID == expectedSys.ID {
-				actualSys = &metrics.Systems[i]
-				break
-			}
-		}
-
+		actualSys := findSystemByID(metrics.Systems, expectedSys.ID)
 		if actualSys == nil {
 			fmt.Printf("❌ System %s (%s) not found in actual metrics\n", expectedSys.Name, expectedSys.ID)
 			allPassed = false
@@ -126,12 +118,7 @@ func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) erro
 
 		fmt.Printf("%s[%s] %s (ID: %s)%s\n", constants.Bold, actualSys.Name, expectedSys.Name, expectedSys.ID, constants.Reset)
 
-		// Validate individual metrics
-		tests := []struct {
-			name     string
-			expected float64
-			actual   float64
-		}{
+		tests := []metricTestCase{
 			{"Grid Import", expectedSys.Expected.GridImport, actualSys.GridImportToday},
 			{"Grid Export", expectedSys.Expected.GridExport, actualSys.GridExportToday},
 			{"Production", expectedSys.Expected.Production, actualSys.ProductionToday},
@@ -140,15 +127,11 @@ func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) erro
 			{"Net Imported", expectedSys.Expected.NetImported, actualSys.NetImportedToday},
 			{"Consumption", expectedSys.Expected.Consumption, actualSys.ConsumptionToday},
 		}
-
-		for _, test := range tests {
-			totalTests++
-			passed := validateMetric(test.name, test.expected, test.actual)
-			if passed {
-				passedTests++
-			} else {
-				allPassed = false
-			}
+		total, passed, anyFailed := runMetricTests(tests)
+		totalTests += total
+		passedTests += passed
+		if anyFailed {
+			allPassed = false
 		}
 		fmt.Println()
 	}
@@ -168,6 +151,38 @@ func ValidateMetrics(metrics *aggregator.AggregatedMetrics, dateStr string) erro
 	return fmt.Errorf("%d/%d validation tests failed", totalTests-passedTests, totalTests)
 }
 
+// findSystemByID returns the system in systems with the given ID, or nil (go-style-core: keeps nesting ≤2).
+func findSystemByID(systems []aggregator.SystemMetrics, id string) *aggregator.SystemMetrics {
+	for i := range systems {
+		if systems[i].ID == id {
+			return &systems[i]
+		}
+	}
+	return nil
+}
+
+// metricTestCase is a single metric comparison for validation (used by runMetricTests).
+type metricTestCase struct {
+	name     string
+	expected float64
+	actual   float64
+}
+
+// runMetricTests runs the given metric tests and returns total count, passed count, and whether any failed.
+func runMetricTests(tests []metricTestCase) (total, passed int, anyFailed bool) {
+	for _, test := range tests {
+		total++
+		p := validateMetric(test.name, test.expected, test.actual)
+		if p {
+			passed++
+		}
+		if !p {
+			anyFailed = true
+		}
+	}
+	return total, passed, anyFailed
+}
+
 // validateMetric validates a single metric value against expected with tolerance
 func validateMetric(name string, expected, actual float64) bool {
 	// Calculate tolerance: 10% of expected value, with minimum 0.1 kWh
@@ -175,11 +190,9 @@ func validateMetric(name string, expected, actual float64) bool {
 	diff := actual - expected
 	absDiff := math.Abs(diff)
 
-	// Calculate percentage difference
-	var percentDiff float64
-	if expected == 0 {
-		percentDiff = constants.ValidationInfinitePercent // Use special value for division by zero
-	} else {
+	// Calculate percentage difference (default for division by zero)
+	percentDiff := constants.ValidationInfinitePercent
+	if expected != 0 {
 		percentDiff = (absDiff / math.Abs(expected)) * 100
 	}
 

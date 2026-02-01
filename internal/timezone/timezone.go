@@ -34,28 +34,27 @@ func LoadTimezone(timezoneStr string) (*time.Location, error) {
 	}
 
 	tz, err := time.LoadLocation(timezoneStr)
-	if err != nil {
-		// If invalid, fall back to system timezone
-		systemTZ := time.Now().Location()
-		// If system timezone is UTC, use FallbackTimezone as last resort
-		if systemTZ.String() == constants.UTCTimezone {
-			if fallbackTZ, err := time.LoadLocation(constants.FallbackTimezone); err == nil {
-				return fallbackTZ, nil
-			}
-		}
+	if err == nil {
+		return tz, nil
+	}
+	// If invalid, fall back to system timezone (go-style-core: max 2 levels)
+	systemTZ := time.Now().Location()
+	if systemTZ.String() != constants.UTCTimezone {
 		return systemTZ, nil
 	}
-	return tz, nil
+	fallbackTZ, err := time.LoadLocation(constants.FallbackTimezone)
+	if err != nil {
+		return systemTZ, nil
+	}
+	return fallbackTZ, nil
 }
 
 // GetDayBoundaries returns the start and end times for a given date in the specified timezone.
 // The end time is capped to the current time if the date is today to prevent 422 errors.
 func GetDayBoundaries(targetDate time.Time, tz *time.Location) (dayStart, dayEnd time.Time) {
-	var date time.Time
+	date := time.Now().In(tz)
 	if !targetDate.IsZero() {
 		date = targetDate.In(tz)
-	} else {
-		date = time.Now().In(tz)
 	}
 
 	// Calculate day boundaries in the specified timezone

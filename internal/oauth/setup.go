@@ -108,16 +108,13 @@ func Setup(cfg *config.Config) error {
 	// Try to open the browser automatically
 	fmt.Println("STEP 1: Opening your browser to the authorization page...")
 	fmt.Println()
+	msg := "Browser opened! If it did not open, copy and paste this URL:"
 	if err := openBrowser(authURL); err != nil {
-		fmt.Println("Could not open browser automatically.")
-		fmt.Println("Please copy and paste this URL into your browser:")
-		fmt.Println()
-		fmt.Println(authURL)
-	} else {
-		fmt.Println("Browser opened! If it did not open, copy and paste this URL:")
-		fmt.Println()
-		fmt.Println(authURL)
+		msg = "Could not open browser automatically.\nPlease copy and paste this URL into your browser:"
 	}
+	fmt.Println(msg)
+	fmt.Println()
+	fmt.Println(authURL)
 	fmt.Println()
 	fmt.Println("STEP 2: Log in with your Enlighten account and authorize the application")
 	fmt.Println()

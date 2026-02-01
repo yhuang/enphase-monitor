@@ -50,7 +50,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go                                # Entry point (~197 lines) - orchestration only
+├── main.go                                # Entry point (~207 lines) - orchestration only
 ├── internal/
 │   ├── aggregator/                        # Multi-system data aggregation
 │   │   ├── types.go                       # Metric data structures (AggregatedMetrics, SystemMetrics)
@@ -251,8 +251,8 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ### 1. Struct Method Receivers
 
 ```go
-// cloud_client.go - Methods bound to struct
-// See cloud_client.go lines 117-140 for the actual EnlightenCloudClient implementation
+// internal/api/client.go - Methods bound to struct
+// See internal/api/client.go for the EnlightenCloudClient implementation
 type EnlightenCloudClient struct {
     systemID    string
     apiKey      string
@@ -271,7 +271,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 **Why:** Go does not have classes, but struct methods provide similar encapsulation.
 The receiver acts like `this` or `self` in other languages.
 
-**See also:** [cloud_client.go](cloud_client.go) for the complete implementation.
+**See also:** [internal/api/client.go](internal/api/client.go) for the complete implementation.
 
 ### 2. Error Wrapping with Context
 
@@ -371,7 +371,7 @@ The constructor overloading approach is appropriate here since `Display` only ha
 ### 5. Deferred Resource Cleanup
 
 ```go
-// cloud_client.go - Guaranteed cleanup even on error
+// internal/api/client.go - Guaranteed cleanup even on error
 resp, err := c.httpClient.Do(req)
 if err != nil {
     return nil, err
@@ -454,7 +454,7 @@ This code does not create any goroutines. The signal handler runs in a Go runtim
 ### 7. JSON Struct Tags
 
 ```go
-// cloud_client.go - Mapping JSON to Go structs
+// internal/api/client.go - Mapping JSON to Go structs
 type TelemetryResponse struct {
     LastReportedAggregateSOC string              `json:"last_reported_aggregate_soc,omitempty"`
     Intervals                []TelemetryInterval `json:"intervals"`
@@ -470,7 +470,7 @@ Go convention is PascalCase; JSON convention is often snake_case.
 // oauth.go - Caching tokens at package level (single-goroutine access)
 var tokenCache *TokenCache  // Shared token cache (singleton)
 
-// cache.go - Package-level state (set at startup, read-only during execution)
+// internal/cache/cache.go - Package-level state (set at startup, read-only during execution)
 var (
     testMode              bool
     cacheDisabled         bool

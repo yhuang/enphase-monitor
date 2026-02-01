@@ -114,7 +114,10 @@ func ValidateTestModeCache(targetDate time.Time, reportTZ *time.Location) error 
 	// Check if cache exists for this date
 	hasCache, err := cache.HasCacheForDate(dateStr)
 	if err != nil {
-		return fmt.Errorf("failed to check cache: %w", err)
+		return fmt.Errorf("failed to check cache for %s: %w\n\n"+
+			"To populate the cache, run:\n"+
+			"  ./enphase-monitor --once\n\n"+
+			"Then retry with --test.", dateStr, err)
 	}
 
 	if !hasCache {

@@ -196,14 +196,15 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 		formData = url.Values{}
 		formData.Set("grant_type", "refresh_token")
 		formData.Set("refresh_token", apiConfig.RefreshToken)
-	} else if apiConfig.Username != "" && apiConfig.Password != "" {
+	}
+	if apiConfig.Username != "" && apiConfig.Password != "" && formData == nil {
 		// Priority 2: Use password grant (for Partner/Installer plans)
 		formData = url.Values{}
 		formData.Set("grant_type", "password")
 		formData.Set("username", apiConfig.Username)
 		formData.Set("password", apiConfig.Password)
-	} else {
-		// No valid authentication method available
+	}
+	if formData == nil {
 		return "", fmt.Errorf("no valid authentication method available. For developer plan: you need to complete one-time authorization to get a refresh_token. See README for instructions.")
 	}
 
@@ -229,19 +230,17 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 		body, _ := io.ReadAll(resp.Body)
 		errorMsg := string(body)
 
-		// Provide helpful error message for common OAuth errors
-		if resp.StatusCode == constants.HTTPStatusUnauthorized {
-			if apiConfig.RefreshToken != "" {
-				return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
-					"Your refresh token appears to be invalid or expired. Please regenerate it by running:\n"+
-					"  ./enphase-monitor --setup-oauth\n\n"+
-					"Then update the refresh_token in your config.yaml file.", resp.StatusCode, errorMsg)
-			} else {
-				return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
-					"Authentication failed. Please check your credentials in config.yaml.", resp.StatusCode, errorMsg)
-			}
+		// Provide helpful error message for common OAuth errors (go-style-core: early return, max 2 levels)
+		if resp.StatusCode == constants.HTTPStatusUnauthorized && apiConfig.RefreshToken != "" {
+			return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
+				"Your refresh token appears to be invalid or expired. Please regenerate it by running:\n"+
+				"  ./enphase-monitor --setup-oauth\n\n"+
+				"Then update the refresh_token in your config.yaml file.", resp.StatusCode, errorMsg)
 		}
-
+		if resp.StatusCode == constants.HTTPStatusUnauthorized {
+			return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
+				"Authentication failed. Please check your credentials in config.yaml.", resp.StatusCode, errorMsg)
+		}
 		return "", fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, errorMsg)
 	}
 

@@ -42,7 +42,7 @@ if err != nil {
 
 ### Error Handling with Early Return
 
-**Location**: `response_parser.go:19`
+**Location**: `internal/parser/parser.go:19`
 
 We check `err` immediately and return early if non-nil. This is idiomatic Go - handle errors as soon as they occur.
 
@@ -81,7 +81,7 @@ if strings.Contains(err.Error(), "rate limit exceeded (429)") {
 
 ### Constructor Function Pattern
 
-**Location**: `cloud_client.go:131`
+**Location**: `internal/api/client.go:131`
 
 Functions starting with "New" are constructors - they create and initialize structs. This is a Go convention (not a language feature, just a naming pattern). We return a pointer `(*EnlightenCloudClient)` because:
 1. The struct is moderately sized (more efficient to pass pointer)
@@ -96,7 +96,7 @@ func NewEnlightenCloudClient(...) *EnlightenCloudClient {
 
 ### Struct Literal with Pointer
 
-**Location**: `cloud_client.go:139`
+**Location**: `internal/api/client.go:139`
 
 `&EnlightenCloudClient{...}` creates a struct and returns a pointer to it. This is idiomatic Go - create struct, take address, return pointer.
 
@@ -122,7 +122,7 @@ metrics := &AggregatedMetrics{
 
 ### Nested Struct Initialization
 
-**Location**: `cloud_client.go:147`
+**Location**: `internal/api/client.go:147`
 
 We initialize `httpClient` field with a struct literal. `http.Client` is from standard library - we set Timeout for safety.
 
@@ -166,7 +166,7 @@ type TokenCache struct {
 
 ### Struct Design Principles
 
-**Location**: `cloud_client.go:188`
+**Location**: `internal/api/client.go:188`
 
 This struct follows Go best practices:
 1. Grouped related fields together (energy metrics, battery status)
@@ -176,7 +176,7 @@ This struct follows Go best practices:
 
 ### Field Types
 
-**Location**: `cloud_client.go:195`
+**Location**: `internal/api/client.go:195`
 
 - `time.Time`: Go's standard time type (always has a value, cannot be nil)
 - `float64`: 64-bit floating point (precise enough for energy values)
@@ -188,7 +188,7 @@ This struct follows Go best practices:
 
 ### Slice Declaration
 
-**Location**: `response_parser.go:31`
+**Location**: `internal/parser/parser.go:31`
 
 `var name []Type` declares a nil slice (zero value for slices). We will append to it to build the flattened array.
 
@@ -212,7 +212,7 @@ Systems: make([]SystemMetrics, 0, len(systems)),
 
 ### Variadic Append
 
-**Location**: `response_parser.go:40`
+**Location**: `internal/parser/parser.go:40`
 
 `append(slice, elements...)` can take multiple elements. `intervalArray...` spreads the slice into individual elements. This is equivalent to: `append(allIntervals, intervalArray[0], intervalArray[1], ...)`
 
@@ -232,7 +232,7 @@ rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name,
 
 ### Array to Slice Conversion
 
-**Location**: `api_cache.go:97`
+**Location**: `internal/cache/cache.go:97`
 
 `hash[:]` converts the `[32]byte` array to a `[]byte` slice. This is necessary because `hex.EncodeToString` expects `[]byte`, not `[32]byte`. The `[:]` syntax creates a slice that views the entire array.
 
@@ -247,7 +247,7 @@ return hex.EncodeToString(hash[:])
 
 ### Range Loop
 
-**Location**: `response_parser.go:35`
+**Location**: `internal/parser/parser.go:35`
 
 `for _, intervalArray := range data.Intervals` iterates over the slice. The `_` discards the index (we do not need it). `intervalArray` is each nested array in the array of arrays.
 
@@ -259,7 +259,7 @@ for _, intervalArray := range data.Intervals {
 
 ### Range Loop Over Slice
 
-**Location**: `response_parser.go:98`
+**Location**: `internal/parser/parser.go:98`
 
 `for _, interval := range intervals` iterates over each element. `_` discards the index (we do not need it).
 
@@ -271,7 +271,7 @@ for _, interval := range intervals {
 
 ### Switch Statement
 
-**Location**: `response_parser.go:90, 102`
+**Location**: `internal/parser/parser.go:90, 102`
 
 `switch` is like `if/else` but cleaner for multiple conditions. It is idiomatic Go for handling multiple cases based on a single value. `switch` compares `fieldName` against each case and executes the matching one. This is more readable than multiple `if/else if` statements.
 
@@ -313,7 +313,7 @@ if *testDate != "" {
 
 ### Zero Value Initialization
 
-**Location**: `response_parser.go:94`
+**Location**: `internal/parser/parser.go:94`
 
 `var total float64` initializes `total` to `0.0` (zero value for float64). Go's zero values mean we do not need explicit initialization for most types.
 
@@ -329,7 +329,7 @@ var total float64
 
 ### Interface Types
 
-**Location**: `response_parser.go:67`
+**Location**: `internal/parser/parser.go:67`
 
 `io.ReadCloser` is an interface that combines `io.Reader` and `io.Closer`. `http.Response.Body` satisfies this interface, so we can pass it here. Interfaces in Go are satisfied implicitly - no "implements" keyword needed.
 
@@ -341,7 +341,7 @@ func readResponseBody(respBody io.ReadCloser) ([]byte, error) {
 
 ### Interface Usage
 
-**Location**: `response_parser.go:72`
+**Location**: `internal/parser/parser.go:72`
 
 `io.ReadAll` accepts any `io.Reader` (interface type). `respBody` satisfies `io.Reader`, so we can pass it directly. This is the power of Go interfaces - code works with any type that has `Read()` method.
 
@@ -355,7 +355,7 @@ bodyBytes, err := io.ReadAll(respBody)
 
 ### JSON Unmarshaling
 
-**Location**: `response_parser.go:12`
+**Location**: `internal/parser/parser.go:12`
 
 `json.Unmarshal` converts JSON bytes into Go structs. We pass `&data` (pointer to struct) so `Unmarshal` can modify it. The struct fields must have json tags matching the JSON field names. If unmarshaling fails, it returns an error (we wrap it with context using `%w`).
 
@@ -372,7 +372,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Duration Literals
 
-**Location**: `cloud_client.go:151`
+**Location**: `internal/api/client.go:151`
 
 `time.Second` is a constant. `30 * time.Second` converts seconds to `time.Duration`. This is idiomatic Go for time durations.
 
@@ -827,7 +827,7 @@ var (
 
 ### Hash Functions and Array Slices
 
-**Location**: `api_cache.go:87`
+**Location**: `internal/cache/cache.go:87`
 
 `sha256.Sum256()` computes a SHA-256 hash and returns a `[32]byte` array (fixed size). We convert it to a string using hex encoding for a readable cache key.
 

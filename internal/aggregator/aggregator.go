@@ -109,14 +109,12 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 
 		var cacheUsed bool
 		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate)
-		if err != nil {
-			if constants.IsRateLimitError(err) {
-				// Collect the error but do not fail immediately
-				rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
-				continue
-			}
-			// For other errors, return immediately (fail fast)
+		if err != nil && !constants.IsRateLimitError(err) {
 			return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
+		}
+		if err != nil {
+			rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
+			continue
 		}
 		// Track if any system used cache
 		if cacheUsed {

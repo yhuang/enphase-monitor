@@ -552,6 +552,94 @@ func TestToleranceCalculation(t *testing.T) {
 }
 
 // =============================================================================
+// TESTING REFACTOR HELPERS (findSystemByID, runMetricTests)
+// =============================================================================
+//
+// These helpers were introduced during go-style-core refactoring to keep
+// ValidateMetrics nesting at most 2 levels. Tests ensure they behave correctly.
+
+// TestFindSystemByID tests the findSystemByID helper.
+func TestFindSystemByID(t *testing.T) {
+	systems := []aggregator.SystemMetrics{
+		{ID: "id-a", Name: "System A"},
+		{ID: "id-b", Name: "System B"},
+		{ID: "id-c", Name: "System C"},
+	}
+
+	tests := []struct {
+		name    string
+		systems []aggregator.SystemMetrics
+		id      string
+		wantNil bool
+		wantID  string
+	}{
+		{"empty slice", nil, "id-a", true, ""},
+		{"no match", systems, "id-x", true, ""},
+		{"match first", systems, "id-a", false, "id-a"},
+		{"match middle", systems, "id-b", false, "id-b"},
+		{"match last", systems, "id-c", false, "id-c"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := findSystemByID(tt.systems, tt.id)
+			if tt.wantNil {
+				if got != nil {
+					t.Errorf("findSystemByID() = %+v, want nil", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatal("findSystemByID() = nil, want non-nil")
+			}
+			if got.ID != tt.wantID {
+				t.Errorf("findSystemByID().ID = %q, want %q", got.ID, tt.wantID)
+			}
+		})
+	}
+}
+
+// TestRunMetricTests tests the runMetricTests helper.
+// runMetricTests calls validateMetric which prints to stdout; we only assert return values.
+func TestRunMetricTests(t *testing.T) {
+	tests := []struct {
+		name       string
+		cases      []metricTestCase
+		wantTotal  int
+		wantPassed int
+		wantFailed bool
+	}{
+		{"empty", nil, 0, 0, false},
+		{"one pass", []metricTestCase{{"A", 10.0, 10.0}}, 1, 1, false},
+		{"one fail", []metricTestCase{{"A", 10.0, 20.0}}, 1, 0, true},
+		{"mixed", []metricTestCase{
+			{"A", 10.0, 10.0},
+			{"B", 5.0, 10.0},
+			{"C", 0.0, 0.0},
+		}, 3, 2, true},
+		{"all pass", []metricTestCase{
+			{"A", 10.0, 10.0},
+			{"B", 1.0, 1.0},
+		}, 2, 2, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			total, passed, anyFailed := runMetricTests(tt.cases)
+			if total != tt.wantTotal {
+				t.Errorf("runMetricTests() total = %d, want %d", total, tt.wantTotal)
+			}
+			if passed != tt.wantPassed {
+				t.Errorf("runMetricTests() passed = %d, want %d", passed, tt.wantPassed)
+			}
+			if anyFailed != tt.wantFailed {
+				t.Errorf("runMetricTests() anyFailed = %v, want %v", anyFailed, tt.wantFailed)
+			}
+		})
+	}
+}
+
+// =============================================================================
 // INTEGRATION-STYLE TESTS
 // =============================================================================
 //

@@ -112,11 +112,11 @@ func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate tim
 
 	timestampLocal := timestamp.In(d.timezone)
 	fmt.Fprintf(d.writer, "  %s%-16s%s%s", d.colors.SecondaryText, "Last Updated:   ", d.colors.PrimaryText, timestampLocal.Format("Mon Jan 2, 2006 03:04:05 PM"))
+	sourceLabel := d.colors.Discharge + "(live)" + constants.Reset
 	if cacheUsed {
-		fmt.Fprintf(d.writer, " %s(cached)%s", d.colors.SecondaryText, constants.Reset)
-	} else {
-		fmt.Fprintf(d.writer, " %s(live)%s", d.colors.Discharge, constants.Reset)
+		sourceLabel = d.colors.SecondaryText + "(cached)" + constants.Reset
 	}
+	fmt.Fprintf(d.writer, " %s", sourceLabel)
 	fmt.Fprintln(d.writer)
 	fmt.Fprintln(d.writer, d.colors.Headers+d.separatorLine+constants.Reset)
 }

@@ -56,7 +56,7 @@
 //	  ]
 //	}
 //
-// See response_parser.go for parsing logic that handles both formats.
+// See internal/parser/parser.go for parsing logic that handles both formats.
 //
 // API ENDPOINTS
 // -------------
@@ -439,6 +439,53 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	return metrics, cacheUsed, nil
 }
 
+// maybeShowNoCacheFallbackWarning prints a one-time warning when returning cached
+// data despite --no-cache (e.g. on API error or 429). reason is used in the message.
+func maybeShowNoCacheFallbackWarning(reason string) {
+	if cache.RateLimitWarningShown() {
+		return
+	}
+	fmt.Printf("WARNING: %s - returning cached data despite --no-cache flag\n", reason)
+	cache.SetRateLimitWarningShown(true)
+}
+
+// tryLoadPastDateCache attempts to load a cached response by matching URL endpoint,
+// system ID, and target date when the primary cache lookup failed (e.g. URL normalization differs).
+// Returns (cached, true) when a match is found, (nil, false) otherwise.
+// Used only for past-date queries to avoid deep nesting in makeCachedAPIRequest.
+func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.Time) (*cache.CachedResponse, bool) {
+	parsedURL, err := neturl.Parse(url)
+	if err != nil {
+		return nil, false
+	}
+	pathParts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+	var endpoint string
+	if len(pathParts) >= 4 && pathParts[len(pathParts)-2] == "telemetry" {
+		endpoint = "telemetry/" + pathParts[len(pathParts)-1]
+	}
+	var systemID string
+	if len(pathParts) >= 3 {
+		systemID = pathParts[len(pathParts)-3]
+	}
+	targetDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, c.timezone)
+	dateStr := targetDay.Format("2006-01-02")
+	allEntries, err := cache.ListCacheEntries()
+	if err != nil {
+		return nil, false
+	}
+	for _, entry := range allEntries {
+		if entry.SystemID != systemID || entry.Endpoint != endpoint || entry.Date != dateStr {
+			continue
+		}
+		found, err := cache.LoadCachedResponseByPath(entry.Path)
+		if err != nil {
+			continue
+		}
+		return found, true
+	}
+	return nil, false
+}
+
 // makeCachedAPIRequest makes an API request with intelligent caching.
 //
 // This is a complex function that handles multiple concerns:
@@ -497,45 +544,10 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// We will use this either directly (if valid) or as fallback (if API fails).
 	// ─────────────────────────────────────────────────────────────────────────
 	cached, cacheErr := cache.LoadCachedResponse(url, c.timezone)
-
-	// If cache lookup failed for past dates, try to find cache by endpoint and date
 	if cacheErr != nil && isDateInPast && !targetDate.IsZero() {
-		// Extract endpoint from URL
-		parsedURL, err := neturl.Parse(url)
-		if err == nil {
-			pathParts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
-			var endpoint string
-			if len(pathParts) >= 4 && pathParts[len(pathParts)-2] == "telemetry" {
-				endpoint = "telemetry/" + pathParts[len(pathParts)-1]
-			}
-
-			// Extract system ID from URL
-			var systemID string
-			if len(pathParts) >= 3 {
-				systemID = pathParts[len(pathParts)-3]
-			}
-
-			// Find cache entries by date
-			// Use the report timezone
-			targetDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, c.timezone)
-			dateStr := targetDay.Format("2006-01-02")
-			allEntries, err := cache.ListCacheEntries()
-			if err == nil {
-				for _, entry := range allEntries {
-					// Match by endpoint, system ID, and date
-					// SystemID might be stored as string in cache, so compare as strings
-					entrySystemID := entry.SystemID
-					if entrySystemID == systemID && entry.Endpoint == endpoint && entry.Date == dateStr {
-						// Found a matching cache entry - use it
-						foundCached, err := cache.LoadCachedResponseByPath(entry.Path)
-						if err == nil {
-							cached = foundCached
-							cacheErr = nil // Clear the error since we found a match
-							break
-						}
-					}
-				}
-			}
+		if found, ok := c.tryLoadPastDateCache(url, targetDate); ok {
+			cached = found
+			cacheErr = nil
 		}
 	}
 
@@ -561,7 +573,6 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// Note: We still fall back to cache on 429 errors as a safety measure.
 	// ─────────────────────────────────────────────────────────────────────────
 	if cache.CacheDisabled() {
-		// Make direct API request
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to create request: %w", err)
@@ -570,49 +581,37 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		req.Header.Set("Accept", "application/json")
 
 		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			// Even in no-cache mode, fall back to cache on error
-			if cacheErr == nil {
-				if !cache.RateLimitWarningShown() {
-					fmt.Printf("WARNING: API error - returning cached data despite --no-cache flag\n")
-					cache.SetRateLimitWarningShown(true)
-				}
-				resp := cached.ToHTTPResponse()
-				return resp, true, nil // Cache was used (error fallback in no-cache mode)
-			}
+		if err != nil && cacheErr != nil {
 			return nil, false, fmt.Errorf("API request failed: %w", err)
 		}
+		if err != nil {
+			maybeShowNoCacheFallbackWarning("API error")
+			return cached.ToHTTPResponse(), true, nil
+		}
 
-		// Handle rate limit (429) specially
-		if resp.StatusCode == 429 {
+		if resp.StatusCode == 429 && cacheErr != nil {
 			resp.Body.Close()
-			if cacheErr == nil {
-				if !cache.RateLimitWarningShown() {
-					fmt.Printf("WARNING: Rate limited (429) - returning cached data despite --no-cache flag\n")
-					cache.SetRateLimitWarningShown(true)
-				}
-				resp := cached.ToHTTPResponse()
-				return resp, true, nil // Cache was used (429 fallback in no-cache mode)
-			}
 			return nil, false, fmt.Errorf(constants.RateLimitError)
 		}
-		// Save response to cache for future use (even in no-cache mode)
+		if resp.StatusCode == 429 {
+			resp.Body.Close()
+			maybeShowNoCacheFallbackWarning("Rate limited (429)")
+			return cached.ToHTTPResponse(), true, nil
+		}
+
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			resp.Body.Close()
 			return nil, false, fmt.Errorf("failed to read response: %w", err)
 		}
 		resp.Body.Close()
-		tempResp := &http.Response{
-			StatusCode: resp.StatusCode,
-			Header:     resp.Header,
-		}
+		tempResp := &http.Response{StatusCode: resp.StatusCode, Header: resp.Header}
 		_ = cache.SaveCachedResponseFromBytes(url, tempResp, bodyBytes, c.timezone)
 		return &http.Response{
 			StatusCode: resp.StatusCode,
 			Header:     resp.Header,
 			Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
-		}, false, nil // Cache was NOT used (no-cache mode)
+		}, false, nil
 	}
 
 	// Check cache age if it exists
@@ -637,13 +636,11 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		// If API call failed, try cache as fallback
-		if cacheErr == nil {
-			resp := cached.ToHTTPResponse()
-			return resp, true, nil // Cache was used (error fallback)
-		}
+	if err != nil && cacheErr != nil {
 		return nil, false, fmt.Errorf("API request failed: %w", err)
+	}
+	if err != nil {
+		return cached.ToHTTPResponse(), true, nil // Cache was used (error fallback)
 	}
 
 	// Handle rate limit (429)
@@ -663,33 +660,24 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		return nil, false, fmt.Errorf(constants.RateLimitError)
 	}
 
-	// Handle other non-OK status codes
+	// Handle other non-OK status codes: try cache as fallback, then return error
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-
-		// For other errors, try cache as fallback
-		// For past dates, always prefer cache over live API errors
-		if isDateInPast {
-			// Re-try cache lookup in case it failed initially
-			if cacheErr == nil && !isCacheStale {
-				// Cache exists and is valid - use it
-				resp := cached.ToHTTPResponse()
-				return resp, true, nil // Cache was used (fallback for past date)
-			}
-			// Try one more time to load cache - maybe the initial lookup failed due to timing
-			if retryCached, retryErr := cache.LoadCachedResponse(url, c.timezone); retryErr == nil {
-				resp := retryCached.ToHTTPResponse()
-				return resp, true, nil // Cache was used (retry for past date)
-			}
-		} else {
-			// For non-past dates, try cache as fallback if it exists and is not stale
-			if cacheErr == nil && !isCacheStale {
-				resp := cached.ToHTTPResponse()
-				return resp, true, nil // Cache was used (fallback)
-			}
+		if isDateInPast && cacheErr == nil && !isCacheStale {
+			return cached.ToHTTPResponse(), true, nil
 		}
-		// Cache is stale (from a different day) or does not exist - return the error
+		var retryCached *cache.CachedResponse
+		var retryErr error
+		if isDateInPast {
+			retryCached, retryErr = cache.LoadCachedResponse(url, c.timezone)
+		}
+		if isDateInPast && retryErr == nil {
+			return retryCached.ToHTTPResponse(), true, nil
+		}
+		if cacheErr == nil && !isCacheStale {
+			return cached.ToHTTPResponse(), true, nil
+		}
 		return nil, false, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 

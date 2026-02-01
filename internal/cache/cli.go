@@ -105,13 +105,12 @@ func ClearTodayCache() error {
 
 		// Only delete if both cached today AND file modified today
 		// This ensures we are deleting cache for today, not past dates that were accessed today
-		if cachedDate == todayStr {
-			// Delete this cache file (it is for today)
-			if err := os.Remove(cachePath); err == nil {
-				deletedCount++
-			}
-		} else {
+		if cachedDate != todayStr {
 			skippedCount++
+			continue
+		}
+		if err := os.Remove(cachePath); err == nil {
+			deletedCount++
 		}
 	}
 
@@ -120,11 +119,11 @@ func ClearTodayCache() error {
 		if skippedCount > 0 {
 			fmt.Printf("Preserved %d cache file(s) from yesterday or earlier\n", skippedCount)
 		}
-	} else {
-		fmt.Printf("No cache files found for today (%s)\n", todayStr)
-		if skippedCount > 0 {
-			fmt.Printf("Found %d cache file(s) from other dates (preserved)\n", skippedCount)
-		}
+		return nil
+	}
+	fmt.Printf("No cache files found for today (%s)\n", todayStr)
+	if skippedCount > 0 {
+		fmt.Printf("Found %d cache file(s) from other dates (preserved)\n", skippedCount)
 	}
 
 	return nil
@@ -255,12 +254,12 @@ func InspectCacheEntry(hash string) error {
 	if systemID != "" {
 		fmt.Printf("System ID: %s\n", systemID)
 	}
-	// Show both the queried date and the API's start_date
+	// Show both the queried date and the API's start_date (go-style-core: default + override)
+	queriedDateLine := "Queried Date: (not stored - this is an old cache entry)\n"
 	if cached.QueriedDate != "" {
-		fmt.Printf("Queried Date: %s (date requested in API call via --date parameter)\n", cached.QueriedDate)
-	} else {
-		fmt.Printf("Queried Date: (not stored - this is an old cache entry)\n")
+		queriedDateLine = fmt.Sprintf("Queried Date: %s (date requested in API call via --date parameter)\n", cached.QueriedDate)
 	}
+	fmt.Printf(queriedDateLine)
 	if apiStartDate != "" {
 		fmt.Printf("API start_date: %s (system installation date)\n", apiStartDate)
 	}
@@ -277,21 +276,31 @@ func InspectCacheEntry(hash string) error {
 
 	// Try to parse and pretty-print the JSON body
 	var jsonData interface{}
-	if err := json.Unmarshal(cached.Body, &jsonData); err == nil {
-		fmt.Printf("\nBody (JSON):\n")
-		prettyJSON, err := json.MarshalIndent(jsonData, "  ", "  ")
-		if err == nil {
-			fmt.Printf("%s\n", string(prettyJSON))
-		} else {
-			fmt.Printf("  (failed to format JSON: %v)\n", err)
-			fmt.Printf("  Raw body: %s\n", string(cached.Body))
-		}
-	} else {
+	if err := json.Unmarshal(cached.Body, &jsonData); err != nil {
 		fmt.Printf("\nBody (raw):\n")
 		fmt.Printf("%s\n", string(cached.Body))
+		return nil
 	}
-
+	fmt.Printf("\nBody (JSON):\n")
+	prettyJSON, err := json.MarshalIndent(jsonData, "  ", "  ")
+	if err != nil {
+		fmt.Printf("  (failed to format JSON: %v)\n", err)
+		fmt.Printf("  Raw body: %s\n", string(cached.Body))
+		return nil
+	}
+	fmt.Printf("%s\n", string(prettyJSON))
 	return nil
+}
+
+// tryAppendEntryByCachedAt loads the cache file for entry and appends to matchingEntries if CachedAt date matches (go-style-core: max 2 levels).
+func tryAppendEntryByCachedAt(entry CacheEntry, tz *time.Location, targetDateStr string, matchingEntries *[]CacheEntry) {
+	cached, err := LoadCachedResponseByPath(entry.Path)
+	if err != nil {
+		return
+	}
+	if cached.CachedAt.In(tz).Format(constants.DateFormat) == targetDateStr {
+		*matchingEntries = append(*matchingEntries, entry)
+	}
 }
 
 // FindCacheEntriesByDate finds cache entries that match a specific date
@@ -313,34 +322,21 @@ func FindCacheEntriesByDate(targetDate time.Time, tz *time.Location) ([]CacheEnt
 
 	var matchingEntries []CacheEntry
 	for _, entry := range allEntries {
-		// Use the Date field from the parsed entry (which comes from the response body)
-		// If Date is not set, fall back to checking CachedAt timestamp
-		if entry.Date != "" {
-			// Normalize both dates for comparison (remove any whitespace)
-			entryDate := strings.TrimSpace(entry.Date)
-			// Also try to parse and reformat the date in case the format differs
-			if parsedDate, err := time.Parse(constants.DateFormat, entryDate); err == nil {
-				entryDate = parsedDate.Format(constants.DateFormat)
-			} else {
-				// Try other common date formats
-				if parsedDate, err := time.Parse(constants.AltDateFormat, entryDate); err == nil {
-					entryDate = parsedDate.Format(constants.DateFormat)
-				}
-			}
-			// Direct string comparison should work if both are in DateFormat
-			if entryDate == targetDateStr {
-				matchingEntries = append(matchingEntries, entry)
-			}
-		} else {
-			// Fallback: check cached timestamp if Date was not parsed from response
-			cached, err := LoadCachedResponseByPath(entry.Path)
-			if err != nil {
-				continue
-			}
-			cachedDateStr := cached.CachedAt.In(tz).Format(constants.DateFormat)
-			if cachedDateStr == targetDateStr {
-				matchingEntries = append(matchingEntries, entry)
-			}
+		// Handle missing Date first: fall back to CachedAt from file (go-style-core: max 2 levels)
+		if entry.Date == "" {
+			tryAppendEntryByCachedAt(entry, tz, targetDateStr, &matchingEntries)
+			continue
+		}
+
+		// Normalize entry date: try primary format, then alt format (default + override)
+		entryDate := strings.TrimSpace(entry.Date)
+		if parsedDate, err := time.Parse(constants.DateFormat, entryDate); err == nil {
+			entryDate = parsedDate.Format(constants.DateFormat)
+		} else if parsedDate, err := time.Parse(constants.AltDateFormat, entryDate); err == nil {
+			entryDate = parsedDate.Format(constants.DateFormat)
+		}
+		if entryDate == targetDateStr {
+			matchingEntries = append(matchingEntries, entry)
 		}
 	}
 
@@ -350,7 +346,6 @@ func FindCacheEntriesByDate(targetDate time.Time, tz *time.Location) ([]CacheEnt
 // parseCacheResponse attempts to parse the cached response body and extract useful information
 // Returns: endpoint type, system ID, date, and summary
 func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) {
-	// Try to parse as TelemetryResponse first (new approach - telemetry endpoints)
 	var telemetryResp struct {
 		Intervals []struct {
 			EndAt  int64   `json:"end_at"`
@@ -365,73 +360,68 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 			} `json:"discharge"`
 		} `json:"intervals"`
 	}
-	if err := json.Unmarshal(body, &telemetryResp); err == nil && len(telemetryResp.Intervals) > 0 {
-		// Extract date from first interval's timestamp
-		// Use default timezone for cache parsing (cache is system-agnostic)
-		firstTime := time.Unix(telemetryResp.Intervals[0].EndAt, 0)
-		defaultTZ, _ := time.LoadLocation("US/Pacific")
-		firstTime = firstTime.In(defaultTZ)
-		date = firstTime.Format(constants.DateFormat)
-
-		// Determine endpoint type based on which fields are populated
-		// Battery has charge/discharge, others have WhDlvd/WhRcvd/Enwh
-		hasCharge := false
-		hasWhDel := false
-		hasWhRcv := false
-		hasEnwh := false
-		for _, interval := range telemetryResp.Intervals {
-			if interval.Charge.Enwh > 0 || interval.Discharge.Enwh > 0 {
-				hasCharge = true
-			}
-			if interval.WhDel > 0 {
-				hasWhDel = true
-			}
-			if interval.WhRcv > 0 {
-				hasWhRcv = true
-			}
-			if interval.Enwh > 0 {
-				hasEnwh = true
-			}
-		}
-
-		if hasCharge {
-			endpoint = "telemetry/battery"
-			var totalCharge, totalDischarge float64
-			for _, interval := range telemetryResp.Intervals {
-				totalCharge += interval.Charge.Enwh
-				totalDischarge += interval.Discharge.Enwh
-			}
-			summary = fmt.Sprintf("Battery: %d intervals, charge=%.2f, discharge=%.2f kWh",
-				len(telemetryResp.Intervals), totalCharge/constants.WhToKWh, totalDischarge/constants.WhToKWh)
-		} else if hasWhDel && !hasWhRcv {
-			endpoint = "energy_import_telemetry"
-			var totalImport float64
-			for _, interval := range telemetryResp.Intervals {
-				totalImport += interval.WhDel
-			}
-			summary = fmt.Sprintf("Import: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalImport/constants.WhToKWh)
-		} else if hasWhRcv && !hasWhDel {
-			endpoint = "energy_export_telemetry"
-			var totalExport float64
-			for _, interval := range telemetryResp.Intervals {
-				totalExport += interval.WhRcv
-			}
-			summary = fmt.Sprintf("Export: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalExport/constants.WhToKWh)
-		} else if hasEnwh {
-			// Could be production_meter or consumption_meter - check URL in cache or use Enwh
-			endpoint = "telemetry/production_meter" // Default assumption
-			var totalEnwh float64
-			for _, interval := range telemetryResp.Intervals {
-				totalEnwh += interval.Enwh
-			}
-			summary = fmt.Sprintf("Production/Consumption: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalEnwh/constants.WhToKWh)
-		}
-		return
+	if err := json.Unmarshal(body, &telemetryResp); err != nil || len(telemetryResp.Intervals) == 0 {
+		return "", "", "", ""
 	}
 
-	// If we cannot parse it, return empty strings
-	return "", "", "", ""
+	// Extract date from first interval's timestamp
+	firstTime := time.Unix(telemetryResp.Intervals[0].EndAt, 0)
+	defaultTZ, _ := time.LoadLocation("US/Pacific")
+	date = firstTime.In(defaultTZ).Format(constants.DateFormat)
+
+	// Determine endpoint type from which fields are populated (go-style-core: flat with early return)
+	hasCharge, hasWhDel, hasWhRcv, hasEnwh := false, false, false, false
+	for _, interval := range telemetryResp.Intervals {
+		if interval.Charge.Enwh > 0 || interval.Discharge.Enwh > 0 {
+			hasCharge = true
+		}
+		if interval.WhDel > 0 {
+			hasWhDel = true
+		}
+		if interval.WhRcv > 0 {
+			hasWhRcv = true
+		}
+		if interval.Enwh > 0 {
+			hasEnwh = true
+		}
+	}
+
+	if hasCharge {
+		var totalCharge, totalDischarge float64
+		for _, interval := range telemetryResp.Intervals {
+			totalCharge += interval.Charge.Enwh
+			totalDischarge += interval.Discharge.Enwh
+		}
+		return "telemetry/battery", "", date,
+			fmt.Sprintf("Battery: %d intervals, charge=%.2f, discharge=%.2f kWh",
+				len(telemetryResp.Intervals), totalCharge/constants.WhToKWh, totalDischarge/constants.WhToKWh)
+	}
+	if hasWhDel && !hasWhRcv {
+		var totalImport float64
+		for _, interval := range telemetryResp.Intervals {
+			totalImport += interval.WhDel
+		}
+		return "energy_import_telemetry", "", date,
+			fmt.Sprintf("Import: %d intervals, total=%.2f kWh",
+				len(telemetryResp.Intervals), totalImport/constants.WhToKWh)
+	}
+	if hasWhRcv && !hasWhDel {
+		var totalExport float64
+		for _, interval := range telemetryResp.Intervals {
+			totalExport += interval.WhRcv
+		}
+		return "energy_export_telemetry", "", date,
+			fmt.Sprintf("Export: %d intervals, total=%.2f kWh",
+				len(telemetryResp.Intervals), totalExport/constants.WhToKWh)
+	}
+	if hasEnwh {
+		var totalEnwh float64
+		for _, interval := range telemetryResp.Intervals {
+			totalEnwh += interval.Enwh
+		}
+		return "telemetry/production_meter", "", date,
+			fmt.Sprintf("Production/Consumption: %d intervals, total=%.2f kWh",
+				len(telemetryResp.Intervals), totalEnwh/constants.WhToKWh)
+	}
+	return "", "", date, ""
 }

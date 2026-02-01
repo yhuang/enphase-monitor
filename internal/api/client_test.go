@@ -158,3 +158,36 @@ func TestEnlightenCloudClient_CacheUsedFlag(t *testing.T) {
 		t.Error("Expected non-nil client")
 	}
 }
+
+// TestTryLoadPastDateCache_* test the tryLoadPastDateCache helper
+// (past-date cache fallback when primary cache lookup fails).
+func TestTryLoadPastDateCache_InvalidURL(t *testing.T) {
+	tz, _ := time.LoadLocation("US/Pacific")
+	client := NewEnlightenCloudClientWithBaseURL("http://test", "12345", "key", "token", tz)
+	targetDate := time.Date(2026, 1, 15, 0, 0, 0, 0, tz)
+
+	cached, ok := client.tryLoadPastDateCache("://invalid-url", targetDate)
+	if ok {
+		t.Error("tryLoadPastDateCache() ok = true, want false for invalid URL")
+	}
+	if cached != nil {
+		t.Errorf("tryLoadPastDateCache() cached = %v, want nil", cached)
+	}
+}
+
+// TestTryLoadPastDateCache_NoMatch verifies (nil, false) when no cache entry matches system/endpoint/date.
+func TestTryLoadPastDateCache_NoMatch(t *testing.T) {
+	tz, _ := time.LoadLocation("US/Pacific")
+	client := NewEnlightenCloudClientWithBaseURL("http://test", "12345", "key", "token", tz)
+	targetDate := time.Date(2026, 1, 15, 0, 0, 0, 0, tz)
+
+	// Valid URL; no matching cache entry (empty or different system/date).
+	url := "http://test/12345/telemetry/battery?key=key&start_at=0&end_at=0"
+	cached, ok := client.tryLoadPastDateCache(url, targetDate)
+	if ok {
+		t.Error("tryLoadPastDateCache() ok = true, want false when no matching cache")
+	}
+	if cached != nil {
+		t.Errorf("tryLoadPastDateCache() cached = %v, want nil", cached)
+	}
+}
