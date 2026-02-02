@@ -26,7 +26,7 @@ mkdir -p "$PDF_DIR"
 MD_FILES=(
     "README.md"
     "QUICKSTART.md"
-    "GO_BEST_PRACTICES.md"
+    "docs/GO_BEST_PRACTICES.md"
 )
 
 echo "Generating PDF files from markdown..."

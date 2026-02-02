@@ -56,7 +56,7 @@
 // - Pattern 4: Mock HTTP Servers (for failure scenarios)
 // - Pattern 1: Table-Driven Tests
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 package oauth
 
 import (

@@ -28,7 +28,7 @@
 //	--- PASS: TestValidateMetric_ExactMatch/zero_values  <- Subtest passed
 //	--- PASS: TestValidateMetric_ExactMatch (0.00s)      <- All subtests passed
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 package validation
 
 import (

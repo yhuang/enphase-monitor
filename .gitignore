@@ -2,6 +2,7 @@ enphase-monitor
 
 cache/
 .github/
+.docs/
 
 *.yaml
 

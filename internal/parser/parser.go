@@ -7,7 +7,7 @@
 //
 // For API endpoint details and response format documentation, see:
 //   - internal/api/client.go: endpoint list and response format examples
-//   - ARCHITECTURE.md: "Data Flow Diagram" section
+//   - docs/ARCHITECTURE.md: "Data Flow Diagram" section
 //
 // RESPONSE FORMATS
 // ----------------

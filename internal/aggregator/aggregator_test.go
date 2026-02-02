@@ -34,7 +34,7 @@
 // - Pattern 6: Test Fixtures (makeTestMetrics helper)
 // - Pattern 12: Context Cancellation Testing
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 package aggregator
 
 import (

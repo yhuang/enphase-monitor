@@ -42,7 +42,7 @@
 // - Pattern 5: Writer Injection (bytes.Buffer)
 // - Pattern 6: Test Fixtures (helper functions for test data)
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 package display
 
 import (

@@ -467,7 +467,7 @@ func TestValidateMetrics_RealData(t *testing.T) {
 }
 ```
 
-**Used in**: `validation_integration_test.go`, `run-tests.sh`
+**Used in**: `validation_integration_test.go`, `scripts/run-tests.sh`
 
 ### Pattern 12: Context Cancellation Testing
 

@@ -46,7 +46,7 @@
 // - Pattern 1: Table-Driven Tests
 // - Pattern 9: State Reset (resetFlags before each test)
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 package cli
 
 import (

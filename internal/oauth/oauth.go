@@ -7,7 +7,7 @@
 //
 // SETUP GUIDE
 // -----------
-// For step-by-step OAuth setup instructions, see OAUTH_SETUP.md
+// For step-by-step OAuth setup instructions, see docs/OAUTH_SETUP.md
 // To run the interactive setup wizard: ./enphase-monitor --setup-oauth
 //
 // AUTHENTICATION FLOW

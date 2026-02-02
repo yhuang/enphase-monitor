@@ -80,7 +80,7 @@ This interactive wizard will:
      refresh_token: "YOUR_REFRESH_TOKEN"  # Paste here
    ```
 
-> **📖 Want to understand OAuth better?** See **[OAUTH_SETUP.md](OAUTH_SETUP.md)** for a detailed explanation of how OAuth works, what each component does, and how authentication is performed.
+> **📖 Want to understand OAuth better?** See **[OAUTH_SETUP.md](docs/OAUTH_SETUP.md)** for a detailed explanation of how OAuth works, what each component does, and how authentication is performed.
 
 ## Step 5: Build and Install
 
@@ -138,8 +138,8 @@ Once it is working:
 ## Need More Help?
 
 - **[README.md](README.md)** - Complete documentation with all features and options
-- **[OAUTH_SETUP.md](OAUTH_SETUP.md)** - Detailed OAuth guide with troubleshooting
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Understand how the codebase works
+- **[OAUTH_SETUP.md](docs/OAUTH_SETUP.md)** - Detailed OAuth guide with troubleshooting
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Understand how the codebase works
 - **Troubleshooting section** in README.md
 
 Happy monitoring! ☀️🔋

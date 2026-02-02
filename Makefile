@@ -80,7 +80,7 @@ lint:
 # Generate PDFs from markdown files
 pdfs:
 	@echo "Generating PDFs from markdown files..."
-	@./generate-pdfs.sh
+	@./scripts/generate-pdfs.sh
 
 # Show help
 help:

@@ -62,7 +62,7 @@
 // ------------
 // - Pattern 8: Benchmark Tests (testing.B)
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 package parser
 
 import (

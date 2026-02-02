@@ -61,7 +61,7 @@
 //	        ├─► Can you use an interface? → Define interface in consumer
 //	        └─► Need concrete type? → Move to internal/types/
 //
-// See GO_CONCEPTS.md for detailed flowchart and examples.
+// See docs/GO_CONCEPTS.md for detailed flowchart and examples.
 //
 // TYPES IN THIS PACKAGE
 // ---------------------

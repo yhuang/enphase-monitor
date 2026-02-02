@@ -11,10 +11,10 @@
 // For comprehensive guides, see:
 //   - README.md: User guide with installation and usage instructions
 //   - QUICKSTART.md: 5-minute setup guide for new users
-//   - ARCHITECTURE.md: Detailed architecture and execution flow
-//   - OAUTH_SETUP.md: OAuth authentication setup guide
-//   - GO_BEST_PRACTICES.md: Go patterns and idioms used in this codebase
-//   - GO_CONCEPTS.md: Go language reference for concepts used here
+//   - docs/ARCHITECTURE.md: Detailed architecture and execution flow
+//   - docs/OAUTH_SETUP.md: OAuth authentication setup guide
+//   - docs/GO_BEST_PRACTICES.md: Go patterns and idioms used in this codebase
+//   - docs/GO_CONCEPTS.md: Go language reference for concepts used here
 //
 // KEY FEATURES
 // ------------

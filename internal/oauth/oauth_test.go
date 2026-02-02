@@ -42,7 +42,7 @@
 // - Pattern 3: Subtests with t.Run()
 // - Pattern 9: State Reset (token cache)
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 package oauth
 
 import (

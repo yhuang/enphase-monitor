@@ -2,7 +2,7 @@
 
 A Go application for monitoring and aggregating data from multiple Enphase solar systems via the Enphase Enlighten Cloud API v4.
 
-> **📚 New to Go?** This codebase follows Go best practices and includes comprehensive documentation. See **[GO_BEST_PRACTICES.md](GO_BEST_PRACTICES.md)** for a guide to Go patterns and idioms, and **[GO_CONCEPTS.md](GO_CONCEPTS.md)** for a reference of Go concepts used in the code.
+> **📚 New to Go?** This codebase follows Go best practices and includes comprehensive documentation. See **[GO_BEST_PRACTICES.md](docs/GO_BEST_PRACTICES.md)** for a guide to Go patterns and idioms, and **[GO_CONCEPTS.md](docs/GO_CONCEPTS.md)** for a reference of Go concepts used in the code.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ A Go application for monitoring and aggregating data from multiple Enphase solar
 **New to this project?** Start here:
 
 1. **[QUICKSTART.md](QUICKSTART.md)** - Get up and running in 5 minutes
-2. **[OAUTH_SETUP.md](OAUTH_SETUP.md)** - Complete OAuth authentication (required for first-time setup)
+2. **[OAUTH_SETUP.md](docs/OAUTH_SETUP.md)** - Complete OAuth authentication (required for first-time setup)
 3. Return here for detailed usage and configuration
 
 ## Features
@@ -187,7 +187,7 @@ Run the interactive setup wizard that will guid you through:
 
 For a comprehensive explanation of OAuth 2.0, what each component does, and how authentication works, see:
 
-**[OAUTH_SETUP.md](OAUTH_SETUP.md)** - Complete OAuth guide with:
+**[OAUTH_SETUP.md](docs/OAUTH_SETUP.md)** - Complete OAuth guide with:
 - Explanation of OAuth 2.0 concepts
 - What the API server expects for authentication
 - How authorization works
@@ -508,20 +508,20 @@ This project includes comprehensive documentation for different learning paths:
 
 ### For Getting Started
 - **[QUICKSTART.md](QUICKSTART.md)** - Get up and running in 5 minutes
-- **[OAUTH_SETUP.md](OAUTH_SETUP.md)** - Complete OAuth 2.0 setup guide with detailed explanations
+- **[OAUTH_SETUP.md](docs/OAUTH_SETUP.md)** - Complete OAuth 2.0 setup guide with detailed explanations
 
 ### For Understanding the Codebase
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture, execution flow, and design patterns
-- **[GO_BEST_PRACTICES.md](GO_BEST_PRACTICES.md)** - Go concepts and patterns used in this codebase
-- **[GO_CONCEPTS.md](GO_CONCEPTS.md)** - Quick reference for Go concepts used in the code, including channels and signals
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture, execution flow, and design patterns
+- **[GO_BEST_PRACTICES.md](docs/GO_BEST_PRACTICES.md)** - Go concepts and patterns used in this codebase
+- **[GO_CONCEPTS.md](docs/GO_CONCEPTS.md)** - Quick reference for Go concepts used in the code, including channels and signals
 
 ### Recommended Learning Path
 
 1. **New Users**: Start with [QUICKSTART.md](QUICKSTART.md)
-2. **OAuth Setup**: Follow [OAUTH_SETUP.md](OAUTH_SETUP.md) for authentication
-3. **Understanding Go**: Read [GO_BEST_PRACTICES.md](GO_BEST_PRACTICES.md) for Go concepts
-4. **System Design**: Study [ARCHITECTURE.md](ARCHITECTURE.md) to understand the codebase structure
-5. **Advanced Topics**: Explore [GO_CONCEPTS.md](GO_CONCEPTS.md#channels-and-signals) for channels, signals, and concurrency patterns
+2. **OAuth Setup**: Follow [OAUTH_SETUP.md](docs/OAUTH_SETUP.md) for authentication
+3. **Understanding Go**: Read [GO_BEST_PRACTICES.md](docs/GO_BEST_PRACTICES.md) for Go concepts
+4. **System Design**: Study [ARCHITECTURE.md](docs/ARCHITECTURE.md) to understand the codebase structure
+5. **Advanced Topics**: Explore [GO_CONCEPTS.md](docs/GO_CONCEPTS.md#channels-and-signals) for channels, signals, and concurrency patterns
 
 ## Project Structure
 
@@ -587,7 +587,12 @@ enphase-monitor/
 │       ├── validation.go                  # Metrics validation logic (uses io.Writer for testability)
 │       ├── validation_test.go             # Unit tests (tolerance calculations, edge cases)
 │       └── validation_integration_test.go # Integration tests (real expected values)
-├── docs/                                  # Additional documentation
+├── docs/                                  # Project documentation
+│   ├── ARCHITECTURE.md                    # Architecture documentation
+│   ├── GO_BEST_PRACTICES.md               # Go best practices guide
+│   ├── GO_CONCEPTS.md                     # Go concepts reference (channels, signals, and more)
+│   ├── OAUTH_SETUP.md                     # OAuth setup documentation (detailed)
+│   ├── TESTING.md                         # Testing patterns and guidelines
 │   ├── go-documentation-review.md         # Go documentation style review
 │   ├── go-linting-review.md               # Linting configuration review
 │   └── go-style-core-review.md            # Go style guide compliance review
@@ -598,16 +603,12 @@ enphase-monitor/
 ├── cache/                                 # Cached API responses (created at runtime)
 ├── go.mod                                 # Go module definition
 ├── go.sum                                 # Go module checksums
+├── scripts/                               # Utility scripts
+│   ├── generate-pdfs.sh                   # Script to generate PDFs from markdown files
+│   └── run-tests.sh                       # Test runner script
 ├── Makefile                               # Build automation
-├── generate-pdfs.sh                       # Script to generate PDFs from markdown files
-├── run-tests.sh                           # Test runner script
 ├── README.md                              # This file
 ├── QUICKSTART.md                          # Quick start guide
-├── TESTING.md                             # Testing patterns and guidelines
-├── OAUTH_SETUP.md                         # OAuth setup documentation (detailed)
-├── ARCHITECTURE.md                        # Architecture documentation
-├── GO_BEST_PRACTICES.md                   # Go best practices guide
-├── GO_CONCEPTS.md                         # Go concepts reference (channels, signals, and more)
 └── pdfs/                                  # Generated PDF documentation (created by generate-pdfs.sh)
 ```
 
@@ -710,7 +711,7 @@ To skip validation and just use cache-only mode, omit the --test flag:
 
 1. **Run all tests** (recommended):
    ```bash
-   ./run-tests.sh
+   ./scripts/run-tests.sh
    ```
    This script will:
    - Check which test dates have cached responses
@@ -731,7 +732,7 @@ To skip validation and just use cache-only mode, omit the --test flag:
    ./enphase-monitor --once --test --date 2026-01-20
    ```
 
-**Note:** Test mode uses the cache from `cache/`. The `run-tests.sh` script ensures all test dates have cached responses available.
+**Note:** Test mode uses the cache from `cache/`. The `scripts/run-tests.sh` script ensures all test dates have cached responses available.
 
 ### Expected Values Format
 

@@ -51,7 +51,7 @@
 // - Pattern 1: Table-Driven Tests
 // - Pattern 7: Error Path Testing
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 package oauth
 
 import (

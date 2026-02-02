@@ -47,7 +47,7 @@
 // - Pattern 8: Benchmark Tests (testing.B)
 // - Pattern 2: Mock Objects (MockCloudClient)
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 //
 // =============================================================================
 // PATTERN 8: BENCHMARK TESTS WALKTHROUGH

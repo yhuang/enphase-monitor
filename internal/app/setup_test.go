@@ -54,7 +54,7 @@
 // - Pattern 1: Table-Driven Tests
 // - Pattern 3: Subtests with t.Run()
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 //
 // =============================================================================
 // TESTING PATTERNS DEMONSTRATED IN THIS FILE

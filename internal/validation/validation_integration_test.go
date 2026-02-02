@@ -38,7 +38,7 @@
 // - Pattern 7: Error Path Testing
 // - Pattern 11: Golden Data Validation (expected values files)
 //
-// See TESTING.md for detailed pattern explanations.
+// See docs/TESTING.md for detailed pattern explanations.
 package validation
 
 import (
