@@ -327,11 +327,90 @@ var total float64
 
 > **📚 Advanced Topic:** For how interfaces can break circular dependencies (duck typing), see [Why Interfaces Can Avoid Shared Types](#why-interfaces-can-avoid-shared-types) in the File Organization Patterns section.
 
-### Interface Types
+### What Is an Interface?
+
+An **interface** is a contract that defines **behavior** (methods), not data. Think of it like a job posting:
+
+> "We need someone who can `Read()` and `Close()`."
+
+Any type that has those methods can apply for the job. The interface does not care:
+- What the type is called
+- What fields it has
+- How it implements the methods internally
+
+It only cares: **"Can you do these things?"**
+
+### The Mental Model
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│  STRUCT (concrete type)    vs    INTERFACE (behavior type)    │
+├───────────────────────────────────────────────────────────────┤
+│                                                               │
+│  What do you HAVE?              What can you DO?              │
+│  ────────────────               ──────────────                │
+│  - Fields (data)                - Methods only                │
+│  - Methods                      - No fields                   │
+│  - Implementation               - No implementation           │
+│                                                               │
+│  type File struct {             type Reader interface {       │
+│      name string                    Read([]byte) (int, error) │
+│      data []byte                }                             │
+│  }                                                            │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+```
+
+### Implicit Satisfaction (No "implements" Keyword)
+
+In Go, you do not declare that a type implements an interface. If the type has the right methods, it automatically satisfies the interface:
+
+```go
+// Define an interface
+type Writer interface {
+    Write([]byte) (int, error)
+}
+
+// Define a struct - NO "implements Writer" needed!
+type FileWriter struct {
+    file *os.File
+}
+
+// Just implement the method
+func (fw *FileWriter) Write(data []byte) (int, error) {
+    return fw.file.Write(data)
+}
+
+// FileWriter now automatically satisfies Writer!
+```
+
+This is different from Java/C#/TypeScript where you must explicitly declare:
+```java
+// Java - explicit implements
+class FileWriter implements Writer { ... }
+```
+
+### Why This Matters: Compile-Time Safety
+
+The key insight is that Go checks interface satisfaction at **compile time**, not runtime:
+
+```
+Go:     "Prove you can do X before I let you in."
+Ruby:   "I trust you can do X, we'll see at runtime."
+```
+
+| Aspect | Go Interface | Ruby Duck Typing |
+|--------|--------------|------------------|
+| Check happens | Compile time | Runtime |
+| Missing method | Won't compile | Runtime error |
+| IDE support | Full autocomplete | Limited |
+| Refactoring | Compiler catches breaks | Tests must catch breaks |
+
+### Interface Types in This Codebase
 
 **Location**: `internal/parser/parser.go:67`
 
-`io.ReadCloser` is an interface that combines `io.Reader` and `io.Closer`. `http.Response.Body` satisfies this interface, so we can pass it here. Interfaces in Go are satisfied implicitly - no "implements" keyword needed.
+`io.ReadCloser` is an interface that combines `io.Reader` and `io.Closer`. `http.Response.Body` satisfies this interface, so we can pass it here:
 
 ```go
 func readResponseBody(respBody io.ReadCloser) ([]byte, error) {
@@ -339,15 +418,55 @@ func readResponseBody(respBody io.ReadCloser) ([]byte, error) {
 }
 ```
 
-### Interface Usage
-
 **Location**: `internal/parser/parser.go:72`
 
-`io.ReadAll` accepts any `io.Reader` (interface type). `respBody` satisfies `io.Reader`, so we can pass it directly. This is the power of Go interfaces - code works with any type that has `Read()` method.
+`io.ReadAll` accepts any `io.Reader` (interface type). `respBody` satisfies `io.Reader`, so we can pass it directly. This is the power of Go interfaces - code works with any type that has a `Read()` method:
 
 ```go
 bodyBytes, err := io.ReadAll(respBody)
 ```
+
+### The io.Writer Pattern for Testable I/O
+
+**Location**: `internal/validation/validation.go`
+
+A common pattern in Go is accepting `io.Writer` instead of writing directly to `os.Stdout`. This makes code testable:
+
+```go
+// Production code passes os.Stdout
+func ValidateMetrics(w io.Writer, metrics *AggregatedMetrics, date string) error {
+    fmt.Fprintf(w, "Validating %s...\n", date)
+    // ...
+}
+
+// Test code passes a buffer to capture output
+func TestValidateMetrics(t *testing.T) {
+    var buf bytes.Buffer
+    err := ValidateMetrics(&buf, metrics, "2026-01-20")
+
+    // Now we can assert on the output!
+    if !strings.Contains(buf.String(), "ALL VALIDATIONS PASSED") {
+        t.Error("Expected success message")
+    }
+}
+```
+
+This works because:
+- `os.Stdout` (type `*os.File`) has a `Write()` method → satisfies `io.Writer`
+- `bytes.Buffer` has a `Write()` method → satisfies `io.Writer`
+- The function works with both, and neither knows about the other!
+
+### Summary: Interface Is Always a Type
+
+In Go, an interface is always a type - you cannot have an interface that is "something else." Unlike some languages where "interface" might mean different things in different contexts, Go's interface has exactly one meaning:
+
+> **A type defined by a set of method signatures.**
+
+You can use interfaces as:
+- Function parameter types: `func Process(r io.Reader)`
+- Function return types: `func NewReader() io.Reader`
+- Struct field types: `type Config struct { Logger Logger }`
+- Variable types: `var w io.Writer = os.Stdout`
 
 ---
 
