@@ -29,7 +29,7 @@ This document explains all the intermediate Go concepts that are used throughout
 
 ### Error Handling Pattern
 
-**Location**: `aggregator.go:297`
+**Location**: `aggregator.go:102-103`
 
 Standard Go pattern: function returns `(result, error)`. We check `err` immediately and return early if non-nil. This is idiomatic Go - errors are values, not exceptions.
 
@@ -42,7 +42,7 @@ if err != nil {
 
 ### Error Handling with Early Return
 
-**Location**: `internal/parser/parser.go:19`
+**Location**: `internal/parser/parser.go:63`
 
 We check `err` immediately and return early if non-nil. This is idiomatic Go - handle errors as soon as they occur.
 
@@ -54,23 +54,26 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Error Wrapping with %w
 
-**Location**: `aggregator.go:307`
+**Location**: `aggregator.go:104`
 
-`fmt.Errorf` with `%w` verb wraps the original error, preserving the error chain. This allows callers to use `errors.Is()` or `errors.Unwrap()` to inspect the chain. We add context ("failed to get OAuth access token for system X") while preserving the original error for debugging.
+`fmt.Errorf` with `%w` verb wraps the original error, preserving the error chain. This allows callers to use `errors.Is()` or `errors.Unwrap()` to inspect the chain. We add context ("failed to refresh token for system X") while preserving the original error for debugging.
 
 ```go
-return nil, fmt.Errorf("failed to get OAuth access token for system %s: %w", sys.Name, err)
+return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, sys.Name, err)
 ```
 
 ### Error Inspection
 
-**Location**: `aggregator.go:326`
+**Location**: `aggregator.go:113-119`
 
-We check the error message to determine error type. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit.
+We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit.
 
 ```go
-if strings.Contains(err.Error(), "rate limit exceeded (429)") {
-    // Handle rate limit error
+if err != nil && !constants.IsRateLimitError(err) {
+    return nil, fmt.Errorf("failed to get metrics: %w", err)
+}
+if err != nil {
+    rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
     continue
 }
 ```
@@ -81,12 +84,13 @@ if strings.Contains(err.Error(), "rate limit exceeded (429)") {
 
 ### Constructor Function Pattern
 
-**Location**: `internal/api/client.go:131`
+**Location**: `internal/api/client.go:140-151`
 
-Functions starting with "New" are constructors - they create and initialize structs. This is a Go convention (not a language feature, just a naming pattern). We return a pointer `(*EnlightenCloudClient)` because:
-1. The struct is moderately sized (more efficient to pass pointer)
-2. Methods use pointer receivers (consistent with return type)
-3. Allows nil checks if needed
+Functions starting with "New" are constructors - they create and initialize structs. This is a Go naming convention, not a language feature. We return a pointer `(*EnlightenCloudClient)` because:
+1. the return type specifies a pointer type;
+2. we have defined methods that will require this pointer receiver;
+3. it allows a nil check if needed; and
+4. the struct is moderately sized, so passing a pointer to the struct would be more efficient.
 
 ```go
 func NewEnlightenCloudClient(...) *EnlightenCloudClient {
@@ -96,7 +100,7 @@ func NewEnlightenCloudClient(...) *EnlightenCloudClient {
 
 ### Struct Literal with Pointer
 
-**Location**: `internal/api/client.go:139`
+**Location**: `internal/api/client.go:156-165`
 
 `&EnlightenCloudClient{...}` creates a struct and returns a pointer to it. This is idiomatic Go - create struct, take address, return pointer.
 
@@ -109,7 +113,7 @@ return &EnlightenCloudClient{
 
 ### Struct Initialization with Pointer Return
 
-**Location**: `aggregator.go:265`
+**Location**: `aggregator.go:80-84`
 
 We use `&AggregatedMetrics{}` to create a pointer to a new struct. This is more efficient than returning by value (avoids copying large struct).
 
@@ -122,7 +126,7 @@ metrics := &AggregatedMetrics{
 
 ### Nested Struct Initialization
 
-**Location**: `internal/api/client.go:147`
+**Location**: `internal/api/client.go:147-149`
 
 We initialize `httpClient` field with a struct literal. `http.Client` is from standard library - we set Timeout for safety.
 
@@ -134,7 +138,7 @@ httpClient: &http.Client{
 
 ### Pointer Receiver Method
 
-**Location**: `config.go:137`
+**Location**: `internal/config/config.go:127`
 
 `(c *ColorConfig)` means this is a method on `ColorConfig` with a pointer receiver. We use a pointer receiver because:
 1. We modify the struct (set ANSI codes in place)
@@ -152,7 +156,7 @@ func (c *ColorConfig) convertHexFields() {
 
 ### Struct Definition
 
-**Location**: `oauth.go:67`
+**Location**: `internal/oauth/oauth.go:85-89`
 
 Structs group related data together. This struct holds token information. Fields are exported (PascalCase) so they can be accessed from other packages.
 
@@ -166,7 +170,7 @@ type TokenCache struct {
 
 ### Struct Design Principles
 
-**Location**: `internal/api/client.go:188`
+**Location**: `internal/api/types.go:21-30`
 
 This struct follows Go best practices:
 1. Grouped related fields together (energy metrics, battery status)
@@ -176,7 +180,7 @@ This struct follows Go best practices:
 
 ### Field Types
 
-**Location**: `internal/api/client.go:195`
+**Location**: `internal/api/types.go:22-29`
 
 - `time.Time`: Go's standard time type (always has a value, cannot be nil)
 - `float64`: 64-bit floating point (precise enough for energy values)
@@ -188,7 +192,7 @@ This struct follows Go best practices:
 
 ### Slice Declaration
 
-**Location**: `internal/parser/parser.go:31`
+**Location**: `internal/parser/parser.go:72`
 
 `var name []Type` declares a nil slice (zero value for slices). We will append to it to build the flattened array.
 
@@ -198,7 +202,7 @@ var allIntervals []TelemetryInterval
 
 ### Slice Capacity Hint
 
-**Location**: `aggregator.go:271`
+**Location**: `aggregator.go:83`
 
 `make([]Type, length, capacity)` pre-allocates capacity to avoid reallocation. We know we will have `len(systems)` elements, so we pre-allocate that capacity. This is more efficient than letting the slice grow dynamically.
 
@@ -212,7 +216,7 @@ Systems: make([]SystemMetrics, 0, len(systems)),
 
 ### Variadic Append
 
-**Location**: `internal/parser/parser.go:40`
+**Location**: `internal/parser/parser.go:74`
 
 `append(slice, elements...)` can take multiple elements. `intervalArray...` spreads the slice into individual elements. This is equivalent to: `append(allIntervals, intervalArray[0], intervalArray[1], ...)`
 
@@ -222,7 +226,7 @@ allIntervals = append(allIntervals, intervalArray...)
 
 ### Slice Append
 
-**Location**: `aggregator.go:332`
+**Location**: `aggregator.go:117`
 
 `append()` adds elements to a slice, automatically growing if needed. Since we pre-allocated capacity, this should be efficient.
 
@@ -232,7 +236,7 @@ rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name,
 
 ### Array to Slice Conversion
 
-**Location**: `internal/cache/cache.go:97`
+**Location**: `internal/cache/cache.go:160-161`
 
 `hash[:]` converts the `[32]byte` array to a `[]byte` slice. This is necessary because `hex.EncodeToString` expects `[]byte`, not `[32]byte`. The `[:]` syntax creates a slice that views the entire array.
 
@@ -247,7 +251,7 @@ return hex.EncodeToString(hash[:])
 
 ### Range Loop
 
-**Location**: `internal/parser/parser.go:35`
+**Location**: `internal/parser/parser.go:73-75`
 
 `for _, intervalArray := range data.Intervals` iterates over the slice. The `_` discards the index (we do not need it). `intervalArray` is each nested array in the array of arrays.
 
@@ -259,7 +263,7 @@ for _, intervalArray := range data.Intervals {
 
 ### Range Loop Over Slice
 
-**Location**: `internal/parser/parser.go:98`
+**Location**: `internal/parser/parser.go:112`
 
 `for _, interval := range intervals` iterates over each element. `_` discards the index (we do not need it).
 
@@ -271,49 +275,50 @@ for _, interval := range intervals {
 
 ### Switch Statement
 
-**Location**: `internal/parser/parser.go:90, 102`
+**Location**: `internal/parser/parser.go:113-122`
 
 `switch` is like `if/else` but cleaner for multiple conditions. It is idiomatic Go for handling multiple cases based on a single value. `switch` compares `fieldName` against each case and executes the matching one. This is more readable than multiple `if/else if` statements.
 
 ```go
 switch fieldName {
-case "wh_imported":
+case constants.FieldWhImported:
     total += interval.WhImported
-case "wh_exported":
+case constants.FieldWhExported:
     total += interval.WhExported
 }
 ```
 
 ### Continue Statement
 
-**Location**: `aggregator.go:336`
+**Location**: `aggregator.go:118`
 
 `continue` skips to next iteration of the loop. We use it here to skip this system and try the next one.
 
 ```go
-if strings.Contains(err.Error(), "rate limit exceeded (429)") {
-    rateLimitErrors = append(rateLimitErrors, ...)
+if err != nil {
+    rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
     continue  // Skip to next system
 }
 ```
 
 ### Zero Value Pattern
 
-**Location**: `main.go:257`
+**Location**: `internal/app/setup.go:72-75`
 
 Using `time.Time` (not `*time.Time`) with `.IsZero()` is the idiomatic Go approach. Zero value (`time.Time{}`) means "not set" (use today). Non-zero value means "use this specific date".
 
 ```go
-var testDateParsed time.Time
-if *testDate != "" {
-    testDateParsed = parsed
+func ParseTestDate(dateStr string, reportTZ *time.Location) (time.Time, error) {
+    if dateStr == "" {
+        return time.Time{}, nil  // Returns zero value
+    }
+    // ... parse and return non-zero time
 }
-// else: testDateParsed remains zero value (today)
 ```
 
 ### Zero Value Initialization
 
-**Location**: `internal/parser/parser.go:94`
+**Location**: `internal/parser/parser.go:111`
 
 `var total float64` initializes `total` to `0.0` (zero value for float64). Go's zero values mean we do not need explicit initialization for most types.
 
@@ -408,17 +413,17 @@ Ruby:   "I trust you can do X, we'll see at runtime."
 
 ### Interface Types in This Codebase
 
-**Location**: `internal/parser/parser.go:67`
+**Location**: `internal/parser/parser.go:96`
 
 `io.ReadCloser` is an interface that combines `io.Reader` and `io.Closer`. `http.Response.Body` satisfies this interface, so we can pass it here:
 
 ```go
-func readResponseBody(respBody io.ReadCloser) ([]byte, error) {
+func ReadResponseBody(respBody io.ReadCloser) ([]byte, error) {
     // ...
 }
 ```
 
-**Location**: `internal/parser/parser.go:72`
+**Location**: `internal/parser/parser.go:97`
 
 `io.ReadAll` accepts any `io.Reader` (interface type). `respBody` satisfies `io.Reader`, so we can pass it directly. This is the power of Go interfaces - code works with any type that has a `Read()` method:
 
@@ -474,14 +479,14 @@ You can use interfaces as:
 
 ### JSON Unmarshaling
 
-**Location**: `internal/parser/parser.go:12`
+**Location**: `internal/parser/parser.go:62-68`
 
 `json.Unmarshal` converts JSON bytes into Go structs. We pass `&data` (pointer to struct) so `Unmarshal` can modify it. The struct fields must have json tags matching the JSON field names. If unmarshaling fails, it returns an error (we wrap it with context using `%w`).
 
 ```go
 var data TelemetryResponseNested
 if err := json.Unmarshal(bodyBytes, &data); err != nil {
-    return nil, fmt.Errorf("failed to decode: %w", err)
+    return nil, fmt.Errorf("failed to decode nested telemetry response: %w", err)
 }
 ```
 
@@ -491,22 +496,24 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Duration Literals
 
-**Location**: `internal/api/client.go:151`
+**Location**: `internal/api/client.go:147-149`
 
 `time.Second` is a constant. `30 * time.Second` converts seconds to `time.Duration`. This is idiomatic Go for time durations.
 
 ```go
-Timeout: 30 * time.Second
+httpClient: &http.Client{
+    Timeout: constants.APIRequestTimeout,
+}
 ```
 
 ### Time Ticker
 
-**Location**: `main.go:315`
+**Location**: `internal/app/runner.go:57-58`
 
 `time.NewTicker` creates a ticker that sends a value on its channel at regular intervals. `time.Duration(config.RefreshInterval) * time.Second` converts seconds to Duration. We use `defer` to ensure the ticker is stopped when the function returns.
 
 ```go
-ticker := time.NewTicker(time.Duration(config.RefreshInterval) * time.Second)
+ticker := time.NewTicker(time.Duration(cfg.RefreshIntervalSeconds) * time.Second)
 defer ticker.Stop()
 ```
 
@@ -543,7 +550,7 @@ When running in continuous mode, the program needs to:
 #### Step 1 & 2: Create Context with Signal Handling
 
 ```go
-// main.go, line 241
+// main.go:177-178
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
 ```
@@ -569,8 +576,8 @@ defer stop()
 #### Step 3: Create Timer Ticker
 
 ```go
-// main.go, line 319
-ticker := time.NewTicker(time.Duration(config.RefreshInterval) * time.Second)
+// internal/app/runner.go:57-58
+ticker := time.NewTicker(time.Duration(cfg.RefreshIntervalSeconds) * time.Second)
 defer ticker.Stop()
 ```
 
@@ -586,7 +593,7 @@ defer ticker.Stop()
 #### Step 4: The Main Loop with Select
 
 ```go
-// main.go, lines 329-340
+// internal/app/runner.go:65-78
 for {
     select {
     case <-ticker.C:
@@ -916,7 +923,7 @@ for {
 
 ### Defer Statement
 
-**Location**: `main.go:320`
+**Location**: `internal/app/runner.go:58`
 
 `defer` schedules a function call to execute when the surrounding function returns. This ensures cleanup happens even if the function returns early or panics. Here we ensure the ticker is stopped to prevent resource leaks.
 
@@ -930,7 +937,7 @@ defer ticker.Stop()
 
 ### Package-Level Variable
 
-**Location**: `oauth.go:76`
+**Location**: `internal/oauth/oauth.go:91`
 
 Variables declared outside functions are package-level (shared across all functions). We use `*TokenCache` (pointer) so it can be `nil` (meaning "no cache yet"). This is a singleton pattern - one cache for the entire application.
 
@@ -946,7 +953,7 @@ var (
 
 ### Hash Functions and Array Slices
 
-**Location**: `internal/cache/cache.go:87`
+**Location**: `internal/cache/cache.go:160-161`
 
 `sha256.Sum256()` computes a SHA-256 hash and returns a `[32]byte` array (fixed size). We convert it to a string using hex encoding for a readable cache key.
 
@@ -967,7 +974,7 @@ return hex.EncodeToString(hash[:])
 
 ### Variable Declaration with Type
 
-**Location**: `aggregator.go:282`
+**Location**: `internal/aggregator/aggregator.go:86`
 
 `var name []Type` declares a variable with zero value (nil slice for slices). We could use `:= []string{}` but `var` is clearer when we are not initializing.
 
@@ -981,7 +988,7 @@ var rateLimitErrors []string
 
 ### Multiple Return Values
 
-**Location**: `aggregator.go:319`
+**Location**: `internal/aggregator/aggregator.go:112`
 
 Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for rate limiting).
 

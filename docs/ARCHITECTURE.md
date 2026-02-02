@@ -513,51 +513,52 @@ when possible to improve testability.
 
 ### Main Package
 
-| File                    | Responsibility                                         | Lines |
-|-------------------------|--------------------------------------------------------|-------|
-| [main.go](main.go)      | Application entry point (pure orchestration)           | 171   |
+| File                    | Responsibility                                         |
+|-------------------------|--------------------------------------------------------|
+| [main.go](main.go)      | Application entry point (pure orchestration)           |
 
 ### Internal Packages - Application Layer
 
-| Package/File                                      | Responsibility                                    | Key Info     |
-|---------------------------------------------------|---------------------------------------------------|--------------|
-| [internal/app/setup.go](internal/app/setup.go)         | Application initialization & configuration        | Setup funcs  |
-| [internal/app/runner.go](internal/app/runner.go)       | Execution modes (once/continuous)                 | Run modes    |
+| Package/File                                      | Responsibility                                    |
+|---------------------------------------------------|---------------------------------------------------|
+| [internal/app/setup.go](internal/app/setup.go)         | Application initialization & configuration        |
+| [internal/app/runner.go](internal/app/runner.go)       | Execution modes (once/continuous)                 |
 
 ### Internal Packages - CLI Layer
 
-| Package/File                                      | Responsibility                                    | Key Info     |
-|---------------------------------------------------|---------------------------------------------------|--------------|
-| [internal/cli/flags.go](internal/cli/flags.go)         | CLI flag parsing and definitions                  | Flag struct  |
-| [internal/cli/cache_commands.go](internal/cli/cache_commands.go) | Cache management command handlers     | Cache CLI    |
+| Package/File                                      | Responsibility                                    |
+|---------------------------------------------------|---------------------------------------------------|
+| [internal/cli/flags.go](internal/cli/flags.go)         | CLI flag parsing and definitions                  |
+| [internal/cli/cache_commands.go](internal/cli/cache_commands.go) | Cache management command handlers     |
 
 ### Internal Packages - Authentication
 
-| Package/File                                      | Responsibility                                    | Key Info     |
-|---------------------------------------------------|---------------------------------------------------|--------------|
-| [internal/oauth/oauth.go](internal/oauth/oauth.go)     | OAuth token management & refresh                  | Token logic  |
-| [internal/oauth/setup.go](internal/oauth/setup.go)     | Interactive OAuth setup wizard                    | OAuth wizard |
-| [internal/oauth/oauth_test.go](internal/oauth/oauth_test.go) | OAuth tests                               | Test suite   |
+| Package/File                                      | Responsibility                                    |
+|---------------------------------------------------|---------------------------------------------------|
+| [internal/oauth/oauth.go](internal/oauth/oauth.go)     | OAuth token management & refresh                  |
+| [internal/oauth/setup.go](internal/oauth/setup.go)     | Interactive OAuth setup wizard                    |
+| [internal/oauth/oauth_test.go](internal/oauth/oauth_test.go) | OAuth tests                               |
 
 ### Internal Packages - Business Logic
 
-| Package/File                                      | Responsibility                                    | Key Info     |
-|---------------------------------------------------|---------------------------------------------------|--------------|
-| [internal/aggregator/types.go](internal/aggregator/types.go)         | Metric data structures                            | 41 lines     |
-| [internal/aggregator/aggregator.go](internal/aggregator/aggregator.go) | Multi-system aggregation with DI                  | 163 lines    |
-| [internal/display/display.go](internal/display/display.go)           | Terminal output formatting with colors            | 197 lines    |
-| [internal/api/*](internal/api/)                   | HTTP client for Enphase Cloud API v4              | Multiple     |
-| [internal/cache/*](internal/cache/)               | Disk-based response caching                       | Multiple     |
-| [internal/parser/*](internal/parser/)             | JSON telemetry response parsing                   | Multiple     |
-| [internal/config/*](internal/config/)             | Configuration types and utilities                 | Multiple     |
-| [internal/timezone/*](internal/timezone/)         | Timezone handling and date boundaries             | Multiple     |
-| [internal/validation/*](internal/validation/)     | Test mode validation with tolerance checks        | Multiple     |
-| [internal/constants/*](internal/constants/)       | Centralized constants (20+ constants)             | Multiple     |
+| Package/File                                      | Responsibility                                    |
+|---------------------------------------------------|---------------------------------------------------|
+| [internal/aggregator/types.go](internal/aggregator/types.go)         | Metric data structures                            |
+| [internal/aggregator/aggregator.go](internal/aggregator/aggregator.go) | Multi-system aggregation with DI                  |
+| [internal/display/display.go](internal/display/display.go)           | Terminal output formatting with colors            |
+| [internal/api/*](internal/api/)                   | HTTP client for Enphase Cloud API v4              |
+| [internal/cache/*](internal/cache/)               | Disk-based response caching                       |
+| [internal/parser/*](internal/parser/)             | JSON telemetry response parsing                   |
+| [internal/config/*](internal/config/)             | Configuration types and utilities                 |
+| [internal/timezone/*](internal/timezone/)         | Timezone handling and date boundaries             |
+| [internal/validation/*](internal/validation/)     | Test mode validation with tolerance checks        |
+| [internal/constants/*](internal/constants/)       | Centralized constants (20+ constants)             |
+
 ### Internal Packages - Shared Types
 
-| Package/File                                      | Responsibility                                    | Key Info     |
-|---------------------------------------------------|---------------------------------------------------|--------------|
-| [internal/types/types.go](internal/types/types.go)     | Shared type definitions (SystemConfig, APIConfig) | Breaks circular deps |
+| Package/File                                      | Responsibility                                    |
+|---------------------------------------------------|---------------------------------------------------|
+| [internal/types/types.go](internal/types/types.go)     | Shared type definitions (SystemConfig, APIConfig) |
 
 ---
 
