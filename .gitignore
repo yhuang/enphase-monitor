@@ -1,7 +1,13 @@
 enphase-monitor
-*.yaml
+
 cache/
 .github/
-*.out
+
+*.yaml
+
+.DS_Store
 *.coverprofile
-test-output.txt
+*.out
+*.prof
+*.test
+*.txt

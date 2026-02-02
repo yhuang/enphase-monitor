@@ -884,44 +884,52 @@ Go projects use the `internal/` directory for packages that should not be import
 internal/
 ├── aggregator/                  # Multi-system data aggregation
 │   ├── aggregator.go            # Core aggregation logic
-│   └── types.go                 # Data types (AggregatedMetrics, SystemMetrics)
+│   ├── types.go                 # Data types (AggregatedMetrics, SystemMetrics)
+│   └── *_test.go                # Tests and benchmarks
 ├── api/                         # API client for Enphase Cloud API
 │   ├── client.go                # HTTP client implementation
 │   ├── interface.go             # CloudClient interface definition
-│   └── types.go                 # LocalMetrics type
+│   ├── types.go                 # LocalMetrics type
+│   └── *_test.go                # Unit and functional tests
 ├── app/                         # Application setup and execution
 │   ├── setup.go                 # Configuration and initialization
-│   └── runner.go                # Execution modes (once/continuous)
+│   ├── runner.go                # Execution modes (once/continuous)
+│   └── *_test.go                # Setup and runner tests
 ├── cache/                       # Disk-based API response caching
 │   ├── cache.go                 # Core caching logic
 │   ├── cli.go                   # Cache inspection utilities
-│   ├── cache_test.go            # State management tests
-│   └── cache_functions_test.go  # Functionality tests
+│   └── *_test.go                # Cache and CLI tests
 ├── cli/                         # Command-line interface
 │   ├── flags.go                 # Flag parsing
-│   └── cache_commands.go        # Cache management commands
+│   ├── cache_commands.go        # Cache management commands
+│   └── *_test.go                # Flag and command tests
 ├── config/                      # Configuration loading and validation
-│   └── config.go                # YAML config parsing
+│   ├── config.go                # YAML config parsing
+│   └── config_test.go           # Configuration tests
 ├── constants/                   # Application-wide constants
-│   └── constants.go             # All magic numbers and strings
+│   ├── constants.go             # All magic numbers and strings
+│   └── constants_test.go        # Constants tests
 ├── display/                     # Terminal output formatting
-│   └── display.go               # Colored output with metrics
+│   ├── display.go               # Colored output with metrics
+│   └── display_test.go          # Display tests
 ├── oauth/                       # OAuth 2.0 authentication
 │   ├── oauth.go                 # Token acquisition/refresh
 │   ├── setup.go                 # Interactive setup wizard
-│   ├── oauth_test.go            # Basic unit tests
-│   ├── oauth_functional_test.go # Integration tests
-│   └── oauth_edge_cases_test.go # Edge case tests
+│   └── *_test.go                # Unit, functional, and edge case tests
 ├── parser/                      # JSON response parsing
-│   └── parser.go                # Telemetry data parsing
+│   ├── parser.go                # Telemetry data parsing
+│   └── *_test.go                # Parser tests and benchmarks
 ├── timezone/                    # Timezone handling
-│   └── timezone.go              # Day boundaries calculation
+│   ├── timezone.go              # Day boundaries calculation
+│   └── timezone_test.go         # Timezone tests
 ├── types/                       # Shared type definitions
 │   └── types.go                 # Types used across packages
 ├── urlbuilder/                  # API URL construction
-│   └── urlbuilder.go            # URL building utilities
+│   ├── urlbuilder.go            # URL building utilities
+│   └── urlbuilder_test.go       # URL builder tests
 └── validation/                  # Test mode validation
-    └── validation.go            # Metrics comparison
+    ├── validation.go            # Metrics comparison (uses io.Writer for testability)
+    └── *_test.go                # Unit and integration tests
 ```
 
 ---

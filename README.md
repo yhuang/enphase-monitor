@@ -532,23 +532,30 @@ enphase-monitor/
 │   ├── aggregator/                        # Multi-system data aggregation
 │   │   ├── types.go                       # Metric data structures
 │   │   ├── aggregator.go                  # Aggregation logic with dependency injection
-│   │   └── aggregator_test.go             # Aggregator tests with mock clients
+│   │   ├── aggregator_test.go             # Aggregator tests with mock clients
+│   │   └── aggregator_bench_test.go       # Benchmark tests
 │   ├── api/                               # HTTP client for Cloud API v4
 │   │   ├── client.go                      # Enlighten Cloud API client
 │   │   ├── types.go                       # API request/response types
 │   │   ├── interface.go                   # CloudClient interface for testability
-│   │   └── client_test.go                 # API client tests
+│   │   ├── client_test.go                 # API client unit tests
+│   │   └── client_functional_test.go      # Functional tests with mock HTTP servers
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
-│   │   └── runner.go                      # Execution modes (once/continuous)
+│   │   ├── setup_test.go                  # Setup tests
+│   │   ├── runner.go                      # Execution modes (once/continuous)
+│   │   └── runner_test.go                 # Runner tests
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation
-│   │   ├── cli.go                         # Cache inspection utilities
 │   │   ├── cache_test.go                  # Cache state management tests
-│   │   └── cache_functions_test.go        # Cache functionality tests
+│   │   ├── cache_functions_test.go        # Cache functionality tests
+│   │   ├── cli.go                         # Cache inspection utilities
+│   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
 │   │   ├── flags.go                       # CLI flag parsing
-│   │   └── cache_commands.go              # Cache management commands
+│   │   ├── flags_test.go                  # Flag parsing tests
+│   │   ├── cache_commands.go              # Cache management commands
+│   │   └── cache_commands_test.go         # Cache commands tests
 │   ├── config/                            # Configuration types
 │   │   ├── config.go                      # YAML loading & validation (uses type aliases)
 │   │   └── config_test.go                 # Configuration tests
@@ -566,23 +573,29 @@ enphase-monitor/
 │   │   └── oauth_edge_cases_test.go       # Edge case tests
 │   ├── parser/                            # JSON telemetry parsing
 │   │   ├── parser.go                      # Response parsing utilities
-│   │   └── parser_test.go                 # Parser tests
+│   │   ├── parser_test.go                 # Parser tests
+│   │   └── parser_bench_test.go           # Benchmark tests
 │   ├── timezone/                          # Timezone handling
 │   │   ├── timezone.go                    # Timezone utilities
 │   │   └── timezone_test.go               # Timezone tests
 │   ├── types/                             # Shared type definitions
 │   │   └── types.go                       # SystemConfig, APIConfig (breaks circular deps)
 │   ├── urlbuilder/                        # API URL construction
-│   │   └── urlbuilder.go                  # URL building helpers
+│   │   ├── urlbuilder.go                  # URL building helpers
+│   │   └── urlbuilder_test.go             # URL builder tests
 │   └── validation/                        # Test mode validation
-│       ├── validation.go                  # Metrics validation logic
+│       ├── validation.go                  # Metrics validation logic (uses io.Writer for testability)
 │       ├── validation_test.go             # Unit tests (tolerance calculations, edge cases)
 │       └── validation_integration_test.go # Integration tests (real expected values)
+├── docs/                                  # Additional documentation
+│   ├── go-documentation-review.md         # Go documentation style review
+│   ├── go-linting-review.md               # Linting configuration review
+│   └── go-style-core-review.md            # Go style guide compliance review
+├── test-data/                             # Test validation data
+│   └── expected_values_*.json             # Expected values for validation
 ├── config.yaml.example                    # Example configuration with all options
 ├── config.yaml                            # Your actual configuration (create from example)
 ├── cache/                                 # Cached API responses (created at runtime)
-├── test-data/                             # Test validation data
-│   └── expected_values_*.json             # Expected values for validation
 ├── go.mod                                 # Go module definition
 ├── go.sum                                 # Go module checksums
 ├── Makefile                               # Build automation
@@ -590,9 +603,10 @@ enphase-monitor/
 ├── run-tests.sh                           # Test runner script
 ├── README.md                              # This file
 ├── QUICKSTART.md                          # Quick start guide
+├── TESTING.md                             # Testing patterns and guidelines
 ├── OAUTH_SETUP.md                         # OAuth setup documentation (detailed)
 ├── ARCHITECTURE.md                        # Architecture documentation
-├── GO_BEST_PRACTICES.md                   # Go concepts guide
+├── GO_BEST_PRACTICES.md                   # Go best practices guide
 ├── GO_CONCEPTS.md                         # Go concepts reference (channels, signals, and more)
 └── pdfs/                                  # Generated PDF documentation (created by generate-pdfs.sh)
 ```
