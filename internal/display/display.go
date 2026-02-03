@@ -130,13 +130,12 @@ func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
 	fmt.Fprintf(d.writer, "\n %s%sCOMBINED ENERGY REPORT (kWh)%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printMetric("Produced", metrics.ProductionToday, d.colors.Production, "          ", 12)
-	d.printMetric("Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "          ", 12)
+	d.printMetric("Produced", metrics.ProductionToday, d.colors.Production, "          ", 12, false)
+	d.printMetric("Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "          ", 12, false)
 
-	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, " ", 21)
+	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, " ", 21, false)
 }
 
-// 53.4 kWh
 func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) {
 	if len(metrics.Systems) <= 1 {
 		return
@@ -152,15 +151,15 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
-		d.printMetric("Imported from the Grid", sys.GridImportToday, d.colors.Import, "      ", 29)
-		d.printMetric("Exported to the Grid", sys.GridExportToday, d.colors.Export, "      ", 29)
-		d.printMetric("Captured from the Sun", sys.ProductionToday, d.colors.Production, "      ", 29)
-		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "      ", 29)
-		d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "      ", 29)
-		d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "      ", 29)
-		fmt.Fprintf(d.writer, "      %sBattery Charge Percentage:%s   %s%d%%%s\n",
+		d.printMetric("Imported from the Grid", sys.GridImportToday, d.colors.Import, "      ", 29, true)
+		d.printMetric("Exported to the Grid", sys.GridExportToday, d.colors.Export, "      ", 29, true)
+		d.printMetric("Captured from the Sun", sys.ProductionToday, d.colors.Production, "      ", 29, true)
+		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "      ", 29, true)
+		d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "      ", 29, true)
+		d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "      ", 29, true)
+		fmt.Fprintf(d.writer, "      %sBattery Charge Percentage:%s   %s%10d%%%s\n",
 			d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
-		d.printMetric("Total Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "      ", 29)
+		d.printMetric("Total Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "      ", 29, true)
 	}
 }
 
@@ -168,18 +167,22 @@ func (d *Display) printSeparator() {
 	fmt.Fprintln(d.writer, "\n"+d.colors.Headers+d.separatorLine+constants.Reset+"\n")
 }
 
-func (d *Display) printMetric(label string, value float64, valueColor string, indent string, labelWidth int) {
+func (d *Display) printMetric(label string, value float64, valueColor string, indent string, labelWidth int, rightAlign bool) {
 	labelWithColon := label + ":"
 	padding := ""
 	if labelWidth > 0 && len(labelWithColon) < labelWidth {
 		padding = strings.Repeat(" ", labelWidth-len(labelWithColon))
 	}
-	fmt.Fprintf(d.writer, "%s%s%s%s%s%s%.1f kWh%s\n",
+	valueFormat := "%.1f"
+	if rightAlign {
+		valueFormat = "%7.1f"
+	}
+	fmt.Fprintf(d.writer, "%s%s%s%s%s%s"+valueFormat+" kWh%s\n",
 		indent, d.colors.SecondaryText, labelWithColon, constants.Reset,
 		padding, valueColor, value, constants.Reset)
 }
 
-func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int) {
+func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int, rightAlign bool) {
 	// Default to import (positive), override for export (negative)
 	color := d.colors.NetImport
 	direction := "import"
@@ -196,7 +199,11 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 	if labelWidth > 0 && len(labelWithColon) < labelWidth {
 		padding = strings.Repeat(" ", labelWidth-len(labelWithColon))
 	}
-	fmt.Fprintf(d.writer, "%s%s%s%s%s%s%.1f kWh%s %s(%s)%s\n",
+	valueFormat := "%.1f"
+	if rightAlign {
+		valueFormat = "%7.1f"
+	}
+	fmt.Fprintf(d.writer, "%s%s%s%s%s%s"+valueFormat+" kWh%s %s(%s)%s\n",
 		indent, d.colors.SecondaryText, labelWithColon, constants.Reset,
 		padding, color, displayValue, constants.Reset,
 		color, direction, constants.Reset)

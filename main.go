@@ -210,10 +210,13 @@ func main() {
 	// Run once or continuous (exit only from main; app returns errors)
 	if runOnce {
 		if err := app.RunOnce(ctx, agg, disp, cfg, testDateParsed, flags.TestMode, reportTZ); err != nil {
-			if !constants.IsRateLimitError(err) {
+			if constants.IsRateLimitError(err) {
+				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", constants.APIRateLimitWaitSeconds)
+			} else {
 				disp.ShowError(err)
+				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 			}
-			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 			os.Exit(1)
 		}
 		return

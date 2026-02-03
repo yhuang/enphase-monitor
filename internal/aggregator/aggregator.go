@@ -9,7 +9,6 @@ package aggregator
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"enphase-monitor/internal/api"
@@ -83,7 +82,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 		Systems:   make([]SystemMetrics, 0, len(systems)),
 	}
 	anyCacheUsed := false
-	var rateLimitErrors []string // Collect 429 errors to print once at the end
+	var rateLimitErrors []string // Collect 429 errors to report at the end
 
 	for _, sys := range systems {
 		// Use Cloud API
@@ -157,12 +156,9 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 
 	metrics.CacheUsed = anyCacheUsed
 
-	// If we collected any 429 errors that could not be resolved with cache, print them once and exit
+	// If we collected any 429 errors that could not be resolved with cache, return error
 	if len(rateLimitErrors) > 0 {
-		// Enphase API rate limit window is 60 seconds (10 requests/minute for free tier)
-		fmt.Fprintf(os.Stderr, "ERROR: API rate limit exceeded (429)\n")
-		fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", constants.APIRateLimitWaitSeconds)
-		return nil, fmt.Errorf("rate limit exceeded (429): %d system(s) affected", len(rateLimitErrors))
+		return nil, fmt.Errorf("API rate limit exceeded (429): %d system(s) affected", len(rateLimitErrors))
 	}
 
 	return metrics, nil

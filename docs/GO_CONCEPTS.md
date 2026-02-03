@@ -29,7 +29,7 @@ This document explains all the intermediate Go concepts that are used throughout
 
 ### Error Handling Pattern
 
-**Location**: `aggregator.go:102-103`
+**Location**: `aggregator.go:101-102`
 
 Standard Go pattern: function returns `(result, error)`. We check `err` immediately and return early if non-nil. This is idiomatic Go - errors are values, not exceptions.
 
@@ -54,7 +54,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Error Wrapping with %w
 
-**Location**: `aggregator.go:104`
+**Location**: `aggregator.go:103`
 
 `fmt.Errorf` with `%w` verb wraps the original error, preserving the error chain. This allows callers to use `errors.Is()` or `errors.Unwrap()` to inspect the chain. We add context ("failed to refresh token for system X") while preserving the original error for debugging.
 
@@ -64,7 +64,7 @@ return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, 
 
 ### Error Inspection
 
-**Location**: `aggregator.go:113-119`
+**Location**: `aggregator.go:112-118`
 
 We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit.
 
@@ -113,7 +113,7 @@ return &EnlightenCloudClient{
 
 ### Struct Initialization with Pointer Return
 
-**Location**: `aggregator.go:80-84`
+**Location**: `aggregator.go:79-83`
 
 We use `&AggregatedMetrics{}` to create a pointer to a new struct. This is more efficient than returning by value (avoids copying large struct).
 
@@ -202,7 +202,7 @@ var allIntervals []TelemetryInterval
 
 ### Slice Capacity Hint
 
-**Location**: `aggregator.go:83`
+**Location**: `aggregator.go:82`
 
 `make([]Type, length, capacity)` pre-allocates capacity to avoid reallocation. We know we will have `len(systems)` elements, so we pre-allocate that capacity. This is more efficient than letting the slice grow dynamically.
 
@@ -226,7 +226,7 @@ allIntervals = append(allIntervals, intervalArray...)
 
 ### Slice Append
 
-**Location**: `aggregator.go:117`
+**Location**: `aggregator.go:116`
 
 `append()` adds elements to a slice, automatically growing if needed. Since we pre-allocated capacity, this should be efficient.
 
@@ -290,7 +290,7 @@ case constants.FieldWhExported:
 
 ### Continue Statement
 
-**Location**: `aggregator.go:118`
+**Location**: `aggregator.go:117`
 
 `continue` skips to next iteration of the loop. We use it here to skip this system and try the next one.
 
@@ -974,7 +974,7 @@ return hex.EncodeToString(hash[:])
 
 ### Variable Declaration with Type
 
-**Location**: `internal/aggregator/aggregator.go:86`
+**Location**: `internal/aggregator/aggregator.go:85`
 
 `var name []Type` declares a variable with zero value (nil slice for slices). We could use `:= []string{}` but `var` is clearer when we are not initializing.
 
@@ -988,7 +988,7 @@ var rateLimitErrors []string
 
 ### Multiple Return Values
 
-**Location**: `internal/aggregator/aggregator.go:112`
+**Location**: `internal/aggregator/aggregator.go:111`
 
 Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for rate limiting).
 
