@@ -110,13 +110,13 @@ func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate tim
 	// Use helper to calculate date range (eliminates duplicate logic)
 	dayStart, dayEnd := d.getDateRange(queryDate, nowLocal)
 
-	fmt.Fprintf(d.writer, "  %s%-16s%s%s 12:00 AM\n                          to\n                  %s%s\n\n",
+	fmt.Fprintf(d.writer, "   %s%-11s%s%s 12:00 AM\n                          to\n                  %s%s\n\n",
 		d.colors.SecondaryText, "Query Range:   ", d.colors.PrimaryText,
 		dayStart.Format("Mon Jan 2, 2006"),
 		dayEnd.Format("Mon Jan 2, 2006 03:04 PM"), constants.Reset)
 
 	timestampLocal := timestamp.In(d.timezone)
-	fmt.Fprintf(d.writer, "  %s%-16s%s%s", d.colors.SecondaryText, "Last Updated:   ", d.colors.PrimaryText, timestampLocal.Format("Mon Jan 2, 2006 03:04:05 PM"))
+	fmt.Fprintf(d.writer, "  %s%-12s%s%s", d.colors.SecondaryText, "Last Updated:   ", d.colors.PrimaryText, timestampLocal.Format("Mon Jan 2, 2006 03:04:05 PM"))
 	sourceLabel := d.colors.Discharge + "(live)" + constants.Reset
 	if cacheUsed {
 		sourceLabel = d.colors.SecondaryText + "(cached)" + constants.Reset
@@ -130,12 +130,13 @@ func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
 	fmt.Fprintf(d.writer, "\n %s%sCOMBINED ENERGY REPORT (kWh)%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printMetric("Produced", metrics.ProductionToday, d.colors.Production, "  ")
-	d.printMetric("Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "  ")
+	d.printMetric("Produced", metrics.ProductionToday, d.colors.Production, "          ", 12)
+	d.printMetric("Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "          ", 12)
 
-	d.printNetFlow("Net Energy Flow", metrics.NetImportToday, "  ")
+	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, " ", 21)
 }
 
+// 53.4 kWh
 func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) {
 	if len(metrics.Systems) <= 1 {
 		return
@@ -151,15 +152,15 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
-		d.printMetric("Imported from the Grid", sys.GridImportToday, d.colors.Import, "      ")
-		d.printMetric("Exported to the Grid", sys.GridExportToday, d.colors.Export, "      ")
-		d.printMetric("Captured from the Sun", sys.ProductionToday, d.colors.Production, "      ")
-		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "      ")
-		d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "      ")
-		d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "      ")
-		fmt.Fprintf(d.writer, "      %sBattery Charge Percentage:%s      %s%7d%%%s\n",
+		d.printMetric("Imported from the Grid", sys.GridImportToday, d.colors.Import, "      ", 29)
+		d.printMetric("Exported to the Grid", sys.GridExportToday, d.colors.Export, "      ", 29)
+		d.printMetric("Captured from the Sun", sys.ProductionToday, d.colors.Production, "      ", 29)
+		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "      ", 29)
+		d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "      ", 29)
+		d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "      ", 29)
+		fmt.Fprintf(d.writer, "      %sBattery Charge Percentage:%s   %s%d%%%s\n",
 			d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
-		d.printMetric("Total Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "      ")
+		d.printMetric("Total Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "      ", 29)
 	}
 }
 
@@ -167,13 +168,18 @@ func (d *Display) printSeparator() {
 	fmt.Fprintln(d.writer, "\n"+d.colors.Headers+d.separatorLine+constants.Reset+"\n")
 }
 
-func (d *Display) printMetric(label string, value float64, valueColor string, indent string) {
-	fmt.Fprintf(d.writer, "%s%s%s:%s%s%8.1f kWh%s\n",
-		indent, d.colors.SecondaryText, label, constants.Reset,
-		valueColor, value, constants.Reset)
+func (d *Display) printMetric(label string, value float64, valueColor string, indent string, labelWidth int) {
+	labelWithColon := label + ":"
+	padding := ""
+	if labelWidth > 0 && len(labelWithColon) < labelWidth {
+		padding = strings.Repeat(" ", labelWidth-len(labelWithColon))
+	}
+	fmt.Fprintf(d.writer, "%s%s%s%s%s%s%.1f kWh%s\n",
+		indent, d.colors.SecondaryText, labelWithColon, constants.Reset,
+		padding, valueColor, value, constants.Reset)
 }
 
-func (d *Display) printNetFlow(label string, netValue float64, indent string) {
+func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int) {
 	// Default to import (positive), override for export (negative)
 	color := d.colors.NetImport
 	direction := "import"
@@ -185,9 +191,14 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string) {
 		displayValue = -netValue
 	}
 
-	fmt.Fprintf(d.writer, "%s%s%s:%s%s%8.1f kWh%s %s(%s)%s\n",
-		indent, d.colors.SecondaryText, label, constants.Reset,
-		color, displayValue, constants.Reset,
+	labelWithColon := label + ":"
+	padding := ""
+	if labelWidth > 0 && len(labelWithColon) < labelWidth {
+		padding = strings.Repeat(" ", labelWidth-len(labelWithColon))
+	}
+	fmt.Fprintf(d.writer, "%s%s%s%s%s%s%.1f kWh%s %s(%s)%s\n",
+		indent, d.colors.SecondaryText, labelWithColon, constants.Reset,
+		padding, color, displayValue, constants.Reset,
 		color, direction, constants.Reset)
 }
 
