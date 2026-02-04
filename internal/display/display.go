@@ -158,8 +158,8 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 	// Use MWh for values >= 1000 kWh
 	displayValue := value
 	unit := "kWh"
-	if value >= 1000 {
-		displayValue = value / 1000
+	if value >= constants.KWhToMWh {
+		displayValue = value / constants.KWhToMWh
 		unit = "MWh"
 	}
 
@@ -192,8 +192,8 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 
 	// Use MWh for values >= 1000 kWh
 	unit := "kWh"
-	if displayValue >= 1000 {
-		displayValue = displayValue / 1000
+	if displayValue >= constants.KWhToMWh {
+		displayValue = displayValue / constants.KWhToMWh
 		unit = "MWh"
 	}
 

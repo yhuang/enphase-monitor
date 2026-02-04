@@ -130,6 +130,8 @@ const (
 const (
 	// WhToKWh is the conversion factor from watt-hours to kilowatt-hours
 	WhToKWh = 1000.0
+	// KWhToMWh is the conversion factor from kilowatt-hours to megawatt-hours
+	KWhToMWh = 1000.0
 )
 
 // Telemetry field name constants
