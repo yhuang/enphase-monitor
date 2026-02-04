@@ -5,19 +5,6 @@
       "id": "5525881",
       "name": "Right Subpanel",
       "expected": {
-        "grid_import": 431.9,
-        "grid_export": 362.6,
-        "production": 685.6,
-        "battery_discharged": 143.4,
-        "battery_charged": 190.8,
-        "net_imported": 69.2,
-        "consumption": 700.6
-      }
-    },
-    {
-      "id": "5392556",
-      "name": "Left Subpanel",
-      "expected": {
         "grid_import": 553.2,
         "grid_export": 241.6,
         "production": 543.5,
@@ -25,6 +12,19 @@
         "battery_charged": 240.6,
         "net_imported": 311.6,
         "consumption": 788.6
+      }
+    },
+    {
+      "id": "5392556",
+      "name": "Left Subpanel",
+      "expected": {
+        "grid_import": 431.8,
+        "grid_export": 362.6,
+        "production": 686.3,
+        "battery_discharged": 143.4,
+        "battery_charged": 190.8,
+        "net_imported": 69.1,
+        "consumption": 701.4
       }
     }
   ]

@@ -154,7 +154,7 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 	if labelWidth > 0 && len(labelWithColon) < labelWidth {
 		padding = strings.Repeat(" ", labelWidth-len(labelWithColon))
 	}
-	
+
 	// Use MWh for values >= 1000 kWh
 	displayValue := value
 	unit := "kWh"
@@ -162,7 +162,7 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 		displayValue = value / 1000
 		unit = "MWh"
 	}
-	
+
 	valueFormat := "%.1f"
 	if rightAlign {
 		valueFormat = "%7.1f"
@@ -189,14 +189,14 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 	if labelWidth > 0 && len(labelWithColon) < labelWidth {
 		padding = strings.Repeat(" ", labelWidth-len(labelWithColon))
 	}
-	
+
 	// Use MWh for values >= 1000 kWh
 	unit := "kWh"
 	if displayValue >= 1000 {
 		displayValue = displayValue / 1000
 		unit = "MWh"
 	}
-	
+
 	valueFormat := "%.1f"
 	if rightAlign {
 		valueFormat = "%7.1f"

@@ -63,6 +63,7 @@
 // This client uses the following Enlighten Cloud API v4 endpoints:
 //
 // INTERVAL-BASED ENDPOINTS (15-minute data, 7-day limit):
+//
 //	Production (Solar Generation):
 //	GET /api/v4/systems/{system_id}/telemetry/production_meter
 //	Returns: Array of intervals with enwh (energy produced)
@@ -84,6 +85,7 @@
 //	Returns: Array of intervals with charge/discharge/soc data
 //
 // LIFETIME ENDPOINTS (daily aggregated data, no 7-day limit):
+//
 //	Production Lifetime:
 //	GET /api/v4/systems/{system_id}/energy_lifetime
 //	Returns: {"production": [18205, 20777, ...]} - array of daily Wh values
@@ -410,10 +412,10 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 func (c *EnlightenCloudClient) getBatteryLifetime(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error) {
 	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryType, c.timezone)
 	startDateStr := periodStart.Format(constants.DateFormat)
-	
+
 	// Build URL for lifetime endpoint
 	reqURL := fmt.Sprintf("%s/%s/battery_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
-	
+
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate)
 	c.cacheUsed = cacheUsed
 	if err != nil {
@@ -421,12 +423,12 @@ func (c *EnlightenCloudClient) getBatteryLifetime(ctx context.Context, testDate 
 		return 0, 0, 0, nil
 	}
 	defer resp.Body.Close()
-	
+
 	bodyBytes, err := parser.ReadResponseBody(resp.Body)
 	if err != nil {
 		return 0, 0, 0, nil
 	}
-	
+
 	// Parse the lifetime response
 	// Battery lifetime returns arrays like: {"charge": [...], "discharge": [...]}
 	var data struct {
@@ -435,24 +437,24 @@ func (c *EnlightenCloudClient) getBatteryLifetime(ctx context.Context, testDate 
 		Charge    []float64 `json:"charge"`
 		Discharge []float64 `json:"discharge"`
 	}
-	
+
 	if err := json.Unmarshal(bodyBytes, &data); err != nil {
 		return 0, 0, 0, nil
 	}
-	
+
 	// Calculate dates and sum values in range
 	startDate, err := time.Parse(constants.DateFormat, data.StartDate)
 	if err != nil {
 		return 0, 0, 0, nil
 	}
-	
+
 	endDateStr := periodEnd.Format(constants.DateFormat)
 	var totalCharge, totalDischarge float64
-	
+
 	for i := range data.Charge {
 		date := startDate.AddDate(0, 0, i)
 		dateStr := date.Format(constants.DateFormat)
-		
+
 		// Filter by date range (inclusive)
 		if dateStr >= startDateStr && dateStr <= endDateStr {
 			totalCharge += data.Charge[i]
@@ -461,7 +463,7 @@ func (c *EnlightenCloudClient) getBatteryLifetime(ctx context.Context, testDate 
 			}
 		}
 	}
-	
+
 	return totalCharge / constants.WhToKWh, totalDischarge / constants.WhToKWh, 0, nil
 }
 
@@ -840,27 +842,27 @@ func (c *EnlightenCloudClient) getEnergyLifetime(ctx context.Context, testDate t
 	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryType, c.timezone)
 	startDateStr := periodStart.Format(constants.DateFormat)
 	endDateStr := periodEnd.Format(constants.DateFormat)
-	
+
 	// Build URL for lifetime endpoint
 	reqURL := fmt.Sprintf("%s/%s/energy_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
-	
+
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate)
 	c.cacheUsed = cacheUsed
 	if err != nil {
 		return 0, err
 	}
 	defer resp.Body.Close()
-	
+
 	bodyBytes, err := parser.ReadResponseBody(resp.Body)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	dailyIntervals, err := parser.ParseLifetimeResponse(bodyBytes)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	// Sum daily values within the period
 	totalWh := parser.SumDailyIntervals(dailyIntervals, startDateStr, endDateStr)
 	return totalWh / constants.WhToKWh, nil
@@ -871,26 +873,26 @@ func (c *EnlightenCloudClient) getConsumptionLifetime(ctx context.Context, testD
 	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryType, c.timezone)
 	startDateStr := periodStart.Format(constants.DateFormat)
 	endDateStr := periodEnd.Format(constants.DateFormat)
-	
+
 	reqURL := fmt.Sprintf("%s/%s/consumption_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
-	
+
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate)
 	c.cacheUsed = cacheUsed
 	if err != nil {
 		return 0, err
 	}
 	defer resp.Body.Close()
-	
+
 	bodyBytes, err := parser.ReadResponseBody(resp.Body)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	dailyIntervals, err := parser.ParseLifetimeResponse(bodyBytes)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	totalWh := parser.SumDailyIntervals(dailyIntervals, startDateStr, endDateStr)
 	return totalWh / constants.WhToKWh, nil
 }
@@ -900,26 +902,26 @@ func (c *EnlightenCloudClient) getEnergyImportLifetime(ctx context.Context, test
 	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryType, c.timezone)
 	startDateStr := periodStart.Format(constants.DateFormat)
 	endDateStr := periodEnd.Format(constants.DateFormat)
-	
+
 	reqURL := fmt.Sprintf("%s/%s/energy_import_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
-	
+
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate)
 	c.cacheUsed = cacheUsed
 	if err != nil {
 		return 0, err
 	}
 	defer resp.Body.Close()
-	
+
 	bodyBytes, err := parser.ReadResponseBody(resp.Body)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	dailyIntervals, err := parser.ParseLifetimeResponse(bodyBytes)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	totalWh := parser.SumDailyIntervals(dailyIntervals, startDateStr, endDateStr)
 	return totalWh / constants.WhToKWh, nil
 }
@@ -929,26 +931,26 @@ func (c *EnlightenCloudClient) getEnergyExportLifetime(ctx context.Context, test
 	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryType, c.timezone)
 	startDateStr := periodStart.Format(constants.DateFormat)
 	endDateStr := periodEnd.Format(constants.DateFormat)
-	
+
 	reqURL := fmt.Sprintf("%s/%s/energy_export_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
-	
+
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate)
 	c.cacheUsed = cacheUsed
 	if err != nil {
 		return 0, err
 	}
 	defer resp.Body.Close()
-	
+
 	bodyBytes, err := parser.ReadResponseBody(resp.Body)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	dailyIntervals, err := parser.ParseLifetimeResponse(bodyBytes)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	totalWh := parser.SumDailyIntervals(dailyIntervals, startDateStr, endDateStr)
 	return totalWh / constants.WhToKWh, nil
 }

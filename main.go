@@ -198,14 +198,21 @@ func main() {
 	app.ConfigureModes(flags.TestMode, flags.NoCache)
 
 	// Determine run mode
-	// If querying a past period, always run once since historical data doesn't change
+	// Month and year queries always run once (aggregated data doesn't need continuous refresh)
+	// Past date queries always run once (historical data doesn't change)
 	runOnce := flags.Once
-	if !testDateParsed.IsZero() && timezone.IsPastPeriod(testDateParsed, queryType, reportTZ) {
+	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear {
 		runOnce = true
 		if !flags.Once {
 			// Inform user why we're running once instead of continuous
 			periodName := queryType.String()
-			fmt.Printf("Note: Running once for historical %s (data won't change)\n\n", periodName)
+			fmt.Printf("Note: Running once for %s query (aggregated data)\n\n", periodName)
+		}
+	} else if !testDateParsed.IsZero() && timezone.IsPastPeriod(testDateParsed, queryType, reportTZ) {
+		runOnce = true
+		if !flags.Once {
+			// Inform user why we're running once instead of continuous
+			fmt.Printf("Note: Running once for historical date (data won't change)\n\n")
 		}
 	}
 
