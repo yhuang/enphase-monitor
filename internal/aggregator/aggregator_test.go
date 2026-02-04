@@ -44,6 +44,7 @@ import (
 	"time"
 
 	"enphase-monitor/internal/api"
+	"enphase-monitor/internal/constants"
 )
 
 // mustLoadLocation loads a timezone for tests; fails the test if the timezone is invalid.
@@ -64,7 +65,7 @@ type MockCloudClient struct {
 }
 
 // GetMetricsFromCloud returns the mock metrics or error.
-func (m *MockCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time) (*api.LocalMetrics, bool, error) {
+func (m *MockCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*api.LocalMetrics, bool, error) {
 	if m.Err != nil {
 		return nil, false, m.Err
 	}
@@ -72,7 +73,7 @@ func (m *MockCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time
 }
 
 // GetEnergyImportForDate returns mock energy import.
-func (m *MockCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time) (float64, error) {
+func (m *MockCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
 	if m.Err != nil {
 		return 0, m.Err
 	}
@@ -83,7 +84,7 @@ func (m *MockCloudClient) GetEnergyImportForDate(ctx context.Context, testDate t
 }
 
 // GetEnergyExportForDate returns mock energy export.
-func (m *MockCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time) (float64, error) {
+func (m *MockCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
 	if m.Err != nil {
 		return 0, m.Err
 	}
@@ -94,7 +95,7 @@ func (m *MockCloudClient) GetEnergyExportForDate(ctx context.Context, testDate t
 }
 
 // GetProductionForDate returns mock production.
-func (m *MockCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time) (float64, error) {
+func (m *MockCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
 	if m.Err != nil {
 		return 0, m.Err
 	}
@@ -105,7 +106,7 @@ func (m *MockCloudClient) GetProductionForDate(ctx context.Context, testDate tim
 }
 
 // GetConsumptionForDate returns mock consumption.
-func (m *MockCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time) (float64, error) {
+func (m *MockCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
 	if m.Err != nil {
 		return 0, m.Err
 	}
@@ -116,7 +117,7 @@ func (m *MockCloudClient) GetConsumptionForDate(ctx context.Context, testDate ti
 }
 
 // GetBatteryDataForDate returns mock battery data.
-func (m *MockCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time) (charged float64, discharged float64, soc int, err error) {
+func (m *MockCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error) {
 	if m.Err != nil {
 		return 0, 0, 0, m.Err
 	}
@@ -190,7 +191,7 @@ func TestGetAggregatedMetrics_SingleSystem(t *testing.T) {
 	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, tz)
+	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, constants.QueryTypeDay, tz)
 
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -254,7 +255,7 @@ func TestGetAggregatedMetrics_MultipleSystems(t *testing.T) {
 	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, tz)
+	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, constants.QueryTypeDay, tz)
 
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -314,7 +315,7 @@ func TestGetAggregatedMetrics_MissingAPIConfig(t *testing.T) {
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	_, err := agg.GetAggregatedMetrics(context.Background(), systems, nil, time.Time{}, tz)
+	_, err := agg.GetAggregatedMetrics(context.Background(), systems, nil, time.Time{}, constants.QueryTypeDay, tz)
 
 	if err == nil {
 		t.Error("Expected error for nil API config")
@@ -333,7 +334,7 @@ func TestGetAggregatedMetrics_MissingAPIKey(t *testing.T) {
 	apiConfig := &APIConfig{ClientID: "test-client", ClientSecret: "test-secret"} // No Key
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	_, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, tz)
+	_, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, constants.QueryTypeDay, tz)
 
 	if err == nil {
 		t.Error("Expected error for missing API key")
@@ -352,7 +353,7 @@ func TestGetAggregatedMetrics_TokenError(t *testing.T) {
 	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	_, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, tz)
+	_, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, constants.QueryTypeDay, tz)
 
 	if err == nil {
 		t.Error("Expected error for token retrieval failure")
@@ -375,7 +376,7 @@ func TestGetAggregatedMetrics_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := agg.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, tz)
+	_, err := agg.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryTypeDay, tz)
 
 	if err == nil {
 		t.Error("Expected error for cancelled context")

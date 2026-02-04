@@ -55,6 +55,10 @@ const (
 const (
 	// DateFormat is the standard date format used throughout the application (YYYY-MM-DD)
 	DateFormat = "2006-01-02"
+	// MonthFormat is the format for month-level queries (YYYY-MM)
+	MonthFormat = "2006-01"
+	// YearFormat is the format for year-level queries (YYYY)
+	YearFormat = "2006"
 	// AltDateFormat is an alternative date format (YYYY/MM/DD)
 	AltDateFormat = "2006/01/02"
 	// TimestampFormat includes time and timezone
@@ -62,6 +66,30 @@ const (
 	// JSONExtension is the file extension for JSON cache files
 	JSONExtension = ".json"
 )
+
+// QueryType represents the granularity of a date query (day, month, or year).
+type QueryType int
+
+const (
+	// QueryTypeDay represents a query for a specific day (YYYY-MM-DD)
+	QueryTypeDay QueryType = iota
+	// QueryTypeMonth represents a query for a specific month (YYYY-MM)
+	QueryTypeMonth
+	// QueryTypeYear represents a query for a specific year (YYYY)
+	QueryTypeYear
+)
+
+// String returns a human-readable name for the query type.
+func (qt QueryType) String() string {
+	switch qt {
+	case QueryTypeMonth:
+		return "month"
+	case QueryTypeYear:
+		return "year"
+	default:
+		return "day"
+	}
+}
 
 // HTTP client configuration
 const (

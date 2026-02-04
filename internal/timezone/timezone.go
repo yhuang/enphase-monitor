@@ -19,10 +19,17 @@
 package timezone
 
 import (
+	"fmt"
 	"time"
 
 	"enphase-monitor/internal/constants"
 )
+
+// ParseResult contains the parsed date and its query type.
+type ParseResult struct {
+	Date      time.Time
+	QueryType constants.QueryType
+}
 
 // LoadTimezone loads a timezone location from a timezone string (e.g., "America/Los_Angeles").
 // If the timezone string is empty, uses the system's local timezone.
@@ -91,4 +98,129 @@ func ParseDateInTimezone(dateStr string, tz *time.Location) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return parsed, nil
+}
+
+// ParseDateString parses a date string and determines its format (day/month/year).
+// Supported formats:
+//   - YYYY-MM-DD (day)
+//   - YYYY-MM (month)
+//   - YYYY (year)
+//
+// Returns the parsed date and query type, or an error if format is invalid.
+func ParseDateString(dateStr string, tz *time.Location) (ParseResult, error) {
+	// Try YYYY-MM-DD first (most specific)
+	if parsed, err := time.ParseInLocation(constants.DateFormat, dateStr, tz); err == nil {
+		// Validate the date is real (e.g., not 2026-02-30)
+		if parsed.Format(constants.DateFormat) != dateStr {
+			return ParseResult{}, fmt.Errorf("invalid date: %s does not exist", dateStr)
+		}
+		return ParseResult{Date: parsed, QueryType: constants.QueryTypeDay}, nil
+	}
+
+	// Try YYYY-MM (month)
+	if parsed, err := time.ParseInLocation(constants.MonthFormat, dateStr, tz); err == nil {
+		if parsed.Format(constants.MonthFormat) != dateStr {
+			return ParseResult{}, fmt.Errorf("invalid month: %s", dateStr)
+		}
+		return ParseResult{Date: parsed, QueryType: constants.QueryTypeMonth}, nil
+	}
+
+	// Try YYYY (year)
+	if parsed, err := time.ParseInLocation(constants.YearFormat, dateStr, tz); err == nil {
+		year := parsed.Year()
+		if year < 1900 || year > 2100 {
+			return ParseResult{}, fmt.Errorf("invalid year: %s (must be between 1900-2100)", dateStr)
+		}
+		return ParseResult{Date: parsed, QueryType: constants.QueryTypeYear}, nil
+	}
+
+	return ParseResult{}, fmt.Errorf("invalid date format: use YYYY-MM-DD, YYYY-MM, or YYYY")
+}
+
+// GetMonthBoundaries returns the start and end times for a given month.
+// Start is 00:00:00 on the 1st day, end is 23:59:59 on the last day.
+// End time is capped to now if the month includes today.
+func GetMonthBoundaries(targetDate time.Time, tz *time.Location) (start, end time.Time) {
+	date := time.Now().In(tz)
+	if !targetDate.IsZero() {
+		date = targetDate.In(tz)
+	}
+
+	// Start of month: 1st day at 00:00:00
+	start = time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, tz)
+
+	// End of month: last day at 23:59:59
+	// Go to next month, then back one day
+	nextMonth := start.AddDate(0, 1, 0)
+	lastDay := nextMonth.Add(-24 * time.Hour)
+	end = time.Date(lastDay.Year(), lastDay.Month(), lastDay.Day(), 23, 59, 59, 0, tz)
+
+	// Cap to now if end is in the future
+	now := time.Now().In(tz)
+	if end.After(now) {
+		end = now
+	}
+
+	return start, end
+}
+
+// GetYearBoundaries returns the start and end times for a given year.
+// Start is 00:00:00 on Jan 1, end is 23:59:59 on Dec 31.
+// End time is capped to now if the year includes today.
+func GetYearBoundaries(targetDate time.Time, tz *time.Location) (start, end time.Time) {
+	date := time.Now().In(tz)
+	if !targetDate.IsZero() {
+		date = targetDate.In(tz)
+	}
+
+	// Start of year: Jan 1 at 00:00:00
+	start = time.Date(date.Year(), time.January, 1, 0, 0, 0, 0, tz)
+
+	// End of year: Dec 31 at 23:59:59
+	end = time.Date(date.Year(), time.December, 31, 23, 59, 59, 0, tz)
+
+	// Cap to now if end is in the future
+	now := time.Now().In(tz)
+	if end.After(now) {
+		end = now
+	}
+
+	return start, end
+}
+
+// GetBoundaries returns the start and end times based on query type.
+// This is a unified boundary function that delegates to the appropriate handler.
+func GetBoundaries(targetDate time.Time, queryType constants.QueryType, tz *time.Location) (start, end time.Time) {
+	switch queryType {
+	case constants.QueryTypeMonth:
+		return GetMonthBoundaries(targetDate, tz)
+	case constants.QueryTypeYear:
+		return GetYearBoundaries(targetDate, tz)
+	default:
+		return GetDayBoundaries(targetDate, tz)
+	}
+}
+
+// IsPastPeriod checks if the given date's period (day/month/year) is in the past.
+func IsPastPeriod(targetDate time.Time, queryType constants.QueryType, tz *time.Location) bool {
+	if targetDate.IsZero() {
+		return false
+	}
+
+	now := time.Now().In(tz)
+	target := targetDate.In(tz)
+
+	switch queryType {
+	case constants.QueryTypeYear:
+		return target.Year() < now.Year()
+	case constants.QueryTypeMonth:
+		if target.Year() < now.Year() {
+			return true
+		}
+		return target.Year() == now.Year() && target.Month() < now.Month()
+	default:
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
+		targetDay := time.Date(target.Year(), target.Month(), target.Day(), 0, 0, 0, 0, tz)
+		return targetDay.Before(today)
+	}
 }

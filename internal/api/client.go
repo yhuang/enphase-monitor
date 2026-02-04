@@ -168,10 +168,11 @@ func NewEnlightenCloudClientWithBaseURL(baseURL, systemID, apiKey, accessToken s
 // fetchTelemetryData is a helper method that reduces redundant code across Get*ForDate methods.
 // It handles the common pattern of: make request, track cache usage, read body, close response.
 // This helper eliminates ~15 lines of boilerplate per method (5 methods = ~75 lines saved).
-func (c *EnlightenCloudClient) fetchTelemetryData(ctx context.Context, endpoint string, testDate time.Time) ([]byte, error) {
-	dayStart, dayEnd := timezone.GetDayBoundaries(testDate, c.timezone)
+// queryType determines the date boundaries (day/month/year).
+func (c *EnlightenCloudClient) fetchTelemetryData(ctx context.Context, endpoint string, testDate time.Time, queryType constants.QueryType) ([]byte, error) {
+	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryType, c.timezone)
 	// Use client's baseURL for dependency injection (testability)
-	reqURL := c.buildTelemetryURL(endpoint, dayStart, dayEnd)
+	reqURL := c.buildTelemetryURL(endpoint, periodStart, periodEnd)
 
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate)
 	c.cacheUsed = cacheUsed
@@ -194,10 +195,10 @@ func (c *EnlightenCloudClient) buildTelemetryURL(endpoint string, dayStart, dayE
 
 // LocalMetrics is exported in types.go
 //
-// GetEnergyImportForDate gets the total energy imported from the grid for a specific date.
-// If testDate is nil, uses today. Uses energy_import_telemetry endpoint which respects date filtering.
-func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time) (float64, error) {
-	bodyBytes, err := c.fetchTelemetryData(ctx, "energy_import_telemetry", testDate)
+// GetEnergyImportForDate gets the total energy imported from the grid for a specific date/period.
+// If testDate is zero, uses today. queryType determines the time range (day/month/year).
+func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
+	bodyBytes, err := c.fetchTelemetryData(ctx, "energy_import_telemetry", testDate, queryType)
 	if err != nil {
 		return 0, err
 	}
@@ -221,10 +222,10 @@ func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testD
 	return importWh / constants.WhToKWh, nil // Convert Wh to kWh
 }
 
-// GetEnergyExportForDate gets the total energy exported to the grid for a specific date.
-// If testDate is nil, uses today. Uses energy_export_telemetry endpoint which respects date filtering.
-func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time) (float64, error) {
-	bodyBytes, err := c.fetchTelemetryData(ctx, "energy_export_telemetry", testDate)
+// GetEnergyExportForDate gets the total energy exported to the grid for a specific date/period.
+// If testDate is zero, uses today. queryType determines the time range (day/month/year).
+func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
+	bodyBytes, err := c.fetchTelemetryData(ctx, "energy_export_telemetry", testDate, queryType)
 	if err != nil {
 		return 0, err
 	}
@@ -242,11 +243,11 @@ func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testD
 	return exportWh / constants.WhToKWh, nil // Convert Wh to kWh
 }
 
-// GetProductionForDate gets the total energy production for a specific date.
-// If testDate is nil, uses today. Uses telemetry/production_meter endpoint which respects date filtering.
+// GetProductionForDate gets the total energy production for a specific date/period.
+// If testDate is zero, uses today. queryType determines the time range (day/month/year).
 // Returns the aggregated sum of all wh_del values from the API response.
-func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time) (float64, error) {
-	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/production_meter", testDate)
+func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
+	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/production_meter", testDate, queryType)
 	if err != nil {
 		return 0, err
 	}
@@ -269,10 +270,10 @@ func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDat
 	return productionWh / constants.WhToKWh, nil // Convert Wh to kWh
 }
 
-// GetConsumptionForDate gets the total energy consumption for a specific date.
-// If testDate is nil, uses today. Uses telemetry/consumption_meter endpoint which respects date filtering.
-func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time) (float64, error) {
-	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/consumption_meter", testDate)
+// GetConsumptionForDate gets the total energy consumption for a specific date/period.
+// If testDate is zero, uses today. queryType determines the time range (day/month/year).
+func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
+	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/consumption_meter", testDate, queryType)
 	if err != nil {
 		return 0, err
 	}
@@ -290,12 +291,12 @@ func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDa
 	return consumptionWh / constants.WhToKWh, nil // Convert Wh to kWh
 }
 
-// GetBatteryDataForDate gets battery charge, discharge, and State of Charge (SOC) for a specific date.
-// If testDate is nil, uses today. Uses /telemetry/battery endpoint which returns both charge and discharge in one call.
+// GetBatteryDataForDate gets battery charge, discharge, and State of Charge (SOC) for a specific date/period.
+// If testDate is zero, uses today. queryType determines the time range (day/month/year).
 // Returns charged kWh, discharged kWh, and SOC percentage from last_reported_aggregate_soc.
-// Note: Charge and discharge calculations are unchanged - SOC is extracted separately from the response.
-func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time) (charged float64, discharged float64, soc int, err error) {
-	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/battery", testDate)
+// Note: SOC is only meaningful for day queries; for month/year it's just the latest snapshot.
+func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error) {
+	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/battery", testDate, queryType)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("battery API request failed: %w", err)
 	}
@@ -315,13 +316,13 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 		}
 	}
 
-	// Sum intervals that fall within the requested day (in configured timezone)
+	// Sum intervals that fall within the requested period (in configured timezone)
 	// For battery telemetry:
 	// - charge.enwh = energy charged to battery (Wh) per interval
 	// - discharge.enwh = energy discharged from battery (Wh) per interval
 	// These are incremental values per 15-minute interval, so we sum them
-	// Filter by configured timezone (dayStart to dayEnd)
-	dayStart, dayEnd := timezone.GetDayBoundaries(testDate, c.timezone)
+	// Filter by configured timezone (periodStart to periodEnd)
+	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryType, c.timezone)
 	var chargeWh, dischargeWh float64
 
 	for _, interval := range data.Intervals {
@@ -329,9 +330,9 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 		// The interval.EndAt is a Unix timestamp - convert to report timezone
 		intervalEndTime := time.Unix(interval.EndAt, 0).In(c.timezone)
 
-		// Include interval if its end time is within [dayStart, dayEnd] (inclusive both ends)
+		// Include interval if its end time is within [periodStart, periodEnd] (inclusive both ends)
 		// We use end time because the interval represents energy during the period ending at EndAt
-		if (intervalEndTime.Equal(dayStart) || intervalEndTime.After(dayStart)) && (intervalEndTime.Equal(dayEnd) || intervalEndTime.Before(dayEnd)) {
+		if (intervalEndTime.Equal(periodStart) || intervalEndTime.After(periodStart)) && (intervalEndTime.Equal(periodEnd) || intervalEndTime.Before(periodEnd)) {
 			chargeWh += interval.Charge.Enwh       // Energy charged to battery
 			dischargeWh += interval.Discharge.Enwh // Energy discharged from battery
 		}
@@ -340,10 +341,11 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	return chargeWh / constants.WhToKWh, dischargeWh / constants.WhToKWh, socPercent, nil // Convert Wh to kWh
 }
 
-// GetMetricsFromCloud fetches all today's metrics from the Cloud API.
+// GetMetricsFromCloud fetches all metrics from the Cloud API for the specified period.
 // If testDate is provided, uses that date instead of today.
+// queryType determines the time range (day/month/year).
 // Returns metrics and a boolean indicating if any cache was used.
-func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time) (*LocalMetrics, bool, error) {
+func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*LocalMetrics, bool, error) {
 	metrics := &LocalMetrics{
 		Timestamp: time.Now(),
 	}
@@ -351,10 +353,10 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 
 	// Helper to handle optional metrics that may fail (grid import/export, battery)
 	shouldLogError := func(err error) bool {
-		if timezone.IsPastDate(testDate, c.timezone) {
-			return false // Silently use 0 for past dates
+		if timezone.IsPastPeriod(testDate, queryType, c.timezone) {
+			return false // Silently use 0 for past periods
 		}
-		// For today, log only non-rate-limit errors
+		// For current period, log only non-rate-limit errors
 		return !constants.IsRateLimitError(err)
 	}
 
@@ -369,7 +371,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	// Fetch all metrics - make grid import/export optional (they may fail with 500)
 	var err error
 
-	metrics.GridImportToday, err = c.GetEnergyImportForDate(ctx, testDate)
+	metrics.GridImportToday, err = c.GetEnergyImportForDate(ctx, testDate, queryType)
 	if err != nil {
 		if err := checkCancelled(); err != nil {
 			return nil, false, err
@@ -382,7 +384,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	}
 	cacheUsed = cacheUsed || c.cacheUsed
 
-	metrics.GridExportToday, err = c.GetEnergyExportForDate(ctx, testDate)
+	metrics.GridExportToday, err = c.GetEnergyExportForDate(ctx, testDate, queryType)
 	if err != nil {
 		if err := checkCancelled(); err != nil {
 			return nil, false, err
@@ -395,7 +397,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	}
 	cacheUsed = cacheUsed || c.cacheUsed
 
-	metrics.ProductionToday, err = c.GetProductionForDate(ctx, testDate)
+	metrics.ProductionToday, err = c.GetProductionForDate(ctx, testDate, queryType)
 	if err != nil {
 		if err := checkCancelled(); err != nil {
 			return nil, false, err
@@ -404,7 +406,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	}
 	cacheUsed = cacheUsed || c.cacheUsed
 
-	metrics.BatteryChargedToday, metrics.BatteryDischargedToday, metrics.BatterySOC, err = c.GetBatteryDataForDate(ctx, testDate)
+	metrics.BatteryChargedToday, metrics.BatteryDischargedToday, metrics.BatterySOC, err = c.GetBatteryDataForDate(ctx, testDate, queryType)
 	if err != nil {
 		if err := checkCancelled(); err != nil {
 			return nil, false, err
@@ -419,7 +421,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	cacheUsed = cacheUsed || c.cacheUsed
 
 	// Get consumption from API (more accurate than calculation)
-	metrics.ConsumptionToday, err = c.GetConsumptionForDate(ctx, testDate)
+	metrics.ConsumptionToday, err = c.GetConsumptionForDate(ctx, testDate, queryType)
 	if err != nil {
 		if err := checkCancelled(); err != nil {
 			return nil, false, err

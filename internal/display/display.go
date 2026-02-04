@@ -15,6 +15,7 @@ import (
 	"enphase-monitor/internal/aggregator"
 	"enphase-monitor/internal/config"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/timezone"
 )
 
 // GetDefaultColors returns the default color configuration.
@@ -72,48 +73,24 @@ func NewDisplayWithWriter(colors config.ColorConfig, tz *time.Location, w io.Wri
 
 // ShowMetrics displays the aggregated metrics in a formatted output.
 func (d *Display) ShowMetrics(metrics *aggregator.AggregatedMetrics) {
-	d.printHeader(metrics.Timestamp, metrics.CacheUsed, metrics.QueryDate)
+	d.printHeader(metrics.Timestamp, metrics.CacheUsed, metrics.QueryDate, metrics.QueryType)
 	d.printTodayEnergy(metrics)
 	d.printIndividualSystems(metrics)
 	d.printSeparator()
 }
 
-// getDateRange calculates the display date range for a query.
-// Returns the start time (midnight) and end time for display purposes.
-func (d *Display) getDateRange(queryDate, nowLocal time.Time) (start, end time.Time) {
-	// Determine which date to use
-	targetDate := nowLocal
-	if !queryDate.IsZero() {
-		targetDate = queryDate
-	}
-
-	// Calculate midnight of the target date
-	start = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, d.timezone)
-
-	// Calculate end time: default to end of day, override to now if querying today
-	todayMidnight := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, d.timezone)
-	end = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 23, 59, 59, 0, d.timezone)
-	if start.Equal(todayMidnight) {
-		end = nowLocal
-	}
-
-	return start, end
-}
-
-func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate time.Time) {
+func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate time.Time, queryType constants.QueryType) {
 	fmt.Fprintln(d.writer, "\n"+d.colors.Headers+d.separatorLine+constants.Reset)
 	fmt.Fprintf(d.writer, "  %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
 	fmt.Fprintln(d.writer, d.colors.Headers+d.separatorLine+constants.Reset)
 
-	nowLocal := time.Now().In(d.timezone)
-
-	// Use helper to calculate date range (eliminates duplicate logic)
-	dayStart, dayEnd := d.getDateRange(queryDate, nowLocal)
+	// Calculate date range based on query type (day/month/year)
+	periodStart, periodEnd := timezone.GetBoundaries(queryDate, queryType, d.timezone)
 
 	fmt.Fprintf(d.writer, "   %s%-11s%s%s 12:00 AM\n                          to\n                  %s%s\n\n",
 		d.colors.SecondaryText, "Query Range:   ", d.colors.PrimaryText,
-		dayStart.Format("Mon Jan 2, 2006"),
-		dayEnd.Format("Mon Jan 2, 2006 03:04 PM"), constants.Reset)
+		periodStart.Format("Mon Jan 2, 2006"),
+		periodEnd.Format("Mon Jan 2, 2006 03:04 PM"), constants.Reset)
 
 	timestampLocal := timestamp.In(d.timezone)
 	fmt.Fprintf(d.writer, "  %s%-12s%s%s", d.colors.SecondaryText, "Last Updated:   ", d.colors.PrimaryText, timestampLocal.Format("Mon Jan 2, 2006 03:04:05 PM"))
@@ -157,8 +134,12 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "      ", 29, true)
 		d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "      ", 29, true)
 		d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "      ", 29, true)
-		fmt.Fprintf(d.writer, "      %sBattery Charge Percentage:%s   %s%10d%%%s\n",
-			d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
+		// Only show battery charge percentage for day queries
+		// For month/year queries, the SOC is just a snapshot and not meaningful
+		if metrics.QueryType == constants.QueryTypeDay {
+			fmt.Fprintf(d.writer, "      %sBattery Charge Percentage:%s   %s%10d%%%s\n",
+				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
+		}
 		d.printMetric("Total Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "      ", 29, true)
 	}
 }

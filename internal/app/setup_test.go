@@ -89,6 +89,7 @@ import (
 
 	"enphase-monitor/internal/aggregator"
 	"enphase-monitor/internal/config"
+	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/types"
 )
 
@@ -223,7 +224,7 @@ func TestParseTestDate_EmptyString(t *testing.T) {
 		t.Errorf("ParseTestDate() error = %v, want nil", err)
 	}
 	// time.Time{}.IsZero() returns true for uninitialized time
-	if !parsed.IsZero() {
+	if !parsed.Date.IsZero() {
 		t.Error("ParseTestDate() should return zero time for empty string")
 	}
 }
@@ -238,14 +239,18 @@ func TestParseTestDate_ValidDate(t *testing.T) {
 	if err != nil {
 		t.Errorf("ParseTestDate() error = %v, want nil", err)
 	}
-	if parsed.IsZero() {
+	if parsed.Date.IsZero() {
 		t.Error("ParseTestDate() returned zero time for valid date")
 	}
 
 	// Verify the EXACT parsed value, not just that it's non-zero
 	expected := time.Date(2026, 1, 15, 0, 0, 0, 0, tz)
-	if !parsed.Equal(expected) {
-		t.Errorf("ParseTestDate() = %v, want %v", parsed, expected)
+	if !parsed.Date.Equal(expected) {
+		t.Errorf("ParseTestDate() = %v, want %v", parsed.Date, expected)
+	}
+	// Verify query type is day for YYYY-MM-DD format
+	if parsed.QueryType != constants.QueryTypeDay {
+		t.Errorf("ParseTestDate() QueryType = %v, want QueryTypeDay", parsed.QueryType)
 	}
 }
 
@@ -345,7 +350,7 @@ func TestRunOnce_ContextCancelled(t *testing.T) {
 	testDate := time.Time{}
 
 	// RunOnce with cancelled context should return error (no os.Exit)
-	err := RunOnce(ctx, agg, disp, cfg, testDate, false, tz)
+	err := RunOnce(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, false, tz)
 	if err == nil {
 		t.Fatal("RunOnce() with cancelled context: error = nil, want non-nil")
 	}

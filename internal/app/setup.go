@@ -18,10 +18,17 @@ import (
 	"enphase-monitor/internal/aggregator"
 	"enphase-monitor/internal/cache"
 	"enphase-monitor/internal/config"
+	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/display"
 	"enphase-monitor/internal/oauth"
 	"enphase-monitor/internal/timezone"
 )
+
+// ParseDateInput represents the result of parsing a date input string.
+type ParseDateInput struct {
+	Date      time.Time
+	QueryType constants.QueryType
+}
 
 // CreateOAuthAdapter creates an adapter function for OAuth token retrieval.
 // Since config.APIConfig and aggregator.APIConfig are now type aliases to
@@ -67,19 +74,39 @@ func ConfigureModes(testMode, noCache bool) {
 	}
 }
 
-// ParseTestDate parses the test date string and returns a time.Time value.
-// Returns zero value if date string is empty (meaning use today).
-func ParseTestDate(dateStr string, reportTZ *time.Location) (time.Time, error) {
+// ParseTestDate parses the test date string and returns the date and query type.
+// Supports YYYY-MM-DD (day), YYYY-MM (month), and YYYY (year) formats.
+// Returns zero values if date string is empty (meaning use today as a day query).
+func ParseTestDate(dateStr string, reportTZ *time.Location) (ParseDateInput, error) {
 	if dateStr == "" {
-		return time.Time{}, nil
+		return ParseDateInput{
+			Date:      time.Time{},
+			QueryType: constants.QueryTypeDay,
+		}, nil
 	}
 
-	// Parse date using the reporting timezone
-	parsed, err := timezone.ParseDateInTimezone(dateStr, reportTZ)
+	// Use the unified parser that detects format
+	result, err := timezone.ParseDateString(dateStr, reportTZ)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("invalid date format: use YYYY-MM-DD (e.g. 2026-01-19): %w", err)
+		return ParseDateInput{}, fmt.Errorf("invalid date format: use YYYY-MM-DD, YYYY-MM, or YYYY (e.g., 2026-01-19, 2026-01, 2026): %w", err)
 	}
-	return parsed, nil
+
+	return ParseDateInput{
+		Date:      result.Date,
+		QueryType: result.QueryType,
+	}, nil
+}
+
+// FormatDateForQueryType formats a date according to its query type.
+func FormatDateForQueryType(date time.Time, queryType constants.QueryType) string {
+	switch queryType {
+	case constants.QueryTypeYear:
+		return date.Format(constants.YearFormat)
+	case constants.QueryTypeMonth:
+		return date.Format(constants.MonthFormat)
+	default:
+		return date.Format(constants.DateFormat)
+	}
 }
 
 // GetAggregatorTypes extracts systems and API config from the main config.

@@ -177,12 +177,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Parse test date
-	testDateParsed, err := app.ParseTestDate(flags.TestDate, reportTZ)
+	// Parse test date (returns date and query type)
+	parsedInput, err := app.ParseTestDate(flags.TestDate, reportTZ)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(1)
 	}
+	testDateParsed := parsedInput.Date
+	queryType := parsedInput.QueryType
 
 	// Validate cache exists when in test mode (before configuring modes)
 	if flags.TestMode {
@@ -196,20 +198,20 @@ func main() {
 	app.ConfigureModes(flags.TestMode, flags.NoCache)
 
 	// Determine run mode
-	// If querying a past date, always run once since historical data doesn't change
+	// If querying a past period, always run once since historical data doesn't change
 	runOnce := flags.Once
-	if !testDateParsed.IsZero() && timezone.IsPastDate(testDateParsed, reportTZ) {
+	if !testDateParsed.IsZero() && timezone.IsPastPeriod(testDateParsed, queryType, reportTZ) {
 		runOnce = true
 		if !flags.Once {
 			// Inform user why we're running once instead of continuous
-			fmt.Printf("Note: Running once for historical date %s (data won't change)\n\n",
-				testDateParsed.Format("2006-01-02"))
+			periodName := queryType.String()
+			fmt.Printf("Note: Running once for historical %s (data won't change)\n\n", periodName)
 		}
 	}
 
 	// Run once or continuous (exit only from main; app returns errors)
 	if runOnce {
-		if err := app.RunOnce(ctx, agg, disp, cfg, testDateParsed, flags.TestMode, reportTZ); err != nil {
+		if err := app.RunOnce(ctx, agg, disp, cfg, testDateParsed, queryType, flags.TestMode, reportTZ); err != nil {
 			if constants.IsRateLimitError(err) {
 				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 				fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", constants.APIRateLimitWaitSeconds)
@@ -221,7 +223,7 @@ func main() {
 		}
 		return
 	}
-	if err := app.RunContinuous(ctx, agg, disp, cfg, testDateParsed, reportTZ); err != nil {
+	if err := app.RunContinuous(ctx, agg, disp, cfg, testDateParsed, queryType, reportTZ); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(1)
 	}

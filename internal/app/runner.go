@@ -25,10 +25,11 @@ import (
 
 // RunOnce executes a single query, displays results, and returns an error on failure.
 // The caller (main) is responsible for exiting with a non-zero code.
-func RunOnce(ctx context.Context, agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, testDate time.Time, testMode bool, reportTZ *time.Location) error {
+// queryType specifies the query granularity (day/month/year).
+func RunOnce(ctx context.Context, agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, testDate time.Time, queryType constants.QueryType, testMode bool, reportTZ *time.Location) error {
 	aggSystems, aggAPIConfig := GetAggregatorTypes(cfg)
 
-	metrics, err := agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, testDate, reportTZ)
+	metrics, err := agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, testDate, queryType, reportTZ)
 	if err != nil {
 		return err
 	}
@@ -40,7 +41,7 @@ func RunOnce(ctx context.Context, agg *aggregator.DataAggregator, disp *display.
 		if testDate.IsZero() {
 			return fmt.Errorf("--test flag requires --date flag to specify which date to validate")
 		}
-		testDateStr := testDate.Format(constants.DateFormat)
+		testDateStr := FormatDateForQueryType(testDate, queryType)
 		if err := validation.ValidateMetrics(os.Stdout, metrics, testDateStr); err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
@@ -50,7 +51,8 @@ func RunOnce(ctx context.Context, agg *aggregator.DataAggregator, disp *display.
 
 // RunContinuous executes continuous monitoring with periodic refresh.
 // It returns an error only on fatal failures (e.g. rate limit); normal shutdown returns nil.
-func RunContinuous(ctx context.Context, agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, testDate time.Time, reportTZ *time.Location) error {
+// queryType specifies the query granularity (day/month/year).
+func RunContinuous(ctx context.Context, agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, testDate time.Time, queryType constants.QueryType, reportTZ *time.Location) error {
 	disp.ShowInfo(fmt.Sprintf("Starting continuous monitoring (refresh every %d seconds)", cfg.RefreshIntervalSeconds))
 	disp.ShowInfo("Press Ctrl+C to stop")
 
@@ -58,14 +60,14 @@ func RunContinuous(ctx context.Context, agg *aggregator.DataAggregator, disp *di
 	defer ticker.Stop()
 
 	// Run immediately on start
-	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, reportTZ); err != nil {
+	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, queryType, reportTZ); err != nil {
 		return err
 	}
 
 	for {
 		select {
 		case <-ticker.C:
-			if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, reportTZ); err != nil {
+			if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, queryType, reportTZ); err != nil {
 				return err
 			}
 
@@ -81,10 +83,11 @@ func RunContinuous(ctx context.Context, agg *aggregator.DataAggregator, disp *di
 // fetchAndDisplay fetches metrics and displays them to the terminal.
 // Returns a non-nil error only on fatal failures (e.g. rate limit); caller may exit.
 // On non-fatal errors it shows the error and returns nil so the loop can continue.
-func fetchAndDisplay(ctx context.Context, agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, testDate time.Time, reportTZ *time.Location) error {
+// queryType specifies the query granularity (day/month/year).
+func fetchAndDisplay(ctx context.Context, agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, testDate time.Time, queryType constants.QueryType, reportTZ *time.Location) error {
 	aggSystems, aggAPIConfig := GetAggregatorTypes(cfg)
 
-	metrics, err := agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, testDate, reportTZ)
+	metrics, err := agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, testDate, queryType, reportTZ)
 	if err != nil {
 		// If context was cancelled (shutdown in progress), exit silently
 		if ctx.Err() != nil {
