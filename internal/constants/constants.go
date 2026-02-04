@@ -99,12 +99,17 @@ const (
 	APIRateLimitPerMinute = 10
 	// APIRateLimitWaitSeconds is the recommended wait time after hitting rate limit
 	APIRateLimitWaitSeconds = 60
+	// APIMaxDateRangeDays is the maximum date range per API request (7 days)
+	// The Enphase API returns 422 errors for ranges exceeding this limit
+	APIMaxDateRangeDays = 7
 	// HTTPStatusOK is the standard HTTP success status code
 	HTTPStatusOK = 200
 	// HTTPStatusUnauthorized is the unauthorized HTTP status code
 	HTTPStatusUnauthorized = 401
 	// HTTPStatusTooManyRequests is the rate limit HTTP status code
 	HTTPStatusTooManyRequests = 429
+	// HTTPStatusUnprocessableEntity is returned when request parameters are invalid
+	HTTPStatusUnprocessableEntity = 422
 )
 
 // Error Message Constants

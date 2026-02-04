@@ -80,37 +80,37 @@ func (d *Display) ShowMetrics(metrics *aggregator.AggregatedMetrics) {
 }
 
 func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate time.Time, queryType constants.QueryType) {
-	fmt.Fprintln(d.writer, "\n"+d.colors.Headers+d.separatorLine+constants.Reset)
-	fmt.Fprintf(d.writer, "  %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
-	fmt.Fprintln(d.writer, d.colors.Headers+d.separatorLine+constants.Reset)
+	fmt.Fprintln(d.writer, "\n  "+d.colors.Headers+d.separatorLine+constants.Reset)
+	fmt.Fprintf(d.writer, "    %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
+	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
 
 	// Calculate date range based on query type (day/month/year)
 	periodStart, periodEnd := timezone.GetBoundaries(queryDate, queryType, d.timezone)
 
-	fmt.Fprintf(d.writer, "   %s%-11s%s%s 12:00 AM\n                          to\n                  %s%s\n\n",
+	fmt.Fprintf(d.writer, "     %s%-11s%s%s 12:00 AM\n                            to\n                    %s%s\n\n",
 		d.colors.SecondaryText, "Query Range:   ", d.colors.PrimaryText,
 		periodStart.Format("Mon Jan 2, 2006"),
 		periodEnd.Format("Mon Jan 2, 2006 03:04 PM"), constants.Reset)
 
 	timestampLocal := timestamp.In(d.timezone)
-	fmt.Fprintf(d.writer, "  %s%-12s%s%s", d.colors.SecondaryText, "Last Updated:   ", d.colors.PrimaryText, timestampLocal.Format("Mon Jan 2, 2006 03:04:05 PM"))
+	fmt.Fprintf(d.writer, "    %s%-12s%s%s", d.colors.SecondaryText, "Last Updated:   ", d.colors.PrimaryText, timestampLocal.Format("Mon Jan 2, 2006 03:04:05 PM"))
 	sourceLabel := d.colors.Discharge + "(live)" + constants.Reset
 	if cacheUsed {
 		sourceLabel = d.colors.SecondaryText + "(cached)" + constants.Reset
 	}
 	fmt.Fprintf(d.writer, " %s", sourceLabel)
 	fmt.Fprintln(d.writer)
-	fmt.Fprintln(d.writer, d.colors.Headers+d.separatorLine+constants.Reset)
+	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
 }
 
 func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
-	fmt.Fprintf(d.writer, "\n %s%sCOMBINED ENERGY REPORT (kWh)%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
-	fmt.Fprintln(d.writer, d.colors.SecondaryText+d.subSeparator+constants.Reset)
+	fmt.Fprintf(d.writer, "\n   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
+	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printMetric("Produced", metrics.ProductionToday, d.colors.Production, "          ", 12, false)
-	d.printMetric("Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "          ", 12, false)
+	d.printMetric("Produced", metrics.ProductionToday, d.colors.Production, "            ", 12, false)
+	d.printMetric("Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "            ", 12, false)
 
-	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, " ", 21, false)
+	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, "   ", 21, false)
 }
 
 func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) {
@@ -118,34 +118,34 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		return
 	}
 
-	fmt.Fprintf(d.writer, "\n %s%sINDIVIDUAL SYSTEMS REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
-	fmt.Fprintln(d.writer, d.colors.SecondaryText+d.subSeparator+constants.Reset)
+	fmt.Fprintf(d.writer, "\n   %s%sINDIVIDUAL SYSTEMS REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
+	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
 	for i, sys := range metrics.Systems {
 		displayName := sys.Name
 		identifier := sys.ID
-		fmt.Fprintf(d.writer, "\n  %s[%d]%s %s%s%s %s(%s)%s\n",
+		fmt.Fprintf(d.writer, "\n    %s[%d]%s %s%s%s %s(%s)%s\n",
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
-		d.printMetric("Imported from the Grid", sys.GridImportToday, d.colors.Import, "      ", 29, true)
-		d.printMetric("Exported to the Grid", sys.GridExportToday, d.colors.Export, "      ", 29, true)
-		d.printMetric("Captured from the Sun", sys.ProductionToday, d.colors.Production, "      ", 29, true)
-		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "      ", 29, true)
-		d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "      ", 29, true)
-		d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "      ", 29, true)
+		d.printMetric("Imported from the Grid", sys.GridImportToday, d.colors.Import, "        ", 29, true)
+		d.printMetric("Exported to the Grid", sys.GridExportToday, d.colors.Export, "        ", 29, true)
+		d.printMetric("Captured from the Sun", sys.ProductionToday, d.colors.Production, "        ", 29, true)
+		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", 29, true)
+		d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", 29, true)
+		d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "        ", 29, true)
 		// Only show battery charge percentage for day queries
 		// For month/year queries, the SOC is just a snapshot and not meaningful
 		if metrics.QueryType == constants.QueryTypeDay {
-			fmt.Fprintf(d.writer, "      %sBattery Charge Percentage:%s   %s%10d%%%s\n",
+			fmt.Fprintf(d.writer, "        %sBattery Charge Percentage:%s   %s%10d%%%s\n",
 				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		}
-		d.printMetric("Total Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "      ", 29, true)
+		d.printMetric("Total Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", 29, true)
 	}
 }
 
 func (d *Display) printSeparator() {
-	fmt.Fprintln(d.writer, "\n"+d.colors.Headers+d.separatorLine+constants.Reset+"\n")
+	fmt.Fprintln(d.writer, "\n  "+d.colors.Headers+d.separatorLine+constants.Reset+"\n")
 }
 
 func (d *Display) printMetric(label string, value float64, valueColor string, indent string, labelWidth int, rightAlign bool) {
@@ -154,13 +154,22 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 	if labelWidth > 0 && len(labelWithColon) < labelWidth {
 		padding = strings.Repeat(" ", labelWidth-len(labelWithColon))
 	}
+	
+	// Use MWh for values >= 1000 kWh
+	displayValue := value
+	unit := "kWh"
+	if value >= 1000 {
+		displayValue = value / 1000
+		unit = "MWh"
+	}
+	
 	valueFormat := "%.1f"
 	if rightAlign {
 		valueFormat = "%7.1f"
 	}
-	fmt.Fprintf(d.writer, "%s%s%s%s%s%s"+valueFormat+" kWh%s\n",
+	fmt.Fprintf(d.writer, "%s%s%s%s%s%s"+valueFormat+" %s%s\n",
 		indent, d.colors.SecondaryText, labelWithColon, constants.Reset,
-		padding, valueColor, value, constants.Reset)
+		padding, valueColor, displayValue, unit, constants.Reset)
 }
 
 func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int, rightAlign bool) {
@@ -180,23 +189,31 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 	if labelWidth > 0 && len(labelWithColon) < labelWidth {
 		padding = strings.Repeat(" ", labelWidth-len(labelWithColon))
 	}
+	
+	// Use MWh for values >= 1000 kWh
+	unit := "kWh"
+	if displayValue >= 1000 {
+		displayValue = displayValue / 1000
+		unit = "MWh"
+	}
+	
 	valueFormat := "%.1f"
 	if rightAlign {
 		valueFormat = "%7.1f"
 	}
-	fmt.Fprintf(d.writer, "%s%s%s%s%s%s"+valueFormat+" kWh%s %s(%s)%s\n",
+	fmt.Fprintf(d.writer, "%s%s%s%s%s%s"+valueFormat+" %s%s %s(%s)%s\n",
 		indent, d.colors.SecondaryText, labelWithColon, constants.Reset,
-		padding, color, displayValue, constants.Reset,
+		padding, color, displayValue, unit, constants.Reset,
 		color, direction, constants.Reset)
 }
 
 // ShowError displays an error message.
 func (d *Display) ShowError(err error) {
-	fmt.Fprintf(d.writer, "\n%s%sERROR:%s\n", constants.Bold, d.colors.Error, constants.Reset)
-	fmt.Fprintf(d.writer, "   %s%v%s\n\n", d.colors.Error, err, constants.Reset)
+	fmt.Fprintf(d.writer, "\n  %s%sERROR:%s\n", constants.Bold, d.colors.Error, constants.Reset)
+	fmt.Fprintf(d.writer, "     %s%v%s\n\n", d.colors.Error, err, constants.Reset)
 }
 
 // ShowInfo displays an informational message.
 func (d *Display) ShowInfo(message string) {
-	fmt.Fprintf(d.writer, "\n%s%s%s\n", d.colors.SecondaryText, message, constants.Reset)
+	fmt.Fprintf(d.writer, "\n  %s%s%s\n", d.colors.SecondaryText, message, constants.Reset)
 }
