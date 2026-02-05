@@ -378,7 +378,7 @@ Note: Colors are customizable via `config.yaml` (see Color Customization section
 - **Net Energy Flow**: Net import/export for this system (kWh) with (import) or (export) suffix
 - **Charged to Battery**: Energy stored in batteries for this system (kWh)
 - **Discharged from Battery**: Energy used from batteries for this system (kWh)
-- **Battery Charge Percentage**: Current state of charge (SOC) of the battery system, displayed as a percentage (0-100%). This metric is shown per-system only and is not aggregated across multiple systems.
+- **Battery Charge Percentage**: Current state of charge (SOC) of the battery system, displayed as a percentage (0-100%). This metric is shown per-system only (not aggregated) and only for day queries. For month/year queries, battery SOC is omitted since it represents a point-in-time snapshot that isn't meaningful when aggregated over a period.
 - **Total Consumed**: Total consumption for this system (kWh)
 
 ## Color Customization

@@ -177,7 +177,7 @@ type MockCloudClient struct {
     Err       error
 }
 
-func (m *MockCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time) (*api.LocalMetrics, bool, error) {
+func (m *MockCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*api.LocalMetrics, bool, error) {
     if m.Err != nil {
         return nil, false, m.Err
     }
@@ -483,15 +483,15 @@ func TestValidateMetrics_RealData(t *testing.T) {
 ```go
 func TestGetAggregatedMetrics_ContextCancellation(t *testing.T) {
     ctx, cancel := context.WithCancel(context.Background())
-    
+
     // Create slow mock that checks context
     mockClient := &SlowMockClient{delay: 1 * time.Second}
-    
+
     // Cancel immediately
     cancel()
-    
+
     // Should return context error
-    _, err := aggregator.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, tz)
+    _, err := aggregator.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryTypeDay, tz)
     if err == nil || !errors.Is(err, context.Canceled) {
         t.Error("Expected context.Canceled error")
     }

@@ -279,9 +279,10 @@ type EnlightenCloudClient struct {
     cacheUsed   bool            // Tracks if cache was used for the last request
 }
 
-func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time) (*LocalMetrics, bool, error) {
+func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*LocalMetrics, bool, error) {
     // 'c' is the receiver - access struct fields via c.systemID, etc.
     // ctx is used for request cancellation and timeout handling
+    // queryType specifies query granularity (day/month/year)
 }
 ```
 
@@ -414,11 +415,11 @@ for {
     select {
     case <-ticker.C:
         // Timer fired - do periodic work
-        fetchAndDisplay(ctx, ...)
+        fetchAndDisplay(ctx, agg, disp, cfg, testDate, queryType, reportTZ)
     case <-ctx.Done():
         // Signal received - exit gracefully
-        display.ShowInfo("Shutting down gracefully...")
-        return  // defer ticker.Stop() runs here
+        disp.ShowInfo("Shutting down gracefully...")
+        return nil  // defer ticker.Stop() runs here
     }
 }
 ```

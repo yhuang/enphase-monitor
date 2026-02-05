@@ -29,7 +29,7 @@ This document explains all the intermediate Go concepts that are used throughout
 
 ### Error Handling Pattern
 
-**Location**: `aggregator.go:101-102`
+**Location**: `aggregator.go:103-106`
 
 Standard Go pattern: function returns `(result, error)`. We check `err` immediately and return early if non-nil. This is idiomatic Go - errors are values, not exceptions.
 
@@ -54,7 +54,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Error Wrapping with %w
 
-**Location**: `aggregator.go:103`
+**Location**: `aggregator.go:105`
 
 `fmt.Errorf` with `%w` verb wraps the original error, preserving the error chain. This allows callers to use `errors.Is()` or `errors.Unwrap()` to inspect the chain. We add context ("failed to refresh token for system X") while preserving the original error for debugging.
 
@@ -64,7 +64,7 @@ return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, 
 
 ### Error Inspection
 
-**Location**: `aggregator.go:112-118`
+**Location**: `aggregator.go:114-120`
 
 We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit.
 
@@ -84,7 +84,7 @@ if err != nil {
 
 ### Constructor Function Pattern
 
-**Location**: `internal/api/client.go:140-151`
+**Location**: `internal/api/client.go:172-183`
 
 Functions starting with "New" are constructors - they create and initialize structs. This is a Go naming convention, not a language feature. We return a pointer `(*EnlightenCloudClient)` because:
 1. the return type specifies a pointer type;
@@ -100,7 +100,7 @@ func NewEnlightenCloudClient(...) *EnlightenCloudClient {
 
 ### Struct Literal with Pointer
 
-**Location**: `internal/api/client.go:156-165`
+**Location**: `internal/api/client.go:173-182`
 
 `&EnlightenCloudClient{...}` creates a struct and returns a pointer to it. This is idiomatic Go - create struct, take address, return pointer.
 
@@ -113,7 +113,7 @@ return &EnlightenCloudClient{
 
 ### Struct Initialization with Pointer Return
 
-**Location**: `aggregator.go:79-83`
+**Location**: `aggregator.go:80-85`
 
 We use `&AggregatedMetrics{}` to create a pointer to a new struct. This is more efficient than returning by value (avoids copying large struct).
 
@@ -126,7 +126,7 @@ metrics := &AggregatedMetrics{
 
 ### Nested Struct Initialization
 
-**Location**: `internal/api/client.go:147-149`
+**Location**: `internal/api/client.go:179-181`
 
 We initialize `httpClient` field with a struct literal. `http.Client` is from standard library - we set Timeout for safety.
 
@@ -192,7 +192,7 @@ This struct follows Go best practices:
 
 ### Slice Declaration
 
-**Location**: `internal/parser/parser.go:72`
+**Location**: `internal/parser/parser.go:94`
 
 `var name []Type` declares a nil slice (zero value for slices). We will append to it to build the flattened array.
 
@@ -202,7 +202,7 @@ var allIntervals []TelemetryInterval
 
 ### Slice Capacity Hint
 
-**Location**: `aggregator.go:82`
+**Location**: `aggregator.go:84`
 
 `make([]Type, length, capacity)` pre-allocates capacity to avoid reallocation. We know we will have `len(systems)` elements, so we pre-allocate that capacity. This is more efficient than letting the slice grow dynamically.
 
@@ -216,7 +216,7 @@ Systems: make([]SystemMetrics, 0, len(systems)),
 
 ### Variadic Append
 
-**Location**: `internal/parser/parser.go:74`
+**Location**: `internal/parser/parser.go:96`
 
 `append(slice, elements...)` can take multiple elements. `intervalArray...` spreads the slice into individual elements. This is equivalent to: `append(allIntervals, intervalArray[0], intervalArray[1], ...)`
 
@@ -226,7 +226,7 @@ allIntervals = append(allIntervals, intervalArray...)
 
 ### Slice Append
 
-**Location**: `aggregator.go:116`
+**Location**: `aggregator.go:118`
 
 `append()` adds elements to a slice, automatically growing if needed. Since we pre-allocated capacity, this should be efficient.
 
@@ -251,7 +251,7 @@ return hex.EncodeToString(hash[:])
 
 ### Range Loop
 
-**Location**: `internal/parser/parser.go:73-75`
+**Location**: `internal/parser/parser.go:95-97`
 
 `for _, intervalArray := range data.Intervals` iterates over the slice. The `_` discards the index (we do not need it). `intervalArray` is each nested array in the array of arrays.
 
@@ -263,7 +263,7 @@ for _, intervalArray := range data.Intervals {
 
 ### Range Loop Over Slice
 
-**Location**: `internal/parser/parser.go:112`
+**Location**: `internal/parser/parser.go:134`
 
 `for _, interval := range intervals` iterates over each element. `_` discards the index (we do not need it).
 
@@ -275,7 +275,7 @@ for _, interval := range intervals {
 
 ### Switch Statement
 
-**Location**: `internal/parser/parser.go:113-122`
+**Location**: `internal/parser/parser.go:135-145`
 
 `switch` is like `if/else` but cleaner for multiple conditions. It is idiomatic Go for handling multiple cases based on a single value. `switch` compares `fieldName` against each case and executes the matching one. This is more readable than multiple `if/else if` statements.
 
@@ -290,7 +290,7 @@ case constants.FieldWhExported:
 
 ### Continue Statement
 
-**Location**: `aggregator.go:117`
+**Location**: `aggregator.go:119`
 
 `continue` skips to next iteration of the loop. We use it here to skip this system and try the next one.
 
@@ -303,22 +303,25 @@ if err != nil {
 
 ### Zero Value Pattern
 
-**Location**: `internal/app/setup.go:72-75`
+**Location**: `internal/app/setup.go:80-86`
 
 Using `time.Time` (not `*time.Time`) with `.IsZero()` is the idiomatic Go approach. Zero value (`time.Time{}`) means "not set" (use today). Non-zero value means "use this specific date".
 
 ```go
-func ParseTestDate(dateStr string, reportTZ *time.Location) (time.Time, error) {
+func ParseTestDate(dateStr string, reportTZ *time.Location) (ParseDateInput, error) {
     if dateStr == "" {
-        return time.Time{}, nil  // Returns zero value
+        return ParseDateInput{
+            Date:      time.Time{},  // Returns zero value
+            QueryType: constants.QueryTypeDay,
+        }, nil
     }
-    // ... parse and return non-zero time
+    // ... parse and return non-zero time with query type
 }
 ```
 
 ### Zero Value Initialization
 
-**Location**: `internal/parser/parser.go:111`
+**Location**: `internal/parser/parser.go:133`
 
 `var total float64` initializes `total` to `0.0` (zero value for float64). Go's zero values mean we do not need explicit initialization for most types.
 
@@ -413,7 +416,7 @@ Ruby:   "I trust you can do X, we'll see at runtime."
 
 ### Interface Types in This Codebase
 
-**Location**: `internal/parser/parser.go:96`
+**Location**: `internal/parser/parser.go:118`
 
 `io.ReadCloser` is an interface that combines `io.Reader` and `io.Closer`. `http.Response.Body` satisfies this interface, so we can pass it here:
 
@@ -423,7 +426,7 @@ func ReadResponseBody(respBody io.ReadCloser) ([]byte, error) {
 }
 ```
 
-**Location**: `internal/parser/parser.go:97`
+**Location**: `internal/parser/parser.go:119`
 
 `io.ReadAll` accepts any `io.Reader` (interface type). `respBody` satisfies `io.Reader`, so we can pass it directly. This is the power of Go interfaces - code works with any type that has a `Read()` method:
 
@@ -496,7 +499,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Duration Literals
 
-**Location**: `internal/api/client.go:147-149`
+**Location**: `internal/api/client.go:179-181`
 
 `time.Second` is a constant. `30 * time.Second` converts seconds to `time.Duration`. This is idiomatic Go for time durations.
 
@@ -508,7 +511,7 @@ httpClient: &http.Client{
 
 ### Time Ticker
 
-**Location**: `internal/app/runner.go:57-58`
+**Location**: `internal/app/runner.go:59-60`
 
 `time.NewTicker` creates a ticker that sends a value on its channel at regular intervals. `time.Duration(config.RefreshInterval) * time.Second` converts seconds to Duration. We use `defer` to ensure the ticker is stopped when the function returns.
 
@@ -576,7 +579,7 @@ defer stop()
 #### Step 3: Create Timer Ticker
 
 ```go
-// internal/app/runner.go:57-58
+// internal/app/runner.go:59-60
 ticker := time.NewTicker(time.Duration(cfg.RefreshIntervalSeconds) * time.Second)
 defer ticker.Stop()
 ```
@@ -593,17 +596,17 @@ defer ticker.Stop()
 #### Step 4: The Main Loop with Select
 
 ```go
-// internal/app/runner.go:65-78
+// internal/app/runner.go:67-80
 for {
     select {
     case <-ticker.C:
         // Timer ticked - do periodic work
-        fetchAndDisplay(ctx, aggregator, display, config, testDate, reportTZ)
+        fetchAndDisplay(ctx, agg, disp, cfg, testDate, queryType, reportTZ)
 
     case <-ctx.Done():
         // Context cancelled when signal received - handle shutdown
-        display.ShowInfo("Shutting down gracefully...")
-        return
+        disp.ShowInfo("Shutting down gracefully...")
+        return nil
     }
 }
 ```
@@ -923,7 +926,7 @@ for {
 
 ### Defer Statement
 
-**Location**: `internal/app/runner.go:58`
+**Location**: `internal/app/runner.go:60`
 
 `defer` schedules a function call to execute when the surrounding function returns. This ensures cleanup happens even if the function returns early or panics. Here we ensure the ticker is stopped to prevent resource leaks.
 
@@ -974,7 +977,7 @@ return hex.EncodeToString(hash[:])
 
 ### Variable Declaration with Type
 
-**Location**: `internal/aggregator/aggregator.go:85`
+**Location**: `internal/aggregator/aggregator.go:87`
 
 `var name []Type` declares a variable with zero value (nil slice for slices). We could use `:= []string{}` but `var` is clearer when we are not initializing.
 
@@ -988,12 +991,12 @@ var rateLimitErrors []string
 
 ### Multiple Return Values
 
-**Location**: `internal/aggregator/aggregator.go:111`
+**Location**: `internal/aggregator/aggregator.go:113`
 
 Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for rate limiting).
 
 ```go
-localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate)
+localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryType)
 ```
 
 ---
@@ -1110,7 +1113,7 @@ func (c *Client) GetMetrics() (*LocalMetrics, error) {
 
 // interface.go - Contains interface definitions
 type CloudClient interface {
-    GetMetricsFromCloud(ctx context.Context, date time.Time) (*LocalMetrics, bool, error)
+    GetMetricsFromCloud(ctx context.Context, date time.Time, queryType constants.QueryType) (*LocalMetrics, bool, error)
 }
 ```
 
