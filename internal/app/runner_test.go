@@ -11,6 +11,7 @@ import (
 	"enphase-monitor/internal/aggregator"
 	"enphase-monitor/internal/api"
 	"enphase-monitor/internal/config"
+	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/display"
 	"enphase-monitor/internal/types"
 )
@@ -21,30 +22,30 @@ type mockCloudClient struct {
 	err     error
 }
 
-func (m *mockCloudClient) GetMetricsFromCloud(ctx context.Context, date time.Time) (*api.LocalMetrics, bool, error) {
+func (m *mockCloudClient) GetMetricsFromCloud(ctx context.Context, date time.Time, queryType constants.QueryType) (*api.LocalMetrics, bool, error) {
 	if m.err != nil {
 		return nil, false, m.err
 	}
 	return m.metrics, false, nil
 }
 
-func (m *mockCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time) (float64, error) {
+func (m *mockCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
 	return 0, nil
 }
 
-func (m *mockCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time) (float64, error) {
+func (m *mockCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
 	return 0, nil
 }
 
-func (m *mockCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time) (float64, error) {
+func (m *mockCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
 	return 0, nil
 }
 
-func (m *mockCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time) (float64, error) {
+func (m *mockCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
 	return 0, nil
 }
 
-func (m *mockCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time) (charged float64, discharged float64, soc int, err error) {
+func (m *mockCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error) {
 	return 0, 0, 0, nil
 }
 
@@ -95,7 +96,7 @@ func TestRunOnce_Success(t *testing.T) {
 	// Run once
 	testDate := time.Time{} // Use zero time for "today"
 
-	err := RunOnce(ctx, agg, disp, cfg, testDate, false, tz)
+	err := RunOnce(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, false, tz)
 	if err != nil {
 		t.Fatalf("RunOnce() error = %v, want nil", err)
 	}
@@ -146,7 +147,7 @@ func TestFetchAndDisplay_Success(t *testing.T) {
 
 	// Test fetchAndDisplay
 	testDate := time.Time{}
-	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, tz); err != nil {
+	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, tz); err != nil {
 		t.Fatalf("fetchAndDisplay: %v", err)
 	}
 
@@ -189,7 +190,7 @@ func TestFetchAndDisplay_ContextCancelled(t *testing.T) {
 
 	// Test fetchAndDisplay with cancelled context
 	testDate := time.Time{}
-	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, tz); err != nil {
+	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, tz); err != nil {
 		t.Fatalf("fetchAndDisplay: %v", err)
 	}
 
@@ -228,7 +229,7 @@ func TestFetchAndDisplay_Error(t *testing.T) {
 
 	// Test fetchAndDisplay with error
 	testDate := time.Time{}
-	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, tz); err != nil {
+	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, tz); err != nil {
 		t.Fatalf("fetchAndDisplay: %v", err)
 	}
 
@@ -277,7 +278,7 @@ func TestRunContinuous_ImmediateExecution(t *testing.T) {
 
 	// Run continuous (will exit after 100ms due to context timeout)
 	testDate := time.Time{}
-	err := RunContinuous(ctx, agg, disp, cfg, testDate, tz)
+	err := RunContinuous(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, tz)
 	if err != nil {
 		t.Fatalf("RunContinuous() error = %v, want nil", err)
 	}
@@ -340,7 +341,7 @@ func TestRunContinuous_GracefulShutdown(t *testing.T) {
 
 	// Run continuous
 	testDate := time.Time{}
-	err := RunContinuous(ctx, agg, disp, cfg, testDate, tz)
+	err := RunContinuous(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, tz)
 	if err != nil {
 		t.Fatalf("RunContinuous() error = %v, want nil", err)
 	}

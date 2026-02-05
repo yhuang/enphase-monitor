@@ -96,7 +96,7 @@ func TestEnlightenCloudClient_GetProductionForDate(t *testing.T) {
 
 	// Test GetProductionForDate with mock server
 	ctx := context.Background()
-	production, err := client.GetProductionForDate(ctx, time.Time{}) // Today
+	production, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryTypeDay) // Today
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -132,7 +132,7 @@ func TestEnlightenCloudClient_RateLimitHandling(t *testing.T) {
 
 	// Test GetProductionForDate - should return error for 429
 	ctx := context.Background()
-	_, err := client.GetProductionForDate(ctx, time.Time{})
+	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryTypeDay)
 
 	// Verify we got a rate limit error
 	if err == nil {

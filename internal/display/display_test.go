@@ -53,6 +53,7 @@ import (
 
 	"enphase-monitor/internal/aggregator"
 	"enphase-monitor/internal/config"
+	"enphase-monitor/internal/constants"
 )
 
 // mustLoadLocation loads a timezone for tests; fails the test if the timezone is invalid.
@@ -308,73 +309,81 @@ func TestShowInfo(t *testing.T) {
 	}
 }
 
-// TestGetDateRange verifies the date range calculation helper.
-func TestGetDateRange(t *testing.T) {
+// TestShowMetrics_BatterySOC_DayQuery verifies battery SOC is shown for day queries.
+func TestShowMetrics_BatterySOC_DayQuery(t *testing.T) {
+	var buf bytes.Buffer
 	tz := mustLoadLocation(t, "US/Pacific")
-	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &bytes.Buffer{})
 
-	// Test case: query date in the past
-	now := time.Date(2026, 1, 30, 15, 30, 0, 0, tz)
-	queryDate := time.Date(2026, 1, 20, 10, 0, 0, 0, tz)
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
-	start, end := d.getDateRange(queryDate, now)
-
-	// Start should be midnight of query date
-	expectedStart := time.Date(2026, 1, 20, 0, 0, 0, 0, tz)
-	if !start.Equal(expectedStart) {
-		t.Errorf("Start should be %v, got %v", expectedStart, start)
+	metrics := &aggregator.AggregatedMetrics{
+		Timestamp: time.Now(),
+		QueryType: constants.QueryTypeDay,
+		Systems: []aggregator.SystemMetrics{
+			{Name: "Home System", ID: "12345", BatterySOC: 75},
+			{Name: "Office System", ID: "67890", BatterySOC: 50},
+		},
 	}
 
-	// End should be 23:59:59 of query date (past date)
-	expectedEnd := time.Date(2026, 1, 20, 23, 59, 59, 0, tz)
-	if !end.Equal(expectedEnd) {
-		t.Errorf("End should be %v, got %v", expectedEnd, end)
+	d.ShowMetrics(metrics)
+
+	output := buf.String()
+
+	// Battery charge percentage should be shown for day queries
+	if !strings.Contains(output, "Battery Charge Percentage") {
+		t.Error("Output should contain 'Battery Charge Percentage' for day query")
 	}
 }
 
-// TestGetDateRange_Today verifies date range for today.
-func TestGetDateRange_Today(t *testing.T) {
+// TestShowMetrics_BatterySOC_MonthQuery verifies battery SOC is hidden for month queries.
+func TestShowMetrics_BatterySOC_MonthQuery(t *testing.T) {
+	var buf bytes.Buffer
 	tz := mustLoadLocation(t, "US/Pacific")
-	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &bytes.Buffer{})
 
-	// Test case: query date is today
-	now := time.Date(2026, 1, 30, 15, 30, 0, 0, tz)
-	queryDate := time.Date(2026, 1, 30, 10, 0, 0, 0, tz) // Same day
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
-	start, end := d.getDateRange(queryDate, now)
-
-	// Start should be midnight of today
-	expectedStart := time.Date(2026, 1, 30, 0, 0, 0, 0, tz)
-	if !start.Equal(expectedStart) {
-		t.Errorf("Start should be %v, got %v", expectedStart, start)
+	metrics := &aggregator.AggregatedMetrics{
+		Timestamp: time.Now(),
+		QueryType: constants.QueryTypeMonth,
+		Systems: []aggregator.SystemMetrics{
+			{Name: "Home System", ID: "12345", BatterySOC: 75},
+			{Name: "Office System", ID: "67890", BatterySOC: 50},
+		},
 	}
 
-	// End should be current time (now)
-	if !end.Equal(now) {
-		t.Errorf("End should be %v (now), got %v", now, end)
+	d.ShowMetrics(metrics)
+
+	output := buf.String()
+
+	// Battery charge percentage should NOT be shown for month queries
+	if strings.Contains(output, "Battery Charge Percentage") {
+		t.Error("Output should NOT contain 'Battery Charge Percentage' for month query")
 	}
 }
 
-// TestGetDateRange_ZeroQueryDate verifies date range when query date is zero (today).
-func TestGetDateRange_ZeroQueryDate(t *testing.T) {
+// TestShowMetrics_BatterySOC_YearQuery verifies battery SOC is hidden for year queries.
+func TestShowMetrics_BatterySOC_YearQuery(t *testing.T) {
+	var buf bytes.Buffer
 	tz := mustLoadLocation(t, "US/Pacific")
-	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &bytes.Buffer{})
 
-	// Test case: zero query date (means today)
-	now := time.Date(2026, 1, 30, 15, 30, 0, 0, tz)
-	queryDate := time.Time{} // Zero value
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
-	start, end := d.getDateRange(queryDate, now)
-
-	// Start should be midnight of today
-	expectedStart := time.Date(2026, 1, 30, 0, 0, 0, 0, tz)
-	if !start.Equal(expectedStart) {
-		t.Errorf("Start should be %v, got %v", expectedStart, start)
+	metrics := &aggregator.AggregatedMetrics{
+		Timestamp: time.Now(),
+		QueryType: constants.QueryTypeYear,
+		Systems: []aggregator.SystemMetrics{
+			{Name: "Home System", ID: "12345", BatterySOC: 75},
+			{Name: "Office System", ID: "67890", BatterySOC: 50},
+		},
 	}
 
-	// End should be current time (now)
-	if !end.Equal(now) {
-		t.Errorf("End should be %v (now), got %v", now, end)
+	d.ShowMetrics(metrics)
+
+	output := buf.String()
+
+	// Battery charge percentage should NOT be shown for year queries
+	if strings.Contains(output, "Battery Charge Percentage") {
+		t.Error("Output should NOT contain 'Battery Charge Percentage' for year query")
 	}
 }
 

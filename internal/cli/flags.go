@@ -27,7 +27,7 @@ func ParseFlags() *Flags {
 	flag.BoolVar(&flags.SetupOAuth, "setup-oauth", false, "Run OAuth setup wizard (one-time for developer plan)")
 	flag.BoolVar(&flags.ClearCache, "clear-cache", false, "Clear cached API responses for today's date only (preserves yesterday and earlier)")
 	flag.BoolVar(&flags.ClearAllCache, "clear-all-cache", false, "Clear all cached API responses (all dates)")
-	flag.StringVar(&flags.TestDate, "date", "", "Query a specific date (YYYY-MM-DD format, e.g. 2026-01-19). Defaults to today if not specified.")
+	flag.StringVar(&flags.TestDate, "date", "", "Query a specific date/period. Formats: YYYY-MM-DD (day), YYYY-MM (month), YYYY (year). Examples: 2026-01-19, 2026-01, 2026. Defaults to today if not specified.")
 	flag.BoolVar(&flags.TestMode, "test", false, "Test mode: use cache only, no live API calls, validate against expected values")
 	flag.BoolVar(&flags.NoCache, "no-cache", false, "Bypass cache and always make live API calls")
 	flag.BoolVar(&flags.ListCache, "list-cache", false, "List all cached API responses")

@@ -2,12 +2,15 @@ package aggregator
 
 import (
 	"time"
+
+	"enphase-monitor/internal/constants"
 )
 
 // AggregatedMetrics represents combined data from all Enphase systems.
 type AggregatedMetrics struct {
 	Timestamp time.Time
-	QueryDate time.Time // The date being queried (zero value means today)
+	QueryDate time.Time             // The date being queried (zero value means today)
+	QueryType constants.QueryType   // The query granularity (day/month/year)
 
 	// Today's Energy (kWh)
 	ProductionToday  float64

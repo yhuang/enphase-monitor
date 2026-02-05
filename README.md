@@ -217,6 +217,17 @@ This application uses the **Enphase Enlighten Cloud API v4** exclusively to fetc
 - **Reliable Access**: Works from anywhere with internet (no local network required)
 - **Standardized Format**: Consistent JSON responses across all system types
 
+### API Limitations
+
+The Enphase Cloud API v4 has the following technical limits:
+
+- **7-Day Request Limit for Interval Data**: Interval-based endpoints (15-minute data) cannot span more than 7 days per request
+  - The application automatically uses **daily aggregated `_lifetime` endpoints** for month/year queries
+  - These endpoints have no 7-day limit and return one value per day instead of 96 intervals
+  - Example: Querying January 2026 (31 days) → **single API request** using `energy_lifetime` endpoint
+  - Single-day queries still use interval endpoints for better granularity
+- **Rate Limiting**: See [Rate Limits](#rate-limits) section below
+
 ### Rate Limits
 
 The free developer plan has the following limits:
@@ -249,9 +260,19 @@ Query a specific historical date:
 ./enphase-monitor --once --date 2026-01-15
 ```
 
-> **Note:** When querying a past date, the program automatically runs once (even without `--once` flag) since historical data doesn't change over time. You'll see a message like:
+Query an entire month:
+```bash
+./enphase-monitor --once --date 2026-01
+```
+
+Query an entire year:
+```bash
+./enphase-monitor --once --date 2025
+```
+
+> **Note:** When querying a past date/period, the program automatically runs once (even without `--once` flag) since historical data doesn't change over time. You'll see a message like:
 > ```
-> Note: Running once for historical date 2026-01-15 (data won't change)
+> Note: Running once for historical month (data won't change)
 > ```
 
 ### Continuous Monitoring
@@ -269,7 +290,7 @@ Press `Ctrl+C` to stop.
 
 - `--config <path>` - Path to configuration file (default: `config.yaml`)
 - `--once` - Run once and exit instead of continuous monitoring
-- `--date <YYYY-MM-DD>` - Query specific date instead of today (e.g., `2026-01-15`)
+- `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
 - `--setup-oauth` - Run OAuth setup wizard (one-time for developer plan)
 - `--test` - Test mode: use cache only, no live API calls, validate against expected values
 - `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429 rate limit)
@@ -306,7 +327,7 @@ The application displays:
   Last Updated:   Sat Jan 24, 2026 09:52:18 PM (cached)
 =========================================================
 
- COMBINED ENERGY REPORT (kWh)
+ COMBINED ENERGY REPORT
 ---------------------------------------------------------
   Produced:                   33.4 kWh
   Consumed:                   48.6 kWh
