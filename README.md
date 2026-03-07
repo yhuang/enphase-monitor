@@ -226,6 +226,7 @@ The Enphase Cloud API v4 has the following technical limits:
   - These endpoints have no 7-day limit and return one value per day instead of 96 intervals
   - Example: Querying January 2026 (31 days) → **single API request** using `energy_lifetime` endpoint
   - Single-day queries still use interval endpoints for better granularity
+- **Current Month/Year Data Coverage**: When querying the current (ongoing) month or year, data is reported through the **previous complete day** (yesterday). Today's partial data is excluded because the `_lifetime` endpoints only contain completed days. The query range displayed in the report reflects this — it ends at yesterday 11:59 PM, not the current time.
 - **Rate Limiting**: See [Rate Limits](#rate-limits) section below
 
 ### Rate Limits
@@ -453,9 +454,9 @@ The Enphase Enlighten Cloud API v4 enforces strict rate limits:
 The `refresh_interval` setting controls how often the application queries the API in continuous mode. To respect rate limits:
 
 - **Recommended**: `refresh_interval: 3600` (1 hour)
-- **Why**: Each system requires multiple API calls. With 2 systems, you might make 8-10 requests per query cycle. At 3600 seconds, that is ~20 requests per hour, well within limits.
+- **Why**: Each query fetches 5 metrics per system (production, consumption, grid import, grid export, battery). With 2 systems that is exactly 10 requests per cycle — right at the limit. At 3600 seconds, that is ~10 requests per hour, well within limits.
 - **Not Recommended**: Values below 60 seconds (e.g., `refresh_interval: 5`) can quickly exceed the 10 requests/minute limit, especially with multiple systems.
-- **Calculation**: If you have N systems and each requires M API calls, you make N×M requests per cycle. At `refresh_interval: 5`, that is N×M×12 requests per minute, which can easily exceed 10/minute.
+- **Calculation**: If you have N systems, each query makes N×5 requests. With 2 systems that is 10/cycle. At `refresh_interval: 5`, that is 10×12 = 120 requests per minute, far above the limit.
 
 ### Caching Strategy
 

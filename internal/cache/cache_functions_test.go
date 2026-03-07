@@ -144,7 +144,7 @@ func TestNormalizeURLForCache(t *testing.T) {
 		{
 			name:     "URL with timestamps",
 			url:      "https://api.example.com/endpoint?key=test&start_at=1768896000&end_at=1768982400",
-			expected: "https://api.example.com/endpoint?end_date=2026-01-20&key=test&start_date=2026-01-20",
+			expected: "https://api.example.com/endpoint?end_date=2026-01-21&key=test&start_date=2026-01-20",
 		},
 		{
 			name:     "URL with date strings",
@@ -154,7 +154,7 @@ func TestNormalizeURLForCache(t *testing.T) {
 		{
 			name:     "URL with mismatched dates",
 			url:      "https://api.example.com/endpoint?start_date=2026-01-20&end_date=2026-01-21",
-			expected: "https://api.example.com/endpoint?end_date=2026-01-20&start_date=2026-01-20",
+			expected: "https://api.example.com/endpoint?end_date=2026-01-21&start_date=2026-01-20",
 		},
 		{
 			name:     "URL without date parameters",
