@@ -234,8 +234,8 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ┌────────────────────────────────────────────────────────────────────┐
 │              internal/api/EnlightenCloudClient                     │
 │  - OAuth authentication (internal/oauth)                           │
-│  - Telemetry endpoints                                             │
-│  - 15-min intervals                                                │
+│  - Interval endpoints (15-min data, single-day queries)            │
+│  - Lifetime endpoints (daily totals, month/year queries)           │
 └────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
@@ -472,7 +472,7 @@ This code does not create any goroutines. The signal handler runs in a Go runtim
 ### 7. JSON Struct Tags
 
 ```go
-// internal/api/client.go - Mapping JSON to Go structs
+// internal/parser/parser.go - Mapping JSON to Go structs
 type TelemetryResponse struct {
     LastReportedAggregateSOC string              `json:"last_reported_aggregate_soc,omitempty"`
     Intervals                []TelemetryInterval `json:"intervals"`
@@ -597,7 +597,7 @@ when possible to improve testability.
 | **Channels & Select**  | `main.go`                                           | `select` statement, signal handling, graceful shutdown                |
 | **Concurrency**        | `main.go`                                           | Channels, select statement, signal handling (single-threaded execution) |
 | **Struct Methods**     | All files                                           | Pointer vs value receivers, method design                             |
-| **JSON Parsing**       | `internal/parser/parser.go`, `internal/api/client.go` | Struct tags, JSON marshaling/unmarshaling                             |
+| **JSON Parsing**       | `internal/parser/parser.go`                           | Struct tags, JSON marshaling/unmarshaling                             |
 | **Defer Usage**        | Throughout                                          | Resource cleanup, guaranteed execution                                |
 | **Interfaces**         | Throughout                                          | Implicit satisfaction, dependency injection                           |
 

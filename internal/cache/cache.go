@@ -162,8 +162,8 @@ func GetCacheKey(url string, tz *time.Location) string {
 }
 
 // NormalizeURLForCache normalizes a URL by replacing timestamps with date strings
-// Also normalizes date strings to ensure consistent cache keys
-// Example: ...start_at=1735717600&end_at=1737504000 -> ...start_at=2026-01-20&end_at=2026-01-20
+// for consistent cache keys regardless of the exact timestamp within a day.
+// Example: ...start_at=1740960000&end_at=1741132800 -> ...start_date=2026-03-01&end_date=2026-03-06
 // Example: ...start_date=2026-01-20&end_date=2026-01-20 -> ...start_date=2026-01-20&end_date=2026-01-20 (no change)
 func NormalizeURLForCache(urlStr string, tz *time.Location) string {
 	// Parse URL to extract query parameters
@@ -190,15 +190,6 @@ func NormalizeURLForCache(urlStr string, tz *time.Location) string {
 			dateStr := t.Format(constants.DateFormat)
 			query.Del("end_at")
 			query.Set("end_date", dateStr)
-		}
-	}
-
-	// For date strings, ensure both start_date and end_date use the same date
-	// (since we are querying for a single day, both should be the same)
-	if startDate := query.Get("start_date"); startDate != "" {
-		if endDate := query.Get("end_date"); endDate != "" && startDate != endDate {
-			// If dates differ, use start_date for both (the day we are querying)
-			query.Set("end_date", startDate)
 		}
 	}
 

@@ -84,8 +84,15 @@ func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate tim
 	fmt.Fprintf(d.writer, "    %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
 
-	// Calculate date range based on query type (day/month/year)
+	// Calculate date range based on query type (day/month/year).
+	// For ongoing month/year periods, cap the display end to yesterday (last complete day)
+	// to match the lifetime endpoint data coverage — today's partial day is not included.
 	periodStart, periodEnd := timezone.GetBoundaries(queryDate, queryType, d.timezone)
+	if (queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear) &&
+		!timezone.IsPastPeriod(queryDate, queryType, d.timezone) {
+		yesterday := time.Now().In(d.timezone).AddDate(0, 0, -1)
+		periodEnd = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, d.timezone)
+	}
 
 	fmt.Fprintf(d.writer, "     %s%-11s%s%s 12:00 AM\n                            to\n                    %s%s\n\n",
 		d.colors.SecondaryText, "Query Range:   ", d.colors.PrimaryText,
