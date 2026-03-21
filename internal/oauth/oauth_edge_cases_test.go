@@ -46,9 +46,9 @@
 // TEST ORGANIZATION
 // -----------------
 // This package has 3 test files (1:many pattern):
-// - oauth_test.go: Basic unit tests (270 lines)
-// - oauth_functional_test.go: Integration tests (598 lines)
-// - oauth_edge_cases_test.go (this file): Edge cases (442 lines)
+// - oauth_test.go: Basic unit tests (316 lines)
+// - oauth_functional_test.go: Integration tests (652 lines)
+// - oauth_edge_cases_test.go (this file): Edge cases (560 lines)
 //
 // PATTERN USED
 // ------------
@@ -63,9 +63,12 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"enphase-monitor/internal/config"
 	"enphase-monitor/internal/types"
 )
 
@@ -496,5 +499,62 @@ func TestGetAuthorizationURL_EmptyRedirectURI(t *testing.T) {
 	_, err := GetAuthorizationURL(apiConfig)
 	if err == nil {
 		t.Error("Expected error for empty redirect_uri")
+	}
+}
+
+// TestSetup_NilAPI tests that Setup returns an error when cfg.API is nil.
+func TestSetup_NilAPI(t *testing.T) {
+	cfg := &config.Config{API: nil}
+	err := Setup(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("Setup() with nil API: want error, got nil")
+	}
+	if !strings.Contains(err.Error(), "API configuration is required") {
+		t.Errorf("Setup() with nil API: got %q, want 'API configuration is required'", err.Error())
+	}
+}
+
+// TestSetup_EmptyClientID tests that Setup returns an error when ClientID is empty.
+func TestSetup_EmptyClientID(t *testing.T) {
+	cfg := &config.Config{API: &config.APIConfig{ClientID: ""}}
+	err := Setup(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("Setup() with empty ClientID: want error, got nil")
+	}
+	if !strings.Contains(err.Error(), "client_id is required") {
+		t.Errorf("Setup() with empty ClientID: got %q, want 'client_id is required'", err.Error())
+	}
+}
+
+// TestSetup_AuthorizationError tests the authorization-error path of Setup.
+// It provides a redirect URL containing "error=" via stdin, which causes Setup
+// to return early without requiring token exchange or browser interaction.
+func TestSetup_AuthorizationError(t *testing.T) {
+	// Redirect os.Stdin so Setup can read from it without blocking.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe() error = %v", err)
+	}
+	origStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = origStdin }()
+
+	// Write an error redirect URL and close so reads don't block.
+	_, _ = w.WriteString("http://localhost:8080/callback?error=access_denied\n")
+	w.Close()
+
+	cfg := &config.Config{
+		API: &config.APIConfig{
+			ClientID:    "test_client_id",
+			RedirectURI: "http://localhost:8080/callback",
+		},
+	}
+
+	setupErr := Setup(context.Background(), cfg)
+	if setupErr == nil {
+		t.Fatal("Setup() with error redirect: want error, got nil")
+	}
+	if !strings.Contains(setupErr.Error(), "authorization failed") {
+		t.Errorf("Setup() with error redirect: got %q, want 'authorization failed'", setupErr.Error())
 	}
 }

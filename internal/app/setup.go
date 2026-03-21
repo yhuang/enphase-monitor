@@ -44,7 +44,7 @@ func CreateOAuthAdapter() aggregator.OAuthTokenGetter {
 func SetupDisplay(cfg *config.Config, reportTZ *time.Location) *display.Display {
 	colors := display.GetDefaultColors()
 	if cfg.Colors != nil {
-		// Convert main.ColorConfig to config.ColorConfig
+		// Copy config color fields into the display color struct
 		colors.Production = cfg.Colors.Production
 		colors.Discharge = cfg.Colors.Discharge
 		colors.Import = cfg.Colors.Import

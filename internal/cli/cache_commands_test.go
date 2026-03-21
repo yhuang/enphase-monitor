@@ -3,10 +3,13 @@ package cli
 import (
 	"bytes"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"enphase-monitor/internal/cache"
 )
 
 func TestHandleClearCache_Success(t *testing.T) {
@@ -336,5 +339,113 @@ func TestHandleInspectCacheByDate_Integration(t *testing.T) {
 	// Should handle date format properly (either show results or "no cache" message)
 	if output == "" {
 		t.Error("Expected some output from date inspection")
+	}
+}
+
+// createCLITestCacheFile saves a real cache entry and returns its cache path for cleanup.
+func createCLITestCacheFile(t *testing.T, testURL string, body []byte) string {
+	t.Helper()
+	resp := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+	}
+	if err := cache.SaveCachedResponseFromBytes(testURL, resp, body, time.UTC); err != nil {
+		t.Fatalf("failed to create test cache file: %v", err)
+	}
+	return cache.GetCachePath(testURL, time.UTC)
+}
+
+// TestHandleListCache_WithEntries exercises the "Found N cached responses" code path.
+func TestHandleListCache_WithEntries(t *testing.T) {
+	testURL := "https://api.enphaseenergy.com/api/v4/systems/77777/telemetry/production_meter?key=listkey&start_at=1700100000&end_at=1700186400"
+	body := []byte(`{"system_id":77777,"intervals":[{"end_at":1700143200,"wh_del":300.0,"enwh":300.0}]}`)
+	cachePath := createCLITestCacheFile(t, testURL, body)
+	defer os.Remove(cachePath)
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := HandleListCache()
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("HandleListCache() error = %v", err)
+	}
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	output := buf.String()
+
+	// With at least one entry we should see the "Found N cached responses" header
+	if !strings.Contains(output, "cached response") {
+		t.Errorf("HandleListCache() output missing 'cached response': %q", output)
+	}
+}
+
+// TestHandleInspectCache_ByDate_WithEntries exercises handleInspectCacheByDate with a matching entry.
+func TestHandleInspectCache_ByDate_WithEntries(t *testing.T) {
+	// 1763164800 = 2025-11-15 00:00:00 UTC — so QueriedDate will be "2025-11-15"
+	testURL := "https://api.enphaseenergy.com/api/v4/systems/66666/telemetry/battery?key=inspectkey&start_at=1763164800&end_at=1763251200"
+	body := []byte(`{"system_id":66666,"intervals":[]}`)
+	cachePath := createCLITestCacheFile(t, testURL, body)
+	defer os.Remove(cachePath)
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// handleInspectCacheByDate is called by HandleInspectCache when input is a date
+	err := HandleInspectCache("2025-11-15", "config.yaml")
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+
+	if err != nil {
+		t.Fatalf("HandleInspectCache(date) error = %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "Found 1 cached responses") {
+		t.Errorf("HandleInspectCache(date) output missing 'Found 1 cached responses': %s", output)
+	}
+}
+
+// TestHandleInspectCache_ByDate_NoMatchShowsAvailableDates exercises showAvailableDates.
+// It creates a cache entry for one date, then queries a different date so that
+// showAvailableDates is called and prints the available dates.
+func TestHandleInspectCache_ByDate_NoMatchShowsAvailableDates(t *testing.T) {
+	// 1763164800 = 2025-11-15 00:00:00 UTC
+	testURL := "https://api.enphaseenergy.com/api/v4/systems/55555/telemetry/battery?key=showdates&start_at=1763164800&end_at=1763251200"
+	body := []byte(`{"system_id":55555,"intervals":[]}`)
+	cachePath := createCLITestCacheFile(t, testURL, body)
+	defer os.Remove(cachePath)
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Query a different date — not found, so showAvailableDates should print "2025-11-15"
+	err := HandleInspectCache("2025-12-01", "config.yaml")
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+
+	if err != nil {
+		t.Fatalf("HandleInspectCache(no-match date) error = %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "No cached responses found for date 2025-12-01") {
+		t.Errorf("expected 'No cached responses' message, got: %s", output)
+	}
+	if !strings.Contains(output, "Available dates") {
+		t.Errorf("expected 'Available dates' in output, got: %s", output)
 	}
 }

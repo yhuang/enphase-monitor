@@ -48,9 +48,9 @@
 // WHY SEPARATE FILE
 // -----------------
 // This package has 3 test files (1:many pattern):
-// - cache_test.go: Thread safety tests (161 lines)
-// - cache_functions_test.go (this file): Functionality tests (516 lines)
-// - cli_test.go: CLI utilities tests (119 lines)
+// - cache_test.go: Thread safety tests (210 lines)
+// - cache_functions_test.go (this file): Functionality tests (469 lines)
+// - cli_test.go: CLI utilities tests (603 lines)
 //
 // PATTERN USED
 // ------------
@@ -370,6 +370,17 @@ func TestGetCacheDir(t *testing.T) {
 	// Should be an absolute path (starts with /)
 	if !filepath.IsAbs(dir) {
 		t.Errorf("getCacheDir() = %v, should be an absolute path", dir)
+	}
+}
+
+// TestGetCacheDirExported tests the exported GetCacheDir wrapper.
+func TestGetCacheDirExported(t *testing.T) {
+	dir := GetCacheDir()
+	if dir == "" {
+		t.Error("GetCacheDir() returned empty string")
+	}
+	if !filepath.IsAbs(dir) {
+		t.Errorf("GetCacheDir() = %v, should be an absolute path", dir)
 	}
 }
 

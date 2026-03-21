@@ -378,6 +378,78 @@ func contains(s, substr string) bool {
 		(len(s) > 0 && len(substr) > 0 && stringContains(s, substr)))
 }
 
+// TestMergeWithDefaults tests that empty fields are filled from defaults.
+func TestMergeWithDefaults(t *testing.T) {
+	defaults := ColorConfig{
+		Production:    "default-prod",
+		Discharge:     "default-discharge",
+		Import:        "default-import",
+		Export:        "default-export",
+		NetImport:     "default-netimport",
+		NetExport:     "default-netexport",
+		Headers:       "default-headers",
+		Charge:        "default-charge",
+		TotalConsumed: "default-total",
+		SecondaryText: "default-secondary",
+		PrimaryText:   "default-primary",
+		Error:         "default-error",
+	}
+
+	t.Run("all empty fields filled from defaults", func(t *testing.T) {
+		c := ColorConfig{}
+		c.MergeWithDefaults(defaults)
+		if c.Production != "default-prod" {
+			t.Errorf("Production = %q, want %q", c.Production, "default-prod")
+		}
+		if c.Import != "default-import" {
+			t.Errorf("Import = %q, want %q", c.Import, "default-import")
+		}
+		if c.Error != "default-error" {
+			t.Errorf("Error = %q, want %q", c.Error, "default-error")
+		}
+	})
+
+	t.Run("existing fields are not overwritten", func(t *testing.T) {
+		c := ColorConfig{
+			Production: "my-prod",
+			Import:     "my-import",
+		}
+		c.MergeWithDefaults(defaults)
+		if c.Production != "my-prod" {
+			t.Errorf("Production = %q, want %q (should not be overwritten)", c.Production, "my-prod")
+		}
+		if c.Import != "my-import" {
+			t.Errorf("Import = %q, want %q (should not be overwritten)", c.Import, "my-import")
+		}
+		// Other empty fields should still get defaults
+		if c.Discharge != "default-discharge" {
+			t.Errorf("Discharge = %q, want %q", c.Discharge, "default-discharge")
+		}
+	})
+}
+
+// TestConvertHexFields tests that hex color codes in all fields are converted to ANSI.
+func TestConvertHexFields(t *testing.T) {
+	c := ColorConfig{
+		Production: "#FF0000",
+		Import:     "#00FF00",
+		Export:     "not-hex", // non-hex should pass through
+	}
+	c.convertHexFields()
+
+	// After conversion, hex fields should no longer start with #
+	if len(c.Production) > 0 && c.Production[0] == '#' {
+		t.Errorf("convertHexFields() Production still starts with #: %q", c.Production)
+	}
+	if len(c.Import) > 0 && c.Import[0] == '#' {
+		t.Errorf("convertHexFields() Import still starts with #: %q", c.Import)
+	}
+	// Non-hex should be unchanged
+	if c.Export != "not-hex" {
+		t.Errorf("convertHexFields() Export = %q, want %q", c.Export, "not-hex")
+	}
+}
+
 func stringContains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
@@ -386,3 +458,4 @@ func stringContains(s, substr string) bool {
 	}
 	return false
 }
+

@@ -60,6 +60,26 @@ func (e *testError) Error() string {
 	return e.msg
 }
 
+// TestQueryTypeString tests the String() method on QueryType.
+func TestQueryTypeString(t *testing.T) {
+	tests := []struct {
+		qt   QueryType
+		want string
+	}{
+		{QueryTypeDay, "day"},
+		{QueryTypeMonth, "month"},
+		{QueryTypeYear, "year"},
+		{QueryType(99), "day"}, // unknown falls through to default
+	}
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := tt.qt.String(); got != tt.want {
+				t.Errorf("QueryType(%d).String() = %q, want %q", tt.qt, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestIsRateLimitError tests the isRateLimitError helper function
 func TestIsRateLimitError(t *testing.T) {
 	tests := []struct {

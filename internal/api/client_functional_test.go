@@ -208,10 +208,11 @@ func TestGetBatteryDataForDate(t *testing.T) {
 func TestGetBatteryDataForDate_NoSOC(t *testing.T) {
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	// Get current day boundaries
+	// Use midnight (dayStart) as the interval timestamp so it is always within
+	// [periodStart, now] regardless of what time the test runs.
 	now := time.Now().In(tz)
 	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
-	ts1 := dayStart.Add(8 * time.Hour).Unix()
+	ts1 := dayStart.Unix()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return battery telemetry without SOC field
@@ -255,10 +256,11 @@ func TestGetBatteryDataForDate_NoSOC(t *testing.T) {
 func TestGetMetricsFromCloud(t *testing.T) {
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	// Get current day boundaries
+	// Use midnight (dayStart) as the interval timestamp so it is always within
+	// [periodStart, now] regardless of what time the test runs.
 	now := time.Now().In(tz)
 	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
-	ts1 := dayStart.Add(8 * time.Hour).Unix()
+	ts1 := dayStart.Unix()
 
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -558,10 +560,11 @@ func TestGetBatteryDataForDate_InvalidJSON(t *testing.T) {
 func TestGetMetricsFromCloud_ConsumptionFallback(t *testing.T) {
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	// Get current day boundaries
+	// Use midnight (dayStart) as the interval timestamp so it is always within
+	// [periodStart, now] regardless of what time the test runs.
 	now := time.Now().In(tz)
 	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
-	ts1 := dayStart.Add(8 * time.Hour).Unix()
+	ts1 := dayStart.Unix()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path

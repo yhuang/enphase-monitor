@@ -51,7 +51,7 @@
 //   - Converts RGB to ANSI 256-color code
 //   - Falls back to closest ANSI color if exact match not available
 //
-// If colors are not specified, defaults from getDefaultColors() are used.
+// If colors are not specified, defaults from display.GetDefaultColors() are used.
 package config
 
 import (

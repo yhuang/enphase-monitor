@@ -34,15 +34,15 @@ This document explains all the intermediate Go concepts that are used throughout
 Standard Go pattern: function returns `(result, error)`. We check `err` immediately and return early if non-nil. This is idiomatic Go - errors are values, not exceptions.
 
 ```go
-accessToken, err := GetAccessToken(ctx, apiConfig)
+accessToken, err := a.getAccessToken(ctx, apiConfig)
 if err != nil {
-    return nil, err  // Handle or propagate
+    return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, sys.Name, err)
 }
 ```
 
 ### Error Handling with Early Return
 
-**Location**: `internal/parser/parser.go:63`
+**Location**: `internal/parser/parser.go:85`
 
 We check `err` immediately and return early if non-nil. This is idiomatic Go - handle errors as soon as they occur.
 
@@ -70,7 +70,7 @@ We check the error type to determine how to handle it. For rate limit errors, we
 
 ```go
 if err != nil && !constants.IsRateLimitError(err) {
-    return nil, fmt.Errorf("failed to get metrics: %w", err)
+    return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
 }
 if err != nil {
     rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
@@ -84,7 +84,7 @@ if err != nil {
 
 ### Constructor Function Pattern
 
-**Location**: `internal/api/client.go:172-183`
+**Location**: `internal/api/client.go:177-188`
 
 Functions starting with "New" are constructors - they create and initialize structs. This is a Go naming convention, not a language feature. We return a pointer `(*EnlightenCloudClient)` because:
 1. the return type specifies a pointer type;
@@ -100,7 +100,7 @@ func NewEnlightenCloudClient(...) *EnlightenCloudClient {
 
 ### Struct Literal with Pointer
 
-**Location**: `internal/api/client.go:173-182`
+**Location**: `internal/api/client.go:178-187`
 
 `&EnlightenCloudClient{...}` creates a struct and returns a pointer to it. This is idiomatic Go - create struct, take address, return pointer.
 
@@ -149,8 +149,14 @@ If we used `(c ColorConfig)` (value receiver), modifications would only affect t
 
 ```go
 func (c *ColorConfig) convertHexFields() {
-    c.Production = convertIfHex(c.Production)
-    // ...
+    // Collect pointers to all 12 color fields, then convert in one loop
+    fields := []*string{
+        &c.Production, &c.Discharge, &c.Import, &c.Export,
+        // ...all 12 fields...
+    }
+    for _, field := range fields {
+        *field = convertIfHex(*field)
+    }
 }
 ```
 
@@ -236,7 +242,7 @@ rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name,
 
 ### Array to Slice Conversion
 
-**Location**: `internal/cache/cache.go:160-161`
+**Location**: `internal/cache/cache.go:159-160`
 
 `hash[:]` converts the `[32]byte` array to a `[]byte` slice. This is necessary because `hex.EncodeToString` expects `[]byte`, not `[32]byte`. The `[:]` syntax creates a slice that views the entire array.
 
@@ -265,11 +271,15 @@ for _, intervalArray := range data.Intervals {
 
 **Location**: `internal/parser/parser.go:134`
 
-`for _, interval := range intervals` iterates over each element. `_` discards the index (we do not need it).
+`for _, interval := range intervals` iterates over each element. `_` discards the index (we do not need it). The body uses a `switch` to select the correct field (see Switch Statement below).
 
 ```go
 for _, interval := range intervals {
-    total += interval.WhImported
+    switch fieldName {
+    case constants.FieldWhImported:
+        total += interval.WhImported
+    // ...
+    }
 }
 ```
 
@@ -482,14 +492,14 @@ You can use interfaces as:
 
 ### JSON Unmarshaling
 
-**Location**: `internal/parser/parser.go:62-68`
+**Location**: `internal/parser/parser.go:84-90`
 
 `json.Unmarshal` converts JSON bytes into Go structs. We pass `&data` (pointer to struct) so `Unmarshal` can modify it. The struct fields must have json tags matching the JSON field names. If unmarshaling fails, it returns an error (we wrap it with context using `%w`).
 
 ```go
 var data TelemetryResponseNested
 if err := json.Unmarshal(bodyBytes, &data); err != nil {
-    return nil, fmt.Errorf("failed to decode nested telemetry response: %w", err)
+    return nil, fmt.Errorf("failed to decode nested telemetry response (body preview: %s): %w", bodyPreview, err)
 }
 ```
 
@@ -513,10 +523,10 @@ httpClient: &http.Client{
 
 **Location**: `internal/app/runner.go:67-68`
 
-`time.NewTicker` creates a ticker that sends a value on its channel at regular intervals. `time.Duration(config.RefreshInterval) * time.Second` converts seconds to Duration. We use `defer` to ensure the ticker is stopped when the function returns.
+`time.NewTicker` creates a ticker that sends a value on its channel at regular intervals. `time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second` converts seconds to Duration. We use `defer` to ensure the ticker is stopped when the function returns.
 
 ```go
-ticker := time.NewTicker(time.Duration(cfg.RefreshIntervalSeconds) * time.Second)
+ticker := time.NewTicker(time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second)
 defer ticker.Stop()
 ```
 
@@ -601,7 +611,9 @@ for {
     select {
     case <-ticker.C:
         // Timer ticked - do periodic work
-        fetchAndDisplay(ctx, rc)
+        if err := fetchAndDisplay(ctx, rc); err != nil {
+            return err
+        }
 
     case <-ctx.Done():
         // Context cancelled when signal received - handle shutdown
@@ -956,7 +968,7 @@ var (
 
 ### Hash Functions and Array Slices
 
-**Location**: `internal/cache/cache.go:160-161`
+**Location**: `internal/cache/cache.go:159-160`
 
 `sha256.Sum256()` computes a SHA-256 hash and returns a `[32]byte` array (fixed size). We convert it to a string using hex encoding for a readable cache key.
 

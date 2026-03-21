@@ -127,13 +127,13 @@
 // RATE LIMITING
 // -------------
 // The API enforces rate limits (typically 10 requests/minute for free tier).
-// This client relies on api_cache.go for caching responses to reduce API calls.
+// This client relies on internal/cache for caching responses to reduce API calls.
 // On 429 errors, cached responses are used as fallback when available.
 //
 // ERROR HANDLING
 // --------------
 // - 401 Unauthorized: Invalid or expired access token (oauth.go handles refresh)
-// - 429 Too Many Requests: Rate limit exceeded (api_cache.go handles caching)
+// - 429 Too Many Requests: Rate limit exceeded (internal/cache handles caching)
 // - 500 Server Error: Returned to caller (cache fallback if available)
 // - Network errors: Returned to caller for handling
 package api

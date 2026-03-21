@@ -22,22 +22,22 @@ The project follows a pragmatic approach to testing:
 
 | Package | Coverage | Status |
 |---------|----------|--------|
-| constants | 100.0% | ✅ Full coverage - pure constants |
-| display | 100.0% | ✅ Full coverage - output formatting |
 | urlbuilder | 100.0% | ✅ Full coverage - URL construction |
-| validation | 96.6% | ✅ Near-full - metrics validation |
-| timezone | 93.3% | ✅ Near-full - timezone handling |
-| config | 82.4% | ✅ High - YAML parsing |
-| parser | 80.8% | ✅ High - JSON parsing |
-| aggregator | 80.0% | ✅ High - data aggregation |
-| app | 76.8% | ✅ Good - application setup |
-| api | 74.4% | ✅ Good - HTTP client |
-| cache | 66.9% | ✅ Good - file caching |
-| cli | 47.6% | ✅ Adequate - CLI interface |
-| oauth | 46.1% | ✅ Adequate - OAuth flows |
+| constants | 100.0% | ✅ Full coverage - pure constants |
+| display | 95.2% | ✅ Near-full - output formatting |
+| validation | 95.5% | ✅ Near-full - metrics validation |
+| parser | 94.5% | ✅ Near-full - JSON parsing |
+| config | 92.8% | ✅ Near-full - YAML parsing |
+| timezone | 91.4% | ✅ High - timezone handling |
+| cli | 87.7% | ✅ High - CLI interface |
+| aggregator | 86.8% | ✅ High - data aggregation |
+| app | 84.3% | ✅ High - application setup |
+| api | 83.0% | ✅ High - HTTP client |
+| cache | 82.5% | ✅ High - file caching |
+| oauth | 69.2% | ✅ Adequate - OAuth flows |
 | main.go | 0.0% | ✅ **Acceptable** - entry point |
 
-**Overall**: 70.4% coverage (20% above 50-60% typical Go project standard)
+**Overall**: 80.1% coverage (exceeds typical Go project standards of 50-60%)
 
 ### Why main.go Has 0% Coverage
 
@@ -82,19 +82,19 @@ For packages with extensive functionality or different test concerns, tests are 
 **Cache Package** (3 test files):
 - `cache.go` → 3 test files:
   - `cache_test.go` - State management tests
-  - `cache_functions_test.go` - Functionality tests (516 lines)
-  - `cli_test.go` - CLI utilities tests (119 lines)
+  - `cache_functions_test.go` - Functionality tests (469 lines)
+  - `cli_test.go` - CLI utilities tests (603 lines)
 
 **OAuth Package** (3 test files):
 - `oauth.go` → 3 test files:
-  - `oauth_test.go` - Basic unit tests (270 lines)
-  - `oauth_functional_test.go` - Integration tests with mock HTTP servers (598 lines)
-  - `oauth_edge_cases_test.go` - Edge case and error path tests (442 lines)
+  - `oauth_test.go` - Basic unit tests (316 lines)
+  - `oauth_functional_test.go` - Integration tests with mock HTTP servers (652 lines)
+  - `oauth_edge_cases_test.go` - Edge case and error path tests (560 lines)
 
 **Benefits of 1:Many Pattern**:
 - ✅ **Clarity**: Test file name indicates test category
 - ✅ **Maintainability**: Related tests grouped together
-- ✅ **Readability**: Smaller files easier to navigate (161-598 lines vs 516-1310 lines)
+- ✅ **Readability**: Smaller files easier to navigate (210-652 lines vs 516-1310 lines)
 - ✅ **History**: Shows evolution (original → functional → edge cases)
 - ✅ **Focus**: Can run specific test categories independently
 
@@ -668,6 +668,7 @@ These files test component interactions:
 |-----------|-------|---------|
 | `validation_integration_test.go` | 7 test functions | End-to-end validation with real cached data and expected values files |
 | `client_functional_test.go` | API client tests | HTTP interactions with mock server |
+| `client_lifetime_test.go` | Lifetime endpoint tests | Month/year queries via `_lifetime` API endpoints |
 | `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
 
 ### OAuth Test Files

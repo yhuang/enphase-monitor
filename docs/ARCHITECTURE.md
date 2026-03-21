@@ -62,7 +62,8 @@ enphase-monitor/
 │   │   ├── types.go                       # API request/response types
 │   │   ├── interface.go                   # CloudClient interface for testability
 │   │   ├── client_test.go                 # API client unit tests
-│   │   └── client_functional_test.go      # Functional tests with mock HTTP servers
+│   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
+│   │   └── client_lifetime_test.go        # Lifetime endpoint tests (month/year queries)
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   ├── setup_test.go                  # Setup tests
@@ -112,9 +113,11 @@ enphase-monitor/
 │       └── validation_integration_test.go # Integration tests (real expected values)
 │
 ├── docs/                                  # Additional documentation
-│   ├── go-documentation-review.md         # Go documentation style review
-│   ├── go-linting-review.md               # Linting configuration review
-│   └── go-style-core-review.md            # Go style guide compliance review
+│   ├── ARCHITECTURE.md                    # Architecture and design decisions
+│   ├── GO_BEST_PRACTICES.md               # Go best practices guide
+│   ├── GO_CONCEPTS.md                     # Go concepts reference
+│   ├── OAUTH_SETUP.md                     # OAuth setup guide
+│   └── TESTING.md                         # Testing patterns and guidelines
 ├── test-data/                             # Test validation data (expected values)
 ├── config.yaml                            # User configuration (not in git)
 ├── config.yaml.example                    # Configuration template
@@ -271,12 +274,13 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 // internal/api/client.go - Methods bound to struct
 // See internal/api/client.go for the EnlightenCloudClient implementation
 type EnlightenCloudClient struct {
+    baseURL     string         // Base URL for API requests (injectable for testing)
     systemID    string
     apiKey      string
     accessToken string
-    timezone    *time.Location  // Timezone for reporting/queries
+    timezone    *time.Location // Timezone for reporting/queries
     httpClient  *http.Client
-    cacheUsed   bool            // Tracks if cache was used for the last request
+    cacheUsed   bool           // Tracks if cache was used for the last request
 }
 
 func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*LocalMetrics, bool, error) {
@@ -289,7 +293,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 **Why:** Go does not have classes, but struct methods provide similar encapsulation.
 The receiver acts like `this` or `self` in other languages.
 
-**See also:** [internal/api/client.go](internal/api/client.go) for the complete implementation.
+**See also:** [internal/api/client.go](../internal/api/client.go) for the complete implementation.
 
 ### 2. Error Wrapping with Context
 
@@ -304,19 +308,17 @@ if err != nil {
 **Why:** The `%w` verb wraps the original error, preserving the error chain.
 Callers can use `errors.Is()` or `errors.As()` to inspect wrapped errors.
 
-**See also:** [oauth.go](oauth.go) and [aggregator.go](aggregator.go) for error handling patterns throughout the codebase.
+**See also:** [internal/oauth/oauth.go](../internal/oauth/oauth.go) and [internal/aggregator/aggregator.go](../internal/aggregator/aggregator.go) for error handling patterns throughout the codebase.
 
 ### 3. Constructor Overloading with Defaults
 
 This codebase uses a simplified approach to optional configuration:
 
 ```go
-// display.go - Constructor with required timezone and optional colors
-// See display.go lines 80-100 for the actual implementation
-func NewDisplayWithColorsAndTimezone(colors ColorConfig, tz *time.Location) *Display {
-    // Merge with defaults
-    colors.mergeWithDefaults(defaultColors)
-    return &Display{colors: colors, timezone: tz}
+// display.go lines 53-57 - Constructor delegates to NewDisplayWithWriter
+// colors.MergeWithDefaults is called inside NewDisplayWithWriter (lines 61-72)
+func NewDisplayWithColorsAndTimezone(colors config.ColorConfig, tz *time.Location) *Display {
+    return NewDisplayWithWriter(colors, tz, os.Stdout)
 }
 ```
 
@@ -404,11 +406,12 @@ defer resp.Body.Close()  // Always executes when function returns
 This pattern is used **only in continuous monitoring mode** (without `--once`). It is not about parallelism—the work is completely serial. It solves a specific problem: **how to wait for a timer but respond instantly to Ctrl+C**.
 
 ```go
-// main.go - Graceful shutdown with interruptible wait
+// main.go - Signal context for graceful shutdown
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
 
-ticker := time.NewTicker(1 * time.Hour)
+// internal/app/runner.go (RunContinuous) - Ticker and interruptible wait loop
+ticker := time.NewTicker(time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second)
 defer ticker.Stop()
 
 for {
@@ -418,7 +421,7 @@ for {
         fetchAndDisplay(ctx, rc)
     case <-ctx.Done():
         // Signal received - exit gracefully
-        disp.ShowInfo("Shutting down gracefully...")
+        rc.Disp.ShowInfo("Shutting down gracefully...")
         return nil  // defer ticker.Stop() runs here
     }
 }
@@ -522,44 +525,44 @@ when possible to improve testability.
 
 | Package/File                                      | Responsibility                                    |
 |---------------------------------------------------|---------------------------------------------------|
-| [internal/app/setup.go](internal/app/setup.go)         | Application initialization & configuration        |
-| [internal/app/runner.go](internal/app/runner.go)       | Execution modes (once/continuous)                 |
+| [internal/app/setup.go](../internal/app/setup.go)         | Application initialization & configuration        |
+| [internal/app/runner.go](../internal/app/runner.go)       | Execution modes (once/continuous)                 |
 
 ### Internal Packages - CLI Layer
 
 | Package/File                                      | Responsibility                                    |
 |---------------------------------------------------|---------------------------------------------------|
-| [internal/cli/flags.go](internal/cli/flags.go)         | CLI flag parsing and definitions                  |
-| [internal/cli/cache_commands.go](internal/cli/cache_commands.go) | Cache management command handlers     |
+| [internal/cli/flags.go](../internal/cli/flags.go)         | CLI flag parsing and definitions                  |
+| [internal/cli/cache_commands.go](../internal/cli/cache_commands.go) | Cache management command handlers     |
 
 ### Internal Packages - Authentication
 
 | Package/File                                      | Responsibility                                    |
 |---------------------------------------------------|---------------------------------------------------|
-| [internal/oauth/oauth.go](internal/oauth/oauth.go)     | OAuth token management & refresh                  |
-| [internal/oauth/setup.go](internal/oauth/setup.go)     | Interactive OAuth setup wizard                    |
-| [internal/oauth/oauth_test.go](internal/oauth/oauth_test.go) | OAuth tests                               |
+| [internal/oauth/oauth.go](../internal/oauth/oauth.go)     | OAuth token management & refresh                  |
+| [internal/oauth/setup.go](../internal/oauth/setup.go)     | Interactive OAuth setup wizard                    |
+| [internal/oauth/oauth_test.go](../internal/oauth/oauth_test.go) | OAuth tests                               |
 
 ### Internal Packages - Business Logic
 
 | Package/File                                      | Responsibility                                    |
 |---------------------------------------------------|---------------------------------------------------|
-| [internal/aggregator/types.go](internal/aggregator/types.go)         | Metric data structures                            |
-| [internal/aggregator/aggregator.go](internal/aggregator/aggregator.go) | Multi-system aggregation with DI                  |
-| [internal/display/display.go](internal/display/display.go)           | Terminal output formatting with colors            |
-| [internal/api/*](internal/api/)                   | HTTP client for Enphase Cloud API v4              |
-| [internal/cache/*](internal/cache/)               | Disk-based response caching                       |
-| [internal/parser/*](internal/parser/)             | JSON telemetry response parsing                   |
-| [internal/config/*](internal/config/)             | Configuration types and utilities                 |
-| [internal/timezone/*](internal/timezone/)         | Timezone handling and date boundaries             |
-| [internal/validation/*](internal/validation/)     | Test mode validation with tolerance checks        |
-| [internal/constants/*](internal/constants/)       | Centralized constants (20+ constants)             |
+| [internal/aggregator/types.go](../internal/aggregator/types.go)         | Metric data structures                            |
+| [internal/aggregator/aggregator.go](../internal/aggregator/aggregator.go) | Multi-system aggregation with DI                  |
+| [internal/display/display.go](../internal/display/display.go)           | Terminal output formatting with colors            |
+| [internal/api/*](../internal/api/)                   | HTTP client for Enphase Cloud API v4              |
+| [internal/cache/*](../internal/cache/)               | Disk-based response caching                       |
+| [internal/parser/*](../internal/parser/)             | JSON telemetry response parsing                   |
+| [internal/config/*](../internal/config/)             | Configuration types and utilities                 |
+| [internal/timezone/*](../internal/timezone/)         | Timezone handling and date boundaries             |
+| [internal/validation/*](../internal/validation/)     | Test mode validation with tolerance checks        |
+| [internal/constants/*](../internal/constants/)       | Centralized constants (20+ constants)             |
 
 ### Internal Packages - Shared Types
 
 | Package/File                                      | Responsibility                                    |
 |---------------------------------------------------|---------------------------------------------------|
-| [internal/types/types.go](internal/types/types.go)     | Shared type definitions (SystemConfig, APIConfig) |
+| [internal/types/types.go](../internal/types/types.go)     | Shared type definitions (SystemConfig, APIConfig) |
 
 ---
 
@@ -594,8 +597,8 @@ when possible to improve testability.
 | Pattern                | Files to Study                                      | What to Look For                                                      |
 |------------------------|-----------------------------------------------------|-----------------------------------------------------------------------|
 | **Error Handling**     | `internal/oauth/oauth.go`, `internal/api/client.go` | `%w` error wrapping, error propagation                                |
-| **Channels & Select**  | `main.go`                                           | `select` statement, signal handling, graceful shutdown                |
-| **Concurrency**        | `main.go`                                           | Channels, select statement, signal handling (single-threaded execution) |
+| **Channels & Select**  | `main.go`, `internal/app/runner.go`                 | `select` statement, signal handling, graceful shutdown                |
+| **Concurrency**        | `main.go`, `internal/app/runner.go`                 | Channels, select statement, signal handling (single-threaded execution) |
 | **Struct Methods**     | All files                                           | Pointer vs value receivers, method design                             |
 | **JSON Parsing**       | `internal/parser/parser.go`                           | Struct tags, JSON marshaling/unmarshaling                             |
 | **Defer Usage**        | Throughout                                          | Resource cleanup, guaranteed execution                                |
@@ -616,7 +619,7 @@ Each file has package-level documentation explaining its purpose and design deci
 Before committing, run the linter and tests:
 
 - **make lint** — Runs golangci-lint (errcheck, goimports, revive, govet, staticcheck). See [.golangci.yml](.golangci.yml).
-- **CI** — [.github/workflows/ci.yml](.github/workflows/ci.yml) runs on push and pull requests: build, `go vet`, tests, and golangci-lint.
+- **CI** — Not yet configured. Run `make lint` and `go test ./...` locally before committing.
 
 See [README.md#lint-and-ci](README.md#lint-and-ci) for details.
 

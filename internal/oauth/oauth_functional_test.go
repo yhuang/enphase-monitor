@@ -41,9 +41,9 @@
 // TEST ORGANIZATION
 // -----------------
 // This package has 3 test files (1:many pattern):
-// - oauth_test.go: Basic unit tests (270 lines)
-// - oauth_functional_test.go (this file): Integration tests (598 lines)
-// - oauth_edge_cases_test.go: Edge cases and error paths (442 lines)
+// - oauth_test.go: Basic unit tests (316 lines)
+// - oauth_functional_test.go (this file): Integration tests (652 lines)
+// - oauth_edge_cases_test.go: Edge cases and error paths (560 lines)
 //
 // PATTERN USED
 // ------------

@@ -98,8 +98,8 @@ func (c *EnlightenCloudClient) GetMetrics() (*LocalMetrics, error) {
 }
 
 // Value return - small struct, no modification needed
-func getDefaultColors() ColorConfig {
-    return ColorConfig{...}  // Return by value
+func GetDefaultColors() config.ColorConfig {
+    return config.ColorConfig{...}  // Return by value
 }
 
 // Pointer return - large struct, may be nil
@@ -118,8 +118,8 @@ func LoadConfig() (*Config, error) {
 Go methods are functions with a special "receiver" parameter:
 
 ```go
-// Value receiver - receives a copy
-func (d Display) ShowInfo(msg string) {
+// Value receiver - receives a copy (illustrative; Display uses pointer receivers in practice)
+func (d Display) ShowInfo(message string) {
     // Changes to 'd' do not affect the original
 }
 
@@ -789,7 +789,7 @@ This section summarizes documentation rules from the go-documentation skill (Goo
 
 - Every package has a single package comment; multi-file packages use one canonical comment (e.g. cli in cache_commands.go, aggregator in aggregator.go).
 - Exported types and functions have doc comments that start with the name and use full sentences with punctuation.
-- Detailed walkthroughs and onboarding style are in GO_BEST_PRACTICES, GO_CONCEPTS, ARCHITECTURE, and TESTING.md; see [docs/go-documentation-review.md](docs/go-documentation-review.md) for the full review.
+- Detailed walkthroughs and onboarding style are in GO_BEST_PRACTICES, GO_CONCEPTS, ARCHITECTURE, and TESTING.md.
 
 ---
 
@@ -1002,23 +1002,23 @@ For packages with many functions or complex logic, tests are split by **test cat
 **Why split?** Cache has two distinct concerns: state management vs core caching functions.
 
 **OAuth Package** (`oauth.go`):
-1. **`oauth_test.go`** - Basic unit tests (270 lines)
+1. **`oauth_test.go`** - Basic unit tests (316 lines)
    - Tests GetAuthorizationURL validation
    - Tests token refresh mechanics
    - Original tests from early rounds
 
-2. **`oauth_functional_test.go`** - Integration/functional tests (598 lines)
+2. **`oauth_functional_test.go`** - Integration/functional tests (652 lines)
    - Uses mock HTTP servers (`httptest.NewServer`)
    - Tests complete token exchange flows
    - Tests real HTTP interactions with mocked backend
    - Created in Rounds 4-6 for comprehensive coverage
 
-3. **`oauth_edge_cases_test.go`** - Edge case & error path tests (442 lines)
+3. **`oauth_edge_cases_test.go`** - Edge case & error path tests (560 lines)
    - Tests validation errors (missing config, empty fields)
    - Tests network errors, timeouts, malformed responses
    - Created in Round 10 Phase A to improve coverage
 
-**Why split?** OAuth is complex (270 lines of implementation):
+**Why split?** OAuth is complex (283 lines of implementation):
 - Basic validation separate from integration tests
 - Happy path (functional) separate from error paths (edge cases)
 - Easier to maintain and understand test intent
@@ -1027,11 +1027,11 @@ For packages with many functions or complex logic, tests are split by **test cat
 
 ✅ **Clarity** - Test file name indicates test category
 ✅ **Maintainability** - Related tests grouped together
-✅ **Readability** - Smaller files easier to navigate (161-598 lines vs 516-1310 lines)
+✅ **Readability** - Smaller files easier to navigate (210-652 lines vs 516-1310 lines)
 ✅ **History** - Shows evolution (original → functional → edge cases)
 ✅ **Focus** - Can run specific test categories independently
 
-**Bottom line:** The 1:many pattern emerged naturally during refactoring to keep test files organized and maintainable as coverage improved from 29.8% → 70.4%. It's a pragmatic choice, not a strict rule.
+**Bottom line:** The 1:many pattern emerged naturally during refactoring to keep test files organized and maintainable as coverage improved from 29.8% → 80.1%. It's a pragmatic choice, not a strict rule.
 
 ---
 

@@ -233,6 +233,266 @@ func TestIsPastDate(t *testing.T) {
 	}
 }
 
+// TestParseDateString tests unified date string parsing with format detection.
+func TestParseDateString(t *testing.T) {
+	tz, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatalf("Failed to load test timezone: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		dateStr       string
+		wantErr       bool
+		wantQueryType constants.QueryType
+		wantYear      int
+		wantMonth     time.Month
+		wantDay       int
+	}{
+		{
+			name:          "YYYY-MM-DD day format",
+			dateStr:       "2026-01-15",
+			wantQueryType: constants.QueryTypeDay,
+			wantYear:      2026,
+			wantMonth:     time.January,
+			wantDay:       15,
+		},
+		{
+			name:          "YYYY-MM month format",
+			dateStr:       "2026-03",
+			wantQueryType: constants.QueryTypeMonth,
+			wantYear:      2026,
+			wantMonth:     time.March,
+			wantDay:       1,
+		},
+		{
+			name:          "YYYY year format",
+			dateStr:       "2025",
+			wantQueryType: constants.QueryTypeYear,
+			wantYear:      2025,
+			wantMonth:     time.January,
+			wantDay:       1,
+		},
+		{
+			name:    "invalid format",
+			dateStr: "15/01/2026",
+			wantErr: true,
+		},
+		{
+			name:    "invalid day date",
+			dateStr: "2026-02-30",
+			wantErr: true,
+		},
+		{
+			name:    "year out of range",
+			dateStr: "1800",
+			wantErr: true,
+		},
+		{
+			name:    "empty string",
+			dateStr: "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ParseDateString(tt.dateStr, tz)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("ParseDateString(%q) error = nil, want error", tt.dateStr)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ParseDateString(%q) unexpected error = %v", tt.dateStr, err)
+				return
+			}
+			if result.QueryType != tt.wantQueryType {
+				t.Errorf("ParseDateString(%q) QueryType = %v, want %v", tt.dateStr, result.QueryType, tt.wantQueryType)
+			}
+			if result.Date.Year() != tt.wantYear || result.Date.Month() != tt.wantMonth || result.Date.Day() != tt.wantDay {
+				t.Errorf("ParseDateString(%q) date = %v, want %04d-%02d-%02d",
+					tt.dateStr, result.Date, tt.wantYear, tt.wantMonth, tt.wantDay)
+			}
+		})
+	}
+}
+
+// TestGetMonthBoundaries tests month boundary calculations.
+func TestGetMonthBoundaries(t *testing.T) {
+	tz, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatalf("Failed to load test timezone: %v", err)
+	}
+
+	// Past month: boundaries should be exact (Jan 1 to Jan 31)
+	jan2025 := time.Date(2025, time.January, 15, 0, 0, 0, 0, tz)
+	start, end := GetMonthBoundaries(jan2025, tz)
+
+	if start.Year() != 2025 || start.Month() != time.January || start.Day() != 1 {
+		t.Errorf("GetMonthBoundaries() start = %v, want 2025-01-01", start)
+	}
+	if start.Hour() != 0 || start.Minute() != 0 || start.Second() != 0 {
+		t.Errorf("GetMonthBoundaries() start time = %s, want 00:00:00", start.Format("15:04:05"))
+	}
+	if end.Year() != 2025 || end.Month() != time.January || end.Day() != 31 {
+		t.Errorf("GetMonthBoundaries() end = %v, want 2025-01-31", end)
+	}
+	if end.Hour() != 23 || end.Minute() != 59 || end.Second() != 59 {
+		t.Errorf("GetMonthBoundaries() end time = %s, want 23:59:59", end.Format("15:04:05"))
+	}
+
+	// Zero time uses current month — end should be capped to now
+	start2, end2 := GetMonthBoundaries(time.Time{}, tz)
+	if start2.Day() != 1 {
+		t.Errorf("GetMonthBoundaries(zero) start day = %d, want 1", start2.Day())
+	}
+	now := time.Now().In(tz)
+	if end2.After(now.Add(time.Second)) {
+		t.Errorf("GetMonthBoundaries(zero) end %v is after now %v", end2, now)
+	}
+}
+
+// TestGetYearBoundaries tests year boundary calculations.
+func TestGetYearBoundaries(t *testing.T) {
+	tz, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatalf("Failed to load test timezone: %v", err)
+	}
+
+	// Past year: boundaries should be Jan 1 to Dec 31
+	y2024 := time.Date(2024, time.June, 15, 0, 0, 0, 0, tz)
+	start, end := GetYearBoundaries(y2024, tz)
+
+	if start.Year() != 2024 || start.Month() != time.January || start.Day() != 1 {
+		t.Errorf("GetYearBoundaries() start = %v, want 2024-01-01", start)
+	}
+	if end.Year() != 2024 || end.Month() != time.December || end.Day() != 31 {
+		t.Errorf("GetYearBoundaries() end = %v, want 2024-12-31", end)
+	}
+	if end.Hour() != 23 || end.Minute() != 59 || end.Second() != 59 {
+		t.Errorf("GetYearBoundaries() end time = %s, want 23:59:59", end.Format("15:04:05"))
+	}
+
+	// Zero time uses current year — end capped to now
+	start2, end2 := GetYearBoundaries(time.Time{}, tz)
+	if start2.Month() != time.January || start2.Day() != 1 {
+		t.Errorf("GetYearBoundaries(zero) start = %v, want Jan 1", start2)
+	}
+	now := time.Now().In(tz)
+	if end2.After(now.Add(time.Second)) {
+		t.Errorf("GetYearBoundaries(zero) end %v is after now %v", end2, now)
+	}
+}
+
+// TestGetBoundaries tests the unified boundary dispatch function.
+func TestGetBoundaries(t *testing.T) {
+	tz, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatalf("Failed to load test timezone: %v", err)
+	}
+
+	target := time.Date(2025, time.March, 15, 0, 0, 0, 0, tz)
+
+	// Day query: should return day boundaries
+	start, end := GetBoundaries(target, constants.QueryTypeDay, tz)
+	if start.Day() != 15 || start.Hour() != 0 {
+		t.Errorf("GetBoundaries(day) start = %v, want 2025-03-15 00:00:00", start)
+	}
+	if end.Day() != 15 {
+		t.Errorf("GetBoundaries(day) end = %v, want 2025-03-15", end)
+	}
+
+	// Month query: should return month boundaries
+	start, end = GetBoundaries(target, constants.QueryTypeMonth, tz)
+	if start.Day() != 1 {
+		t.Errorf("GetBoundaries(month) start day = %d, want 1", start.Day())
+	}
+	if end.Month() != time.March {
+		t.Errorf("GetBoundaries(month) end month = %v, want March", end.Month())
+	}
+
+	// Year query: should return year boundaries
+	start, end = GetBoundaries(target, constants.QueryTypeYear, tz)
+	if start.Month() != time.January || start.Day() != 1 {
+		t.Errorf("GetBoundaries(year) start = %v, want Jan 1", start)
+	}
+	if end.Month() != time.December || end.Day() != 31 {
+		t.Errorf("GetBoundaries(year) end = %v, want Dec 31", end)
+	}
+}
+
+// TestIsPastPeriod tests period-aware past detection (day/month/year).
+func TestIsPastPeriod(t *testing.T) {
+	tz, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatalf("Failed to load test timezone: %v", err)
+	}
+
+	now := time.Now().In(tz)
+
+	tests := []struct {
+		name       string
+		targetDate time.Time
+		queryType  constants.QueryType
+		want       bool
+	}{
+		{
+			name:       "zero time returns false",
+			targetDate: time.Time{},
+			queryType:  constants.QueryTypeDay,
+			want:       false,
+		},
+		{
+			name:       "past day",
+			targetDate: now.AddDate(0, 0, -1),
+			queryType:  constants.QueryTypeDay,
+			want:       true,
+		},
+		{
+			name:       "today is not past day",
+			targetDate: now,
+			queryType:  constants.QueryTypeDay,
+			want:       false,
+		},
+		{
+			name:       "past month (same year)",
+			targetDate: time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, tz),
+			queryType:  constants.QueryTypeMonth,
+			want:       now.Month() > 1, // only true if we're not in January
+		},
+		{
+			name:       "current month is not past",
+			targetDate: time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, tz),
+			queryType:  constants.QueryTypeMonth,
+			want:       false,
+		},
+		{
+			name:       "past year",
+			targetDate: time.Date(now.Year()-1, time.January, 1, 0, 0, 0, 0, tz),
+			queryType:  constants.QueryTypeYear,
+			want:       true,
+		},
+		{
+			name:       "current year is not past",
+			targetDate: time.Date(now.Year(), time.January, 1, 0, 0, 0, 0, tz),
+			queryType:  constants.QueryTypeYear,
+			want:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsPastPeriod(tt.targetDate, tt.queryType, tz)
+			if got != tt.want {
+				t.Errorf("IsPastPeriod(%v, %v) = %v, want %v",
+					tt.targetDate.Format("2006-01-02"), tt.queryType, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestParseDateInTimezone tests date parsing in specific timezone
 func TestParseDateInTimezone(t *testing.T) {
 	tz, err := time.LoadLocation("America/Los_Angeles")

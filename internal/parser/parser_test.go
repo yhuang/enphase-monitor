@@ -45,6 +45,8 @@
 package parser
 
 import (
+	"io"
+	"strings"
 	"testing"
 
 	"enphase-monitor/internal/constants"
@@ -220,6 +222,183 @@ func TestParseNestedTelemetryResponse(t *testing.T) {
 				if sum != tt.validateSum {
 					t.Errorf("SumIntervalValues() = %.1f, want %.1f", sum, tt.validateSum)
 				}
+			}
+		})
+	}
+}
+
+// TestReadResponseBody tests reading an io.ReadCloser response body.
+func TestReadResponseBody(t *testing.T) {
+	t.Run("reads body successfully", func(t *testing.T) {
+		body := io.NopCloser(strings.NewReader(`{"intervals":[]}`))
+		got, err := ReadResponseBody(body)
+		if err != nil {
+			t.Fatalf("ReadResponseBody() error = %v", err)
+		}
+		if string(got) != `{"intervals":[]}` {
+			t.Errorf("ReadResponseBody() = %q, want %q", string(got), `{"intervals":[]}`)
+		}
+	})
+
+	t.Run("reads empty body", func(t *testing.T) {
+		body := io.NopCloser(strings.NewReader(""))
+		got, err := ReadResponseBody(body)
+		if err != nil {
+			t.Fatalf("ReadResponseBody() error = %v", err)
+		}
+		if len(got) != 0 {
+			t.Errorf("ReadResponseBody() = %q, want empty", string(got))
+		}
+	})
+}
+
+// TestParseLifetimeResponse tests parsing of lifetime endpoint daily aggregated responses.
+func TestParseLifetimeResponse(t *testing.T) {
+	tests := []struct {
+		name      string
+		json      string
+		wantErr   bool
+		wantCount int
+		wantFirst float64
+	}{
+		{
+			name: "production field",
+			json: `{"system_id":12345,"start_date":"2026-01-01","production":[1000.0,2000.0,1500.0]}`,
+			wantCount: 3,
+			wantFirst: 1000.0,
+		},
+		{
+			name: "consumption field",
+			json: `{"system_id":12345,"start_date":"2026-01-01","consumption":[500.0,600.0]}`,
+			wantCount: 2,
+			wantFirst: 500.0,
+		},
+		{
+			name: "import field",
+			json: `{"system_id":12345,"start_date":"2026-01-01","import":[100.0,200.0]}`,
+			wantCount: 2,
+			wantFirst: 100.0,
+		},
+		{
+			name: "export field",
+			json: `{"system_id":12345,"start_date":"2026-01-01","export":[50.0,75.0]}`,
+			wantCount: 2,
+			wantFirst: 50.0,
+		},
+		{
+			name: "intervals fallback field",
+			json: `{"system_id":12345,"start_date":"2026-01-01","intervals":[300.0,400.0]}`,
+			wantCount: 2,
+			wantFirst: 300.0,
+		},
+		{
+			name:      "empty arrays",
+			json:      `{"system_id":12345,"start_date":"2026-01-01","production":[]}`,
+			wantCount: 0,
+		},
+		{
+			name:    "invalid json",
+			json:    `{not valid json`,
+			wantErr: true,
+		},
+		{
+			name:    "invalid start_date",
+			json:    `{"system_id":12345,"start_date":"not-a-date","production":[1000.0]}`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseLifetimeResponse([]byte(tt.json))
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("ParseLifetimeResponse() error = nil, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseLifetimeResponse() unexpected error = %v", err)
+			}
+			if len(got) != tt.wantCount {
+				t.Errorf("ParseLifetimeResponse() len = %d, want %d", len(got), tt.wantCount)
+			}
+			if tt.wantCount > 0 && got[0].Enwh != tt.wantFirst {
+				t.Errorf("ParseLifetimeResponse() first value = %v, want %v", got[0].Enwh, tt.wantFirst)
+			}
+			// Verify dates are sequential
+			if tt.wantCount > 1 {
+				if got[0].Date >= got[1].Date {
+					t.Errorf("ParseLifetimeResponse() dates not sequential: %s >= %s", got[0].Date, got[1].Date)
+				}
+			}
+		})
+	}
+}
+
+// TestSumDailyIntervals tests summing daily interval values within a date range.
+func TestSumDailyIntervals(t *testing.T) {
+	intervals := []DailyInterval{
+		{Date: "2026-01-01", Enwh: 1000.0},
+		{Date: "2026-01-02", Enwh: 2000.0},
+		{Date: "2026-01-03", Enwh: 1500.0},
+		{Date: "2026-01-04", Enwh: 500.0},
+		{Date: "2026-01-05", Enwh: 750.0},
+	}
+
+	tests := []struct {
+		name      string
+		startDate string
+		endDate   string
+		want      float64
+	}{
+		{
+			name:      "full range",
+			startDate: "2026-01-01",
+			endDate:   "2026-01-05",
+			want:      5750.0,
+		},
+		{
+			name:      "single day",
+			startDate: "2026-01-02",
+			endDate:   "2026-01-02",
+			want:      2000.0,
+		},
+		{
+			name:      "partial range",
+			startDate: "2026-01-02",
+			endDate:   "2026-01-04",
+			want:      4000.0,
+		},
+		{
+			name:      "range before all intervals",
+			startDate: "2025-12-01",
+			endDate:   "2025-12-31",
+			want:      0.0,
+		},
+		{
+			name:      "range after all intervals",
+			startDate: "2026-02-01",
+			endDate:   "2026-02-28",
+			want:      0.0,
+		},
+		{
+			name:      "empty intervals",
+			startDate: "2026-01-01",
+			endDate:   "2026-01-05",
+			want:      0.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := intervals
+			if tt.name == "empty intervals" {
+				src = nil
+			}
+			got := SumDailyIntervals(src, tt.startDate, tt.endDate)
+			if got != tt.want {
+				t.Errorf("SumDailyIntervals() = %v, want %v", got, tt.want)
 			}
 		})
 	}

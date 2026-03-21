@@ -111,6 +111,29 @@ import (
 //
 // =============================================================================
 
+// TestFormatDateForQueryType tests date formatting for each query type.
+func TestFormatDateForQueryType(t *testing.T) {
+	date := time.Date(2026, time.March, 15, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		queryType constants.QueryType
+		want      string
+	}{
+		{constants.QueryTypeDay, "2026-03-15"},
+		{constants.QueryTypeMonth, "2026-03"},
+		{constants.QueryTypeYear, "2026"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.queryType.String(), func(t *testing.T) {
+			got := FormatDateForQueryType(date, tt.queryType)
+			if got != tt.want {
+				t.Errorf("FormatDateForQueryType(%v) = %q, want %q", tt.queryType, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCreateOAuthAdapter(t *testing.T) {
 	// SMOKE TEST: Just verify the function returns something
 	// We don't test what the adapter DOES - that's covered in oauth_test.go
