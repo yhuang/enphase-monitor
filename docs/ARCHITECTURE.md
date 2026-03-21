@@ -50,7 +50,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go                                # Entry point (~207 lines) - orchestration only
+├── main.go                                # Entry point (~234 lines) - orchestration only
 ├── internal/
 │   ├── aggregator/                        # Multi-system data aggregation
 │   │   ├── types.go                       # Metric data structures (AggregatedMetrics, SystemMetrics)
@@ -415,7 +415,7 @@ for {
     select {
     case <-ticker.C:
         // Timer fired - do periodic work
-        fetchAndDisplay(ctx, agg, disp, cfg, testDate, queryType, reportTZ)
+        fetchAndDisplay(ctx, rc)
     case <-ctx.Done():
         // Signal received - exit gracefully
         disp.ShowInfo("Shutting down gracefully...")

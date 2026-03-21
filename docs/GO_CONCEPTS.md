@@ -126,13 +126,13 @@ metrics := &AggregatedMetrics{
 
 ### Nested Struct Initialization
 
-**Location**: `internal/api/client.go:179-181`
+**Location**: `internal/api/client.go:184-186`
 
 We initialize `httpClient` field with a struct literal. `http.Client` is from standard library - we set Timeout for safety.
 
 ```go
 httpClient: &http.Client{
-    Timeout: 30 * time.Second,
+    Timeout: constants.APIRequestTimeout,
 }
 ```
 
@@ -499,9 +499,9 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Duration Literals
 
-**Location**: `internal/api/client.go:179-181`
+**Location**: `internal/api/client.go:184-186`
 
-`time.Second` is a constant. `30 * time.Second` converts seconds to `time.Duration`. This is idiomatic Go for time durations.
+`time.Second` is a typed constant (`time.Duration`). Multiplying an integer by `time.Second` — e.g. `30 * time.Second` — is idiomatic Go for expressing durations. In this codebase the value is extracted to `constants.APIRequestTimeout` for clarity.
 
 ```go
 httpClient: &http.Client{
@@ -511,7 +511,7 @@ httpClient: &http.Client{
 
 ### Time Ticker
 
-**Location**: `internal/app/runner.go:59-60`
+**Location**: `internal/app/runner.go:67-68`
 
 `time.NewTicker` creates a ticker that sends a value on its channel at regular intervals. `time.Duration(config.RefreshInterval) * time.Second` converts seconds to Duration. We use `defer` to ensure the ticker is stopped when the function returns.
 
@@ -579,8 +579,8 @@ defer stop()
 #### Step 3: Create Timer Ticker
 
 ```go
-// internal/app/runner.go:59-60
-ticker := time.NewTicker(time.Duration(cfg.RefreshIntervalSeconds) * time.Second)
+// internal/app/runner.go:67-68
+ticker := time.NewTicker(time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second)
 defer ticker.Stop()
 ```
 
@@ -596,16 +596,16 @@ defer ticker.Stop()
 #### Step 4: The Main Loop with Select
 
 ```go
-// internal/app/runner.go:67-80
+// internal/app/runner.go:75-88
 for {
     select {
     case <-ticker.C:
         // Timer ticked - do periodic work
-        fetchAndDisplay(ctx, agg, disp, cfg, testDate, queryType, reportTZ)
+        fetchAndDisplay(ctx, rc)
 
     case <-ctx.Done():
         // Context cancelled when signal received - handle shutdown
-        disp.ShowInfo("Shutting down gracefully...")
+        rc.Disp.ShowInfo("Shutting down gracefully...")
         return nil
     }
 }
@@ -648,7 +648,7 @@ for {
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. Enter Continuous Mode (runContinuous)                    │
+│ 3. Enter Continuous Mode (RunContinuous)                    │
 │    └─► Create ticker: ticker = time.NewTicker(interval)     │
 │        • ticker.C is a channel that fires every interval    │
 └─────────────────────────────────────────────────────────────┘
@@ -926,7 +926,7 @@ for {
 
 ### Defer Statement
 
-**Location**: `internal/app/runner.go:60`
+**Location**: `internal/app/runner.go:68`
 
 `defer` schedules a function call to execute when the surrounding function returns. This ensures cleanup happens even if the function returns early or panics. Here we ensure the ticker is stopped to prevent resource leaks.
 

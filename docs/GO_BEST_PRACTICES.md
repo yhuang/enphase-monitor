@@ -552,20 +552,26 @@ reportTZ, _ := LoadTimezone(config.Timezone) // From config, system, or US/Pacif
 local := time.Now().In(reportTZ)
 ```
 
-### Pointer to Time (Optional Time)
+### Zero Value for Optional Time
+
+This codebase uses `time.Time` (value type) with `.IsZero()` to represent an optional date — zero value means "use today", non-zero means "use this specific date". This avoids pointer indirection and nil checks.
 
 ```go
-// *time.Time allows nil = "not set"
+// time.Time zero value means "not set" — use today
 type AggregatedMetrics struct {
-    Timestamp time.Time   // Always has a value
-    QueryDate *time.Time  // Can be nil (means "today")
+    Timestamp time.Time // Always has a value
+    QueryDate time.Time // Zero value means "today"
 }
 
 // Usage:
-var queryDate *time.Time  // nil = use today
+var queryDate time.Time  // zero = use today
 if userSpecifiedDate {
-    d := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
-    queryDate = &d  // Set to specific date
+    queryDate = time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+}
+
+// Check at call site:
+if queryDate.IsZero() {
+    queryDate = time.Now().In(tz)
 }
 ```
 
@@ -856,7 +862,7 @@ Functions that take a context should accept it as the **first parameter**:
 
 ```go
 // Good: ctx is first
-func RunOnce(ctx context.Context, agg *DataAggregator, ...) error { ... }
+func RunOnce(ctx context.Context, rc RunConfig, testMode bool) error { ... }
 func GetAccessToken(ctx context.Context, apiConfig *APIConfig) (string, error) { ... }
 ```
 
@@ -872,7 +878,7 @@ Use `context.Background()` only for code that is not tied to a request or operat
 // Good: main creates signal context for run loop
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
-app.RunOnce(ctx, agg, disp, ...)
+app.RunOnce(ctx, rc, testMode)
 
 // Good: OAuth setup receives ctx so Ctrl+C cancels token exchange
 oauth.Setup(ctx, cfg)

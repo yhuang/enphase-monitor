@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"context"
-	"io"
 	"strings"
 	"testing"
 	"time"
@@ -47,6 +46,11 @@ func (m *mockCloudClient) GetConsumptionForDate(ctx context.Context, testDate ti
 
 func (m *mockCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error) {
 	return 0, 0, 0, nil
+}
+
+// makeRunConfig creates a RunConfig for tests with QueryTypeDay and zero TestDate.
+func makeRunConfig(agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, tz *time.Location) RunConfig {
+	return RunConfig{Agg: agg, Disp: disp, Cfg: cfg, QueryType: constants.QueryTypeDay, ReportTZ: tz}
 }
 
 // createMockAggregator creates an aggregator with a mock cloud client
@@ -93,10 +97,7 @@ func TestRunOnce_Success(t *testing.T) {
 	buf := &bytes.Buffer{}
 	disp := display.NewDisplayWithWriter(display.GetDefaultColors(), tz, buf)
 
-	// Run once
-	testDate := time.Time{} // Use zero time for "today"
-
-	err := RunOnce(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, false, tz)
+	err := RunOnce(ctx, makeRunConfig(agg, disp, cfg, tz), false)
 	if err != nil {
 		t.Fatalf("RunOnce() error = %v, want nil", err)
 	}
@@ -145,9 +146,7 @@ func TestFetchAndDisplay_Success(t *testing.T) {
 	buf := &bytes.Buffer{}
 	disp := display.NewDisplayWithWriter(display.GetDefaultColors(), tz, buf)
 
-	// Test fetchAndDisplay
-	testDate := time.Time{}
-	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, tz); err != nil {
+	if err := fetchAndDisplay(ctx, makeRunConfig(agg, disp, cfg, tz)); err != nil {
 		t.Fatalf("fetchAndDisplay: %v", err)
 	}
 
@@ -188,9 +187,7 @@ func TestFetchAndDisplay_ContextCancelled(t *testing.T) {
 	buf := &bytes.Buffer{}
 	disp := display.NewDisplayWithWriter(display.GetDefaultColors(), tz, buf)
 
-	// Test fetchAndDisplay with cancelled context
-	testDate := time.Time{}
-	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, tz); err != nil {
+	if err := fetchAndDisplay(ctx, makeRunConfig(agg, disp, cfg, tz)); err != nil {
 		t.Fatalf("fetchAndDisplay: %v", err)
 	}
 
@@ -227,9 +224,7 @@ func TestFetchAndDisplay_Error(t *testing.T) {
 	buf := &bytes.Buffer{}
 	disp := display.NewDisplayWithWriter(display.GetDefaultColors(), tz, buf)
 
-	// Test fetchAndDisplay with error
-	testDate := time.Time{}
-	if err := fetchAndDisplay(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, tz); err != nil {
+	if err := fetchAndDisplay(ctx, makeRunConfig(agg, disp, cfg, tz)); err != nil {
 		t.Fatalf("fetchAndDisplay: %v", err)
 	}
 
@@ -276,9 +271,7 @@ func TestRunContinuous_ImmediateExecution(t *testing.T) {
 	buf := &bytes.Buffer{}
 	disp := display.NewDisplayWithWriter(display.GetDefaultColors(), tz, buf)
 
-	// Run continuous (will exit after 100ms due to context timeout)
-	testDate := time.Time{}
-	err := RunContinuous(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, tz)
+	err := RunContinuous(ctx, makeRunConfig(agg, disp, cfg, tz))
 	if err != nil {
 		t.Fatalf("RunContinuous() error = %v, want nil", err)
 	}
@@ -339,9 +332,7 @@ func TestRunContinuous_GracefulShutdown(t *testing.T) {
 		cancel()
 	}()
 
-	// Run continuous
-	testDate := time.Time{}
-	err := RunContinuous(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, tz)
+	err := RunContinuous(ctx, makeRunConfig(agg, disp, cfg, tz))
 	if err != nil {
 		t.Fatalf("RunContinuous() error = %v, want nil", err)
 	}
@@ -354,5 +345,3 @@ func TestRunContinuous_GracefulShutdown(t *testing.T) {
 	}
 }
 
-// Suppress unused import warning - io package is needed for display.NewDisplayWithWriter signature
-var _ io.Writer

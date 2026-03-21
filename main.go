@@ -204,9 +204,18 @@ func main() {
 		runOnce = true
 	}
 
+	rc := app.RunConfig{
+		Agg:       agg,
+		Disp:      disp,
+		Cfg:       cfg,
+		TestDate:  testDateParsed,
+		QueryType: queryType,
+		ReportTZ:  reportTZ,
+	}
+
 	// Run once or continuous (exit only from main; app returns errors)
 	if runOnce {
-		if err := app.RunOnce(ctx, agg, disp, cfg, testDateParsed, queryType, flags.TestMode, reportTZ); err != nil {
+		if err := app.RunOnce(ctx, rc, flags.TestMode); err != nil {
 			if constants.IsRateLimitError(err) {
 				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 				fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", constants.APIRateLimitWaitSeconds)
@@ -218,7 +227,7 @@ func main() {
 		}
 		return
 	}
-	if err := app.RunContinuous(ctx, agg, disp, cfg, testDateParsed, queryType, reportTZ); err != nil {
+	if err := app.RunContinuous(ctx, rc); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(1)
 	}

@@ -119,7 +119,7 @@ go build -o enphase-monitor
      error: "#ff0000"              # Error Text
    ```
 
-> **💡 Implementation Details**: See [config.go](config.go) for color conversion logic (hex → ANSI) and [display.go](display.go) for color usage in terminal output.
+> **💡 Implementation Details**: See [internal/config/config.go](internal/config/config.go) for color conversion logic (hex → ANSI) and [internal/display/display.go](internal/display/display.go) for color usage in terminal output.
 
 ### Configuration Sections
 

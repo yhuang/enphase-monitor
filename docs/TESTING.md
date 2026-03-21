@@ -41,7 +41,7 @@ The project follows a pragmatic approach to testing:
 
 ### Why main.go Has 0% Coverage
 
-The `main.go` file is pure orchestration (~207 lines) and has 0% coverage by design. This is an **industry standard** because:
+The `main.go` file is pure orchestration (~234 lines) and has 0% coverage by design. This is an **industry standard** because:
 
 1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
 2. **All logic tested**: All functions `main.go` calls are tested in internal packages

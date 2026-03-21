@@ -1,4 +1,4 @@
-// api_cache.go provides a caching layer for API responses.
+// Package cache provides a caching layer for API responses.
 //
 // PURPOSE
 // -------
@@ -137,7 +137,6 @@ type CachedResponse struct {
 	QueriedDate string            `json:"queried_date,omitempty"` // The date that was queried (YYYY-MM-DD), not the API's start_date
 }
 
-// toHTTPResponse reconstructs an *http.Response from a cached response.
 // ToHTTPResponse reconstructs an *http.Response from a cached response.
 func (c *CachedResponse) ToHTTPResponse() *http.Response {
 	resp := &http.Response{

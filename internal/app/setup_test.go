@@ -347,10 +347,9 @@ func TestRunOnce_ContextCancelled(t *testing.T) {
 
 	tz := time.UTC
 	disp := SetupDisplay(cfg, tz)
-	testDate := time.Time{}
 
 	// RunOnce with cancelled context should return error (no os.Exit)
-	err := RunOnce(ctx, agg, disp, cfg, testDate, constants.QueryTypeDay, false, tz)
+	err := RunOnce(ctx, RunConfig{Agg: agg, Disp: disp, Cfg: cfg, QueryType: constants.QueryTypeDay, ReportTZ: tz}, false)
 	if err == nil {
 		t.Fatal("RunOnce() with cancelled context: error = nil, want non-nil")
 	}
