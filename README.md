@@ -140,7 +140,7 @@ Each system requires:
 #### Optional Settings
 
 - `refresh_interval`: How often to query the API in continuous mode (default: 3600 seconds = 1 hour)
-  - **⚠️ Important**: Only applies when running in continuous mode (without `--once` flag)
+  - **⚠️ Important**: Only applies when running in continuous mode (with `--continuous` flag)
   - **Recommended**: Use 3600 seconds (1 hour) to respect API rate limits
   - **Rate Limit Consideration**: The API allows 10 requests per minute. With multiple systems, a low `refresh_interval` (e.g., 5 seconds) can quickly exceed this limit. For 2 systems, you would make 24 requests per minute (2 systems × 12 queries/minute), which exceeds the 10/minute limit.
   - **Best Practice**: Use 3600 seconds (1 hour) or higher to stay well within rate limits
@@ -249,29 +249,29 @@ The application automatically caches API responses to minimize API calls. The de
 
 ## Usage
 
-### Run Once (Single Query)
+### Run Once (Single Query, Default)
 
 Query today's data and exit:
 ```bash
-./enphase-monitor --once
+./enphase-monitor
 ```
 
 Query a specific historical date:
 ```bash
-./enphase-monitor --once --date 2026-01-15
+./enphase-monitor --date 2026-01-15
 ```
 
 Query an entire month:
 ```bash
-./enphase-monitor --once --date 2026-01
+./enphase-monitor --date 2026-01
 ```
 
 Query an entire year:
 ```bash
-./enphase-monitor --once --date 2025
+./enphase-monitor --date 2025
 ```
 
-> **Note:** When querying a past date/period, the program automatically runs once (even without `--once` flag) since historical data doesn't change over time. You'll see a message like:
+> **Note:** When querying a past date/period, the program automatically runs once since historical data doesn't change over time. You'll see a message like:
 > ```
 > Note: Running once for historical month (data won't change)
 > ```
@@ -280,7 +280,7 @@ Query an entire year:
 
 Monitor with auto-refresh (uses `refresh_interval` from config):
 ```bash
-./enphase-monitor
+./enphase-monitor --continuous
 ```
 
 The application will query all systems at the configured `refresh_interval` (default: 3600 seconds = 1 hour) and display updated metrics.
@@ -290,7 +290,7 @@ Press `Ctrl+C` to stop.
 ### Command-Line Options
 
 - `--config <path>` - Path to configuration file (default: `config.yaml`)
-- `--once` - Run once and exit instead of continuous monitoring
+- `--continuous` - Run continuously with periodic refresh (default is run once and exit)
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
 - `--setup-oauth` - Run OAuth setup wizard (one-time for developer plan)
 - `--test` - Test mode: use cache only, no live API calls, validate against expected values
@@ -307,10 +307,10 @@ Press `Ctrl+C` to stop.
 ./enphase-monitor --config /path/to/my-config.yaml
 
 # Query last week's data
-./enphase-monitor --once --date 2026-01-12
+./enphase-monitor --date 2026-01-12
 
-# Continuous monitoring with default settings
-./enphase-monitor
+# Continuous monitoring with periodic refresh
+./enphase-monitor --continuous
 ```
 
 ## Output Format
@@ -688,7 +688,7 @@ CI is not yet configured. Run `make lint` and `go test ./...` locally before com
 Run in test mode using only cached responses (no live API calls):
 
 ```bash
-./enphase-monitor --once --test --date 2026-01-20
+./enphase-monitor --test --date 2026-01-20
 ```
 
 This will:
@@ -705,7 +705,7 @@ The `--test` flag includes early validation to prevent confusing errors:
 ERROR: --test flag requires cached data, but no cache exists for 2026-01-30.
 
 To populate the cache, run:
-  ./enphase-monitor --once
+  ./enphase-monitor
 
 Then retry with --test.
 ```
@@ -721,7 +721,7 @@ Example format:
   { "date": "2026-01-01", "systems": [...] }
 
 To skip validation and just use cache-only mode, omit the --test flag:
-  ./enphase-monitor --once --date 2026-01-01
+  ./enphase-monitor --date 2026-01-01
 ```
 
 ### Setting Up Test Data
@@ -740,7 +740,7 @@ To skip validation and just use cache-only mode, omit the --test flag:
 
 2. **Or manually generate cache for a specific date**:
    ```bash
-   ./enphase-monitor --once --date 2026-01-20
+   ./enphase-monitor --date 2026-01-20
    ```
    This will make live API calls and cache the responses in `cache/`
 
@@ -748,7 +748,7 @@ To skip validation and just use cache-only mode, omit the --test flag:
 
 4. **Now you can iterate rapidly using test mode** (uses cache only, no API calls):
    ```bash
-   ./enphase-monitor --once --test --date 2026-01-20
+   ./enphase-monitor --test --date 2026-01-20
    ```
 
 **Note:** Test mode uses the cache from `cache/`. The `scripts/run-tests.sh` script ensures all test dates have cached responses available.

@@ -165,11 +165,18 @@ import (
 type EnlightenCloudClient struct {
 	baseURL     string // Base URL for API requests (injectable for testing)
 	systemID    string
+	systemName  string
 	apiKey      string
 	accessToken string
 	timezone    *time.Location // Timezone for reporting/queries
 	httpClient  *http.Client
 	cacheUsed   bool // Tracks if cache was used for the last request
+}
+
+// WithSystemName sets the display name used in warning messages and returns the client.
+func (c *EnlightenCloudClient) WithSystemName(name string) *EnlightenCloudClient {
+	c.systemName = name
+	return c
 }
 
 // NewEnlightenCloudClient creates a new client for Enlighten Cloud API with API key and OAuth token.
@@ -227,7 +234,7 @@ func (c *EnlightenCloudClient) fetchTelemetryData(ctx context.Context, endpoint 
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryType)
 	c.cacheUsed = cacheUsed
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", endpoint, err)
 	}
 	defer resp.Body.Close()
 
@@ -353,7 +360,7 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	// Single-day query: use interval endpoint.
 	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/battery", testDate, queryType)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("battery API request failed: %w", err)
+		return 0, 0, 0, err
 	}
 
 	var data parser.TelemetryResponse
@@ -475,6 +482,11 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 		return !constants.IsRateLimitError(err)
 	}
 
+	sysPrefix := ""
+	if c.systemName != "" {
+		sysPrefix = "[" + c.systemName + "] "
+	}
+
 	// Helper to check context cancellation
 	checkCancelled := func() error {
 		if ctx.Err() != nil {
@@ -493,7 +505,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 		}
 		// Grid import may fail - continue with 0
 		if shouldLogError(err) {
-			fmt.Printf("WARNING: Failed to get grid import: %v\n", err)
+			fmt.Printf("WARNING: %sFailed to get grid import: %v\n", sysPrefix, err)
 		}
 		metrics.GridImportToday = 0
 	}
@@ -506,7 +518,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 		}
 		// Grid export may fail - continue with 0
 		if shouldLogError(err) {
-			fmt.Printf("WARNING: Failed to get grid export: %v\n", err)
+			fmt.Printf("WARNING: %sFailed to get grid export: %v\n", sysPrefix, err)
 		}
 		metrics.GridExportToday = 0
 	}
@@ -526,9 +538,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 		if err := checkCancelled(); err != nil {
 			return nil, false, err
 		}
-		// Log the error but continue without battery data
-		// This helps understand why battery data might be missing
-		fmt.Printf("WARNING: Failed to get battery data: %v\n", err)
+		fmt.Printf("WARNING: %sFailed to get battery data: %v\n", sysPrefix, err)
 		metrics.BatteryChargedToday = 0
 		metrics.BatteryDischargedToday = 0
 		metrics.BatterySOC = 0
@@ -718,6 +728,15 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 			maybeShowNoCacheFallbackWarning("Rate limited (429)")
 			return cached.ToHTTPResponse(), true, nil
 		}
+		if resp.StatusCode == http.StatusServiceUnavailable && cacheErr != nil {
+			resp.Body.Close()
+			return nil, false, fmt.Errorf("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
+		}
+		if resp.StatusCode == http.StatusServiceUnavailable {
+			resp.Body.Close()
+			maybeShowNoCacheFallbackWarning("Service unavailable (503)")
+			return cached.ToHTTPResponse(), true, nil
+		}
 
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -779,6 +798,18 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		}
 		// No cache available for 429 - return error
 		return nil, false, fmt.Errorf(constants.RateLimitError)
+	}
+
+	// Handle 503 Service Unavailable - Enphase server temporarily down, use cache if available (even stale)
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		resp.Body.Close()
+		if cacheErr == nil {
+			return cached.ToHTTPResponse(), true, nil // Cache was used (503 fallback)
+		}
+		if retryCached, retryErr := cache.LoadCachedResponse(url, c.timezone); retryErr == nil {
+			return retryCached.ToHTTPResponse(), true, nil // Cache was used (503 retry)
+		}
+		return nil, false, fmt.Errorf("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
 	}
 
 	// Handle other non-OK status codes: try cache as fallback, then return error

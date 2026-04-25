@@ -8,6 +8,7 @@ package aggregator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -30,11 +31,11 @@ type OAuthTokenGetter func(ctx context.Context, apiConfig *APIConfig) (string, e
 
 // CloudClientFactory is a function type for creating cloud clients.
 // This allows dependency injection for testing purposes.
-type CloudClientFactory func(systemID, apiKey, accessToken string, timezone *time.Location) api.CloudClient
+type CloudClientFactory func(systemID, systemName, apiKey, accessToken string, timezone *time.Location) api.CloudClient
 
 // defaultCloudClientFactory creates the default production cloud client.
-func defaultCloudClientFactory(systemID, apiKey, accessToken string, tz *time.Location) api.CloudClient {
-	return api.NewEnlightenCloudClient(systemID, apiKey, accessToken, tz)
+func defaultCloudClientFactory(systemID, systemName, apiKey, accessToken string, tz *time.Location) api.CloudClient {
+	return api.NewEnlightenCloudClient(systemID, apiKey, accessToken, tz).WithSystemName(systemName)
 }
 
 // DataAggregator handles combining data from multiple systems.
@@ -107,15 +108,19 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 
 		// Use the report timezone for all systems (from config, system, or US/Pacific fallback)
 		// Create Cloud API client with API key, access token, and report timezone
-		cloudClient := a.createCloudClient(sys.ID, apiConfig.Key, accessToken, reportTimezone)
+		cloudClient := a.createCloudClient(sys.ID, sys.Name, apiConfig.Key, accessToken, reportTimezone)
 
 		var cacheUsed bool
 		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryType)
-		if err != nil && !constants.IsRateLimitError(err) {
-			return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
+		if err != nil && constants.IsRateLimitError(err) {
+			rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
+			continue
 		}
 		if err != nil {
-			rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
+			if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
+			}
+			fmt.Printf("WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
 			continue
 		}
 		// Track if any system used cache

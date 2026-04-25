@@ -97,7 +97,7 @@ go build -o enphase-monitor
 Run a single query to make sure everything works:
 
 ```bash
-./enphase-monitor --once
+./enphase-monitor
 ```
 
 You should see output showing your combined system metrics!
@@ -130,7 +130,7 @@ Press `Ctrl+C` to stop.
 
 Once it is working:
 
-- Query historical data: `./enphase-monitor --once --date 2026-01-15`
+- Query historical data: `./enphase-monitor --date 2026-01-15`
 - Run on startup: Add to cron or systemd
 - Build a dashboard: Parse the output or extend the code
 - Set up alerts: Monitor grid dependence and trigger notifications

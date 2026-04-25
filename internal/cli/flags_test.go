@@ -13,7 +13,7 @@
 //   - Test empty string flags remain empty
 //
 // 2. Flag Parsing Tests
-//   - Test --once flag sets Once to true
+//   - Test --continuous flag sets Continuous to true
 //   - Test --test flag sets TestMode to true
 //   - Test --date flag parses date string
 //   - Test --config flag overrides default path
@@ -73,8 +73,8 @@ func TestParseFlags_Defaults(t *testing.T) {
 	if flags.ConfigFile != "config.yaml" {
 		t.Errorf("ParseFlags() ConfigFile = %v, want config.yaml", flags.ConfigFile)
 	}
-	if flags.Once {
-		t.Errorf("ParseFlags() Once = %v, want false", flags.Once)
+	if flags.Continuous {
+		t.Errorf("ParseFlags() Continuous = %v, want false", flags.Continuous)
 	}
 	if flags.TestMode {
 		t.Errorf("ParseFlags() TestMode = %v, want false", flags.TestMode)
@@ -94,16 +94,16 @@ func TestParseFlags_ConfigFile(t *testing.T) {
 	}
 }
 
-func TestParseFlags_Once(t *testing.T) {
+func TestParseFlags_Continuous(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--once"}
+	os.Args = []string{"cmd", "--continuous"}
 
 	flags := ParseFlags()
 
-	if !flags.Once {
-		t.Error("Once should be true")
+	if !flags.Continuous {
+		t.Error("Continuous should be true")
 	}
 }
 
@@ -137,15 +137,15 @@ func TestParseFlags_MultipleFlags(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--config", "test.yaml", "--once", "--test", "--date", "2026-01-20"}
+	os.Args = []string{"cmd", "--config", "test.yaml", "--continuous", "--test", "--date", "2026-01-20"}
 
 	flags := ParseFlags()
 
 	if flags.ConfigFile != "test.yaml" {
 		t.Errorf("ConfigFile = %v, want test.yaml", flags.ConfigFile)
 	}
-	if !flags.Once {
-		t.Error("Once should be true")
+	if !flags.Continuous {
+		t.Error("Continuous should be true")
 	}
 	if !flags.TestMode {
 		t.Error("TestMode should be true")
@@ -288,7 +288,7 @@ func TestParseFlags_ComplexCombination(t *testing.T) {
 	os.Args = []string{
 		"cmd",
 		"--config", "production.yaml",
-		"--once",
+		"--continuous",
 		"--date", "2026-01-20",
 		"--test",
 		"--no-cache",
@@ -299,8 +299,8 @@ func TestParseFlags_ComplexCombination(t *testing.T) {
 	if flags.ConfigFile != "production.yaml" {
 		t.Errorf("ConfigFile = %v, want production.yaml", flags.ConfigFile)
 	}
-	if !flags.Once {
-		t.Error("Once should be true")
+	if !flags.Continuous {
+		t.Error("Continuous should be true")
 	}
 	if flags.TestDate != "2026-01-20" {
 		t.Errorf("TestDate = %v, want 2026-01-20", flags.TestDate)

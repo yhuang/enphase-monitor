@@ -7,7 +7,7 @@ import "flag"
 // Flags holds all command-line flag values.
 type Flags struct {
 	ConfigFile    string
-	Once          bool
+	Continuous    bool
 	SetupOAuth    bool
 	ClearCache    bool
 	ClearAllCache bool
@@ -23,7 +23,7 @@ func ParseFlags() *Flags {
 	flags := &Flags{}
 
 	flag.StringVar(&flags.ConfigFile, "config", "config.yaml", "Path to configuration file")
-	flag.BoolVar(&flags.Once, "once", false, "Run once and exit (do not loop)")
+	flag.BoolVar(&flags.Continuous, "continuous", false, "Run continuously with periodic refresh (default is run once and exit)")
 	flag.BoolVar(&flags.SetupOAuth, "setup-oauth", false, "Run OAuth setup wizard (one-time for developer plan)")
 	flag.BoolVar(&flags.ClearCache, "clear-cache", false, "Clear cached API responses for today's date only (preserves yesterday and earlier)")
 	flag.BoolVar(&flags.ClearAllCache, "clear-all-cache", false, "Clear all cached API responses (all dates)")

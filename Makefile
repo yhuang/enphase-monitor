@@ -12,12 +12,12 @@ build:
 # Run in continuous monitoring mode
 run: build
 	@echo "Starting continuous monitoring..."
-	./$(BINARY_NAME)
+	./$(BINARY_NAME) --continuous
 
-# Run once and exit
+# Run single query and exit (default behavior)
 run-once: build
 	@echo "Running single query..."
-	./$(BINARY_NAME) --once
+	./$(BINARY_NAME)
 
 # Install dependencies
 install:
@@ -86,8 +86,8 @@ pdfs:
 help:
 	@echo "Available targets:"
 	@echo "  make build     - Build the application"
-	@echo "  make run       - Build and run in continuous mode"
-	@echo "  make run-once  - Build and run single query"
+	@echo "  make run       - Build and run in continuous mode (--continuous)"
+	@echo "  make run-once  - Build and run single query (default behavior)"
 	@echo "  make install   - Download Go dependencies"
 	@echo "  make setup     - Create config.yaml from template"
 	@echo "  make clean     - Remove built binaries"

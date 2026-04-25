@@ -58,7 +58,7 @@ func createMockAggregator(metrics *api.LocalMetrics, err error) *aggregator.Data
 	mockGetter := func(ctx context.Context, apiConfig *types.APIConfig) (string, error) {
 		return "mock-token", nil
 	}
-	return aggregator.NewDataAggregatorWithFactory(mockGetter, func(systemID, apiKey, accessToken string, tz *time.Location) api.CloudClient {
+	return aggregator.NewDataAggregatorWithFactory(mockGetter, func(systemID, systemName, apiKey, accessToken string, tz *time.Location) api.CloudClient {
 		return &mockCloudClient{metrics: metrics, err: err}
 	})
 }

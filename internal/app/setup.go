@@ -137,17 +137,17 @@ func ValidateTestModeCache(targetDate time.Time, reportTZ *time.Location) error 
 	if err != nil {
 		return fmt.Errorf("failed to check cache for %s: %w\n\n"+
 			"To populate the cache, run:\n"+
-			"  ./enphase-monitor --once\n\n"+
+			"  ./enphase-monitor\n\n"+
 			"Then retry with --test", dateStr, err)
 	}
 
 	if !hasCache {
 		return fmt.Errorf("--test flag requires cached data, but no cache exists for %s\n\n"+
 			"To populate the cache, run:\n"+
-			"  ./enphase-monitor --once\n\n"+
+			"  ./enphase-monitor\n\n"+
 			"Then retry with --test\n\n"+
 			"For historical dates with expected values, use:\n"+
-			"  ./enphase-monitor --once --date %s\n"+
+			"  ./enphase-monitor --date %s\n"+
 			"  ./enphase-monitor --test --date %s", dateStr, dateStr, dateStr)
 	}
 

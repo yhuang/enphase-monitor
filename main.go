@@ -66,7 +66,7 @@
 //
 // EXECUTION FLOW
 // --------------
-//  1. Parse CLI flags via internal/cli (--once, --date, --test, etc.)
+//  1. Parse CLI flags via internal/cli (--continuous, --date, --test, etc.)
 //  2. Handle cache commands via internal/cli if requested
 //  3. Load and validate config.yaml via internal/config
 //  4. Handle OAuth setup via internal/oauth if requested
@@ -197,11 +197,13 @@ func main() {
 	// Configure test mode and cache mode
 	app.ConfigureModes(flags.TestMode, flags.NoCache)
 
-	runOnce := flags.Once
+	// Default is run-once; --continuous enables periodic refresh.
+	// Month/year queries and past-date queries always run once regardless of --continuous.
+	runContinuous := flags.Continuous
 	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear {
-		runOnce = true
+		runContinuous = false
 	} else if !testDateParsed.IsZero() && timezone.IsPastPeriod(testDateParsed, queryType, reportTZ) {
-		runOnce = true
+		runContinuous = false
 	}
 
 	rc := app.RunConfig{
@@ -213,15 +215,14 @@ func main() {
 		ReportTZ:  reportTZ,
 	}
 
-	// Run once or continuous (exit only from main; app returns errors)
-	if runOnce {
+	// Default: run once and exit. With --continuous, loop with periodic refresh.
+	if !runContinuous {
 		if err := app.RunOnce(ctx, rc, flags.TestMode); err != nil {
 			if constants.IsRateLimitError(err) {
 				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 				fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", constants.APIRateLimitWaitSeconds)
 			} else {
 				disp.ShowError(err)
-				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 			}
 			os.Exit(1)
 		}

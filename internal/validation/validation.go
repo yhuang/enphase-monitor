@@ -91,7 +91,7 @@ func ValidateMetrics(w io.Writer, metrics *aggregator.AggregatedMetrics, dateStr
 				"    ]\n"+
 				"  }\n\n"+
 				"To skip validation and just use cache-only mode, omit the --test flag:\n"+
-				"  ./enphase-monitor --once --date %s", dateStr, expectedPath, dateStr, dateStr)
+				"  ./enphase-monitor --date %s", dateStr, expectedPath, dateStr, dateStr)
 		}
 		return fmt.Errorf("failed to read expected values file: %w", err)
 	}

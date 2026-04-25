@@ -3,7 +3,7 @@
 // EXECUTION MODES
 // ---------------
 // The application supports two primary execution modes:
-//   - RunOnce: Single query and exit (--once flag)
+//   - RunOnce: Single query and exit (default behavior)
 //   - RunContinuous: Continuous monitoring with refresh interval
 //
 // Both modes use fetchAndDisplay for the actual metric retrieval and display logic.

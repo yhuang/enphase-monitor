@@ -736,7 +736,7 @@ go test -v ./internal/app/ -run TestValidateTestModeCache
 
 The `--test` flag enables cache-only mode with validation against expected values. This requires:
 
-1. **Cached API responses** - Run `./enphase-monitor --once` first to populate the cache
+1. **Cached API responses** - Run `./enphase-monitor` first to populate the cache
 2. **Expected values file** - Create `test-data/expected_values_YYYY-MM-DD.json`
 
 #### Early Cache Validation
@@ -745,11 +745,11 @@ The application validates cache existence before running in test mode:
 
 ```bash
 # If cache doesn't exist for today:
-$ ./enphase-monitor --test --once
+$ ./enphase-monitor --test
 ERROR: --test flag requires cached data, but no cache exists for 2026-01-30.
 
 To populate the cache, run:
-  ./enphase-monitor --once
+  ./enphase-monitor
 
 Then retry with --test.
 ```
@@ -759,7 +759,7 @@ Then retry with --test.
 If cache exists but expected values file is missing, a helpful error is displayed:
 
 ```bash
-$ ./enphase-monitor --test --date 2026-01-01 --once
+$ ./enphase-monitor --test --date 2026-01-01
 Validation failed: no expected values file found for 2026-01-01.
 
 To run validation, create the file:

@@ -540,7 +540,7 @@ This section explains how the program uses Go channels and Unix signals to imple
 
 ### Overview
 
-The program uses channels and signals **only in continuous monitoring mode** (`./enphase-monitor` without `--once` flag). This allows the application to:
+The program uses channels and signals **only in continuous monitoring mode** (`./enphase-monitor --continuous`). This allows the application to:
 1. Run periodic updates at a configurable interval
 2. Respond to user interrupts (Ctrl+C) gracefully
 3. Clean up resources before exiting

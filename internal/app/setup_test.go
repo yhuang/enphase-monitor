@@ -511,12 +511,12 @@ func TestValidateTestModeCache(t *testing.T) {
 		// Good error messages include:
 		// 1. What went wrong (no cache)
 		// 2. Context (which date)
-		// 3. How to fix it (run with --once)
+		// 3. How to fix it (run the program to populate cache)
 		errMsg := err.Error()
 		if !strings.Contains(errMsg, "1999-01-01") {
 			t.Error("Error message should contain the date")
 		}
-		if !strings.Contains(errMsg, "./enphase-monitor --once") {
+		if !strings.Contains(errMsg, "./enphase-monitor") {
 			t.Error("Error message should contain instructions to populate cache")
 		}
 	})
@@ -560,8 +560,8 @@ func TestValidateTestModeCache(t *testing.T) {
 		}
 
 		// Should contain instructions to populate cache (fix)
-		if !strings.Contains(errMsg, "--once") {
-			t.Error("Error should contain --once flag instruction")
+		if !strings.Contains(errMsg, "./enphase-monitor") {
+			t.Error("Error should contain instructions to populate cache")
 		}
 
 		// Should contain instructions for historical dates (alternative fix)

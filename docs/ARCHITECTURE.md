@@ -403,7 +403,7 @@ defer resp.Body.Close()  // Always executes when function returns
 
 ### 6. Channels and Signal Handling (Interruptible Waiting)
 
-This pattern is used **only in continuous monitoring mode** (without `--once`). It is not about parallelism—the work is completely serial. It solves a specific problem: **how to wait for a timer but respond instantly to Ctrl+C**.
+This pattern is used **only in continuous monitoring mode** (with `--continuous`). It is not about parallelism—the work is completely serial. It solves a specific problem: **how to wait for a timer but respond instantly to Ctrl+C**.
 
 ```go
 // main.go - Signal context for graceful shutdown
