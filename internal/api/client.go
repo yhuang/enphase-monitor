@@ -253,11 +253,11 @@ func (c *EnlightenCloudClient) buildTelemetryURL(endpoint string, dayStart, dayE
 // LocalMetrics is exported in types.go
 //
 // GetEnergyImportForDate gets the total energy imported from the grid for a specific date/period.
-// If testDate is zero, uses today. queryType determines the time range (day/month/year).
-// For month/year queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
+// If testDate is zero, uses today. queryType determines the time range (day/month/year/true-up).
+// For month/year/true-up queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
 // The result always covers complete days only (through yesterday for ongoing periods).
 func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear {
+	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear || queryType == constants.QueryTypeTrueUp {
 		return c.getEnergyImportLifetime(ctx, testDate, queryType)
 	}
 
@@ -278,11 +278,11 @@ func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testD
 }
 
 // GetEnergyExportForDate gets the total energy exported to the grid for a specific date/period.
-// If testDate is zero, uses today. queryType determines the time range (day/month/year).
-// For month/year queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
+// If testDate is zero, uses today. queryType determines the time range (day/month/year/true-up).
+// For month/year/true-up queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
 // The result always covers complete days only (through yesterday for ongoing periods).
 func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear {
+	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear || queryType == constants.QueryTypeTrueUp {
 		return c.getEnergyExportLifetime(ctx, testDate, queryType)
 	}
 
@@ -300,12 +300,12 @@ func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testD
 }
 
 // GetProductionForDate gets the total energy production for a specific date/period.
-// If testDate is zero, uses today. queryType determines the time range (day/month/year).
-// For month/year queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
+// If testDate is zero, uses today. queryType determines the time range (day/month/year/true-up).
+// For month/year/true-up queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
 // The result always covers complete days only (through yesterday for ongoing periods).
 // Returns the aggregated sum of all wh_del values from the API response.
 func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear {
+	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear || queryType == constants.QueryTypeTrueUp {
 		return c.getEnergyLifetime(ctx, testDate, queryType)
 	}
 
@@ -326,11 +326,11 @@ func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDat
 }
 
 // GetConsumptionForDate gets the total energy consumption for a specific date/period.
-// If testDate is zero, uses today. queryType determines the time range (day/month/year).
-// For month/year queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
+// If testDate is zero, uses today. queryType determines the time range (day/month/year/true-up).
+// For month/year/true-up queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
 // The result always covers complete days only (through yesterday for ongoing periods).
 func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear {
+	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear || queryType == constants.QueryTypeTrueUp {
 		return c.getConsumptionLifetime(ctx, testDate, queryType)
 	}
 
@@ -348,12 +348,12 @@ func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDa
 }
 
 // GetBatteryDataForDate gets battery charge, discharge, and State of Charge (SOC) for a specific date/period.
-// If testDate is zero, uses today. queryType determines the time range (day/month/year).
+// If testDate is zero, uses today. queryType determines the time range (day/month/year/true-up).
 // Returns charged kWh, discharged kWh, and SOC percentage from last_reported_aggregate_soc.
-// For month/year queries, uses battery_lifetime endpoint (daily aggregated, no 7-day API limit).
+// For month/year/true-up queries, uses battery_lifetime endpoint (daily aggregated, no 7-day API limit).
 // The result always covers complete days only (through yesterday for ongoing periods).
 func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error) {
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear {
+	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear || queryType == constants.QueryTypeTrueUp {
 		return c.getBatteryLifetime(ctx, testDate, queryType)
 	}
 

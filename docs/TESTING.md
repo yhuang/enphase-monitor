@@ -74,7 +74,7 @@ Most packages follow the simple convention where each source file has one corres
 | `constants.go` | `constants_test.go` | Constants validation |
 | `display.go` | `display_test.go` | Display formatting tests (includes `ShowTrueUpReport` tests) |
 | `timezone.go` | `timezone_test.go` | Timezone handling tests |
-| `trueup.go` | `trueup_test.go` | True-up query schedule, metric accumulation, and context cancellation |
+| `trueup.go` | `trueup_test.go` | True-up report conversion (`buildTrueUpReport`): field mapping, net flow, per-system entries |
 
 #### Pattern 2: Complex 1:Many Mapping
 

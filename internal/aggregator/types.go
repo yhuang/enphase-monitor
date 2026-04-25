@@ -10,7 +10,7 @@ import (
 type AggregatedMetrics struct {
 	Timestamp time.Time
 	QueryDate time.Time             // The date being queried (zero value means today)
-	QueryType constants.QueryType   // The query granularity (day/month/year)
+	QueryType constants.QueryType   // The query granularity (day/month/year/true-up)
 
 	// Today's Energy (kWh)
 	ProductionToday  float64
@@ -27,9 +27,9 @@ type AggregatedMetrics struct {
 	AllFromCache bool // True only when every system was served entirely from cache
 }
 
-// TrueUpReport holds accumulated energy metrics across a true-up year period.
+// TrueUpReport holds energy metrics for a true-up year period.
 type TrueUpReport struct {
-	StartDate   time.Time // user-provided true-up start date
+	StartDate   time.Time // user-provided true-up start date (display only; data starts from the 1st of this month)
 	EndDate     time.Time // last day with complete data (yesterday)
 	GridImport  float64
 	GridExport  float64

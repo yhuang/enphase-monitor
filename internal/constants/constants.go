@@ -67,7 +67,7 @@ const (
 	JSONExtension = ".json"
 )
 
-// QueryType represents the granularity of a date query (day, month, or year).
+// QueryType represents the granularity of a date query (day, month, year, or true-up).
 type QueryType int
 
 const (
@@ -77,6 +77,10 @@ const (
 	QueryTypeMonth
 	// QueryTypeYear represents a query for a specific year (YYYY)
 	QueryTypeYear
+	// QueryTypeTrueUp represents a single-batch query spanning a full true-up year period.
+	// The start date is the first day of the utility true-up start month; data covers
+	// all complete days through yesterday using the lifetime endpoints.
+	QueryTypeTrueUp
 )
 
 // String returns a human-readable name for the query type.
@@ -86,6 +90,8 @@ func (qt QueryType) String() string {
 		return "month"
 	case QueryTypeYear:
 		return "year"
+	case QueryTypeTrueUp:
+		return "true-up"
 	default:
 		return "day"
 	}

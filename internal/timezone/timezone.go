@@ -188,6 +188,17 @@ func GetYearBoundaries(targetDate time.Time, tz *time.Location) (start, end time
 	return start, end
 }
 
+// GetTrueUpBoundaries returns the start and end times for a true-up year query.
+// Start is midnight on the first day of trueUpStartDate's month.
+// End is 23:59:59 of yesterday (the most recent complete day).
+func GetTrueUpBoundaries(trueUpStartDate time.Time, tz *time.Location) (start, end time.Time) {
+	d := trueUpStartDate.In(tz)
+	start = time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, tz)
+	yesterday := time.Now().In(tz).AddDate(0, 0, -1)
+	end = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, tz)
+	return start, end
+}
+
 // GetBoundaries returns the start and end times based on query type.
 // This is a unified boundary function that delegates to the appropriate handler.
 func GetBoundaries(targetDate time.Time, queryType constants.QueryType, tz *time.Location) (start, end time.Time) {
@@ -196,6 +207,8 @@ func GetBoundaries(targetDate time.Time, queryType constants.QueryType, tz *time
 		return GetMonthBoundaries(targetDate, tz)
 	case constants.QueryTypeYear:
 		return GetYearBoundaries(targetDate, tz)
+	case constants.QueryTypeTrueUp:
+		return GetTrueUpBoundaries(targetDate, tz)
 	default:
 		return GetDayBoundaries(targetDate, tz)
 	}
@@ -218,6 +231,10 @@ func IsPastPeriod(targetDate time.Time, queryType constants.QueryType, tz *time.
 			return true
 		}
 		return target.Year() == now.Year() && target.Month() < now.Month()
+	case constants.QueryTypeTrueUp:
+		// The true-up period is always treated as ongoing so the lifetime endpoints
+		// are re-fetched with fresh data each run (through yesterday).
+		return false
 	default:
 		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
 		targetDay := time.Date(target.Year(), target.Month(), target.Day(), 0, 0, 0, 0, tz)

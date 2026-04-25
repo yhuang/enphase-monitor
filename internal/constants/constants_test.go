@@ -69,6 +69,7 @@ func TestQueryTypeString(t *testing.T) {
 		{QueryTypeDay, "day"},
 		{QueryTypeMonth, "month"},
 		{QueryTypeYear, "year"},
+		{QueryTypeTrueUp, "true-up"},
 		{QueryType(99), "day"}, // unknown falls through to default
 	}
 	for _, tt := range tests {

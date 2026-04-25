@@ -480,6 +480,26 @@ func TestIsPastPeriod(t *testing.T) {
 			queryType:  constants.QueryTypeYear,
 			want:       false,
 		},
+		// QueryTypeTrueUp always returns false regardless of date — the true-up
+		// period is treated as ongoing so lifetime endpoints are re-fetched each run.
+		{
+			name:       "true-up with past date is not past",
+			targetDate: time.Date(2025, time.January, 1, 0, 0, 0, 0, tz),
+			queryType:  constants.QueryTypeTrueUp,
+			want:       false,
+		},
+		{
+			name:       "true-up with today is not past",
+			targetDate: now,
+			queryType:  constants.QueryTypeTrueUp,
+			want:       false,
+		},
+		{
+			name:       "true-up with zero time is not past",
+			targetDate: time.Time{},
+			queryType:  constants.QueryTypeTrueUp,
+			want:       false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -490,6 +510,57 @@ func TestIsPastPeriod(t *testing.T) {
 					tt.targetDate.Format("2006-01-02"), tt.queryType, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestGetTrueUpBoundaries verifies that the true-up boundaries start at midnight on
+// the given date and end at 23:59:59 yesterday.
+func TestGetTrueUpBoundaries(t *testing.T) {
+	tz, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatalf("Failed to load test timezone: %v", err)
+	}
+
+	// Simulate RunTrueUp passing the first day of the start month.
+	input := time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)
+	start, end := GetTrueUpBoundaries(input, tz)
+
+	// Start must be midnight on January 1, 2025.
+	if start.Year() != 2025 || start.Month() != time.January || start.Day() != 1 {
+		t.Errorf("start = %v, want 2025-01-01", start)
+	}
+	if start.Hour() != 0 || start.Minute() != 0 || start.Second() != 0 {
+		t.Errorf("start time = %02d:%02d:%02d, want 00:00:00", start.Hour(), start.Minute(), start.Second())
+	}
+
+	// End must be 23:59:59 of yesterday.
+	yesterday := time.Now().In(tz).AddDate(0, 0, -1)
+	if end.Year() != yesterday.Year() || end.Month() != yesterday.Month() || end.Day() != yesterday.Day() {
+		t.Errorf("end date = %v, want yesterday (%v)", end.Format("2006-01-02"), yesterday.Format("2006-01-02"))
+	}
+	if end.Hour() != 23 || end.Minute() != 59 || end.Second() != 59 {
+		t.Errorf("end time = %02d:%02d:%02d, want 23:59:59", end.Hour(), end.Minute(), end.Second())
+	}
+}
+
+// TestGetBoundaries_TrueUp verifies that GetBoundaries dispatches correctly for QueryTypeTrueUp.
+func TestGetBoundaries_TrueUp(t *testing.T) {
+	tz, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatalf("Failed to load test timezone: %v", err)
+	}
+
+	input := time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)
+	start, end := GetBoundaries(input, constants.QueryTypeTrueUp, tz)
+
+	if start.Year() != 2025 || start.Month() != time.January || start.Day() != 1 {
+		t.Errorf("GetBoundaries(true-up) start = %v, want 2025-01-01", start)
+	}
+
+	yesterday := time.Now().In(tz).AddDate(0, 0, -1)
+	if end.Year() != yesterday.Year() || end.Month() != yesterday.Month() || end.Day() != yesterday.Day() {
+		t.Errorf("GetBoundaries(true-up) end date = %v, want yesterday (%v)",
+			end.Format("2006-01-02"), yesterday.Format("2006-01-02"))
 	}
 }
 

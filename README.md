@@ -284,12 +284,9 @@ Calculate the energy balance for your utility true-up year. Provide the start da
 
 This accumulates **full calendar months** from the start month through yesterday. For example, a `2025-01-15` start date queries January 2025 through the most recent complete month.
 
-**How the query schedule works:**
+**How the query works:**
 
-- **Same calendar year** (e.g., `--true-up 2026-02-01` run in April 2026): queries Feb, Mar, Apr month by month
-- **Two calendar years** (most common): queries each month of the start year individually, then uses a single year query for the current year (e.g., `--true-up 2025-01-15` run in 2026 → 12 monthly queries + 1 year query = 13 API batches)
-
-**Rate limiting:** Each API batch uses all 10 allowed requests per minute (2 systems × 5 metrics). A 65-second pause is automatically inserted between batches that made live API calls. The progress is shown on a single status line that updates in place, and is cleared before the final report renders. Subsequent runs are fast because historical month/year data is served from the disk cache.
+A single API batch of exactly 10 calls (2 systems × 5 metrics) is made against the `_lifetime` endpoints with `start_date` set to the first day of the start month. The API returns all daily values from that date through yesterday in one response; the application sums the relevant date range client-side. No inter-batch waits are needed. Subsequent runs are instant because the response is served from the disk cache.
 
 **The `--true-up` flag takes precedence over `--date`** — if both are provided, `--date` is ignored.
 

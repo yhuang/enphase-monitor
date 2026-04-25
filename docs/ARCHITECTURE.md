@@ -70,8 +70,8 @@ enphase-monitor/
 │   │   ├── setup_test.go                  # Setup tests
 │   │   ├── runner.go                      # Execution modes (once/continuous)
 │   │   ├── runner_test.go                 # Runner tests
-│   │   ├── trueup.go                      # True-up year: query schedule, accumulation, progress display
-│   │   └── trueup_test.go                 # True-up logic tests
+│   │   ├── trueup.go                      # True-up year: single-batch lifetime query and report conversion
+│   │   └── trueup_test.go                 # True-up report conversion tests
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation
 │   │   ├── cache_test.go                  # Cache state management tests
@@ -179,12 +179,11 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │  3a. TRUE-UP (internal/app)  │  │  3b. EXECUTION (internal/app)                                      │
 │  app.RunTrueUp(ctx, ...)     │  │     └─► main creates signal context (SIGINT/SIGTERM), passes ctx   │
 │  ├─► Parse start date        │  │     └─► app.RunOnce(ctx, ...) or app.RunContinuous(ctx, ...)       │
-│  ├─► Build query schedule    │  │     └─► RunContinuous: synchronous for/select (ticker.C, ctx.Done) │
-│  │   (months + year query)   │  │         (no goroutines spawned)                                    │
-│  ├─► Execute queries with    │  │     └─► fetchAndDisplay(ctx, ...) calls aggregator                 │
-│  │   65s inter-batch waits   │  └────────────────────────────────────────────────────────────────────┘
-│  │   (skipped when cached)   │
-│  ├─► Accumulate TrueUpReport │
+│  ├─► Normalize to month-1    │  │     └─► RunContinuous: synchronous for/select (ticker.C, ctx.Done) │
+│  ├─► GetAggregatedMetrics    │  │         (no goroutines spawned)                                    │
+│  │   (QueryTypeTrueUp,       │  │     └─► fetchAndDisplay(ctx, ...) calls aggregator                 │
+│  │   single batch, 10 calls) │  └────────────────────────────────────────────────────────────────────┘
+│  ├─► buildTrueUpReport()     │
 │  └─► ShowTrueUpReport()      │
 └──────────────────────────────┘
                                     │
@@ -265,7 +264,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │   - Sums production, consumption across systems                    │
 │   - Aggregates battery charge/discharge across systems             │
 │   - Tracks cache usage flags (CacheUsed, AllFromCache)             │
-│   - TrueUpReport accumulates across multiple query periods         │
+│   - TrueUpReport built from a single lifetime-endpoint batch       │
 └──────────────────────────┬─────────────────────────────────────────┘
                            │
                            ▼
@@ -539,7 +538,7 @@ when possible to improve testability.
 |---------------------------------------------------|---------------------------------------------------|
 | [internal/app/setup.go](../internal/app/setup.go)         | Application initialization & configuration        |
 | [internal/app/runner.go](../internal/app/runner.go)       | Execution modes (once/continuous)                 |
-| [internal/app/trueup.go](../internal/app/trueup.go)       | True-up year: query schedule, metric accumulation, rate-limit-aware pacing, progress display |
+| [internal/app/trueup.go](../internal/app/trueup.go)       | True-up year: single-batch lifetime query (QueryTypeTrueUp) and report conversion            |
 
 ### Internal Packages - CLI Layer
 
