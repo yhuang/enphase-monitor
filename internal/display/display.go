@@ -214,6 +214,63 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 		color, direction, constants.Reset)
 }
 
+// ShowTrueUpReport displays the accumulated true-up year energy report.
+func (d *Display) ShowTrueUpReport(report *aggregator.TrueUpReport) {
+	d.printTrueUpHeader(report)
+	d.printTrueUpCombined(report)
+	if len(report.Systems) > 1 {
+		d.printTrueUpSystems(report)
+	}
+	d.printSeparator()
+}
+
+func (d *Display) printTrueUpHeader(report *aggregator.TrueUpReport) {
+	// Data coverage starts from the first day of the start month (full months used)
+	dataStart := time.Date(report.StartDate.Year(), report.StartDate.Month(), 1, 0, 0, 0, 0, d.timezone)
+
+	fmt.Fprintln(d.writer, "\n  "+d.colors.Headers+d.separatorLine+constants.Reset)
+	fmt.Fprintf(d.writer, "    %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
+	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
+
+	fmt.Fprintf(d.writer, "     %s%-15s%s%s 12:00 AM\n                              to\n                    %s%s\n\n",
+		d.colors.SecondaryText, "Data Range:", d.colors.PrimaryText,
+		dataStart.Format("Mon Jan 2, 2006"),
+		report.EndDate.Format("Mon Jan 2, 2006 03:04 PM"), constants.Reset)
+
+	fmt.Fprintf(d.writer, "     %s%-15s%s%s %s(full months used)%s\n",
+		d.colors.SecondaryText, "True-Up Start:", d.colors.PrimaryText,
+		report.StartDate.Format("Mon Jan 2, 2006"),
+		d.colors.SecondaryText, constants.Reset)
+
+	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
+}
+
+func (d *Display) printTrueUpCombined(report *aggregator.TrueUpReport) {
+	fmt.Fprintf(d.writer, "\n   %s%sTRUE-UP ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
+	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
+
+	d.printMetric("Energy Produced", report.Production, d.colors.Production, "     ", 19, false)
+	d.printMetric("Energy Consumed", report.Consumption, d.colors.TotalConsumed, "     ", 19, false)
+	d.printNetFlow("  Net Energy Flow", report.NetFlow, "   ", 21, false)
+}
+
+func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
+	fmt.Fprintf(d.writer, "\n   %s%sINDIVIDUAL SYSTEMS REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
+	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
+
+	for i, sys := range report.Systems {
+		fmt.Fprintf(d.writer, "\n    %s[%d]%s %s%s%s %s(%s)%s\n",
+			d.colors.Headers, i+1, constants.Reset,
+			constants.Bold, sys.Name, constants.Reset,
+			d.colors.SecondaryText, sys.ID, constants.Reset)
+		d.printMetric("Imported from the Grid", sys.GridImport, d.colors.Import, "        ", 27, true)
+		d.printMetric("Exported to the Grid", sys.GridExport, d.colors.Export, "        ", 27, true)
+		d.printMetric("Captured from the Sun", sys.Production, d.colors.Production, "        ", 27, true)
+		d.printNetFlow("Net Energy Flow", sys.NetFlow, "        ", 27, true)
+		d.printMetric("Total Energy Consumed", sys.Consumption, d.colors.TotalConsumed, "        ", 27, true)
+	}
+}
+
 // ShowError displays an error message.
 func (d *Display) ShowError(err error) {
 	fmt.Fprintf(d.writer, "\n  %s%sERROR:%s\n", constants.Bold, d.colors.Error, constants.Reset)

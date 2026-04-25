@@ -387,6 +387,195 @@ func TestShowMetrics_BatterySOC_YearQuery(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// ShowTrueUpReport Tests
+// =============================================================================
+
+// makeTrueUpReport is a test fixture that builds a TrueUpReport with two systems.
+func makeTrueUpReport(tz *time.Location) *aggregator.TrueUpReport {
+	startDate := time.Date(2025, time.January, 15, 0, 0, 0, 0, tz)
+	endDate := time.Date(2026, time.April, 24, 23, 59, 59, 0, tz)
+	return &aggregator.TrueUpReport{
+		StartDate:   startDate,
+		EndDate:     endDate,
+		GridImport:  1234.5,
+		GridExport:  2345.6,
+		Production:  3456.7,
+		Consumption: 2345.6,
+		NetFlow:     -1111.1, // net export
+		Systems: []aggregator.TrueUpSystemReport{
+			{Name: "Right Subpanel", ID: "5525881", GridImport: 600, GridExport: 1200, Production: 1700, Consumption: 1100, NetFlow: -600},
+			{Name: "Left Subpanel", ID: "5392556", GridImport: 634.5, GridExport: 1145.6, Production: 1756.7, Consumption: 1245.6, NetFlow: -511.1},
+		},
+	}
+}
+
+// TestShowTrueUpReport_ContainsHeader verifies the standard header elements are present.
+func TestShowTrueUpReport_ContainsHeader(t *testing.T) {
+	var buf bytes.Buffer
+	tz := mustLoadLocation(t, "US/Pacific")
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+	d.ShowTrueUpReport(makeTrueUpReport(tz))
+	output := buf.String()
+
+	checks := []string{
+		"ENPHASE MULTI-SYSTEM MONITOR",
+		"True-Up Start:",
+		"Data Range:",
+		"full months used",
+	}
+	for _, want := range checks {
+		if !strings.Contains(output, want) {
+			t.Errorf("output missing %q", want)
+		}
+	}
+}
+
+// TestShowTrueUpReport_StartDateInHeader verifies the user-provided start date appears.
+func TestShowTrueUpReport_StartDateInHeader(t *testing.T) {
+	var buf bytes.Buffer
+	tz := mustLoadLocation(t, "US/Pacific")
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+	d.ShowTrueUpReport(makeTrueUpReport(tz))
+	output := buf.String()
+
+	// The start date Jan 15, 2025 must appear in the header
+	if !strings.Contains(output, "Jan 15, 2025") {
+		t.Error("output should contain the true-up start date 'Jan 15, 2025'")
+	}
+	// Data range should start from Jan 1 (first of the start month)
+	if !strings.Contains(output, "Jan 1, 2025") {
+		t.Error("output should contain data range start 'Jan 1, 2025' (first of start month)")
+	}
+}
+
+// TestShowTrueUpReport_CombinedSection verifies the TRUE-UP ENERGY REPORT section.
+func TestShowTrueUpReport_CombinedSection(t *testing.T) {
+	var buf bytes.Buffer
+	tz := mustLoadLocation(t, "US/Pacific")
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+	d.ShowTrueUpReport(makeTrueUpReport(tz))
+	output := buf.String()
+
+	checks := []string{
+		"TRUE-UP ENERGY REPORT",
+		"Energy Produced",
+		"Energy Consumed",
+		"Net Energy Flow",
+	}
+	for _, want := range checks {
+		if !strings.Contains(output, want) {
+			t.Errorf("output missing %q", want)
+		}
+	}
+}
+
+// TestShowTrueUpReport_NetFlowDirection verifies the net flow direction label.
+func TestShowTrueUpReport_NetFlowDirection(t *testing.T) {
+	tz := mustLoadLocation(t, "US/Pacific")
+
+	tests := []struct {
+		name     string
+		netFlow  float64
+		wantDir  string
+		noDir    string
+	}{
+		{"net export", -500.0, "(export)", "(import)"},
+		{"net import", 500.0, "(import)", "(export)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+			report := makeTrueUpReport(tz)
+			report.NetFlow = tt.netFlow
+
+			d.ShowTrueUpReport(report)
+			output := buf.String()
+
+			if !strings.Contains(output, tt.wantDir) {
+				t.Errorf("output should contain %q for NetFlow=%.1f", tt.wantDir, tt.netFlow)
+			}
+		})
+	}
+}
+
+// TestShowTrueUpReport_IndividualSystemsShownForMultiple verifies per-system section
+// appears when there are multiple systems.
+func TestShowTrueUpReport_IndividualSystemsShownForMultiple(t *testing.T) {
+	var buf bytes.Buffer
+	tz := mustLoadLocation(t, "US/Pacific")
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+	d.ShowTrueUpReport(makeTrueUpReport(tz))
+	output := buf.String()
+
+	if !strings.Contains(output, "INDIVIDUAL SYSTEMS REPORT") {
+		t.Error("output should contain 'INDIVIDUAL SYSTEMS REPORT' for multiple systems")
+	}
+	if !strings.Contains(output, "Right Subpanel") {
+		t.Error("output should contain system name 'Right Subpanel'")
+	}
+	if !strings.Contains(output, "Left Subpanel") {
+		t.Error("output should contain system name 'Left Subpanel'")
+	}
+}
+
+// TestShowTrueUpReport_IndividualSystemsHiddenForSingle verifies per-system section
+// is suppressed when there is only one system.
+func TestShowTrueUpReport_IndividualSystemsHiddenForSingle(t *testing.T) {
+	var buf bytes.Buffer
+	tz := mustLoadLocation(t, "US/Pacific")
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+	report := makeTrueUpReport(tz)
+	report.Systems = report.Systems[:1] // trim to one system
+
+	d.ShowTrueUpReport(report)
+	output := buf.String()
+
+	if strings.Contains(output, "INDIVIDUAL SYSTEMS REPORT") {
+		t.Error("output should NOT contain 'INDIVIDUAL SYSTEMS REPORT' for a single system")
+	}
+}
+
+// TestShowTrueUpReport_PerSystemMetrics verifies the per-system section shows the
+// correct five metrics and omits battery metrics.
+func TestShowTrueUpReport_PerSystemMetrics(t *testing.T) {
+	var buf bytes.Buffer
+	tz := mustLoadLocation(t, "US/Pacific")
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+	d.ShowTrueUpReport(makeTrueUpReport(tz))
+	output := buf.String()
+
+	wantLabels := []string{
+		"Imported from the Grid",
+		"Exported to the Grid",
+		"Captured from the Sun",
+		"Net Energy Flow",
+		"Total Energy Consumed",
+	}
+	for _, label := range wantLabels {
+		if !strings.Contains(output, label) {
+			t.Errorf("output missing per-system label %q", label)
+		}
+	}
+
+	// Battery metrics must be absent
+	batteryLabels := []string{"Battery", "Charged", "Discharged", "Battery Charge Percentage"}
+	for _, label := range batteryLabels {
+		if strings.Contains(output, label) {
+			t.Errorf("output should NOT contain battery label %q in true-up report", label)
+		}
+	}
+}
+
 // testError is a simple error implementation for testing.
 type testError struct {
 	msg string

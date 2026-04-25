@@ -41,7 +41,7 @@ The project follows a pragmatic approach to testing:
 
 ### Why main.go Has 0% Coverage
 
-The `main.go` file is pure orchestration (~234 lines) and has 0% coverage by design. This is an **industry standard** because:
+The `main.go` file is pure orchestration (~256 lines) and has 0% coverage by design. This is an **industry standard** because:
 
 1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
 2. **All logic tested**: All functions `main.go` calls are tested in internal packages
@@ -72,8 +72,9 @@ Most packages follow the simple convention where each source file has one corres
 |-------------|-----------|---------|
 | `config.go` | `config_test.go` | Configuration tests |
 | `constants.go` | `constants_test.go` | Constants validation |
-| `display.go` | `display_test.go` | Display formatting tests |
+| `display.go` | `display_test.go` | Display formatting tests (includes `ShowTrueUpReport` tests) |
 | `timezone.go` | `timezone_test.go` | Timezone handling tests |
+| `trueup.go` | `trueup_test.go` | True-up query schedule, metric accumulation, and context cancellation |
 
 #### Pattern 2: Complex 1:Many Mapping
 

@@ -85,7 +85,8 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 		Systems:   make([]SystemMetrics, 0, len(systems)),
 	}
 	anyCacheUsed := false
-	var rateLimitErrors []string // Collect 429 errors to report at the end
+	allFromCache := len(systems) > 0 // optimistic; flipped false if any live call is made
+	var rateLimitErrors []string      // Collect 429 errors to report at the end
 
 	for _, sys := range systems {
 		// Use Cloud API
@@ -114,6 +115,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryType)
 		if err != nil && constants.IsRateLimitError(err) {
 			rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
+			allFromCache = false
 			continue
 		}
 		if err != nil {
@@ -121,11 +123,14 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 				return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
 			}
 			fmt.Printf("WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
+			allFromCache = false
 			continue
 		}
-		// Track if any system used cache
+		// Track cache status
 		if cacheUsed {
 			anyCacheUsed = true
+		} else {
+			allFromCache = false
 		}
 
 		// Calculate net imported today
@@ -162,6 +167,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 	metrics.NetImportToday = metrics.GridImportToday - metrics.GridExportToday
 
 	metrics.CacheUsed = anyCacheUsed
+	metrics.AllFromCache = allFromCache
 
 	// If we collected any 429 errors that could not be resolved with cache, return error
 	if len(rateLimitErrors) > 0 {

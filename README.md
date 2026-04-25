@@ -33,6 +33,7 @@ A Go application for monitoring and aggregating data from multiple Enphase solar
 - **Multi-System Monitoring**: Query and combine metrics from multiple independent Enphase systems
 - **Comprehensive Metrics**: Track production, consumption, battery usage, grid import/export, and net energy flow
 - **Flexible Querying**: Query historical dates or monitor real-time with auto-refresh
+- **True-Up Year Report**: Accumulate energy metrics across a full utility true-up year period (`--true-up`)
 - **Clean Display**: Formatted terminal output with customizable colors
 - **API Caching**: Automatic caching of API responses to reduce API calls and enable offline validation
 - **Color Customization**: Customize terminal colors using hex codes or ANSI escape codes
@@ -271,10 +272,26 @@ Query an entire year:
 ./enphase-monitor --date 2025
 ```
 
-> **Note:** When querying a past date/period, the program automatically runs once since historical data doesn't change over time. You'll see a message like:
-> ```
-> Note: Running once for historical month (data won't change)
-> ```
+> **Note:** When querying a past date/period, the program automatically runs once since historical data doesn't change over time.
+
+### True-Up Year Report
+
+Calculate the energy balance for your utility true-up year. Provide the start date shown on your PG&E (or other utility) account:
+
+```bash
+./enphase-monitor --true-up 2025-01-15
+```
+
+This accumulates **full calendar months** from the start month through yesterday. For example, a `2025-01-15` start date queries January 2025 through the most recent complete month.
+
+**How the query schedule works:**
+
+- **Same calendar year** (e.g., `--true-up 2026-02-01` run in April 2026): queries Feb, Mar, Apr month by month
+- **Two calendar years** (most common): queries each month of the start year individually, then uses a single year query for the current year (e.g., `--true-up 2025-01-15` run in 2026 → 12 monthly queries + 1 year query = 13 API batches)
+
+**Rate limiting:** Each API batch uses all 10 allowed requests per minute (2 systems × 5 metrics). A 65-second pause is automatically inserted between batches that made live API calls. The progress is shown on a single status line that updates in place, and is cleared before the final report renders. Subsequent runs are fast because historical month/year data is served from the disk cache.
+
+**The `--true-up` flag takes precedence over `--date`** — if both are provided, `--date` is ignored.
 
 ### Continuous Monitoring
 
@@ -292,6 +309,7 @@ Press `Ctrl+C` to stop.
 - `--config <path>` - Path to configuration file (default: `config.yaml`)
 - `--continuous` - Run continuously with periodic refresh (default is run once and exit)
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
+- `--true-up <YYYY-MM-DD>` - Calculate true-up year energy report from this utility start date. Uses full calendar months; takes precedence over `--date`
 - `--setup-oauth` - Run OAuth setup wizard (one-time for developer plan)
 - `--test` - Test mode: use cache only, no live API calls, validate against expected values
 - `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429 rate limit)
@@ -311,6 +329,9 @@ Press `Ctrl+C` to stop.
 
 # Continuous monitoring with periodic refresh
 ./enphase-monitor --continuous
+
+# True-up year report starting January 15, 2025
+./enphase-monitor --true-up 2025-01-15
 ```
 
 ## Output Format
@@ -362,6 +383,46 @@ The application displays:
 
 Note: Colors are customizable via `config.yaml` (see Color Customization section below).
 
+### True-Up Report Output
+
+The `--true-up` flag produces a dedicated report:
+
+```
+=========================================================
+  ENPHASE MULTI-SYSTEM MONITOR
+=========================================================
+  Data Range:     Wed Jan 1, 2025 12:00 AM
+                          to
+                  Fri Apr 24, 2026 11:59 PM
+
+  True-Up Start:  Wed Jan 15, 2025 (full months used)
+
+=========================================================
+
+ TRUE-UP ENERGY REPORT
+---------------------------------------------------------
+  Energy Produced:    3,456.7 kWh
+  Energy Consumed:    2,345.6 kWh
+  Net Energy Flow:    1,111.1 kWh (export)
+
+ INDIVIDUAL SYSTEMS REPORT
+---------------------------------------------------------
+
+  [1] Right Subpanel (5525881)
+      Imported from the Grid:    600.0 kWh
+      Exported to the Grid:    1,200.0 kWh
+      Captured from the Sun:   1,700.0 kWh
+      Net Energy Flow:           600.0 kWh (export)
+      Total Energy Consumed:   1,100.0 kWh
+
+  [2] Left Subpanel (5392556)
+      ...
+
+=========================================================
+```
+
+The "Data Range" starts from the first day of the start month (full months are always used). The "True-Up Start" line shows the exact date you provided. Battery metrics are excluded from the true-up report.
+
 ## Metrics Explained
 
 ### Combined Energy Report
@@ -372,7 +433,7 @@ Note: Colors are customizable via `config.yaml` (see Color Customization section
   - Negative value with "(export)" suffix: More energy exported than imported
   - Calculation: Grid Imported - Grid Exported
 
-### Individual System Metrics
+### Individual System Metrics (Standard Report)
 - **Imported from the Grid**: Energy purchased from utility for this system (kWh)
 - **Exported to the Grid**: Energy sold back to utility from this system (kWh)
 - **Captured from the Sun**: Solar generation for this system (kWh)
@@ -381,6 +442,11 @@ Note: Colors are customizable via `config.yaml` (see Color Customization section
 - **Discharged from Battery**: Energy used from batteries for this system (kWh)
 - **Battery Charge Percentage**: Current state of charge (SOC) of the battery system, displayed as a percentage (0-100%). This metric is shown per-system only (not aggregated) and only for day queries. For month/year queries, battery SOC is omitted since it represents a point-in-time snapshot that isn't meaningful when aggregated over a period.
 - **Total Consumed**: Total consumption for this system (kWh)
+
+### Individual System Metrics (True-Up Report)
+
+The true-up report shows the same per-system breakdown but **without battery metrics**, since battery charge/discharge is not relevant to the utility true-up calculation:
+- **Imported from the Grid**, **Exported to the Grid**, **Captured from the Sun**, **Net Energy Flow**, **Total Energy Consumed**
 
 ## Color Customization
 
@@ -566,7 +632,9 @@ enphase-monitor/
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   ├── setup_test.go                  # Setup tests
 │   │   ├── runner.go                      # Execution modes (once/continuous)
-│   │   └── runner_test.go                 # Runner tests
+│   │   ├── runner_test.go                 # Runner tests
+│   │   ├── trueup.go                      # True-up year report: query schedule, accumulation, progress
+│   │   └── trueup_test.go                 # True-up logic tests
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation
 │   │   ├── cache_test.go                  # Cache state management tests
@@ -817,7 +885,7 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 This project follows Go best practices and coding standards:
 
 - **Test Coverage**: 80.1% overall, 100% for urlbuilder and constants, 95%+ for display, validation, parser, and config
-- **Test Suite**: 24 test files across 14 packages with comprehensive unit, integration, and edge case tests
+- **Test Suite**: 25 test files across 14 packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -829,7 +897,7 @@ This project follows Go best practices and coding standards:
 - Total Lines: ~4,000 (excluding tests)
 - Test Lines: ~9,000 (comprehensive test suite)
 - Packages: 14 internal packages
-- Test Files: 24 (unit, integration, functional, edge case, and benchmark tests)
+- Test Files: 25 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)
 
 ## License

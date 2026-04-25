@@ -177,6 +177,27 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// --true-up takes precedence over --date; handle it early and exit.
+	if flags.TrueUp != "" {
+		app.ConfigureModes(flags.TestMode, flags.NoCache)
+		rc := app.RunConfig{
+			Agg:      agg,
+			Disp:     disp,
+			Cfg:      cfg,
+			ReportTZ: reportTZ,
+		}
+		if err := app.RunTrueUp(ctx, rc, flags.TrueUp); err != nil {
+			if constants.IsRateLimitError(err) {
+				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", constants.APIRateLimitWaitSeconds)
+			} else {
+				disp.ShowError(err)
+			}
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Parse test date (returns date and query type)
 	parsedInput, err := app.ParseTestDate(flags.TestDate, reportTZ)
 	if err != nil {

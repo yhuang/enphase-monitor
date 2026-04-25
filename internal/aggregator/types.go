@@ -23,7 +23,31 @@ type AggregatedMetrics struct {
 	Systems []SystemMetrics
 
 	// Cache status
-	CacheUsed bool // Indicates if any cached data was used
+	CacheUsed    bool // Indicates if any cached data was used
+	AllFromCache bool // True only when every system was served entirely from cache
+}
+
+// TrueUpReport holds accumulated energy metrics across a true-up year period.
+type TrueUpReport struct {
+	StartDate   time.Time // user-provided true-up start date
+	EndDate     time.Time // last day with complete data (yesterday)
+	GridImport  float64
+	GridExport  float64
+	Production  float64
+	Consumption float64
+	NetFlow     float64 // GridImport - GridExport (positive = net import, negative = net export)
+	Systems     []TrueUpSystemReport
+}
+
+// TrueUpSystemReport holds per-system metrics for the true-up period.
+type TrueUpSystemReport struct {
+	Name        string
+	ID          string
+	GridImport  float64
+	GridExport  float64
+	Production  float64
+	Consumption float64
+	NetFlow     float64
 }
 
 // SystemMetrics represents metrics for a single system.

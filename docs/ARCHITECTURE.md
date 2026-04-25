@@ -32,6 +32,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 - **Cloud API Integration**: Uses Enphase Enlighten Cloud API v4 exclusively (no local network access required)
 - **Intelligent Caching**: Disk-based response caching to respect API rate limits (10 calls/minute)
 - **Historical Data**: Query any past date with `--date` flag (auto-runs once since data won't change)
+- **True-Up Year Report**: Accumulate energy metrics across a full utility true-up year with `--true-up`
 - **Real-time Monitoring**: Continuous mode with configurable refresh interval (default: 1 hour)
 - **Color Customization**: Customize terminal output colors via YAML configuration
 - **Validation Mode**: Test against expected values without making API calls
@@ -50,7 +51,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go                                # Entry point (~234 lines) - orchestration only
+├── main.go                                # Entry point (~256 lines) - orchestration only
 ├── internal/
 │   ├── aggregator/                        # Multi-system data aggregation
 │   │   ├── types.go                       # Metric data structures (AggregatedMetrics, SystemMetrics)
@@ -68,7 +69,9 @@ enphase-monitor/
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   ├── setup_test.go                  # Setup tests
 │   │   ├── runner.go                      # Execution modes (once/continuous)
-│   │   └── runner_test.go                 # Runner tests
+│   │   ├── runner_test.go                 # Runner tests
+│   │   ├── trueup.go                      # True-up year: query schedule, accumulation, progress display
+│   │   └── trueup_test.go                 # True-up logic tests
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation
 │   │   ├── cache_test.go                  # Cache state management tests
@@ -167,15 +170,23 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │             └─► app.SetupDisplay() with colors                     │
 └────────────────────────────────────────────────────────────────────┘
                                     │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────┐
-│  3. EXECUTION (internal/app)                                       │
-│     └─► main creates signal context (SIGINT/SIGTERM), passes ctx   │
-│     └─► app.RunOnce(ctx, ...) or app.RunContinuous(ctx, ...)       │
-│     └─► RunContinuous: synchronous for/select (ticker.C, ctx.Done) │
-│         (no goroutines spawned)                                    │
-│     └─► fetchAndDisplay(ctx, ...) calls aggregator                 │
-└────────────────────────────────────────────────────────────────────┘
+                          ┌─────────┴─────────┐
+                          │                   │
+              --true-up provided?         --date / default
+                          │                   │
+                          ▼                   ▼
+┌──────────────────────────────┐  ┌────────────────────────────────────────────────────────────────────┐
+│  3a. TRUE-UP (internal/app)  │  │  3b. EXECUTION (internal/app)                                      │
+│  app.RunTrueUp(ctx, ...)     │  │     └─► main creates signal context (SIGINT/SIGTERM), passes ctx   │
+│  ├─► Parse start date        │  │     └─► app.RunOnce(ctx, ...) or app.RunContinuous(ctx, ...)       │
+│  ├─► Build query schedule    │  │     └─► RunContinuous: synchronous for/select (ticker.C, ctx.Done) │
+│  │   (months + year query)   │  │         (no goroutines spawned)                                    │
+│  ├─► Execute queries with    │  │     └─► fetchAndDisplay(ctx, ...) calls aggregator                 │
+│  │   65s inter-batch waits   │  └────────────────────────────────────────────────────────────────────┘
+│  │   (skipped when cached)   │
+│  ├─► Accumulate TrueUpReport │
+│  └─► ShowTrueUpReport()      │
+└──────────────────────────────┘
                                     │
                                     ▼
 ┌────────────────────────────────────────────────────────────────────┐
@@ -253,7 +264,8 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │              internal/aggregator/AggregatedMetrics                 │
 │   - Sums production, consumption across systems                    │
 │   - Aggregates battery charge/discharge across systems             │
-│   - Tracks cache usage flag                                        │
+│   - Tracks cache usage flags (CacheUsed, AllFromCache)             │
+│   - TrueUpReport accumulates across multiple query periods         │
 └──────────────────────────┬─────────────────────────────────────────┘
                            │
                            ▼
@@ -527,6 +539,7 @@ when possible to improve testability.
 |---------------------------------------------------|---------------------------------------------------|
 | [internal/app/setup.go](../internal/app/setup.go)         | Application initialization & configuration        |
 | [internal/app/runner.go](../internal/app/runner.go)       | Execution modes (once/continuous)                 |
+| [internal/app/trueup.go](../internal/app/trueup.go)       | True-up year: query schedule, metric accumulation, rate-limit-aware pacing, progress display |
 
 ### Internal Packages - CLI Layer
 
