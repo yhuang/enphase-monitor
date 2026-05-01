@@ -465,7 +465,9 @@ func (c *EnlightenCloudClient) getBatteryLifetime(ctx context.Context, testDate 
 
 // GetMetricsFromCloud fetches all metrics from the Cloud API for the specified period.
 // If testDate is provided, uses that date instead of today.
-// queryType determines the time range (day/month/year).
+// queryType determines the time range (day/month/year/true-up).
+// Battery data (charged, discharged, SOC) is only fetched for QueryTypeDay; all other
+// query types leave those fields as zero and skip the battery API call entirely.
 // Returns metrics and a boolean indicating if any cache was used.
 func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*LocalMetrics, bool, error) {
 	metrics := &LocalMetrics{
@@ -533,17 +535,21 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	}
 	cacheUsed = cacheUsed || c.cacheUsed
 
-	metrics.BatteryChargedToday, metrics.BatteryDischargedToday, metrics.BatterySOC, err = c.GetBatteryDataForDate(ctx, testDate, queryType)
-	if err != nil {
-		if err := checkCancelled(); err != nil {
-			return nil, false, err
+	// Battery data is only meaningful for single-day reports; skip the API call
+	// for month/year/true-up queries to save one of the 10 allowed requests/minute.
+	if queryType == constants.QueryTypeDay {
+		metrics.BatteryChargedToday, metrics.BatteryDischargedToday, metrics.BatterySOC, err = c.GetBatteryDataForDate(ctx, testDate, queryType)
+		if err != nil {
+			if err := checkCancelled(); err != nil {
+				return nil, false, err
+			}
+			fmt.Printf("WARNING: %sFailed to get battery data: %v\n", sysPrefix, err)
+			metrics.BatteryChargedToday = 0
+			metrics.BatteryDischargedToday = 0
+			metrics.BatterySOC = 0
 		}
-		fmt.Printf("WARNING: %sFailed to get battery data: %v\n", sysPrefix, err)
-		metrics.BatteryChargedToday = 0
-		metrics.BatteryDischargedToday = 0
-		metrics.BatterySOC = 0
+		cacheUsed = cacheUsed || c.cacheUsed
 	}
-	cacheUsed = cacheUsed || c.cacheUsed
 
 	// Get consumption from API (more accurate than calculation)
 	metrics.ConsumptionToday, err = c.GetConsumptionForDate(ctx, testDate, queryType)

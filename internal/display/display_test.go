@@ -309,8 +309,8 @@ func TestShowInfo(t *testing.T) {
 	}
 }
 
-// TestShowMetrics_BatterySOC_DayQuery verifies battery SOC is shown for day queries.
-func TestShowMetrics_BatterySOC_DayQuery(t *testing.T) {
+// TestShowMetrics_Battery_DayQuery verifies all battery metrics are shown for day queries.
+func TestShowMetrics_Battery_DayQuery(t *testing.T) {
 	var buf bytes.Buffer
 	tz := mustLoadLocation(t, "US/Pacific")
 
@@ -320,8 +320,8 @@ func TestShowMetrics_BatterySOC_DayQuery(t *testing.T) {
 		Timestamp: time.Now(),
 		QueryType: constants.QueryTypeDay,
 		Systems: []aggregator.SystemMetrics{
-			{Name: "Home System", ID: "12345", BatterySOC: 75},
-			{Name: "Office System", ID: "67890", BatterySOC: 50},
+			{Name: "Home System", ID: "12345", BatterySOC: 75, BatteryChargedToday: 5.0, BatteryDischargedToday: 3.0},
+			{Name: "Office System", ID: "67890", BatterySOC: 50, BatteryChargedToday: 2.0, BatteryDischargedToday: 1.0},
 		},
 	}
 
@@ -329,14 +329,20 @@ func TestShowMetrics_BatterySOC_DayQuery(t *testing.T) {
 
 	output := buf.String()
 
-	// Battery charge percentage should be shown for day queries
+	// All three battery fields should appear for day queries
+	if !strings.Contains(output, "Charged to Battery") {
+		t.Error("Output should contain 'Charged to Battery' for day query")
+	}
+	if !strings.Contains(output, "Discharged from Battery") {
+		t.Error("Output should contain 'Discharged from Battery' for day query")
+	}
 	if !strings.Contains(output, "Battery Charge Percentage") {
 		t.Error("Output should contain 'Battery Charge Percentage' for day query")
 	}
 }
 
-// TestShowMetrics_BatterySOC_MonthQuery verifies battery SOC is hidden for month queries.
-func TestShowMetrics_BatterySOC_MonthQuery(t *testing.T) {
+// TestShowMetrics_Battery_MonthQuery verifies battery metrics are hidden for month queries.
+func TestShowMetrics_Battery_MonthQuery(t *testing.T) {
 	var buf bytes.Buffer
 	tz := mustLoadLocation(t, "US/Pacific")
 
@@ -355,14 +361,20 @@ func TestShowMetrics_BatterySOC_MonthQuery(t *testing.T) {
 
 	output := buf.String()
 
-	// Battery charge percentage should NOT be shown for month queries
+	// No battery fields should appear for month queries
+	if strings.Contains(output, "Charged to Battery") {
+		t.Error("Output should NOT contain 'Charged to Battery' for month query")
+	}
+	if strings.Contains(output, "Discharged from Battery") {
+		t.Error("Output should NOT contain 'Discharged from Battery' for month query")
+	}
 	if strings.Contains(output, "Battery Charge Percentage") {
 		t.Error("Output should NOT contain 'Battery Charge Percentage' for month query")
 	}
 }
 
-// TestShowMetrics_BatterySOC_YearQuery verifies battery SOC is hidden for year queries.
-func TestShowMetrics_BatterySOC_YearQuery(t *testing.T) {
+// TestShowMetrics_Battery_YearQuery verifies battery metrics are hidden for year queries.
+func TestShowMetrics_Battery_YearQuery(t *testing.T) {
 	var buf bytes.Buffer
 	tz := mustLoadLocation(t, "US/Pacific")
 
@@ -381,7 +393,13 @@ func TestShowMetrics_BatterySOC_YearQuery(t *testing.T) {
 
 	output := buf.String()
 
-	// Battery charge percentage should NOT be shown for year queries
+	// No battery fields should appear for year queries
+	if strings.Contains(output, "Charged to Battery") {
+		t.Error("Output should NOT contain 'Charged to Battery' for year query")
+	}
+	if strings.Contains(output, "Discharged from Battery") {
+		t.Error("Output should NOT contain 'Discharged from Battery' for year query")
+	}
 	if strings.Contains(output, "Battery Charge Percentage") {
 		t.Error("Output should NOT contain 'Battery Charge Percentage' for year query")
 	}

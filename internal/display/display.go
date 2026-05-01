@@ -139,11 +139,10 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		d.printMetric("Exported to the Grid", sys.GridExportToday, d.colors.Export, "        ", 27, true)
 		d.printMetric("Captured from the Sun", sys.ProductionToday, d.colors.Production, "        ", 27, true)
 		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", 27, true)
-		d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", 27, true)
-		d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "        ", 27, true)
-		// Only show battery charge percentage for day queries
-		// For month/year queries, the SOC is just a snapshot and not meaningful
+		// Battery metrics are only relevant for single-day reports
 		if metrics.QueryType == constants.QueryTypeDay {
+			d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", 27, true)
+			d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "        ", 27, true)
 			fmt.Fprintf(d.writer, "        %sBattery Charge Percentage:%s %s%10d%%%s\n",
 				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		}
