@@ -249,7 +249,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │              internal/api/EnlightenCloudClient                     │
 │  - OAuth authentication (internal/oauth)                           │
 │  - Interval endpoints (15-min data, single-day queries)            │
-│  - Lifetime endpoints (daily totals, month/year queries)           │
+│  - Lifetime endpoints (daily totals, month/year/true-up queries)   │
 └────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
@@ -263,7 +263,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ┌────────────────────────────────────────────────────────────────────┐
 │              internal/aggregator/AggregatedMetrics                 │
 │   - Sums production, consumption across systems                    │
-│   - Aggregates battery charge/discharge across systems             │
+│   - Battery tracked per system only (day queries); zero for others │
 │   - Tracks cache usage flags (CacheUsed, AllFromCache)             │
 │   - TrueUpReport built from a single lifetime-endpoint batch       │
 └──────────────────────────┬─────────────────────────────────────────┘

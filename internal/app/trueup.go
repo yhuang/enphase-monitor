@@ -15,7 +15,7 @@ import (
 // RunTrueUp calculates and displays energy metrics for a true-up year period.
 // trueUpStartStr must be YYYY-MM-DD — the utility-defined start date of the true-up year.
 // Full calendar months are used; the query covers the first day of the start month
-// through yesterday in a single API batch (10 calls, one per system per metric).
+// through yesterday in a single API batch (4 metrics per system, battery excluded).
 func RunTrueUp(ctx context.Context, rc RunConfig, trueUpStartStr string) error {
 	startDate, err := timezone.ParseDateInTimezone(trueUpStartStr, rc.ReportTZ)
 	if err != nil {

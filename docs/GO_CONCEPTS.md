@@ -29,7 +29,7 @@ This document explains all the intermediate Go concepts that are used throughout
 
 ### Error Handling Pattern
 
-**Location**: `aggregator.go:103-106`
+**Location**: `aggregator.go:105-108`
 
 Standard Go pattern: function returns `(result, error)`. We check `err` immediately and return early if non-nil. This is idiomatic Go - errors are values, not exceptions.
 
@@ -54,7 +54,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Error Wrapping with %w
 
-**Location**: `aggregator.go:105`
+**Location**: `aggregator.go:107`
 
 `fmt.Errorf` with `%w` verb wraps the original error, preserving the error chain. This allows callers to use `errors.Is()` or `errors.Unwrap()` to inspect the chain. We add context ("failed to refresh token for system X") while preserving the original error for debugging.
 
@@ -64,16 +64,20 @@ return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, 
 
 ### Error Inspection
 
-**Location**: `aggregator.go:114-120`
+**Location**: `aggregator.go:116-128`
 
-We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit.
+We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit. For other errors, we warn and continue rather than aborting all systems.
 
 ```go
-if err != nil && !constants.IsRateLimitError(err) {
-    return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
+if err != nil && constants.IsRateLimitError(err) {
+    rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
+    allFromCache = false
+    continue
 }
 if err != nil {
-    rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
+    // Non-rate-limit errors: warn and skip this system
+    fmt.Printf("WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
+    allFromCache = false
     continue
 }
 ```
@@ -84,7 +88,7 @@ if err != nil {
 
 ### Constructor Function Pattern
 
-**Location**: `internal/api/client.go:177-188`
+**Location**: `internal/api/client.go:184-195`
 
 Functions starting with "New" are constructors - they create and initialize structs. This is a Go naming convention, not a language feature. We return a pointer `(*EnlightenCloudClient)` because:
 1. the return type specifies a pointer type;
@@ -100,7 +104,7 @@ func NewEnlightenCloudClient(...) *EnlightenCloudClient {
 
 ### Struct Literal with Pointer
 
-**Location**: `internal/api/client.go:178-187`
+**Location**: `internal/api/client.go:185-194`
 
 `&EnlightenCloudClient{...}` creates a struct and returns a pointer to it. This is idiomatic Go - create struct, take address, return pointer.
 
@@ -113,7 +117,7 @@ return &EnlightenCloudClient{
 
 ### Struct Initialization with Pointer Return
 
-**Location**: `aggregator.go:80-85`
+**Location**: `aggregator.go:81-86`
 
 We use `&AggregatedMetrics{}` to create a pointer to a new struct. This is more efficient than returning by value (avoids copying large struct).
 
@@ -126,7 +130,7 @@ metrics := &AggregatedMetrics{
 
 ### Nested Struct Initialization
 
-**Location**: `internal/api/client.go:184-186`
+**Location**: `internal/api/client.go:191-193`
 
 We initialize `httpClient` field with a struct literal. `http.Client` is from standard library - we set Timeout for safety.
 
@@ -208,7 +212,7 @@ var allIntervals []TelemetryInterval
 
 ### Slice Capacity Hint
 
-**Location**: `aggregator.go:84`
+**Location**: `aggregator.go:85`
 
 `make([]Type, length, capacity)` pre-allocates capacity to avoid reallocation. We know we will have `len(systems)` elements, so we pre-allocate that capacity. This is more efficient than letting the slice grow dynamically.
 
@@ -232,7 +236,7 @@ allIntervals = append(allIntervals, intervalArray...)
 
 ### Slice Append
 
-**Location**: `aggregator.go:118`
+**Location**: `aggregator.go:117`
 
 `append()` adds elements to a slice, automatically growing if needed. Since we pre-allocated capacity, this should be efficient.
 
@@ -509,7 +513,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Duration Literals
 
-**Location**: `internal/api/client.go:184-186`
+**Location**: `internal/api/client.go:192`
 
 `time.Second` is a typed constant (`time.Duration`). Multiplying an integer by `time.Second` — e.g. `30 * time.Second` — is idiomatic Go for expressing durations. In this codebase the value is extracted to `constants.APIRequestTimeout` for clarity.
 
@@ -563,7 +567,7 @@ When running in continuous mode, the program needs to:
 #### Step 1 & 2: Create Context with Signal Handling
 
 ```go
-// main.go:177-178
+// main.go:178-179
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
 ```
@@ -989,7 +993,7 @@ return hex.EncodeToString(hash[:])
 
 ### Variable Declaration with Type
 
-**Location**: `internal/aggregator/aggregator.go:87`
+**Location**: `internal/aggregator/aggregator.go:89`
 
 `var name []Type` declares a variable with zero value (nil slice for slices). We could use `:= []string{}` but `var` is clearer when we are not initializing.
 
@@ -1003,7 +1007,7 @@ var rateLimitErrors []string
 
 ### Multiple Return Values
 
-**Location**: `internal/aggregator/aggregator.go:113`
+**Location**: `internal/aggregator/aggregator.go:115`
 
 Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for rate limiting).
 
