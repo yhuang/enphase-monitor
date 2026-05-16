@@ -214,7 +214,7 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 		color, direction, constants.Reset)
 }
 
-// ShowTrueUpReport displays the accumulated true-up year energy report.
+// ShowTrueUpReport displays the true-up year energy report.
 func (d *Display) ShowTrueUpReport(report *aggregator.TrueUpReport) {
 	d.printTrueUpHeader(report)
 	d.printTrueUpCombined(report)

@@ -36,6 +36,7 @@
 //	Application Layer (internal/app):
 //	- setup.go: Application initialization, OAuth adapter, display setup, mode configuration
 //	- runner.go: Execution modes (once/continuous), metric fetching and display
+//	- trueup.go: True-up year report via single-batch lifetime query and report conversion
 //
 //	CLI Layer (internal/cli):
 //	- flags.go: Command-line flag parsing and definitions
@@ -73,7 +74,8 @@
 //  5. Create DataAggregator with OAuth adapter from internal/app
 //  6. Setup display with colors from internal/app
 //  7. Configure modes (test/cache) via internal/app
-//  8. Run execution mode via internal/app:
+//  8. If --true-up: call app.RunTrueUp (single-batch lifetime query, no battery) and exit.
+//     Otherwise, run the standard execution mode:
 //     - For each system in config:
 //     a. Get OAuth access token via internal/oauth (cached or refreshed)
 //     b. Create API client via internal/api for the system

@@ -64,7 +64,7 @@ enphase-monitor/
 │   │   ├── interface.go                   # CloudClient interface for testability
 │   │   ├── client_test.go                 # API client unit tests
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
-│   │   └── client_lifetime_test.go        # Lifetime endpoint tests (month/year queries)
+│   │   └── client_lifetime_test.go        # Lifetime endpoint tests (month/year/true-up queries)
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   ├── setup_test.go                  # Setup tests
@@ -182,7 +182,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │  ├─► Normalize to month-1    │  │     └─► RunContinuous: synchronous for/select (ticker.C, ctx.Done) │
 │  ├─► GetAggregatedMetrics    │  │         (no goroutines spawned)                                    │
 │  │   (QueryTypeTrueUp,       │  │     └─► fetchAndDisplay(ctx, ...) calls aggregator                 │
-│  │   single batch, 10 calls) │  └────────────────────────────────────────────────────────────────────┘
+│  │   4 metrics/system,        │  └────────────────────────────────────────────────────────────────────┘
 │  ├─► buildTrueUpReport()     │
 │  └─► ShowTrueUpReport()      │
 └──────────────────────────────┘
@@ -327,7 +327,7 @@ Callers can use `errors.Is()` or `errors.As()` to inspect wrapped errors.
 This codebase uses a simplified approach to optional configuration:
 
 ```go
-// display.go lines 53-57 - Constructor delegates to NewDisplayWithWriter
+// display.go lines 55-57 - Constructor delegates to NewDisplayWithWriter
 // colors.MergeWithDefaults is called inside NewDisplayWithWriter (lines 61-72)
 func NewDisplayWithColorsAndTimezone(colors config.ColorConfig, tz *time.Location) *Display {
     return NewDisplayWithWriter(colors, tz, os.Stdout)
