@@ -304,14 +304,15 @@ case constants.FieldWhExported:
 
 ### Continue Statement
 
-**Location**: `aggregator.go:119`
+**Location**: `aggregator.go:116-119`
 
-`continue` skips to next iteration of the loop. We use it here to skip this system and try the next one.
+`continue` skips to next iteration of the loop. We use it here to skip this system and try the next one when a rate limit error occurs.
 
 ```go
-if err != nil {
+if err != nil && constants.IsRateLimitError(err) {
     rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
-    continue  // Skip to next system
+    allFromCache = false
+    continue
 }
 ```
 
@@ -567,7 +568,7 @@ When running in continuous mode, the program needs to:
 #### Step 1 & 2: Create Context with Signal Handling
 
 ```go
-// main.go:178-179
+// main.go:179-180
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
 ```
