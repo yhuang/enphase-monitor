@@ -33,7 +33,7 @@ A Go application for monitoring and aggregating data from multiple Enphase solar
 - **Multi-System Monitoring**: Query and combine metrics from multiple independent Enphase systems
 - **Comprehensive Metrics**: Track production, consumption, battery usage, grid import/export, and net energy flow
 - **Flexible Querying**: Query historical dates or monitor real-time with auto-refresh
-- **True-Up Year Report**: Accumulate energy metrics across a full utility true-up year period (`--true-up`)
+- **True-Up Year Report**: Query energy metrics across a full utility true-up year period (`--true-up`)
 - **Clean Display**: Formatted terminal output with customizable colors
 - **API Caching**: Automatic caching of API responses to reduce API calls and enable offline validation
 - **Color Customization**: Customize terminal colors using hex codes or ANSI escape codes
@@ -282,7 +282,7 @@ Calculate the energy balance for your utility true-up year. Provide the start da
 ./enphase-monitor --true-up 2025-01-15
 ```
 
-This accumulates **full calendar months** from the start month through yesterday. For example, a `2025-01-15` start date queries January 2025 through the most recent complete month.
+This covers **full calendar months** from the start month through yesterday. For example, a `2025-01-15` start date queries January 2025 through the most recent complete month.
 
 **How the query works:**
 

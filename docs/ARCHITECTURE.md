@@ -32,7 +32,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 - **Cloud API Integration**: Uses Enphase Enlighten Cloud API v4 exclusively (no local network access required)
 - **Intelligent Caching**: Disk-based response caching to respect API rate limits (10 calls/minute)
 - **Historical Data**: Query any past date with `--date` flag (auto-runs once since data won't change)
-- **True-Up Year Report**: Accumulate energy metrics across a full utility true-up year with `--true-up`
+- **True-Up Year Report**: Query energy metrics across a full utility true-up year with `--true-up`
 - **Real-time Monitoring**: Continuous mode with configurable refresh interval (default: 1 hour)
 - **Color Customization**: Customize terminal output colors via YAML configuration
 - **Validation Mode**: Test against expected values without making API calls
