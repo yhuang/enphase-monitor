@@ -286,7 +286,7 @@ This accumulates **full calendar months** from the start month through yesterday
 
 **How the query works:**
 
-A single API batch of exactly 10 calls (2 systems × 5 metrics) is made against the `_lifetime` endpoints with `start_date` set to the first day of the start month. The API returns all daily values from that date through yesterday in one response; the application sums the relevant date range client-side. No inter-batch waits are needed. Subsequent runs are instant because the response is served from the disk cache.
+A single API batch of 8 calls (2 systems × 4 metrics: import, export, production, consumption) is made against the `_lifetime` endpoints with `start_date` set to the first day of the start month. Battery data is not fetched for true-up queries. The API returns all daily values from that date through yesterday in one response; the application sums the relevant date range client-side. No inter-batch waits are needed. Subsequent runs are instant because the response is served from the disk cache.
 
 **The `--true-up` flag takes precedence over `--date`** — if both are provided, `--date` is ignored.
 
@@ -348,32 +348,34 @@ The application displays:
 
  COMBINED ENERGY REPORT
 ---------------------------------------------------------
-  Produced:                   33.4 kWh
-  Consumed:                   48.6 kWh
-  Net Energy Flow:            19.1 kWh (import)
+    Energy Produced:      33.4 kWh
+    Energy Consumed:      48.6 kWh
+    Energy Imported:      19.1 kWh
+    Energy Exported:       3.8 kWh
+    Net Energy Flow:      15.3 kWh (import)
 
  INDIVIDUAL SYSTEMS REPORT
 ---------------------------------------------------------
 
   [1] Right Subpanel (5525881)
-      Imported from the Grid:         23.1 kWh
-      Exported to the Grid:            3.8 kWh
+      Energy Imported:                23.1 kWh
+      Energy Exported:                 3.8 kWh
       Captured from the Sun:          14.6 kWh
       Net Energy Flow:                19.3 kWh (import)
       Charged to Battery:              8.5 kWh
       Discharged from Battery:         6.8 kWh
       Battery Charge Percentage:           63%
-      Total Consumed:                 32.1 kWh
+      Total Energy Consumed:          32.1 kWh
 
   [2] Left Subpanel (5392556)
-      Imported from the Grid:          7.5 kWh
-      Exported to the Grid:            7.6 kWh
+      Energy Imported:                 7.5 kWh
+      Energy Exported:                 7.6 kWh
       Captured from the Sun:          18.9 kWh
       Net Energy Flow:                 0.2 kWh (export)
       Charged to Battery:              8.1 kWh
       Discharged from Battery:         5.4 kWh
       Battery Charge Percentage:           74%
-      Total Consumed:                 16.4 kWh
+      Total Energy Consumed:          16.4 kWh
 
 =========================================================
 ```
@@ -398,16 +400,18 @@ The `--true-up` flag produces a dedicated report:
 
  TRUE-UP ENERGY REPORT
 ---------------------------------------------------------
-  Energy Produced:    3,456.7 kWh
-  Energy Consumed:    2,345.6 kWh
-  Net Energy Flow:    1,111.1 kWh (export)
+    Energy Produced:      3456.7 kWh
+    Energy Consumed:      2345.6 kWh
+    Energy Imported:       800.0 kWh
+    Energy Exported:      1911.1 kWh
+    Net Energy Flow:      1111.1 kWh (export)
 
  INDIVIDUAL SYSTEMS REPORT
 ---------------------------------------------------------
 
   [1] Right Subpanel (5525881)
-      Imported from the Grid:    600.0 kWh
-      Exported to the Grid:    1,200.0 kWh
+      Energy Imported:           600.0 kWh
+      Energy Exported:         1,200.0 kWh
       Captured from the Sun:   1,700.0 kWh
       Net Energy Flow:           600.0 kWh (export)
       Total Energy Consumed:   1,100.0 kWh
@@ -423,27 +427,29 @@ The "Data Range" starts from the first day of the start month (full months are a
 ## Metrics Explained
 
 ### Combined Energy Report
-- **Produced**: Total solar generation from all systems (kWh)
-- **Consumed**: Total household consumption from all systems (kWh)
+- **Energy Produced**: Total solar generation from all systems (kWh)
+- **Energy Consumed**: Total household consumption from all systems (kWh)
+- **Energy Imported**: Total energy purchased from the grid across all systems (kWh)
+- **Energy Exported**: Total energy sold back to the grid across all systems (kWh)
 - **Net Energy Flow**: Net energy imported from or exported to the grid
   - Positive value with "(import)" suffix: More energy imported than exported
   - Negative value with "(export)" suffix: More energy exported than imported
-  - Calculation: Grid Imported - Grid Exported
+  - Calculation: Energy Imported - Energy Exported
 
 ### Individual System Metrics (Standard Report)
-- **Imported from the Grid**: Energy purchased from utility for this system (kWh)
-- **Exported to the Grid**: Energy sold back to utility from this system (kWh)
+- **Energy Imported**: Energy purchased from utility for this system (kWh)
+- **Energy Exported**: Energy sold back to utility from this system (kWh)
 - **Captured from the Sun**: Solar generation for this system (kWh)
 - **Net Energy Flow**: Net import/export for this system (kWh) with (import) or (export) suffix
 - **Charged to Battery**: Energy stored in batteries for this system (kWh)
 - **Discharged from Battery**: Energy used from batteries for this system (kWh)
 - **Battery Charge Percentage**: Current state of charge (SOC) of the battery system, displayed as a percentage (0-100%). This metric is shown per-system only (not aggregated) and only for day queries. For month/year queries, battery SOC is omitted since it represents a point-in-time snapshot that isn't meaningful when aggregated over a period.
-- **Total Consumed**: Total consumption for this system (kWh)
+- **Total Energy Consumed**: Total consumption for this system (kWh)
 
 ### Individual System Metrics (True-Up Report)
 
 The true-up report shows the same per-system breakdown but **without battery metrics**, since battery charge/discharge is not relevant to the utility true-up calculation:
-- **Imported from the Grid**, **Exported to the Grid**, **Captured from the Sun**, **Net Energy Flow**, **Total Energy Consumed**
+- **Energy Imported**, **Energy Exported**, **Captured from the Sun**, **Net Energy Flow**, **Total Energy Consumed**
 
 ## Color Customization
 
@@ -630,7 +636,7 @@ enphase-monitor/
 │   │   ├── setup_test.go                  # Setup tests
 │   │   ├── runner.go                      # Execution modes (once/continuous)
 │   │   ├── runner_test.go                 # Runner tests
-│   │   ├── trueup.go                      # True-up year report: query schedule, accumulation, progress
+│   │   ├── trueup.go                      # True-up year: single-batch lifetime query and report conversion
 │   │   └── trueup_test.go                 # True-up logic tests
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation

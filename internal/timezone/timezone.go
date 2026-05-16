@@ -189,7 +189,7 @@ func GetYearBoundaries(targetDate time.Time, tz *time.Location) (start, end time
 }
 
 // GetTrueUpBoundaries returns the start and end times for a true-up year query.
-// Start is midnight on the first day of trueUpStartDate's month.
+// Start is midnight on trueUpStartDate (callers normalize this to the first of the month).
 // End is 23:59:59 of yesterday (the most recent complete day).
 func GetTrueUpBoundaries(trueUpStartDate time.Time, tz *time.Location) (start, end time.Time) {
 	d := trueUpStartDate.In(tz)

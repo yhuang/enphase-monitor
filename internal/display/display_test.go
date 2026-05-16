@@ -151,6 +151,40 @@ func TestShowMetrics_ContainsMetricValues(t *testing.T) {
 	}
 }
 
+// TestShowMetrics_CombinedSectionLabels verifies that the combined energy report
+// includes all expected labels, including grid import and export.
+func TestShowMetrics_CombinedSectionLabels(t *testing.T) {
+	var buf bytes.Buffer
+	tz := mustLoadLocation(t, "US/Pacific")
+
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+	metrics := &aggregator.AggregatedMetrics{
+		Timestamp:        time.Now(),
+		ProductionToday:  10.5,
+		ConsumptionToday: 8.2,
+		GridImportToday:  2.0,
+		GridExportToday:  4.3,
+		NetImportToday:   -2.3,
+	}
+
+	d.ShowMetrics(metrics)
+
+	output := buf.String()
+
+	for _, want := range []string{
+		"Energy Produced",
+		"Energy Consumed",
+		"Energy Imported",
+		"Energy Exported",
+		"Net Energy Flow",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("combined section missing %q", want)
+		}
+	}
+}
+
 // TestShowMetrics_CacheIndicator verifies that cache status is displayed.
 func TestShowMetrics_CacheIndicator(t *testing.T) {
 	tz := mustLoadLocation(t, "US/Pacific")
@@ -482,6 +516,8 @@ func TestShowTrueUpReport_CombinedSection(t *testing.T) {
 		"TRUE-UP ENERGY REPORT",
 		"Energy Produced",
 		"Energy Consumed",
+		"Energy Imported",
+		"Energy Exported",
 		"Net Energy Flow",
 	}
 	for _, want := range checks {
@@ -573,8 +609,8 @@ func TestShowTrueUpReport_PerSystemMetrics(t *testing.T) {
 	output := buf.String()
 
 	wantLabels := []string{
-		"Imported from the Grid",
-		"Exported to the Grid",
+		"Energy Imported",
+		"Energy Exported",
 		"Captured from the Sun",
 		"Net Energy Flow",
 		"Total Energy Consumed",

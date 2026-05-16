@@ -108,11 +108,11 @@
 //
 // ENDPOINT SELECTION STRATEGY:
 //   - Single-day queries: Use interval endpoints (better granularity, 96 data points).
-//   - Month/year queries: Use lifetime endpoints (daily aggregated, no 7-day limit).
+//   - Month/year/true-up queries: Use lifetime endpoints (daily aggregated, no 7-day limit).
 //     NOTE: The interval endpoints only return one calendar day per call regardless of
 //     the end_at parameter (API returns granularity=day and ignores wider ranges).
-//   - Ongoing periods (current month/year): Data is capped to yesterday (the last complete
-//     day). Today's partial data is excluded — the lifetime endpoints only contain
+//   - Ongoing periods (current month/year/true-up): Data is capped to yesterday (the last
+//     complete day). Today's partial data is excluded — the lifetime endpoints only contain
 //     completed days. Use lifetimeEndDate() to get the correct end date.
 //
 // All interval endpoints accept query parameters:

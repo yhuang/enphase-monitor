@@ -192,7 +192,8 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │  4. AGGREGATION (internal/aggregator)                              │
 │     └─► GetAggregatedMetrics() loops through systems               │
 │         └─► Uses internal/api for HTTP requests                    │
-│             └─► Fetches production, consumption, grid, battery     │
+│             └─► Fetches production, consumption, grid import/export│
+│                 battery data is fetched only for day queries        │
 └────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -297,7 +298,7 @@ type EnlightenCloudClient struct {
 func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*LocalMetrics, bool, error) {
     // 'c' is the receiver - access struct fields via c.systemID, etc.
     // ctx is used for request cancellation and timeout handling
-    // queryType specifies query granularity (day/month/year)
+    // queryType specifies query granularity (day/month/year/true-up)
 }
 ```
 
