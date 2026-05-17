@@ -1,0 +1,5 @@
+{
+  "name": "doc-sync",
+  "version": "1.0.0",
+  "description": "Verify documentation line references and code examples against current source code"
+}

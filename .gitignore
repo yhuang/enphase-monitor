@@ -1,7 +1,8 @@
 enphase-monitor
 
 cache/
-.claude/
+.claude/settings.json
+.claude/settings.local.json
 .github/
 .docs/
 
