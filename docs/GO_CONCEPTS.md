@@ -29,7 +29,7 @@ This document explains all the intermediate Go concepts that are used throughout
 
 ### Error Handling Pattern
 
-**Location**: `aggregator.go:105-108`
+**Location**: `internal/aggregator/aggregator.go:105-108`
 
 Standard Go pattern: function returns `(result, error)`. We check `err` immediately and return early if non-nil. This is idiomatic Go - errors are values, not exceptions.
 
@@ -54,7 +54,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Error Wrapping with %w
 
-**Location**: `aggregator.go:107`
+**Location**: `internal/aggregator/aggregator.go:107`
 
 `fmt.Errorf` with `%w` verb wraps the original error, preserving the error chain. This allows callers to use `errors.Is()` or `errors.Unwrap()` to inspect the chain. We add context ("failed to refresh token for system X") while preserving the original error for debugging.
 
@@ -64,9 +64,9 @@ return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, 
 
 ### Error Inspection
 
-**Location**: `aggregator.go:116-128`
+**Location**: `internal/aggregator/aggregator.go:117-129`
 
-We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit. For other errors, we warn and continue rather than aborting all systems.
+We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit. For context cancellation errors (Ctrl+C or deadline exceeded), we return immediately to abort all systems. For other errors, we warn and continue.
 
 ```go
 if err != nil && constants.IsRateLimitError(err) {
@@ -75,7 +75,9 @@ if err != nil && constants.IsRateLimitError(err) {
     continue
 }
 if err != nil {
-    // Non-rate-limit errors: warn and skip this system
+    if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+        return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
+    }
     fmt.Printf("WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
     allFromCache = false
     continue
@@ -117,7 +119,7 @@ return &EnlightenCloudClient{
 
 ### Struct Initialization with Pointer Return
 
-**Location**: `aggregator.go:81-86`
+**Location**: `internal/aggregator/aggregator.go:81-86`
 
 We use `&AggregatedMetrics{}` to create a pointer to a new struct. This is more efficient than returning by value (avoids copying large struct).
 
@@ -212,7 +214,7 @@ var allIntervals []TelemetryInterval
 
 ### Slice Capacity Hint
 
-**Location**: `aggregator.go:85`
+**Location**: `internal/aggregator/aggregator.go:85`
 
 `make([]Type, length, capacity)` pre-allocates capacity to avoid reallocation. We know we will have `len(systems)` elements, so we pre-allocate that capacity. This is more efficient than letting the slice grow dynamically.
 
@@ -236,7 +238,7 @@ allIntervals = append(allIntervals, intervalArray...)
 
 ### Slice Append
 
-**Location**: `aggregator.go:117`
+**Location**: `internal/aggregator/aggregator.go:118`
 
 `append()` adds elements to a slice, automatically growing if needed. Since we pre-allocated capacity, this should be efficient.
 
@@ -304,7 +306,7 @@ case constants.FieldWhExported:
 
 ### Continue Statement
 
-**Location**: `aggregator.go:116-119`
+**Location**: `internal/aggregator/aggregator.go:117-121`
 
 `continue` skips to next iteration of the loop. We use it here to skip this system and try the next one when a rate limit error occurs.
 
@@ -1008,7 +1010,7 @@ var rateLimitErrors []string
 
 ### Multiple Return Values
 
-**Location**: `internal/aggregator/aggregator.go:115`
+**Location**: `internal/aggregator/aggregator.go:116`
 
 Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for rate limiting).
 
