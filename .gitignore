@@ -1,6 +1,7 @@
 enphase-monitor
 
 cache/
+.claude/
 .github/
 .docs/
 
