@@ -114,7 +114,7 @@ func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
 	fmt.Fprintf(d.writer, "\n   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, "  ", 24, false, "\033[48;2;1;3;100m", "\033[48;2;1;3;100m")
+	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, "  ", 24, false, "\033[48;2;104;0;99m", "\033[48;2;1;3;100m")
 	d.printMetric("Energy Produced", metrics.ProductionToday, d.colors.Production, "    ", 22, false)
 	d.printMetric("Energy Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 22, false)
 	d.printMetric("Energy Imported", metrics.GridImportToday, d.colors.Import, "    ", 22, false)
@@ -263,7 +263,7 @@ func (d *Display) printTrueUpCombined(report *aggregator.TrueUpReport) {
 	fmt.Fprintf(d.writer, "\n   %s%sTRUE-UP ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Energy Flow", report.NetFlow, "  ", 24, false, "\033[48;2;1;3;100m", "\033[48;2;1;3;100m")
+	d.printNetFlow("  Net Energy Flow", report.NetFlow, "  ", 24, false, "\033[48;2;104;0;99m", "\033[48;2;1;3;100m")
 	d.printMetric("Energy Produced", report.Production, d.colors.Production, "    ", 22, false)
 	d.printMetric("Energy Consumed", report.Consumption, d.colors.TotalConsumed, "    ", 22, false)
 	d.printMetric("Energy Imported", report.GridImport, d.colors.Import, "    ", 22, false)
