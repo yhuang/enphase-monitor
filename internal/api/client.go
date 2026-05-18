@@ -773,6 +773,13 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		return cached.ToHTTPResponse(), true, nil // Cache was used (past date)
 	}
 
+	// For current periods, serve fresh cache without making a live API call.
+	// This prevents burning rate-limit budget on repeated queries for slow-changing
+	// data (e.g. --date 2026 queries a full year of historical daily totals).
+	if !isDateInPast && cacheErr == nil && !isCacheStale {
+		return cached.ToHTTPResponse(), true, nil // Cache was used (fresh cache)
+	}
+
 	// Make the API request
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
