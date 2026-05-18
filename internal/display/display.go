@@ -255,6 +255,7 @@ func (d *Display) printTrueUpCombined(report *aggregator.TrueUpReport) {
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
 	d.printNetFlow("  Net Energy Flow", report.NetFlow, "  ", 24, false)
+	fmt.Fprintln(d.writer)
 	d.printMetric("Energy Produced", report.Production, d.colors.Production, "    ", 22, false)
 	d.printMetric("Energy Consumed", report.Consumption, d.colors.TotalConsumed, "    ", 22, false)
 	d.printMetric("Energy Imported", report.GridImport, d.colors.Import, "    ", 22, false)
