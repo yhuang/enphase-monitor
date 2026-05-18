@@ -140,15 +140,22 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 			prefix, d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
-		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", 31, true, "", "")
-		d.printMetric("Energy Produced", sys.ProductionToday, d.colors.Production, "        ", 31, true)
-		d.printMetric("Energy Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", 31, true)
-		d.printMetric("Energy Imported", sys.GridImportToday, d.colors.Import, "        ", 31, true)
-		d.printMetric("Energy Exported", sys.GridExportToday, d.colors.Export, "        ", 31, true)
+		// labelWidth anchors on the longest visible label + 5-space gap:
+		// day queries show "Battery Charge Percentage:" (26 chars) → 31
+		// month/year queries show "Energy Exported:" (16 chars) → 21
+		lw := 21
+		if metrics.QueryType == constants.QueryTypeDay {
+			lw = 31
+		}
+		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", lw, true, "", "")
+		d.printMetric("Energy Produced", sys.ProductionToday, d.colors.Production, "        ", lw, true)
+		d.printMetric("Energy Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", lw, true)
+		d.printMetric("Energy Imported", sys.GridImportToday, d.colors.Import, "        ", lw, true)
+		d.printMetric("Energy Exported", sys.GridExportToday, d.colors.Export, "        ", lw, true)
 		// Battery metrics are only relevant for single-day reports
 		if metrics.QueryType == constants.QueryTypeDay {
-			d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", 31, true)
-			d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "        ", 31, true)
+			d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", lw, true)
+			d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "        ", lw, true)
 			fmt.Fprintf(d.writer, "        %sBattery Charge Percentage:%s     %s%d%%%s\n",
 				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		}
