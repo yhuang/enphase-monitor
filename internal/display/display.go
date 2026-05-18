@@ -132,8 +132,12 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 	for i, sys := range metrics.Systems {
 		displayName := sys.Name
 		identifier := sys.ID
-		fmt.Fprintf(d.writer, "\n    %s[%d]%s %s%s%s %s(%s)%s\n",
-			d.colors.Headers, i+1, constants.Reset,
+		prefix := "\n"
+		if i == 0 {
+			prefix = ""
+		}
+		fmt.Fprintf(d.writer, "%s    %s[%d]%s %s%s%s %s(%s)%s\n",
+			prefix, d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
 		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", 27, true)
