@@ -150,7 +150,7 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		if metrics.QueryType == constants.QueryTypeDay {
 			d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", 27, true)
 			d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "        ", 27, true)
-			fmt.Fprintf(d.writer, "        %sBattery Charge Percentage:%s %s%10d%%%s\n",
+			fmt.Fprintf(d.writer, "        %sBattery Charge Percentage:%s %s%d%%%s\n",
 				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		}
 	}
@@ -175,11 +175,7 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 		unit = "MWh"
 	}
 
-	valueFormat := "%.1f"
-	if rightAlign {
-		valueFormat = "%7.1f"
-	}
-	fmt.Fprintf(d.writer, "%s%s%s%s%s%s"+valueFormat+" %s%s\n",
+	fmt.Fprintf(d.writer, "%s%s%s%s%s%s%.1f %s%s\n",
 		indent, d.colors.SecondaryText, labelWithColon, constants.Reset,
 		padding, valueColor, displayValue, unit, constants.Reset)
 }
@@ -209,11 +205,6 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 		unit = "MWh"
 	}
 
-	valueFormat := "%.1f"
-	if rightAlign {
-		valueFormat = "%7.1f"
-	}
-
 	if highlightBg != "" {
 		bg := highlightBg
 		r := constants.Reset + bg  // reset fg then re-apply bg so it persists across color changes
@@ -224,12 +215,12 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 		allLeading := indent + labelWithColon[:len(labelWithColon)-len(trimmed)]
 		outerIndent := allLeading[:len(allLeading)-1] // one space stays inside bg as left pad
 
-		fmt.Fprintf(d.writer, "%s%s%s%s%s"+valueFormat+" %s%s %s(%s)%s%s\n",
+		fmt.Fprintf(d.writer, "%s%s%s%s%s%.1f %s%s %s(%s)%s%s\n",
 			outerIndent+bg+" "+d.colors.SecondaryText, trimmed, r,
 			padding, color, displayValue, unit, r,
 			color, direction, bg+" ", constants.Reset)
 	} else {
-		fmt.Fprintf(d.writer, "%s%s%s%s%s%s"+valueFormat+" %s%s %s(%s)%s\n",
+		fmt.Fprintf(d.writer, "%s%s%s%s%s%s%.1f %s%s %s(%s)%s\n",
 			indent, d.colors.SecondaryText, labelWithColon, constants.Reset,
 			padding, color, displayValue, unit, constants.Reset,
 			color, direction, constants.Reset)
