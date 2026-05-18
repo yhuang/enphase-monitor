@@ -131,12 +131,13 @@
 // Three mechanisms work together to stay under the limit:
 //  1. Fresh-cache fast-path: if the cache entry for this exact URL is younger
 //     than cache.MinRequestInterval (60s), it's returned without an API call.
-//  2. Recent-API throttle (serveRecentEndpointCache): if any live API call
-//     happened in the last MinRequestInterval (tracked in cache/last_api_call),
-//     the client serves the most recent cache entry for the same endpoint and
-//     system ID — even if it's for a different date than the one requested.
-//     This keeps back-to-back invocations with different --date flags from
-//     burning rate-limit budget.
+//  2. Recent-API throttle: if any live API call happened in the last
+//     MinRequestInterval (tracked in cache/last_api_call), the client first
+//     tries to serve the most recent cache entry for the same endpoint and
+//     system ID (any date, via serveRecentEndpointCache) — this catches
+//     back-to-back invocations with different --date flags. If no such entry
+//     exists (e.g. legacy cache files written before Endpoint/SystemID were
+//     stored), it falls back to the same-URL cache regardless of age.
 //  3. 429/503 fallback: when the API responds with a rate-limit or service-
 //     unavailable status, cached responses are used as fallback when available.
 //
@@ -589,6 +590,13 @@ func maybeShowNoCacheFallbackWarning(reason string) {
 	cache.SetRateLimitWarningShown(true)
 }
 
+// withinThrottleWindow reports whether a live API call happened in the last
+// cache.MinRequestInterval. Used to gate the recent-API throttle behavior.
+func withinThrottleWindow() bool {
+	last := cache.LastAPICallTime()
+	return !last.IsZero() && time.Since(last) < cache.MinRequestInterval
+}
+
 // serveRecentEndpointCache returns the most recent cache entry for the same
 // endpoint+systemID as url when a live API call was made within the last
 // cache.MinRequestInterval. Returns nil and false when the throttle window has
@@ -598,8 +606,7 @@ func maybeShowNoCacheFallbackWarning(reason string) {
 // serve the most recent cached output for the same endpoint" behavior so
 // back-to-back invocations don't burn API rate-limit budget.
 func serveRecentEndpointCache(url string) (*http.Response, bool) {
-	last := cache.LastAPICallTime()
-	if last.IsZero() || time.Since(last) >= cache.MinRequestInterval {
+	if !withinThrottleWindow() {
 		return nil, false
 	}
 	endpoint, systemID := cache.ExtractEndpointAndSystemID(url)
@@ -682,9 +689,10 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 // │         ▼                                                               │
 // │  ┌────────────────────┐                                                 │
 // │  │ Last live API call │──< 60s──► Return most recent cache for same    │
-// │  │ within 60s?        │           endpoint+system, any date (if any)   │
+// │  │ within 60s?        │           endpoint+system, any date; if none, │
+// │  │                    │           fall back to same-URL cache (any age)│
 // │  └──────┬─────────────┘                                                 │
-// │         │ ≥ 60s OR no match                                             │
+// │         │ ≥ 60s OR no cache anywhere                                    │
 // │         ▼                                                               │
 // │  ┌─────────────┐                                                        │
 // │  │ Make API    │──429──► Return stale cache if available                │
@@ -827,6 +835,13 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// budget even when the user asks for a different date than the previous run.
 	if recent, ok := serveRecentEndpointCache(url); ok {
 		return recent, true, nil
+	}
+	// Throttle fallback: if a cache file exists for this exact URL (even stale), use
+	// it during the throttle window. This catches pre-existing cache entries that
+	// predate the Endpoint/SystemID tagging — FindMostRecentByEndpoint cannot see
+	// them, but they are still valid same-URL data.
+	if cacheErr == nil && withinThrottleWindow() {
+		return cached.ToHTTPResponse(), true, nil
 	}
 
 	// Make the API request
