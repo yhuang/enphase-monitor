@@ -533,8 +533,10 @@ To respect these limits, the application implements intelligent caching:
 
 - **Automatic Disk Caching**: All API responses are cached in `cache/` directory
 - **Cache-First for Past Dates**: When querying historical dates, cached data is used if available (no API call)
+- **Fresh-Cache Reuse**: Repeated queries for the same URL within 60 seconds reuse the cache and skip the API call
+- **Recent-API Throttle**: If any live API call happened in the last 60 seconds (tracked via `cache/last_api_call`), the next query serves the most recent cached entry for the same endpoint and system — even when the new query asks for a different date. This keeps rapid back-to-back invocations (e.g. switching between `--date 2026-05` and `--date 2026-04`) from burning rate-limit budget.
 - **Default Refresh Interval**: 1 hour (3600 seconds) - queries each system once per hour
-- **429 Error Handling**: If rate limited, the program displays wait time and exits gracefully
+- **429 Error Handling**: If rate limited, cached data is served as fallback; if no cache exists, the program displays wait time and exits gracefully
 
 ### Cache File Format and Naming
 
@@ -553,6 +555,11 @@ Each cache file contains:
 - `body`: Raw API response body (JSON bytes)
 - `cached_at`: Timestamp when the response was cached (ISO 8601 format)
 - `queried_date`: The date that was queried (YYYY-MM-DD format), if applicable
+- `endpoint`: API endpoint (e.g. `telemetry/production_meter`, `energy_lifetime`), used by the recent-API throttle to find the most recent cache for an endpoint
+- `system_id`: System ID from the request URL, paired with `endpoint` for the throttle lookup
+
+**Throttle Marker:**
+The cache directory also contains a `last_api_call` file (no JSON extension) that records the timestamp of the most recent live API call. It is used by the recent-API throttle and is ignored by cache listing/clearing commands.
 
 **Cache Key Generation:**
 - Cache keys are generated from normalized API URLs

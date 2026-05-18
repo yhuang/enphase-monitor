@@ -128,7 +128,17 @@
 // -------------
 // The API enforces rate limits (typically 10 requests/minute for free tier).
 // This client relies on internal/cache for caching responses to reduce API calls.
-// On 429 errors, cached responses are used as fallback when available.
+// Three mechanisms work together to stay under the limit:
+//  1. Fresh-cache fast-path: if the cache entry for this exact URL is younger
+//     than cache.MinRequestInterval (60s), it's returned without an API call.
+//  2. Recent-API throttle (serveRecentEndpointCache): if any live API call
+//     happened in the last MinRequestInterval (tracked in cache/last_api_call),
+//     the client serves the most recent cache entry for the same endpoint and
+//     system ID — even if it's for a different date than the one requested.
+//     This keeps back-to-back invocations with different --date flags from
+//     burning rate-limit budget.
+//  3. 429/503 fallback: when the API responds with a rate-limit or service-
+//     unavailable status, cached responses are used as fallback when available.
 //
 // ERROR HANDLING
 // --------------
@@ -579,6 +589,30 @@ func maybeShowNoCacheFallbackWarning(reason string) {
 	cache.SetRateLimitWarningShown(true)
 }
 
+// serveRecentEndpointCache returns the most recent cache entry for the same
+// endpoint+systemID as url when a live API call was made within the last
+// cache.MinRequestInterval. Returns nil and false when the throttle window has
+// elapsed, the URL can't be parsed, or no matching cache entry exists.
+//
+// This implements the "if another query runs within 60s of the previous run,
+// serve the most recent cached output for the same endpoint" behavior so
+// back-to-back invocations don't burn API rate-limit budget.
+func serveRecentEndpointCache(url string) (*http.Response, bool) {
+	last := cache.LastAPICallTime()
+	if last.IsZero() || time.Since(last) >= cache.MinRequestInterval {
+		return nil, false
+	}
+	endpoint, systemID := cache.ExtractEndpointAndSystemID(url)
+	if endpoint == "" || systemID == "" {
+		return nil, false
+	}
+	recent, err := cache.FindMostRecentByEndpoint(endpoint, systemID)
+	if err != nil {
+		return nil, false
+	}
+	return recent.ToHTTPResponse(), true
+}
+
 // tryLoadPastDateCache attempts to load a cached response by matching URL endpoint,
 // system ID, and target date when the primary cache lookup failed (e.g. URL normalization differs).
 // Returns (cached, true) when a match is found, (nil, false) otherwise.
@@ -646,9 +680,15 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 // │  └──────┬──────┘                                                        │
 // │         │ NO (Stale or missing)                                         │
 // │         ▼                                                               │
+// │  ┌────────────────────┐                                                 │
+// │  │ Last live API call │──< 60s──► Return most recent cache for same    │
+// │  │ within 60s?        │           endpoint+system, any date (if any)   │
+// │  └──────┬─────────────┘                                                 │
+// │         │ ≥ 60s OR no match                                             │
+// │         ▼                                                               │
 // │  ┌─────────────┐                                                        │
 // │  │ Make API    │──429──► Return stale cache if available                │
-// │  │   Request   │──OK───► Save to cache, return fresh data               │
+// │  │   Request   │──OK───► Save to cache, MarkAPICall(), return data     │
 // │  └─────────────┘                                                        │
 // └─────────────────────────────────────────────────────────────────────────┘
 //
@@ -724,6 +764,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 			maybeShowNoCacheFallbackWarning("API error")
 			return cached.ToHTTPResponse(), true, nil
 		}
+		cache.MarkAPICall()
 
 		if resp.StatusCode == 429 && cacheErr != nil {
 			resp.Body.Close()
@@ -780,6 +821,14 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		return cached.ToHTTPResponse(), true, nil // Cache was used (fresh cache)
 	}
 
+	// Recent-API throttle: if any live API call happened in the last MinRequestInterval,
+	// serve the most recent cache entry for this endpoint+system (any date) instead of
+	// making another live call. This keeps back-to-back runs from burning rate-limit
+	// budget even when the user asks for a different date than the previous run.
+	if recent, ok := serveRecentEndpointCache(url); ok {
+		return recent, true, nil
+	}
+
 	// Make the API request
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -795,6 +844,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	if err != nil {
 		return cached.ToHTTPResponse(), true, nil // Cache was used (error fallback)
 	}
+	cache.MarkAPICall()
 
 	// Handle rate limit (429)
 	if resp.StatusCode == 429 {

@@ -17,6 +17,11 @@
 //   - Provides cache inspection and management tools (--inspect-cache)
 //   - Handles past date queries with cache fallback
 //   - Normalizes URLs for consistent cache keys (timestamps → dates)
+//   - Tags each cache entry with its endpoint + system ID so the API client can
+//     find the most recent cache for a given endpoint when throttling
+//   - Records the timestamp of the most recent live API call in a marker file
+//     (last_api_call) so a second invocation within MinRequestInterval can
+//     serve cache instead of burning rate-limit budget
 package cache
 
 import (
@@ -76,7 +81,13 @@ func RedactURLKey(rawURL string) string {
 	return parsed.String()
 }
 
-// MinRequestInterval is the minimum time between API requests (used for cache staleness)
+// MinRequestInterval is the minimum time between API requests. It serves two
+// purposes:
+//  1. Cache staleness: for current-period queries, a cache entry younger than
+//     this is reused instead of refetched.
+//  2. Recent-API throttle: if any live API call happened within this window
+//     (see LastAPICallTime/MarkAPICall), the API client serves the most recent
+//     cache entry for the same endpoint+system instead of issuing a new call.
 const MinRequestInterval = 1 * time.Minute
 
 // Package-level state for cache configuration.
@@ -135,6 +146,8 @@ type CachedResponse struct {
 	Body        []byte            `json:"body"`
 	CachedAt    time.Time         `json:"cached_at"`
 	QueriedDate string            `json:"queried_date,omitempty"` // The date that was queried (YYYY-MM-DD), not the API's start_date
+	Endpoint    string            `json:"endpoint,omitempty"`     // API endpoint, e.g. "telemetry/production_meter", "energy_lifetime"
+	SystemID    string            `json:"system_id,omitempty"`    // System ID from the request URL
 }
 
 // ToHTTPResponse reconstructs an *http.Response from a cached response.
@@ -223,6 +236,95 @@ func extractQueriedDateFromURL(urlStr string, tz *time.Location) string {
 	return ""
 }
 
+// ExtractEndpointAndSystemID parses an Enphase API request URL and returns the
+// endpoint path (e.g. "telemetry/production_meter", "energy_lifetime") and the
+// system ID. Returns empty strings if the URL doesn't match the expected shape.
+//
+// Expected URL path: /api/v4/systems/{system_id}/{endpoint...}
+func ExtractEndpointAndSystemID(rawURL string) (endpoint, systemID string) {
+	parsed, err := neturl.Parse(rawURL)
+	if err != nil {
+		return "", ""
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	for i, p := range parts {
+		if p == "systems" && i+1 < len(parts) {
+			systemID = parts[i+1]
+			if i+2 < len(parts) {
+				endpoint = strings.Join(parts[i+2:], "/")
+			}
+			return
+		}
+	}
+	return "", ""
+}
+
+// lastAPICallFilename is the bookkeeping file in the cache directory that stores
+// the timestamp of the most recent live API call. It has no .json extension so
+// the cache iteration loops (HasCacheForDate, ClearTodayCache, etc.) skip it
+// naturally; ListCacheEntries has an explicit skip-list entry for it.
+const lastAPICallFilename = "last_api_call"
+
+// LastAPICallTime returns the timestamp of the most recent live API call recorded
+// by MarkAPICall, or the zero time if no record exists or it cannot be parsed.
+func LastAPICallTime() time.Time {
+	path := filepath.Join(getCacheDir(), lastAPICallFilename)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(data)))
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+// MarkAPICall records the current time as the timestamp of the most recent live
+// API call. Failures are ignored — the marker is best-effort throttling state.
+func MarkAPICall() {
+	if err := os.MkdirAll(getCacheDir(), 0755); err != nil {
+		return
+	}
+	path := filepath.Join(getCacheDir(), lastAPICallFilename)
+	_ = os.WriteFile(path, []byte(time.Now().Format(time.RFC3339Nano)), 0644)
+}
+
+// FindMostRecentByEndpoint scans the cache directory for entries matching the
+// given endpoint and system ID and returns the one with the latest CachedAt.
+// Returns nil and an error if no matching entry exists. Entries cached before
+// the Endpoint/SystemID fields were introduced are skipped.
+func FindMostRecentByEndpoint(endpoint, systemID string) (*CachedResponse, error) {
+	if endpoint == "" || systemID == "" {
+		return nil, fmt.Errorf("endpoint and systemID required")
+	}
+	dir := getCacheDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var best *CachedResponse
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), constants.JSONExtension) {
+			continue
+		}
+		cached, err := LoadCachedResponseByPath(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		if cached.Endpoint != endpoint || cached.SystemID != systemID {
+			continue
+		}
+		if best == nil || cached.CachedAt.After(best.CachedAt) {
+			best = cached
+		}
+	}
+	if best == nil {
+		return nil, fmt.Errorf("no cache entry found for endpoint=%s system=%s", endpoint, systemID)
+	}
+	return best, nil
+}
+
 // GetCachePath returns the file path for a cached response
 func GetCachePath(url string, tz *time.Location) string {
 	key := GetCacheKey(url, tz)
@@ -266,6 +368,7 @@ func SaveCachedResponseFromBytes(url string, resp *http.Response, bodyBytes []by
 
 	// Extract the queried date from the URL (this is the date we queried, not the API's start_date)
 	queriedDate := extractQueriedDateFromURL(url, tz)
+	endpoint, systemID := ExtractEndpointAndSystemID(url)
 
 	cached := CachedResponse{
 		StatusCode:  resp.StatusCode,
@@ -273,6 +376,8 @@ func SaveCachedResponseFromBytes(url string, resp *http.Response, bodyBytes []by
 		Body:        bodyBytes,
 		CachedAt:    time.Now(),
 		QueriedDate: queriedDate,
+		Endpoint:    endpoint,
+		SystemID:    systemID,
 	}
 
 	// Marshal to JSON

@@ -201,8 +201,10 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │  5. API CALLS (internal/api)                                       │
 │     └─► Each call goes through caching layer (internal/cache)      │
 │         ├─► Check cache first (for rate limit protection)          │
+│         ├─► If a live API call ran in the last 60s, serve the      │
+│         │   most recent cache for the same endpoint+system         │
 │         ├─► Make HTTP request if cache miss                        │
-│         └─► Save response to cache                                 │
+│         └─► Save response to cache (also stamps last_api_call)     │
 └────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -255,8 +257,8 @@ These types are re-exported as type aliases in `config` and `aggregator` package
                              ▼
 ┌────────────────────────────────────────────────────────────────────┐
 │                  internal/cache/Cache Layer                        │
-│  - Rate limit tracking                                             │
-│  - Disk-based storage                                              │
+│  - Rate limit tracking (last_api_call marker + 60s throttle)       │
+│  - Disk-based storage tagged with endpoint + system ID             │
 └────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
@@ -569,7 +571,7 @@ when possible to improve testability.
 | [internal/config/*](../internal/config/)             | Configuration types and utilities                 |
 | [internal/timezone/*](../internal/timezone/)         | Timezone handling and date boundaries             |
 | [internal/validation/*](../internal/validation/)     | Test mode validation with tolerance checks        |
-| [internal/constants/*](../internal/constants/)       | Centralized constants (20+ constants)             |
+| [internal/constants/*](../internal/constants/)       | Centralized constants (50+ constants)             |
 
 ### Internal Packages - Shared Types
 
