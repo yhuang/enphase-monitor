@@ -114,7 +114,7 @@ func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
 	fmt.Fprintf(d.writer, "\n   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, "  ", 24, false, true)
+	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, "  ", 24, false, "\033[48;5;53m")
 	fmt.Fprintln(d.writer)
 	d.printMetric("Energy Produced", metrics.ProductionToday, d.colors.Production, "    ", 22, false)
 	d.printMetric("Energy Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 22, false)
@@ -141,7 +141,7 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 			prefix, d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
-		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", 27, true, false)
+		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", 27, true, "")
 		d.printMetric("Energy Produced", sys.ProductionToday, d.colors.Production, "        ", 27, true)
 		d.printMetric("Energy Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", 27, true)
 		d.printMetric("Energy Imported", sys.GridImportToday, d.colors.Import, "        ", 27, true)
@@ -184,7 +184,7 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 		padding, valueColor, displayValue, unit, constants.Reset)
 }
 
-func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int, rightAlign bool, highlight bool) {
+func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int, rightAlign bool, highlightBg string) {
 	// Default to import (positive), override for export (negative)
 	color := d.colors.NetImport
 	direction := "import"
@@ -214,8 +214,8 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 		valueFormat = "%7.1f"
 	}
 
-	if highlight {
-		const bg = "\033[48;5;17m" // dark navy — complements the cyan/yellow value colors
+	if highlightBg != "" {
+		bg := highlightBg
 		r := constants.Reset + bg  // reset fg then re-apply bg so it persists across color changes
 
 		// Separate leading spaces from visible label text so the background starts
@@ -271,7 +271,7 @@ func (d *Display) printTrueUpCombined(report *aggregator.TrueUpReport) {
 	fmt.Fprintf(d.writer, "\n   %s%sTRUE-UP ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Energy Flow", report.NetFlow, "  ", 24, false, true)
+	d.printNetFlow("  Net Energy Flow", report.NetFlow, "  ", 24, false, "\033[48;5;54m")
 	fmt.Fprintln(d.writer)
 	d.printMetric("Energy Produced", report.Production, d.colors.Production, "    ", 22, false)
 	d.printMetric("Energy Consumed", report.Consumption, d.colors.TotalConsumed, "    ", 22, false)
@@ -288,7 +288,7 @@ func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, sys.Name, constants.Reset,
 			d.colors.SecondaryText, sys.ID, constants.Reset)
-		d.printNetFlow("Net Energy Flow", sys.NetFlow, "        ", 27, true, false)
+		d.printNetFlow("Net Energy Flow", sys.NetFlow, "        ", 27, true, "")
 		d.printMetric("Energy Produced", sys.Production, d.colors.Production, "        ", 27, true)
 		d.printMetric("Energy Consumed", sys.Consumption, d.colors.TotalConsumed, "        ", 27, true)
 		d.printMetric("Energy Imported", sys.GridImport, d.colors.Import, "        ", 27, true)
