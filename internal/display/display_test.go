@@ -609,11 +609,11 @@ func TestShowTrueUpReport_PerSystemMetrics(t *testing.T) {
 	output := buf.String()
 
 	wantLabels := []string{
+		"Net Energy Flow",
+		"Energy Produced",
+		"Energy Consumed",
 		"Energy Imported",
 		"Energy Exported",
-		"Captured from the Sun",
-		"Net Energy Flow",
-		"Total Energy Consumed",
 	}
 	for _, label := range wantLabels {
 		if !strings.Contains(output, label) {

@@ -114,11 +114,11 @@ func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
 	fmt.Fprintf(d.writer, "\n   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
+	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, "  ", 24, false)
 	d.printMetric("Energy Produced", metrics.ProductionToday, d.colors.Production, "    ", 22, false)
 	d.printMetric("Energy Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 22, false)
 	d.printMetric("Energy Imported", metrics.GridImportToday, d.colors.Import, "    ", 22, false)
 	d.printMetric("Energy Exported", metrics.GridExportToday, d.colors.Export, "    ", 22, false)
-	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, "  ", 24, false)
 }
 
 func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) {
@@ -136,10 +136,11 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
+		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", 27, true)
+		d.printMetric("Energy Produced", sys.ProductionToday, d.colors.Production, "        ", 27, true)
+		d.printMetric("Energy Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", 27, true)
 		d.printMetric("Energy Imported", sys.GridImportToday, d.colors.Import, "        ", 27, true)
 		d.printMetric("Energy Exported", sys.GridExportToday, d.colors.Export, "        ", 27, true)
-		d.printMetric("Captured from the Sun", sys.ProductionToday, d.colors.Production, "        ", 27, true)
-		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", 27, true)
 		// Battery metrics are only relevant for single-day reports
 		if metrics.QueryType == constants.QueryTypeDay {
 			d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", 27, true)
@@ -147,7 +148,6 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 			fmt.Fprintf(d.writer, "        %sBattery Charge Percentage:%s %s%10d%%%s\n",
 				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		}
-		d.printMetric("Total Energy Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", 27, true)
 	}
 }
 
@@ -249,11 +249,11 @@ func (d *Display) printTrueUpCombined(report *aggregator.TrueUpReport) {
 	fmt.Fprintf(d.writer, "\n   %s%sTRUE-UP ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
+	d.printNetFlow("  Net Energy Flow", report.NetFlow, "  ", 24, false)
 	d.printMetric("Energy Produced", report.Production, d.colors.Production, "    ", 22, false)
 	d.printMetric("Energy Consumed", report.Consumption, d.colors.TotalConsumed, "    ", 22, false)
 	d.printMetric("Energy Imported", report.GridImport, d.colors.Import, "    ", 22, false)
 	d.printMetric("Energy Exported", report.GridExport, d.colors.Export, "    ", 22, false)
-	d.printNetFlow("  Net Energy Flow", report.NetFlow, "  ", 24, false)
 }
 
 func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
@@ -265,11 +265,11 @@ func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, sys.Name, constants.Reset,
 			d.colors.SecondaryText, sys.ID, constants.Reset)
+		d.printNetFlow("Net Energy Flow", sys.NetFlow, "        ", 27, true)
+		d.printMetric("Energy Produced", sys.Production, d.colors.Production, "        ", 27, true)
+		d.printMetric("Energy Consumed", sys.Consumption, d.colors.TotalConsumed, "        ", 27, true)
 		d.printMetric("Energy Imported", sys.GridImport, d.colors.Import, "        ", 27, true)
 		d.printMetric("Energy Exported", sys.GridExport, d.colors.Export, "        ", 27, true)
-		d.printMetric("Captured from the Sun", sys.Production, d.colors.Production, "        ", 27, true)
-		d.printNetFlow("Net Energy Flow", sys.NetFlow, "        ", 27, true)
-		d.printMetric("Total Energy Consumed", sys.Consumption, d.colors.TotalConsumed, "        ", 27, true)
 	}
 }
 
