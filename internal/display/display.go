@@ -126,7 +126,7 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		return
 	}
 
-	fmt.Fprintf(d.writer, "\n   %s%sINDIVIDUAL SYSTEMS REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
+	fmt.Fprintf(d.writer, "\n\n   %s%sINDIVIDUAL SYSTEMS REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
 	for i, sys := range metrics.Systems {
@@ -257,7 +257,7 @@ func (d *Display) printTrueUpCombined(report *aggregator.TrueUpReport) {
 }
 
 func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
-	fmt.Fprintf(d.writer, "\n   %s%sINDIVIDUAL SYSTEMS REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
+	fmt.Fprintf(d.writer, "\n\n   %s%sINDIVIDUAL SYSTEMS REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
 	for i, sys := range report.Systems {
