@@ -64,7 +64,7 @@ return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, 
 
 ### Error Inspection
 
-**Location**: `internal/aggregator/aggregator.go:117-129`
+**Location**: `internal/aggregator/aggregator.go:116-128`
 
 We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit. For context cancellation errors (Ctrl+C or deadline exceeded), we return immediately to abort all systems. For other errors, we warn and continue.
 
@@ -238,7 +238,7 @@ allIntervals = append(allIntervals, intervalArray...)
 
 ### Slice Append
 
-**Location**: `internal/aggregator/aggregator.go:118`
+**Location**: `internal/aggregator/aggregator.go:117`
 
 `append()` adds elements to a slice, automatically growing if needed. Since we pre-allocated capacity, this should be efficient.
 
@@ -291,7 +291,7 @@ for _, interval := range intervals {
 
 ### Switch Statement
 
-**Location**: `internal/parser/parser.go:135-145`
+**Location**: `internal/parser/parser.go:135-144`
 
 `switch` is like `if/else` but cleaner for multiple conditions. It is idiomatic Go for handling multiple cases based on a single value. `switch` compares `fieldName` against each case and executes the matching one. This is more readable than multiple `if/else if` statements.
 
@@ -306,7 +306,7 @@ case constants.FieldWhExported:
 
 ### Continue Statement
 
-**Location**: `internal/aggregator/aggregator.go:117-121`
+**Location**: `internal/aggregator/aggregator.go:116-120`
 
 `continue` skips to next iteration of the loop. We use it here to skip this system and try the next one when a rate limit error occurs.
 
@@ -1010,7 +1010,7 @@ var rateLimitErrors []string
 
 ### Multiple Return Values
 
-**Location**: `internal/aggregator/aggregator.go:116`
+**Location**: `internal/aggregator/aggregator.go:115`
 
 Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for rate limiting).
 
