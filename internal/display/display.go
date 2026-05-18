@@ -216,11 +216,18 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 
 	if highlight {
 		const bg = "\033[48;5;17m" // dark navy — complements the cyan/yellow value colors
-		r := constants.Reset + bg  // reset fg then re-apply bg so it spans the whole line
-		fmt.Fprintf(d.writer, "%s%s%s%s%s%s"+valueFormat+" %s%s %s(%s)%s\n",
-			bg+indent, d.colors.SecondaryText, labelWithColon, r,
+		r := constants.Reset + bg  // reset fg then re-apply bg so it persists across color changes
+
+		// Separate leading spaces from visible label text so the background starts
+		// exactly one space before the first character and ends one space after the last.
+		trimmed := strings.TrimLeft(labelWithColon, " ")
+		allLeading := indent + labelWithColon[:len(labelWithColon)-len(trimmed)]
+		outerIndent := allLeading[:len(allLeading)-1] // one space stays inside bg as left pad
+
+		fmt.Fprintf(d.writer, "%s%s%s%s%s"+valueFormat+" %s%s %s(%s)%s%s\n",
+			outerIndent+bg+" "+d.colors.SecondaryText, trimmed, r,
 			padding, color, displayValue, unit, r,
-			color, direction, constants.Reset)
+			color, direction, bg+" ", constants.Reset)
 	} else {
 		fmt.Fprintf(d.writer, "%s%s%s%s%s%s"+valueFormat+" %s%s %s(%s)%s\n",
 			indent, d.colors.SecondaryText, labelWithColon, constants.Reset,
