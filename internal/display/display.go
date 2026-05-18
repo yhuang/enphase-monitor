@@ -111,7 +111,7 @@ func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate tim
 }
 
 func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
-	fmt.Fprintf(d.writer, "\n   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
+	fmt.Fprintf(d.writer, "   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
 	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, "  ", 24, false)
