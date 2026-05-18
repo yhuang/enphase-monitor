@@ -141,16 +141,16 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 			prefix, d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
-		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", 27, true, "")
-		d.printMetric("Energy Produced", sys.ProductionToday, d.colors.Production, "        ", 27, true)
-		d.printMetric("Energy Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", 27, true)
-		d.printMetric("Energy Imported", sys.GridImportToday, d.colors.Import, "        ", 27, true)
-		d.printMetric("Energy Exported", sys.GridExportToday, d.colors.Export, "        ", 27, true)
+		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", 31, true, "")
+		d.printMetric("Energy Produced", sys.ProductionToday, d.colors.Production, "        ", 31, true)
+		d.printMetric("Energy Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", 31, true)
+		d.printMetric("Energy Imported", sys.GridImportToday, d.colors.Import, "        ", 31, true)
+		d.printMetric("Energy Exported", sys.GridExportToday, d.colors.Export, "        ", 31, true)
 		// Battery metrics are only relevant for single-day reports
 		if metrics.QueryType == constants.QueryTypeDay {
-			d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", 27, true)
-			d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "        ", 27, true)
-			fmt.Fprintf(d.writer, "        %sBattery Charge Percentage:%s %s%d%%%s\n",
+			d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", 31, true)
+			d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "        ", 31, true)
+			fmt.Fprintf(d.writer, "        %sBattery Charge Percentage:%s     %s%d%%%s\n",
 				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		}
 	}
@@ -279,11 +279,11 @@ func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, sys.Name, constants.Reset,
 			d.colors.SecondaryText, sys.ID, constants.Reset)
-		d.printNetFlow("Net Energy Flow", sys.NetFlow, "        ", 27, true, "")
-		d.printMetric("Energy Produced", sys.Production, d.colors.Production, "        ", 27, true)
-		d.printMetric("Energy Consumed", sys.Consumption, d.colors.TotalConsumed, "        ", 27, true)
-		d.printMetric("Energy Imported", sys.GridImport, d.colors.Import, "        ", 27, true)
-		d.printMetric("Energy Exported", sys.GridExport, d.colors.Export, "        ", 27, true)
+		d.printNetFlow("Net Energy Flow", sys.NetFlow, "        ", 21, true, "")
+		d.printMetric("Energy Produced", sys.Production, d.colors.Production, "        ", 21, true)
+		d.printMetric("Energy Consumed", sys.Consumption, d.colors.TotalConsumed, "        ", 21, true)
+		d.printMetric("Energy Imported", sys.GridImport, d.colors.Import, "        ", 21, true)
+		d.printMetric("Energy Exported", sys.GridExport, d.colors.Export, "        ", 21, true)
 	}
 }
 
