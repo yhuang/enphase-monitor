@@ -501,6 +501,7 @@ colors:
 - The program will display how many seconds to wait before retrying
 - Consider increasing `refresh_interval` in your config
 - Use `--test` mode to validate against cached data without making API calls
+- Run with `--debug` to see when the 60-second window resets and how much budget remains
 
 ### "API request failed with status 422"
 - This usually means the requested date is in the future
@@ -596,6 +597,30 @@ The cache directory also contains an `api_calls` file (no JSON extension) holdin
 ./enphase-monitor --test --date 2026-01-15
 ```
 
+### Debug Mode
+
+The `--debug` flag prints a startup status line plus a trace of every cache/live decision to stderr:
+
+```bash
+./enphase-monitor --debug
+```
+
+Sample output:
+
+```
+[DEBUG] --- startup ---
+[DEBUG] current time : 2026-05-19 09:14:22 PDT
+[DEBUG] last API call: 09:13:55 PDT (27s ago)
+[DEBUG] rate window resets in: 33s
+[DEBUG] API budget   : 0/10 calls remaining
+[DEBUG] ---
+[DEBUG] serving cache (past period, age 6h12m0s): https://api.../energy_lifetime?...
+[DEBUG] budget exhausted (0/10), falling back to cache: https://api.../telemetry/production_meter?...
+[DEBUG] serving cache (budget exhausted, age 14m3s)
+```
+
+Use it when you want to understand *why* a query returned cached vs live data, *when* the rate-limit window will reset, or *how much* of the 10 calls/60s budget remains. Debug mode also suppresses the screen-clearing escape sequence so the trace stays visible on subsequent runs.
+
 ### Best Practices
 
 1. **Use Default Refresh Interval**: Use 1 hour to stay well within rate limits
@@ -652,10 +677,9 @@ enphase-monitor/
 │   │   ├── trueup.go                      # True-up year: single-batch lifetime query and report conversion
 │   │   └── trueup_test.go                 # True-up logic tests
 │   ├── cache/                             # Disk-based response caching
-│   │   ├── cache.go                       # Cache implementation
+│   │   ├── cache.go                       # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
-│   │   ├── rate_limit_test.go             # Sliding-window budget tests
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
@@ -900,7 +924,7 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 This project follows Go best practices and coding standards:
 
 - **Test Coverage**: 80.1% overall, 100% for urlbuilder and constants, 95%+ for display, validation, parser, and config
-- **Test Suite**: 25 test files across 14 packages with comprehensive unit, integration, and edge case tests
+- **Test Suite**: 27 test files across 14 packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -912,7 +936,7 @@ This project follows Go best practices and coding standards:
 - Total Lines: ~5,500 (excluding tests)
 - Test Lines: ~11,500 (comprehensive test suite)
 - Packages: 14 internal packages
-- Test Files: 28 (unit, integration, functional, edge case, and benchmark tests)
+- Test Files: 27 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)
 
 ## License

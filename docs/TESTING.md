@@ -80,12 +80,13 @@ Most packages follow the simple convention where each source file has one corres
 
 For packages with extensive functionality or different test concerns, tests are split by category:
 
-**Cache Package** (4 test files):
-- `cache.go` → 4 test files:
+**Cache Package** (3 test files):
+- `cache.go` → 3 test files:
   - `cache_test.go` - State management tests
-  - `cache_functions_test.go` - Functionality tests (469 lines)
-  - `rate_limit_test.go` - Sliding-window budget tests (187 lines)
-  - `cli_test.go` - CLI utilities tests (603 lines)
+  - `cache_functions_test.go` - Functionality tests
+  - `cli_test.go` - CLI utilities tests
+
+The sliding-window rate-limit functions (`RecordAPICall`, `RemainingBudget`, pruning) are exercised indirectly through `internal/api/preflight_test.go`, which primes the cache, drains the budget via `RecordAPICall`, and verifies that subsequent calls fall back to cache.
 
 **OAuth Package** (3 test files):
 - `oauth.go` → 3 test files:
@@ -650,17 +651,17 @@ Tests in this repo follow the [go-testing](https://github.com/golang/go/wiki/Cod
 
 ### Unit Test Files (Standard Pattern)
 
-These files test individual functions and methods in isolation:
+These files test individual functions and methods in isolation. Per-package coverage figures are listed in the [Coverage Achievement](#coverage-achievement) table at the top of this document.
 
-| Test File | Source File | Coverage | Key Tests |
-|-----------|-------------|----------|-----------|
-| `constants_test.go` | `constants.go` | 100% | Constant values, helper functions |
-| `display_test.go` | `display.go` | 100% | Output formatting, color codes |
-| `urlbuilder_test.go` | `urlbuilder.go` | 100% | URL construction, parameter encoding |
-| `validation_test.go` | `validation.go` | 96.6% | Tolerance calculations, metric comparison, edge cases |
-| `timezone_test.go` | `timezone.go` | 93.3% | Timezone loading, date boundaries |
-| `config_test.go` | `config.go` | 82.4% | YAML parsing, validation, color conversion |
-| `parser_test.go` | `parser.go` | 80.8% | JSON parsing, interval summing |
+| Test File | Source File | Key Tests |
+|-----------|-------------|-----------|
+| `constants_test.go` | `constants.go` | Constant values, helper functions |
+| `display_test.go` | `display.go` | Output formatting, color codes |
+| `urlbuilder_test.go` | `urlbuilder.go` | URL construction, parameter encoding |
+| `validation_test.go` | `validation.go` | Tolerance calculations, metric comparison, edge cases |
+| `timezone_test.go` | `timezone.go` | Timezone loading, date boundaries |
+| `config_test.go` | `config.go` | YAML parsing, validation, color conversion |
+| `parser_test.go` | `parser.go` | JSON parsing, interval summing |
 
 ### Integration Test Files
 
@@ -674,7 +675,6 @@ These files test component interactions:
 | `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
 | `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 report types; preflight warning on/off |
 | `query_cost_test.go` | 3 test functions | `QueryCost` output for all query type × hasBattery combinations; 2-system budget constraint |
-| `rate_limit_test.go` | Cache budget tests | `RecordAPICall`, `RemainingBudget`, sliding-window pruning logic |
 
 ### OAuth Test Files
 

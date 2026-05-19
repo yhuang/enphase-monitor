@@ -76,10 +76,9 @@ enphase-monitor/
 │   │   ├── trueup.go                      # True-up year: single-batch lifetime query and report conversion
 │   │   └── trueup_test.go                 # True-up report conversion tests
 │   ├── cache/                             # Disk-based response caching
-│   │   ├── cache.go                       # Cache implementation
+│   │   ├── cache.go                       # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
-│   │   ├── rate_limit_test.go             # Sliding-window budget tests
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
@@ -90,7 +89,7 @@ enphase-monitor/
 │   ├── config/                            # Configuration types
 │   │   ├── config.go                      # YAML loading & validation (uses type aliases)
 │   │   └── config_test.go                 # Configuration tests
-│   ├── constants/                         # Centralized constants (20+)
+│   ├── constants/                         # Centralized constants (50+)
 │   │   ├── constants.go                   # Application-wide constants
 │   │   └── constants_test.go              # Constants tests
 │   ├── display/                           # Terminal output formatting
@@ -356,6 +355,15 @@ The preflight (Layer 2) fires once per `GetMetricsFromCloud` call and is a forwa
 - If budget is full when the run starts and is exhausted mid-run (e.g. the first 4 calls succeed but the 5th lands after the window), Layer 3 handles it gracefully with a cache fallback.
 - If budget is already low before the run, Layer 2 warns the user up front so they understand why the output may show stale numbers.
 - If budget is zero and no cache exists for the endpoint, `RateLimitError` is returned and the metric is shown as 0 in the output (non-fatal for optional metrics like grid import/export; fatal for production which is required).
+
+### Observability: `--debug` mode
+
+When run with `--debug`, the application emits structured logs to stderr that expose Layer 2 and Layer 3 decisions:
+
+- **Startup banner** (`printDebugStartup` in [main.go](../main.go)) shows the current time, the most recent recorded API call (`cache.LastAPICallTime()`), how long until the 60-second window resets, and the remaining budget. This is the single best diagnostic for "why am I getting 429s?" because it answers "is the window still active?" before any work begins.
+- **Per-request trace** (`cache.Debugf` from `makeCachedAPIRequest` in [internal/api/client.go](../internal/api/client.go)) emits one line per URL describing the decision taken: serving past-period cache, serving within-maxAge cache, falling back due to budget exhaustion, making a live call, or hitting the 429 fallback paths. Each line includes the redacted URL and the cache age so traces are reproducible without leaking the API key.
+
+Debug mode also suppresses the terminal-clearing escape sequence in `fetchAndDisplay` so the trace remains visible after the report is printed. The `cache.Debugf` helper is a no-op when debug mode is off — callers do not need to guard the call sites.
 
 ### Tests
 

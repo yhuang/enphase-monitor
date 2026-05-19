@@ -1,0 +1,5 @@
+{
+  "name": "code-doc-audit",
+  "version": "1.0.0",
+  "description": "Audit docs and inline comments for concept/design/implementation accuracy. Pairs with doc-sync (which handles file:line and snippet drift); this one focuses on whether the meaning is right and whether key behaviors are documented."
+}

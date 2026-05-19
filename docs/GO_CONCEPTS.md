@@ -964,9 +964,7 @@ defer ticker.Stop()
 Variables declared outside functions are package-level (shared across all functions). We use `*TokenCache` (pointer) so it can be `nil` (meaning "no cache yet"). This is a singleton pattern - one cache for the entire application.
 
 ```go
-var (
-    tokenCache *TokenCache  // Shared cache
-)
+var tokenCache *TokenCache
 ```
 
 ---
