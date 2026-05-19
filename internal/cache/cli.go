@@ -167,8 +167,9 @@ func ListCacheEntries() ([]CacheEntry, error) {
 			continue
 		}
 
-		// Skip metadata files like last_request.json and the last-API-call marker
-		if entry.Name() == "last_request.json" || entry.Name() == "last_request" || entry.Name() == lastAPICallFilename {
+		// Skip metadata files like last_request.json and the sliding-window
+		// API-call log used by the rate-limit counter.
+		if entry.Name() == "last_request.json" || entry.Name() == "last_request" || entry.Name() == apiCallsFilename {
 			continue
 		}
 

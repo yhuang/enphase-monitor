@@ -126,20 +126,28 @@
 //
 // RATE LIMITING
 // -------------
-// The API enforces rate limits (typically 10 requests/minute for free tier).
-// This client relies on internal/cache for caching responses to reduce API calls.
-// Three mechanisms work together to stay under the limit:
-//  1. Fresh-cache fast-path: if the cache entry for this exact URL is younger
-//     than cache.MinRequestInterval (60s), it's returned without an API call.
-//  2. Recent-API throttle: if any live API call happened in the last
-//     MinRequestInterval (tracked in cache/last_api_call), the client first
-//     tries to serve the most recent cache entry for the same endpoint and
-//     system ID (any date, via serveRecentEndpointCache) — this catches
-//     back-to-back invocations with different --date flags. If no such entry
-//     exists (e.g. legacy cache files written before Endpoint/SystemID were
-//     stored), it falls back to the same-URL cache regardless of age.
-//  3. 429/503 fallback: when the API responds with a rate-limit or service-
-//     unavailable status, cached responses are used as fallback when available.
+// The Enphase Cloud API v4 enforces a per-API-key budget of
+// cache.MaxRequestsPerWindow requests per cache.MinRequestInterval (10 / 60s).
+// This client relies on internal/cache for caching responses and on a
+// sliding-window counter to stay under the limit:
+//  1. Per-query-type cache expiry (see EnlightenCloudClient.cacheMaxAge):
+//       - past day / month / year / past true-up year: never expires
+//       - today's day query:                           1 hour
+//       - MTD / YTD / current true-up year:            24 hours
+//     If a cache entry for the exact URL exists and is within its age bound,
+//     it is returned without an API call. Past periods (immutable totals)
+//     are served regardless of age.
+//  2. Sliding-window counter: every live response appends a timestamp to
+//     cache/api_calls. cache.RemainingBudget() reports how many requests
+//     are still available in the current window. When budget is exhausted
+//     the client tries a cross-endpoint match (same endpoint + system, any
+//     date, gated by the same maxAge) instead of a live call. If no match
+//     passes, the request short-circuits to constants.RateLimitError so
+//     the user sees the 429 wait message instead of us burning a
+//     guaranteed-failed live call.
+//  3. 429/503 fallback: when the API responds with a rate-limit or
+//     service-unavailable status, cached responses are served as a best-
+//     effort fallback regardless of age.
 //
 // ERROR HANDLING
 // --------------
@@ -590,30 +598,67 @@ func maybeShowNoCacheFallbackWarning(reason string) {
 	cache.SetRateLimitWarningShown(true)
 }
 
-// withinThrottleWindow reports whether a live API call happened in the last
-// cache.MinRequestInterval. Used to gate the recent-API throttle behavior.
-func withinThrottleWindow() bool {
-	last := cache.LastAPICallTime()
-	return !last.IsZero() && time.Since(last) < cache.MinRequestInterval
+// budgetExhausted reports whether the per-API-key rate-limit budget for the
+// current MinRequestInterval window has been used up. When true, the client
+// prefers cache over a live API call for any URL that has one.
+func budgetExhausted() bool {
+	return cache.RemainingBudget() <= 0
+}
+
+// cacheMaxAge returns the maximum age at which a cached response for a given
+// query type and target date is still considered valid:
+//   - past periods (already-ended day / month / year / true-up year) -> 0
+//     ("never expires" — the data won't change)
+//   - today's day query                                              -> 1 hour
+//   - current MTD / YTD / current true-up year                       -> 24 hours
+//
+// Note: timezone.IsPastPeriod always returns false for QueryTypeTrueUp by
+// design (so its lifetime endpoints are refreshed each run). For cache
+// purposes we override that here: a true-up year whose start + 1 year is
+// in the past is treated as past, since its totals are immutable.
+func (c *EnlightenCloudClient) cacheMaxAge(targetDate time.Time, queryType constants.QueryType) time.Duration {
+	isPast := timezone.IsPastPeriod(targetDate, queryType, c.timezone)
+	if !isPast && queryType == constants.QueryTypeTrueUp && !targetDate.IsZero() {
+		trueUpEnd := targetDate.AddDate(1, 0, 0).In(c.timezone)
+		if trueUpEnd.Before(time.Now().In(c.timezone)) {
+			isPast = true
+		}
+	}
+	if isPast {
+		return 0
+	}
+	if queryType == constants.QueryTypeDay {
+		return cache.MaxCurrentDayCacheAge
+	}
+	return cache.MaxCurrentPeriodCacheAge
+}
+
+// cacheServable reports whether the cached response is within the acceptable
+// age window for this query type. maxAge of 0 means "no upper bound".
+func cacheServable(cached *cache.CachedResponse, maxAge time.Duration) bool {
+	if cached == nil {
+		return false
+	}
+	if maxAge == 0 {
+		return true
+	}
+	return time.Since(cached.CachedAt) <= maxAge
 }
 
 // serveRecentEndpointCache returns the most recent cache entry for the same
-// endpoint+systemID as url when a live API call was made within the last
-// cache.MinRequestInterval. Returns nil and false when the throttle window has
-// elapsed, the URL can't be parsed, or no matching cache entry exists.
+// endpoint+systemID as url, filtered by maxAge (0 = no upper bound). Returns
+// nil and false when the URL can't be parsed or no eligible entry exists.
 //
-// This implements the "if another query runs within 60s of the previous run,
-// serve the most recent cached output for the same endpoint" behavior so
-// back-to-back invocations don't burn API rate-limit budget.
-func serveRecentEndpointCache(url string) (*http.Response, bool) {
-	if !withinThrottleWindow() {
-		return nil, false
-	}
+// Caller is responsible for gating this on budgetExhausted(); the lookup is
+// shaped specifically for the budget-depleted fallback path so that a query
+// against a new --date can still surface the most recent same-endpoint cache
+// the user has on disk.
+func serveRecentEndpointCache(url string, maxAge time.Duration) (*http.Response, bool) {
 	endpoint, systemID := cache.ExtractEndpointAndSystemID(url)
 	if endpoint == "" || systemID == "" {
 		return nil, false
 	}
-	recent, err := cache.FindMostRecentByEndpoint(endpoint, systemID)
+	recent, err := cache.FindMostRecentByEndpoint(endpoint, systemID, maxAge)
 	if err != nil {
 		return nil, false
 	}
@@ -677,27 +722,24 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 // │  └──────┬────────┘                                                      │
 // │         │ NO                                                            │
 // │         ▼                                                               │
-// │  ┌──────────────┐                                                       │
-// │  │ Past Period? │──YES──► Prefer cache, but allow API if no cache       │
-// │  └──────┬───────┘                                                       │
-// │         │ NO (Current period)                                           │
-// │         ▼                                                               │
-// │  ┌─────────────┐                                                        │
-// │  │Cache Fresh? │──YES──► Return cache (avoid unnecessary API call)      │
-// │  └──────┬──────┘                                                        │
-// │         │ NO (Stale or missing)                                         │
-// │         ▼                                                               │
-// │  ┌────────────────────┐                                                 │
-// │  │ Last live API call │──< 60s──► Return most recent cache for same    │
-// │  │ within 60s?        │           endpoint+system, any date; if none, │
-// │  │                    │           fall back to same-URL cache (any age)│
-// │  └──────┬─────────────┘                                                 │
-// │         │ ≥ 60s OR no cache anywhere                                    │
-// │         ▼                                                               │
-// │  ┌─────────────┐                                                        │
-// │  │ Make API    │──429──► Return stale cache if available                │
-// │  │   Request   │──OK───► Save to cache, MarkAPICall(), return data     │
-// │  └─────────────┘                                                        │
+// │  ┌──────────────────────┐                                               │
+// │  │ Cache within maxAge? │──YES──► Return cache (no API call)            │
+// │  │ Past period:    ∞    │                                                │
+// │  │ Today's day:    1h   │                                                │
+// │  │ MTD/YTD/cur TU: 24h  │                                                │
+// │  └──────┬───────────────┘                                                │
+// │         │ NO (missing or expired)                                        │
+// │         ▼                                                                │
+// │  ┌────────────────────┐                                                  │
+// │  │ Budget exhausted?  │──YES──► Cross-endpoint match (same maxAge);     │
+// │  │ (>=10 calls in 60s)│         else short-circuit to RateLimitError    │
+// │  └──────┬─────────────┘                                                  │
+// │         │ NO (budget available)                                          │
+// │         ▼                                                                │
+// │  ┌─────────────┐                                                         │
+// │  │ Make API    │──429──► Serve any-age cache if available                │
+// │  │   Request   │──OK───► RecordAPICall, save to cache, return data      │
+// │  └─────────────┘                                                         │
 // └─────────────────────────────────────────────────────────────────────────┘
 //
 // Parameters:
@@ -772,7 +814,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 			maybeShowNoCacheFallbackWarning("API error")
 			return cached.ToHTTPResponse(), true, nil
 		}
-		cache.MarkAPICall()
+		cache.RecordAPICall()
 
 		if resp.StatusCode == 429 && cacheErr != nil {
 			resp.Body.Close()
@@ -809,39 +851,29 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		}, false, nil
 	}
 
-	// Check cache age if it exists
-	var isCacheStale bool
-	if cacheErr == nil && !cached.CachedAt.IsZero() {
-		cacheAge := time.Since(cached.CachedAt)
-		isCacheStale = cacheAge >= cache.MinRequestInterval
-	}
+	// Cache age policy by query type (see cacheMaxAge):
+	//   - past periods (already-ended day / month / year / true-up year): 0 = never expires
+	//   - today's day query:                                              1 hour
+	//   - MTD / YTD / current true-up year:                                24 hours
+	maxAge := c.cacheMaxAge(targetDate, queryType)
 
-	// For past dates (yesterday or earlier), prefer cache but allow live API calls if cache does not exist
-	if isDateInPast && cacheErr == nil {
-		// Cache exists for past date - use it
-		return cached.ToHTTPResponse(), true, nil // Cache was used (past date)
-	}
-
-	// For current periods, serve fresh cache without making a live API call.
-	// This prevents burning rate-limit budget on repeated queries for slow-changing
-	// data (e.g. --date 2026 queries a full year of historical daily totals).
-	if !isDateInPast && cacheErr == nil && !isCacheStale {
-		return cached.ToHTTPResponse(), true, nil // Cache was used (fresh cache)
-	}
-
-	// Recent-API throttle: if any live API call happened in the last MinRequestInterval,
-	// serve the most recent cache entry for this endpoint+system (any date) instead of
-	// making another live call. This keeps back-to-back runs from burning rate-limit
-	// budget even when the user asks for a different date than the previous run.
-	if recent, ok := serveRecentEndpointCache(url); ok {
-		return recent, true, nil
-	}
-	// Throttle fallback: if a cache file exists for this exact URL (even stale), use
-	// it during the throttle window. This catches pre-existing cache entries that
-	// predate the Endpoint/SystemID tagging — FindMostRecentByEndpoint cannot see
-	// them, but they are still valid same-URL data.
-	if cacheErr == nil && withinThrottleWindow() {
+	// Serve cache if we have one and it's within the per-query-type bound.
+	// For past periods (maxAge == 0) any age is acceptable.
+	if cacheErr == nil && cacheServable(cached, maxAge) {
 		return cached.ToHTTPResponse(), true, nil
+	}
+
+	// Cache missing or expired. Before making a live call, check the rate-
+	// limit budget. If it's exhausted, try a cross-endpoint match (same
+	// endpoint + system, any date, gated by maxAge) — useful when the user
+	// switches --date between back-to-back runs. If no eligible cache,
+	// short-circuit to RateLimitError so the user sees the 429 wait message
+	// without us burning a guaranteed-failed live call.
+	if budgetExhausted() {
+		if recent, ok := serveRecentEndpointCache(url, maxAge); ok {
+			return recent, true, nil
+		}
+		return nil, false, fmt.Errorf(constants.RateLimitError)
 	}
 
 	// Make the API request
@@ -859,7 +891,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	if err != nil {
 		return cached.ToHTTPResponse(), true, nil // Cache was used (error fallback)
 	}
-	cache.MarkAPICall()
+	cache.RecordAPICall()
 
 	// Handle rate limit (429)
 	if resp.StatusCode == 429 {
@@ -890,25 +922,18 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		return nil, false, fmt.Errorf("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
 	}
 
-	// Handle other non-OK status codes: try cache as fallback, then return error
+	// Handle other non-OK status codes: serve cache as a best-effort fallback
+	// when available, otherwise surface the error. Age is not gated here —
+	// when the API itself is failing, any cache we have is better than
+	// nothing, and the per-query-type freshness policy was already applied
+	// at the top of this function before we attempted the live call.
 	if resp.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
 			return nil, false, fmt.Errorf("API request failed with status %d: failed to read body: %w", resp.StatusCode, err)
 		}
-		if isDateInPast && cacheErr == nil && !isCacheStale {
-			return cached.ToHTTPResponse(), true, nil
-		}
-		var retryCached *cache.CachedResponse
-		var retryErr error
-		if isDateInPast {
-			retryCached, retryErr = cache.LoadCachedResponse(url, c.timezone)
-		}
-		if isDateInPast && retryErr == nil {
-			return retryCached.ToHTTPResponse(), true, nil
-		}
-		if cacheErr == nil && !isCacheStale {
+		if cacheErr == nil {
 			return cached.ToHTTPResponse(), true, nil
 		}
 		return nil, false, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))

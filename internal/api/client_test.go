@@ -58,12 +58,18 @@ import (
 	"testing"
 	"time"
 
+	"enphase-monitor/internal/cache"
 	"enphase-monitor/internal/constants"
 )
 
 // TestEnlightenCloudClient_GetProductionForDate tests production data fetching with mock HTTP server
 // This test now works properly with the new baseURL dependency injection!
 func TestEnlightenCloudClient_GetProductionForDate(t *testing.T) {
+	// Reset the sliding-window rate-limit counter so this test is not affected
+	// by api_calls entries accumulated by earlier tests in the same run.
+	cache.ResetState()
+	defer cache.ResetState()
+
 	// Create mock HTTP server that returns test telemetry data
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check authorization header
@@ -113,6 +119,9 @@ func TestEnlightenCloudClient_GetProductionForDate(t *testing.T) {
 
 // TestEnlightenCloudClient_RateLimitHandling tests 429 error handling with mock server
 func TestEnlightenCloudClient_RateLimitHandling(t *testing.T) {
+	cache.ResetState()
+	defer cache.ResetState()
+
 	// Create mock HTTP server that returns 429 rate limit error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)

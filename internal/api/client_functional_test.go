@@ -12,9 +12,16 @@ import (
 	"enphase-monitor/internal/constants"
 )
 
-// mustLoadLocation loads a timezone for tests; fails the test if the timezone is invalid.
+// mustLoadLocation loads a timezone for tests and clears the sliding-window
+// api_calls counter so each test starts with a fresh rate-limit budget. Most
+// tests in this package call this helper near the top, so clearing the
+// counter here avoids requiring every test to remember to do it manually. We
+// deliberately do NOT call ResetState(): tests that set their own state
+// (e.g. SetCacheDisabled before this helper) rely on it surviving.
 func mustLoadLocation(t *testing.T, name string) *time.Location {
 	t.Helper()
+	cache.ClearAPICalls()
+	t.Cleanup(cache.ClearAPICalls)
 	loc, err := time.LoadLocation(name)
 	if err != nil {
 		t.Fatal(err)
@@ -558,6 +565,9 @@ func TestGetBatteryDataForDate_InvalidJSON(t *testing.T) {
 
 // TestGetMetricsFromCloud_ConsumptionFallback tests consumption calculation fallback
 func TestGetMetricsFromCloud_ConsumptionFallback(t *testing.T) {
+	cache.ResetState()
+	defer cache.ResetState()
+
 	tz := mustLoadLocation(t, "US/Pacific")
 
 	// Use midnight (dayStart) as the interval timestamp so it is always within

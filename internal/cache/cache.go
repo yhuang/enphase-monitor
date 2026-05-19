@@ -18,10 +18,11 @@
 //   - Handles past date queries with cache fallback
 //   - Normalizes URLs for consistent cache keys (timestamps → dates)
 //   - Tags each cache entry with its endpoint + system ID so the API client can
-//     find the most recent cache for a given endpoint when throttling
-//   - Records the timestamp of the most recent live API call in a marker file
-//     (last_api_call) so a second invocation within MinRequestInterval can
-//     serve cache instead of burning rate-limit budget
+//     find the most recent cache for a given endpoint when budget is exhausted
+//   - Maintains a sliding-window counter of recent live API calls in
+//     cache/api_calls so the client can serve cache instead of issuing a call
+//     that would exceed the per-API-key rate limit (MaxRequestsPerWindow per
+//     MinRequestInterval)
 package cache
 
 import (
@@ -81,13 +82,14 @@ func RedactURLKey(rawURL string) string {
 	return parsed.String()
 }
 
-// MinRequestInterval is the minimum time between API requests. It serves two
+// MinRequestInterval is the width of the rate-limit window. It serves two
 // purposes:
 //  1. Cache staleness: for current-period queries, a cache entry younger than
 //     this is reused instead of refetched.
-//  2. Recent-API throttle: if any live API call happened within this window
-//     (see LastAPICallTime/MarkAPICall), the API client serves the most recent
-//     cache entry for the same endpoint+system instead of issuing a new call.
+//  2. Sliding-window budget: RecordAPICall logs each live call and
+//     RemainingBudget returns MaxRequestsPerWindow minus the count of logged
+//     calls newer than now - MinRequestInterval. When budget reaches zero the
+//     API client serves cache instead of issuing a call that would 429.
 const MinRequestInterval = 1 * time.Minute
 
 // Package-level state for cache configuration.
@@ -131,12 +133,22 @@ func SetRateLimitWarningShown(shown bool) {
 	rateLimitWarningShown = shown
 }
 
-// ResetState resets all cache state flags to their default values.
-// This is primarily used for testing to ensure clean state between tests.
+// ResetState resets all cache state flags to their default values and removes
+// the sliding-window api_calls file. Primarily used for testing to ensure
+// clean state between tests; safe to call in production (it only clears
+// throttling state, never cache entries themselves).
 func ResetState() {
 	testMode = false
 	cacheDisabled = false
 	rateLimitWarningShown = false
+	ClearAPICalls()
+}
+
+// ClearAPICalls removes the sliding-window api_calls file. Use this in tests
+// when you want a clean rate-limit budget but want to preserve the other
+// state flags (TestMode, CacheDisabled, etc.).
+func ClearAPICalls() {
+	_ = os.Remove(filepath.Join(getCacheDir(), apiCallsFilename))
 }
 
 // CachedResponse stores a cached API response
@@ -259,42 +271,103 @@ func ExtractEndpointAndSystemID(rawURL string) (endpoint, systemID string) {
 	return "", ""
 }
 
-// lastAPICallFilename is the bookkeeping file in the cache directory that stores
-// the timestamp of the most recent live API call. It has no .json extension so
-// the cache iteration loops (HasCacheForDate, ClearTodayCache, etc.) skip it
+// apiCallsFilename stores the timestamps of recent live API calls as
+// newline-separated RFC3339Nano values. It has no .json extension so the
+// cache iteration loops (HasCacheForDate, ClearTodayCache, etc.) skip it
 // naturally; ListCacheEntries has an explicit skip-list entry for it.
-const lastAPICallFilename = "last_api_call"
+const apiCallsFilename = "api_calls"
 
-// LastAPICallTime returns the timestamp of the most recent live API call recorded
-// by MarkAPICall, or the zero time if no record exists or it cannot be parsed.
-func LastAPICallTime() time.Time {
-	path := filepath.Join(getCacheDir(), lastAPICallFilename)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return time.Time{}
-	}
-	t, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(data)))
-	if err != nil {
-		return time.Time{}
-	}
-	return t
-}
+// MaxRequestsPerWindow is the per-API-key rate limit (calls per
+// MinRequestInterval). The Enphase Cloud API v4 allows 10 requests per minute
+// per API key shared across all systems.
+const MaxRequestsPerWindow = 10
 
-// MarkAPICall records the current time as the timestamp of the most recent live
-// API call. Failures are ignored — the marker is best-effort throttling state.
-func MarkAPICall() {
+// MaxCurrentDayCacheAge bounds how stale a today's-day-query cache may be
+// before we treat it as expired. Today's numbers change throughout the day,
+// so a stale cache would mislead the user about current production /
+// consumption.
+const MaxCurrentDayCacheAge = 1 * time.Hour
+
+// MaxCurrentPeriodCacheAge bounds how stale a current-period cache may be
+// for month-to-date / year-to-date / current-true-up-year queries. These
+// totals are large cumulative numbers where a one-day delay in the refresh
+// is acceptable but a multi-day delay would be misleading.
+//
+// Past periods (already-ended day / month / year / true-up year) never
+// expire and are served regardless of age — see client.cacheMaxAge.
+const MaxCurrentPeriodCacheAge = 24 * time.Hour
+
+// RecordAPICall appends the current timestamp to the api_calls file and prunes
+// entries older than MinRequestInterval. The pruning keeps the file small and
+// avoids it growing unbounded over time. Failures are ignored — the counter
+// is best-effort throttling state.
+func RecordAPICall() {
 	if err := os.MkdirAll(getCacheDir(), 0755); err != nil {
 		return
 	}
-	path := filepath.Join(getCacheDir(), lastAPICallFilename)
-	_ = os.WriteFile(path, []byte(time.Now().Format(time.RFC3339Nano)), 0644)
+	stamps := recentAPICallStampsLocked()
+	stamps = append(stamps, time.Now())
+	writeAPICallStamps(stamps)
+}
+
+// RemainingBudget returns the number of API calls that can still be made in
+// the current MinRequestInterval window without exceeding
+// MaxRequestsPerWindow. Returns 0 when the budget is exhausted.
+func RemainingBudget() int {
+	used := len(recentAPICallStampsLocked())
+	if used >= MaxRequestsPerWindow {
+		return 0
+	}
+	return MaxRequestsPerWindow - used
+}
+
+// recentAPICallStampsLocked reads the api_calls file and returns the
+// timestamps within the last MinRequestInterval. Malformed lines are skipped.
+// "Locked" is aspirational — there is no actual mutex; the CLI is single-
+// process and call sites are serialized within a run.
+func recentAPICallStampsLocked() []time.Time {
+	path := filepath.Join(getCacheDir(), apiCallsFilename)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	cutoff := time.Now().Add(-MinRequestInterval)
+	var stamps []time.Time
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		t, err := time.Parse(time.RFC3339Nano, line)
+		if err != nil {
+			continue
+		}
+		if t.After(cutoff) {
+			stamps = append(stamps, t)
+		}
+	}
+	return stamps
+}
+
+// writeAPICallStamps overwrites the api_calls file with the given timestamps.
+func writeAPICallStamps(stamps []time.Time) {
+	var b strings.Builder
+	for _, t := range stamps {
+		b.WriteString(t.Format(time.RFC3339Nano))
+		b.WriteByte('\n')
+	}
+	path := filepath.Join(getCacheDir(), apiCallsFilename)
+	_ = os.WriteFile(path, []byte(b.String()), 0644)
 }
 
 // FindMostRecentByEndpoint scans the cache directory for entries matching the
 // given endpoint and system ID and returns the one with the latest CachedAt.
 // Returns nil and an error if no matching entry exists. Entries cached before
 // the Endpoint/SystemID fields were introduced are skipped.
-func FindMostRecentByEndpoint(endpoint, systemID string) (*CachedResponse, error) {
+//
+// If maxAge > 0, entries older than time.Now() - maxAge are filtered out.
+// Pass 0 to accept entries of any age.
+func FindMostRecentByEndpoint(endpoint, systemID string, maxAge time.Duration) (*CachedResponse, error) {
 	if endpoint == "" || systemID == "" {
 		return nil, fmt.Errorf("endpoint and systemID required")
 	}
@@ -313,6 +386,9 @@ func FindMostRecentByEndpoint(endpoint, systemID string) (*CachedResponse, error
 			continue
 		}
 		if cached.Endpoint != endpoint || cached.SystemID != systemID {
+			continue
+		}
+		if maxAge > 0 && time.Since(cached.CachedAt) > maxAge {
 			continue
 		}
 		if best == nil || cached.CachedAt.After(best.CachedAt) {
