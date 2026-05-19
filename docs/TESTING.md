@@ -41,7 +41,7 @@ The project follows a pragmatic approach to testing:
 
 ### Why main.go Has 0% Coverage
 
-The `main.go` file is pure orchestration (~256 lines) and has 0% coverage by design. This is an **industry standard** because:
+The `main.go` file is pure orchestration (~294 lines) and has 0% coverage by design. This is an **industry standard** because:
 
 1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
 2. **All logic tested**: All functions `main.go` calls are tested in internal packages
@@ -80,10 +80,11 @@ Most packages follow the simple convention where each source file has one corres
 
 For packages with extensive functionality or different test concerns, tests are split by category:
 
-**Cache Package** (3 test files):
-- `cache.go` → 3 test files:
+**Cache Package** (4 test files):
+- `cache.go` → 4 test files:
   - `cache_test.go` - State management tests
   - `cache_functions_test.go` - Functionality tests (469 lines)
+  - `rate_limit_test.go` - Sliding-window budget tests (187 lines)
   - `cli_test.go` - CLI utilities tests (603 lines)
 
 **OAuth Package** (3 test files):
@@ -671,6 +672,9 @@ These files test component interactions:
 | `client_functional_test.go` | API client tests | HTTP interactions with mock server |
 | `client_lifetime_test.go` | Lifetime endpoint tests | Month/year queries via `_lifetime` API endpoints |
 | `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
+| `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 report types; preflight warning on/off |
+| `query_cost_test.go` | 3 test functions | `QueryCost` output for all query type × hasBattery combinations; 2-system budget constraint |
+| `rate_limit_test.go` | Cache budget tests | `RecordAPICall`, `RemainingBudget`, sliding-window pruning logic |
 
 ### OAuth Test Files
 

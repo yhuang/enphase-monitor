@@ -16,9 +16,10 @@ designed to help new engineers learn Go development patterns and best practices.
 2. [Module Structure](#module-structure)
 3. [Execution Flow](#execution-flow)
 4. [Data Flow Diagram](#data-flow-diagram)
-5. [Key Go Patterns Used](#key-go-patterns-used)
-6. [File Descriptions](#file-descriptions)
-7. [Next Steps for Learning](#next-steps-for-learning)
+5. [Rate Limiting & In-Request Quota Checks](#rate-limiting--in-request-quota-checks)
+6. [Key Go Patterns Used](#key-go-patterns-used)
+7. [File Descriptions](#file-descriptions)
+8. [Next Steps for Learning](#next-steps-for-learning)
 
 ---
 
@@ -51,7 +52,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go                                # Entry point (~256 lines) - orchestration only
+├── main.go                                # Entry point (~294 lines) - orchestration only
 ├── internal/
 │   ├── aggregator/                        # Multi-system data aggregation
 │   │   ├── types.go                       # Metric data structures (AggregatedMetrics, SystemMetrics)
@@ -64,7 +65,9 @@ enphase-monitor/
 │   │   ├── interface.go                   # CloudClient interface for testability
 │   │   ├── client_test.go                 # API client unit tests
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
-│   │   └── client_lifetime_test.go        # Lifetime endpoint tests (month/year/true-up queries)
+│   │   ├── client_lifetime_test.go        # Lifetime endpoint tests (month/year/true-up queries)
+│   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 report types)
+│   │   └── query_cost_test.go             # QueryCost unit tests (all query type × hasBattery combos)
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   ├── setup_test.go                  # Setup tests
@@ -76,6 +79,7 @@ enphase-monitor/
 │   │   ├── cache.go                       # Cache implementation
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
+│   │   ├── rate_limit_test.go             # Sliding-window budget tests
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
@@ -280,6 +284,87 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │   - Structured report output                                       │
 └────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Rate Limiting & In-Request Quota Checks
+
+The Enphase Cloud API enforces a budget of **10 requests per 60-second sliding window**. With two systems each making a full day query (5 endpoints each), that is exactly 10 calls — right at the limit. To stay within it, the client uses three cooperating layers: a cost estimator, a preflight warning, and a per-request gate.
+
+### Layer 1: `QueryCost` — call-count estimator
+
+`QueryCost(queryType, hasBattery)` in [internal/api/client.go](../internal/api/client.go) returns the number of live API calls that `GetMetricsFromCloud` will make for a **single system**:
+
+| Query type | hasBattery=false | hasBattery=true |
+|------------|-----------------|-----------------|
+| Day        | 4               | 5               |
+| Month      | 4               | 4               |
+| Year       | 4               | 4               |
+| True-up    | 4               | 4               |
+
+The base of 4 covers: grid import, grid export, production, and consumption. Battery telemetry adds a 5th call **only for day queries** — month/year/true-up skip it because:
+1. The battery telemetry endpoint returns per-15-minute intervals; summing a month would require calling it for each day, blowing past the budget.
+2. The `battery_lifetime` endpoint only returns charge/discharge totals; SOC (state-of-charge) is not meaningful as a monthly aggregate, so the call is omitted entirely.
+
+This means 2 systems × 5 (day + battery) = **exactly 10** — the documented architectural limit. Adding a third system or a supplementary call would exceed it.
+
+### Layer 2: Preflight check in `GetMetricsFromCloud`
+
+Before making any API calls, `GetMetricsFromCloud` compares the query cost against the remaining budget:
+
+```go
+// internal/api/client.go (inside GetMetricsFromCloud)
+if !timezone.IsPastPeriod(testDate, queryType, c.timezone) {
+    needed := QueryCost(queryType, queryType == constants.QueryTypeDay)
+    remaining := cache.RemainingBudget()
+    if remaining < needed {
+        fmt.Printf("WARNING: ... Insufficient API budget: need %d call(s), %d/%d remaining ...\n", ...)
+    }
+}
+```
+
+Key design decisions:
+- **Past periods are skipped entirely.** A past day/month/year always comes from immutable cache and never consumes any budget, so a preflight check would be misleading noise.
+- **Day queries use `hasBattery=true` (5 calls) as the conservative count.** At this point the client does not know whether the hardware has a battery, so it assumes the worst case. This ensures the warning fires early enough to be useful.
+- **The preflight only warns — it does not abort.** Each individual call will still try cache before giving up, so partial data is still possible even when the budget is tight.
+
+### Layer 3: Per-request gate in `makeCachedAPIRequest`
+
+The actual enforcement happens inside `makeCachedAPIRequest` for every URL. The decision tree (simplified):
+
+```
+Is this a past period with a valid cache entry?
+  YES → serve immutable cache, no budget consumed, done
+  NO  ↓
+Is the cache entry within maxAge (1 h for today, 24 h for MTD/YTD)?
+  YES → serve cache, no live call
+  NO  ↓
+Is budget exhausted (RemainingBudget() <= 0)?
+  YES → try exact-URL cache (any age)
+      → try cross-endpoint same-system cache (any age)
+      → return RateLimitError
+  NO  ↓
+Make live API call → record timestamp → save to cache → return
+```
+
+The cross-endpoint fallback (step 3, middle branch) lets the client surface *some* recent data for the same endpoint+system even when the URL differs (e.g. a new `--date` value), rather than failing outright.
+
+### Interaction between layers
+
+The preflight (Layer 2) fires once per `GetMetricsFromCloud` call and is a forward-looking warning. The per-request gate (Layer 3) fires once per endpoint and is the actual enforcement. Together:
+
+- If budget is full when the run starts and is exhausted mid-run (e.g. the first 4 calls succeed but the 5th lands after the window), Layer 3 handles it gracefully with a cache fallback.
+- If budget is already low before the run, Layer 2 warns the user up front so they understand why the output may show stale numbers.
+- If budget is zero and no cache exists for the endpoint, `RateLimitError` is returned and the metric is shown as 0 in the output (non-fatal for optional metrics like grid import/export; fatal for production which is required).
+
+### Tests
+
+| Test File | What it covers |
+|-----------|---------------|
+| [internal/api/query_cost_test.go](../internal/api/query_cost_test.go) | All 8 `QueryCost` combinations; asserts 2-system day+battery = exactly 10 |
+| [internal/api/preflight_test.go](../internal/api/preflight_test.go) | Budget-exhaustion cache fallback for all 8 report types; preflight warning emitted/suppressed correctly |
+
+`preflight_test.go` follows the same **prime → exhaust → probe** pattern for every report type: a first live call populates the cache, the budget is manually drained to zero via `cache.RecordAPICall()`, and the probe call must serve from cache with zero additional server hits. Past-period probes (types 2, 4, 6, 8) never even reach the budget check — they short-circuit at the `isPast` branch — making them a useful control group that confirms immutable-cache behaviour is budget-free.
 
 ---
 

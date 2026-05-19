@@ -349,34 +349,34 @@ The application displays:
 
  COMBINED ENERGY REPORT
 ---------------------------------------------------------
+    Net Energy Flow:      15.3 kWh (import)
     Energy Produced:      33.4 kWh
     Energy Consumed:      48.6 kWh
     Energy Imported:      19.1 kWh
     Energy Exported:       3.8 kWh
-    Net Energy Flow:      15.3 kWh (import)
 
  INDIVIDUAL SYSTEMS REPORT
 ---------------------------------------------------------
 
   [1] Right Subpanel (5525881)
+      Net Energy Flow:                19.3 kWh (import)
+      Energy Produced:                14.6 kWh
+      Energy Consumed:                32.1 kWh
       Energy Imported:                23.1 kWh
       Energy Exported:                 3.8 kWh
-      Captured from the Sun:          14.6 kWh
-      Net Energy Flow:                19.3 kWh (import)
       Charged to Battery:              8.5 kWh
       Discharged from Battery:         6.8 kWh
       Battery Charge Percentage:           63%
-      Total Energy Consumed:          32.1 kWh
 
   [2] Left Subpanel (5392556)
+      Net Energy Flow:                 0.2 kWh (export)
+      Energy Produced:                18.9 kWh
+      Energy Consumed:                16.4 kWh
       Energy Imported:                 7.5 kWh
       Energy Exported:                 7.6 kWh
-      Captured from the Sun:          18.9 kWh
-      Net Energy Flow:                 0.2 kWh (export)
       Charged to Battery:              8.1 kWh
       Discharged from Battery:         5.4 kWh
       Battery Charge Percentage:           74%
-      Total Energy Consumed:          16.4 kWh
 
 =========================================================
 ```
@@ -412,11 +412,11 @@ The `--true-up` flag produces a dedicated report:
 ---------------------------------------------------------
 
   [1] Right Subpanel (5525881)
+      Net Energy Flow:           600.0 kWh (export)
+      Energy Produced:         1,700.0 kWh
+      Energy Consumed:         1,100.0 kWh
       Energy Imported:           600.0 kWh
       Energy Exported:         1,200.0 kWh
-      Captured from the Sun:   1,700.0 kWh
-      Net Energy Flow:           600.0 kWh (export)
-      Total Energy Consumed:   1,100.0 kWh
 
   [2] Left Subpanel (5392556)
       ...
@@ -439,14 +439,14 @@ The "True-Up Start" line shows the exact date you provided. The "Query Range" st
   - Calculation: Energy Imported - Energy Exported
 
 ### Individual System Metrics (Standard Report)
+- **Net Energy Flow**: Net import/export for this system (kWh) with (import) or (export) suffix
+- **Energy Produced**: Solar generation for this system (kWh)
+- **Energy Consumed**: Total consumption for this system (kWh)
 - **Energy Imported**: Energy purchased from utility for this system (kWh)
 - **Energy Exported**: Energy sold back to utility from this system (kWh)
-- **Captured from the Sun**: Solar generation for this system (kWh)
-- **Net Energy Flow**: Net import/export for this system (kWh) with (import) or (export) suffix
 - **Charged to Battery**: Energy stored in batteries for this system (kWh)
 - **Discharged from Battery**: Energy used from batteries for this system (kWh)
 - **Battery Charge Percentage**: Current state of charge (SOC) of the battery system, displayed as a percentage (0-100%). This metric is shown per-system only (not aggregated) and only for day queries. For month/year queries, battery SOC is omitted since it represents a point-in-time snapshot that isn't meaningful when aggregated over a period.
-- **Total Energy Consumed**: Total consumption for this system (kWh)
 
 ### Individual System Metrics (True-Up Report)
 
@@ -640,7 +640,10 @@ enphase-monitor/
 │   │   ├── types.go                       # API request/response types
 │   │   ├── interface.go                   # CloudClient interface for testability
 │   │   ├── client_test.go                 # API client unit tests
-│   │   └── client_functional_test.go      # Functional tests with mock HTTP servers
+│   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
+│   │   ├── client_lifetime_test.go        # Lifetime endpoint tests (month/year/true-up queries)
+│   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 report types)
+│   │   └── query_cost_test.go             # QueryCost unit tests (all query type × hasBattery combos)
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   ├── setup_test.go                  # Setup tests
@@ -652,6 +655,7 @@ enphase-monitor/
 │   │   ├── cache.go                       # Cache implementation
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
+│   │   ├── rate_limit_test.go             # Sliding-window budget tests
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
@@ -905,10 +909,10 @@ This project follows Go best practices and coding standards:
 - **Performance**: Benchmarks included for hot paths
 
 **Code Metrics:**
-- Total Lines: ~4,000 (excluding tests)
-- Test Lines: ~9,000 (comprehensive test suite)
+- Total Lines: ~5,500 (excluding tests)
+- Test Lines: ~11,500 (comprehensive test suite)
 - Packages: 14 internal packages
-- Test Files: 25 (unit, integration, functional, edge case, and benchmark tests)
+- Test Files: 28 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)
 
 ## License

@@ -482,6 +482,24 @@ func (c *EnlightenCloudClient) getBatteryLifetime(ctx context.Context, testDate 
 	return totalCharge / constants.WhToKWh, totalDischarge / constants.WhToKWh, 0, nil
 }
 
+// QueryCost returns the number of live API calls GetMetricsFromCloud will make
+// for a single system with the given query type. Callers can compare this value
+// against cache.RemainingBudget() before starting a fetch to decide whether a
+// fully live run is possible or whether cached data will be needed.
+//
+// hasBattery should be true when the system is known to have a battery device.
+// For QueryTypeDay the battery telemetry endpoint adds one extra call.
+// For QueryTypeMonth / QueryTypeYear / QueryTypeTrueUp the battery endpoint is
+// never called regardless of hasBattery.
+func QueryCost(queryType constants.QueryType, hasBattery bool) int {
+	// Fixed set per system: grid import, grid export, production, consumption.
+	const baseCalls = 4
+	if queryType == constants.QueryTypeDay && hasBattery {
+		return baseCalls + 1
+	}
+	return baseCalls
+}
+
 // GetMetricsFromCloud fetches all metrics from the Cloud API for the specified period.
 // If testDate is provided, uses that date instead of today.
 // queryType determines the time range (day/month/year/true-up).
@@ -506,6 +524,21 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	sysPrefix := ""
 	if c.systemName != "" {
 		sysPrefix = "[" + c.systemName + "] "
+	}
+
+	// Preflight: warn when the remaining budget is smaller than what this query
+	// needs. For past periods every endpoint is served from immutable cache so
+	// budget consumption is zero — skip the check. For current periods the client
+	// will still make whatever live calls it can and fall back to cache for the
+	// rest, but alerting early helps the caller understand why results may be stale.
+	// Day queries always attempt battery (hasBattery=true for the conservative count).
+	if !timezone.IsPastPeriod(testDate, queryType, c.timezone) {
+		needed := QueryCost(queryType, queryType == constants.QueryTypeDay)
+		remaining := cache.RemainingBudget()
+		if remaining < needed {
+			fmt.Printf("WARNING: %sInsufficient API budget: need %d call(s), %d/%d remaining — results may use cached data\n",
+				sysPrefix, needed, remaining, cache.MaxRequestsPerWindow)
+		}
 	}
 
 	// Helper to check context cancellation
@@ -682,6 +715,12 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 	var systemID string
 	if len(pathParts) >= 3 {
 		systemID = pathParts[len(pathParts)-3]
+	}
+	// Guard: if we cannot identify endpoint and systemID the scan would match
+	// old-format cache entries that predate those metadata fields. Bail out
+	// rather than returning a false positive.
+	if endpoint == "" || systemID == "" {
+		return nil, false
 	}
 	targetDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, c.timezone)
 	dateStr := targetDay.Format("2006-01-02")
