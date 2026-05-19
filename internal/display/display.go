@@ -253,15 +253,26 @@ func (d *Display) printTrueUpHeader(report *aggregator.TrueUpReport) {
 	fmt.Fprintf(d.writer, "    %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
 
-	fmt.Fprintf(d.writer, "     %s%-15s%s%s 12:00 AM\n                              to\n                    %s%s\n\n",
-		d.colors.SecondaryText, "Data Range:", d.colors.PrimaryText,
+	// All three labels are right-aligned to 13 chars so the colon falls at the
+	// same column (5 prefix + 13 label = col 18). Two spaces follow the colon,
+	// placing values at column 21.
+	fmt.Fprintf(d.writer, "     %s%13s:%s  %s\n\n",
+		d.colors.SecondaryText, "True-Up Start", d.colors.PrimaryText,
+		report.StartDate.Format("Mon Jan 2, 2006")+constants.Reset)
+
+	fmt.Fprintf(d.writer, "     %s%13s:%s  %s 12:00 AM\n                             to\n                     %s%s\n\n",
+		d.colors.SecondaryText, "Query Range", d.colors.PrimaryText,
 		dataStart.Format("Mon Jan 2, 2006"),
 		report.EndDate.Format("Mon Jan 2, 2006 03:04 PM"), constants.Reset)
 
-	fmt.Fprintf(d.writer, "     %s%-15s%s%s %s(full months used)%s\n",
-		d.colors.SecondaryText, "True-Up Start:", d.colors.PrimaryText,
-		report.StartDate.Format("Mon Jan 2, 2006"),
-		d.colors.SecondaryText, constants.Reset)
+	timestampLocal := report.Timestamp.In(d.timezone)
+	sourceLabel := d.colors.Discharge + "(live)" + constants.Reset
+	if report.CacheUsed {
+		sourceLabel = d.colors.SecondaryText + "(cached)" + constants.Reset
+	}
+	fmt.Fprintf(d.writer, "     %s%13s:%s  %s %s\n",
+		d.colors.SecondaryText, "Last Updated", d.colors.PrimaryText,
+		timestampLocal.Format("Mon Jan 2, 2006 03:04:05 PM"), sourceLabel)
 
 	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
 }

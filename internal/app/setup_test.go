@@ -462,7 +462,7 @@ func TestConfigureModes(t *testing.T) {
 			// Note: ConfigureModes calls cache.SetTestMode and cache.SetCacheDisabled
 			// We can't easily test the actual state changes without mocking,
 			// but we can verify the function doesn't panic
-			ConfigureModes(tt.testMode, tt.noCache)
+			ConfigureModes(tt.testMode, tt.noCache, false)
 			_ = cache // Use the mock struct to avoid unused variable
 		})
 	}

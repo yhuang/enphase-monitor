@@ -17,6 +17,7 @@ type Flags struct {
 	NoCache       bool
 	ListCache     bool
 	InspectCache  string
+	Debug         bool
 }
 
 // ParseFlags parses command-line flags and returns the flag values.
@@ -34,6 +35,7 @@ func ParseFlags() *Flags {
 	flag.BoolVar(&flags.NoCache, "no-cache", false, "Bypass cache and always make live API calls")
 	flag.BoolVar(&flags.ListCache, "list-cache", false, "List all cached API responses")
 	flag.StringVar(&flags.InspectCache, "inspect-cache", "", "Inspect cached responses by hash or date (YYYY-MM-DD format). Use --list-cache to see hashes.")
+	flag.BoolVar(&flags.Debug, "debug", false, "Print debug information: last run time, API budget, and cache/API decisions")
 
 	flag.Parse()
 

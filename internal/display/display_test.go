@@ -450,6 +450,8 @@ func makeTrueUpReport(tz *time.Location) *aggregator.TrueUpReport {
 	return &aggregator.TrueUpReport{
 		StartDate:   startDate,
 		EndDate:     endDate,
+		Timestamp:   time.Date(2026, time.April, 25, 10, 30, 0, 0, tz),
+		CacheUsed:   false,
 		GridImport:  1234.5,
 		GridExport:  2345.6,
 		Production:  3456.7,
@@ -474,8 +476,8 @@ func TestShowTrueUpReport_ContainsHeader(t *testing.T) {
 	checks := []string{
 		"ENPHASE MULTI-SYSTEM MONITOR",
 		"True-Up Start:",
-		"Data Range:",
-		"full months used",
+		"Query Range:",
+		"Last Updated:",
 	}
 	for _, want := range checks {
 		if !strings.Contains(output, want) {

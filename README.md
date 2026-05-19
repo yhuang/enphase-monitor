@@ -314,6 +314,7 @@ Press `Ctrl+C` to stop.
 - `--clear-all-cache` - Clear all cached API responses (all dates)
 - `--list-cache` - List all cached API responses
 - `--inspect-cache <hash|date>` - Inspect cached responses by hash or date (YYYY-MM-DD format)
+- `--debug` - Print debug information: last run time, API budget remaining, and per-request cache/live decisions
 
 ### Examples
 
@@ -390,12 +391,13 @@ The `--true-up` flag produces a dedicated report:
 =========================================================
   ENPHASE MULTI-SYSTEM MONITOR
 =========================================================
-  Data Range:     Wed Jan 1, 2025 12:00 AM
-                          to
-                  Fri Apr 24, 2026 11:59 PM
+     True-Up Start:  Wed Jan 15, 2025
 
-  True-Up Start:  Wed Jan 15, 2025 (full months used)
+       Query Range:  Wed Jan 1, 2025 12:00 AM
+                             to
+                     Fri Apr 24, 2026 11:59 PM
 
+      Last Updated:  Mon May 18, 2026 10:24:41 PM (live)
 =========================================================
 
  TRUE-UP ENERGY REPORT
@@ -422,7 +424,7 @@ The `--true-up` flag produces a dedicated report:
 =========================================================
 ```
 
-The "Data Range" starts from the first day of the start month (full months are always used). The "True-Up Start" line shows the exact date you provided. Battery metrics are excluded from the true-up report.
+The "True-Up Start" line shows the exact date you provided. The "Query Range" starts from the first day of that month (full calendar months are always used). Battery metrics are excluded from the true-up report.
 
 ## Metrics Explained
 
@@ -529,16 +531,15 @@ The `refresh_interval` setting controls how often the application queries the AP
 
 ### Caching Strategy
 
-To respect these limits, the application combines disk caching with a sliding-window rate-limit counter and a per-query-type cache expiry policy:
+To respect these limits, the application combines disk caching with a sliding-window rate-limit counter and a live-first serving policy:
 
 - **Automatic Disk Caching**: All API responses are cached as JSON files in the `cache/` directory.
-- **Per-Query-Type Cache Expiry**: How long a cached response is reused depends on what was queried:
-  - **Past day / past month / past year / past true-up year** — *never expires.* The data won't change.
-  - **Today's day query** (`./enphase-monitor` with no args) — **1 hour.** Today's numbers change throughout the day, so we refresh hourly.
-  - **Month-to-date / Year-to-date / Current true-up year** — **24 hours.** These are large cumulative totals; a day-old refresh is fine.
-- **Sliding-Window Rate-Limit Counter**: Every live API response appends its timestamp to `cache/api_calls`. The available budget at any moment is `10 − count_of_timestamps_in_last_60s`. When budget reaches 0 the client prefers cache over a live call (cross-endpoint same-system match within the same `maxAge`); if no acceptable cache exists, it short-circuits to the 429 "wait 60 seconds" message instead of issuing a guaranteed-failed call.
+- **Live-First for Current Periods, Cache-Only for Past Periods**:
+  - **Past day / past month / past year / past true-up year** — always served from cache. The data is immutable; a live call would waste budget and return identical results.
+  - **Current periods** (today's day query, month-to-date, year-to-date, active true-up year) — a live API call is made whenever budget allows. Cache is the fallback only when the budget is exhausted.
+- **Sliding-Window Rate-Limit Counter**: Every live API response appends its timestamp to `cache/api_calls`. The available budget at any moment is `10 − count_of_timestamps_in_last_60s`. When budget reaches 0 the client falls back to cache (exact-URL match, then cross-endpoint same-system match at any age); if no cache exists, it short-circuits to the 429 "wait 60 seconds" message instead of issuing a guaranteed-failed call.
 - **Default Refresh Interval**: 1 hour (3600 seconds) — queries each system once per hour in continuous mode.
-- **429 / 503 Fallback**: If the API returns a rate-limit or service-unavailable error, any cached data for that URL is served regardless of age. If no cache exists, the program surfaces the error to the user.
+- **429 / 503 Fallback**: If the API returns a rate-limit or service-unavailable error, any cached data is served — first an exact-URL match, then any prior cache for the same endpoint and system regardless of age. If no cache exists at all, the program surfaces the error to the user.
 
 ### Cache File Format and Naming
 

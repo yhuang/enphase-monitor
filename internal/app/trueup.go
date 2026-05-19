@@ -51,6 +51,8 @@ func buildTrueUpReport(m *aggregator.AggregatedMetrics, startDate, endDate time.
 	report := &aggregator.TrueUpReport{
 		StartDate:   startDate,
 		EndDate:     endDate,
+		Timestamp:   m.Timestamp,
+		CacheUsed:   m.CacheUsed,
 		GridImport:  m.GridImportToday,
 		GridExport:  m.GridExportToday,
 		Production:  m.ProductionToday,

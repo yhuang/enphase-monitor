@@ -31,6 +31,8 @@ type AggregatedMetrics struct {
 type TrueUpReport struct {
 	StartDate   time.Time // user-provided true-up start date (display only; data starts from the 1st of this month)
 	EndDate     time.Time // last day with complete data (yesterday)
+	Timestamp   time.Time // when the data was fetched
+	CacheUsed   bool      // true if any cached data was used
 	GridImport  float64
 	GridExport  float64
 	Production  float64

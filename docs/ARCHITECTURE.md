@@ -200,11 +200,12 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ┌────────────────────────────────────────────────────────────────────┐
 │  5. API CALLS (internal/api)                                       │
 │     └─► Each call goes through caching layer (internal/cache)      │
-│         ├─► Cache served if within per-query-type expiry (∞ for   │
-│         │   past periods, 1h for today, 24h for MTD/YTD/cur TU)   │
-│         ├─► When 60s rate-limit budget is empty, look up the       │
-│         │   most recent cache for the same endpoint+system        │
-│         ├─► Make HTTP request if no cache and budget available     │
+│         ├─► Past periods: always served from cache (data immutable)│
+│         ├─► Current periods: live call when budget allows;         │
+│         │   cache is fallback only when budget exhausted           │
+│         ├─► Budget exhausted: exact-URL cache → cross-endpoint     │
+│         │   same-system cache (any age) → RateLimitError           │
+│         ├─► Make HTTP request if current period and budget > 0     │
 │         └─► Save response to cache + append timestamp to api_calls │
 └────────────────────────────────────────────────────────────────────┘
                                     │
@@ -259,7 +260,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ┌────────────────────────────────────────────────────────────────────┐
 │                  internal/cache/Cache Layer                        │
 │  - Sliding-window rate-limit counter (api_calls, 10/60s)           │
-│  - Per-query-type cache expiry (∞/1h/24h)                          │
+│  - Past periods: always from cache; current periods: live-first    │
 │  - Disk-based storage tagged with endpoint + system ID             │
 └────────────────────────────┬───────────────────────────────────────┘
                              │
@@ -512,6 +513,7 @@ var tokenCache *TokenCache  // Shared token cache (singleton)
 var (
     testMode              bool
     cacheDisabled         bool
+    debugMode             bool
     rateLimitWarningShown bool
 )
 

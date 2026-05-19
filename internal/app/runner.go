@@ -31,6 +31,7 @@ type RunConfig struct {
 	TestDate  time.Time
 	QueryType constants.QueryType
 	ReportTZ  *time.Location
+	Debug     bool
 }
 
 // RunOnce executes a single query, displays results, and returns an error on failure.
@@ -108,8 +109,10 @@ func fetchAndDisplay(ctx context.Context, rc RunConfig) error {
 		return nil
 	}
 
-	// Clear screen for cleaner output
-	fmt.Print("\033[H\033[2J")
+	// Clear screen for cleaner output (skipped in debug mode to preserve debug output)
+	if !rc.Debug {
+		fmt.Print("\033[H\033[2J")
+	}
 
 	rc.Disp.ShowMetrics(metrics)
 	return nil

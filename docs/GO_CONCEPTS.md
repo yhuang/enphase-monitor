@@ -248,7 +248,7 @@ rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name,
 
 ### Array to Slice Conversion
 
-**Location**: `internal/cache/cache.go:184-185`
+**Location**: `internal/cache/cache.go:216-217`
 
 `hash[:]` converts the `[32]byte` array to a `[]byte` slice. This is necessary because `hex.EncodeToString` expects `[]byte`, not `[32]byte`. The `[:]` syntax creates a slice that views the entire array.
 
@@ -320,7 +320,7 @@ if err != nil && constants.IsRateLimitError(err) {
 
 ### Zero Value Pattern
 
-**Location**: `internal/app/setup.go:80-86`
+**Location**: `internal/app/setup.go:84-90`
 
 Using `time.Time` (not `*time.Time`) with `.IsZero()` is the idiomatic Go approach. Zero value (`time.Time{}`) means "not set" (use today). Non-zero value means "use this specific date".
 
@@ -528,7 +528,7 @@ httpClient: &http.Client{
 
 ### Time Ticker
 
-**Location**: `internal/app/runner.go:67-68`
+**Location**: `internal/app/runner.go:68-69`
 
 `time.NewTicker` creates a ticker that sends a value on its channel at regular intervals. `time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second` converts seconds to Duration. We use `defer` to ensure the ticker is stopped when the function returns.
 
@@ -570,7 +570,7 @@ When running in continuous mode, the program needs to:
 #### Step 1 & 2: Create Context with Signal Handling
 
 ```go
-// main.go:179-180
+// main.go:180-181
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
 ```
@@ -596,7 +596,7 @@ defer stop()
 #### Step 3: Create Timer Ticker
 
 ```go
-// internal/app/runner.go:67-68
+// internal/app/runner.go:68-69
 ticker := time.NewTicker(time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second)
 defer ticker.Stop()
 ```
@@ -613,7 +613,7 @@ defer ticker.Stop()
 #### Step 4: The Main Loop with Select
 
 ```go
-// internal/app/runner.go:75-88
+// internal/app/runner.go:76-89
 for {
     select {
     case <-ticker.C:
@@ -945,7 +945,7 @@ for {
 
 ### Defer Statement
 
-**Location**: `internal/app/runner.go:68`
+**Location**: `internal/app/runner.go:69`
 
 `defer` schedules a function call to execute when the surrounding function returns. This ensures cleanup happens even if the function returns early or panics. Here we ensure the ticker is stopped to prevent resource leaks.
 
@@ -975,7 +975,7 @@ var (
 
 ### Hash Functions and Array Slices
 
-**Location**: `internal/cache/cache.go:184-185`
+**Location**: `internal/cache/cache.go:216-217`
 
 `sha256.Sum256()` computes a SHA-256 hash and returns a `[32]byte` array (fixed size). We convert it to a string using hex encoding for a readable cache key.
 

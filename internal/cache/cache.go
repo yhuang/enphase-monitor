@@ -98,6 +98,7 @@ const MinRequestInterval = 1 * time.Minute
 var (
 	testMode              bool
 	cacheDisabled         bool
+	debugMode             bool
 	rateLimitWarningShown bool
 )
 
@@ -123,6 +124,36 @@ func SetCacheDisabled(disabled bool) {
 	cacheDisabled = disabled
 }
 
+// DebugMode returns whether debug mode is enabled.
+func DebugMode() bool { return debugMode }
+
+// SetDebugMode enables or disables debug output.
+func SetDebugMode(enabled bool) { debugMode = enabled }
+
+// Debugf prints a debug message to stderr when debug mode is on.
+func Debugf(format string, args ...any) {
+	if !debugMode {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] "+format+"\n", args...)
+}
+
+// LastAPICallTime returns the most recent recorded live API call timestamp.
+// Returns (zero, false) when no calls have been recorded in the current window.
+func LastAPICallTime() (time.Time, bool) {
+	stamps := recentAPICallStampsLocked()
+	if len(stamps) == 0 {
+		return time.Time{}, false
+	}
+	latest := stamps[0]
+	for _, t := range stamps[1:] {
+		if t.After(latest) {
+			latest = t
+		}
+	}
+	return latest, true
+}
+
 // RateLimitWarningShown returns whether a rate limit warning has been shown.
 func RateLimitWarningShown() bool {
 	return rateLimitWarningShown
@@ -140,6 +171,7 @@ func SetRateLimitWarningShown(shown bool) {
 func ResetState() {
 	testMode = false
 	cacheDisabled = false
+	debugMode = false
 	rateLimitWarningShown = false
 	ClearAPICalls()
 }

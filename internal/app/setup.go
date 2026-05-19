@@ -61,8 +61,8 @@ func SetupDisplay(cfg *config.Config, reportTZ *time.Location) *display.Display 
 	return display.NewDisplayWithColorsAndTimezone(colors, reportTZ)
 }
 
-// ConfigureModes sets up test mode and cache mode based on flags.
-func ConfigureModes(testMode, noCache bool) {
+// ConfigureModes sets up test mode, cache mode, and debug mode based on flags.
+func ConfigureModes(testMode, noCache, debug bool) {
 	if testMode {
 		cache.SetTestMode(true)
 		fmt.Println("TEST MODE: Using cache only, no live API calls")
@@ -71,6 +71,10 @@ func ConfigureModes(testMode, noCache bool) {
 	if noCache {
 		cache.SetCacheDisabled(true)
 		fmt.Println("NO-CACHE MODE: Bypassing cache, making live API calls")
+	}
+
+	if debug {
+		cache.SetDebugMode(true)
 	}
 }
 

@@ -99,6 +99,7 @@ import (
 
 	"enphase-monitor/internal/aggregator"
 	"enphase-monitor/internal/app"
+	"enphase-monitor/internal/cache"
 	"enphase-monitor/internal/cli"
 	"enphase-monitor/internal/config"
 	"enphase-monitor/internal/constants"
@@ -181,12 +182,14 @@ func main() {
 
 	// --true-up takes precedence over --date; handle it early and exit.
 	if flags.TrueUp != "" {
-		app.ConfigureModes(flags.TestMode, flags.NoCache)
+		app.ConfigureModes(flags.TestMode, flags.NoCache, flags.Debug)
+		printDebugStartup(flags.Debug, reportTZ)
 		rc := app.RunConfig{
 			Agg:      agg,
 			Disp:     disp,
 			Cfg:      cfg,
 			ReportTZ: reportTZ,
+			Debug:    flags.Debug,
 		}
 		if err := app.RunTrueUp(ctx, rc, flags.TrueUp); err != nil {
 			if constants.IsRateLimitError(err) {
@@ -218,7 +221,8 @@ func main() {
 	}
 
 	// Configure test mode and cache mode
-	app.ConfigureModes(flags.TestMode, flags.NoCache)
+	app.ConfigureModes(flags.TestMode, flags.NoCache, flags.Debug)
+	printDebugStartup(flags.Debug, reportTZ)
 
 	// Default is run-once; --continuous enables periodic refresh.
 	// Month/year queries and past-date queries always run once regardless of --continuous.
@@ -236,6 +240,7 @@ func main() {
 		TestDate:  testDateParsed,
 		QueryType: queryType,
 		ReportTZ:  reportTZ,
+		Debug:     flags.Debug,
 	}
 
 	// Default: run once and exit. With --continuous, loop with periodic refresh.
@@ -255,4 +260,35 @@ func main() {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// printDebugStartup prints the rate-limit status when debug mode is on.
+// It shows the last recorded API call time (so the user knows if they are
+// still inside the 60-second cooling-off window) and the remaining budget.
+func printDebugStartup(debug bool, reportTZ *time.Location) {
+	if !debug {
+		return
+	}
+	now := time.Now().In(reportTZ)
+	fmt.Fprintf(os.Stderr, "[DEBUG] --- startup ---\n")
+	fmt.Fprintf(os.Stderr, "[DEBUG] current time : %s\n", now.Format("2006-01-02 15:04:05 MST"))
+	if last, ok := cache.LastAPICallTime(); ok {
+		last = last.In(reportTZ)
+		age := time.Since(last).Round(time.Second)
+		windowReset := cache.MinRequestInterval - time.Since(last)
+		if windowReset < 0 {
+			windowReset = 0
+		}
+		fmt.Fprintf(os.Stderr, "[DEBUG] last API call: %s (%s ago)\n", last.Format("15:04:05 MST"), age)
+		if windowReset > 0 {
+			fmt.Fprintf(os.Stderr, "[DEBUG] rate window resets in: %s\n", windowReset.Round(time.Second))
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] rate window: clear (no calls in last 60s)\n")
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] last API call: none (no calls recorded in last 60s)\n")
+	}
+	budget := cache.RemainingBudget()
+	fmt.Fprintf(os.Stderr, "[DEBUG] API budget   : %d/%d calls remaining\n", budget, cache.MaxRequestsPerWindow)
+	fmt.Fprintf(os.Stderr, "[DEBUG] ---\n")
 }
