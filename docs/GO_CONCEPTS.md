@@ -90,7 +90,7 @@ if err != nil {
 
 ### Constructor Function Pattern
 
-**Location**: `internal/api/client.go:192-205`
+**Location**: `internal/api/client.go:201-214`
 
 Functions starting with "New" are constructors - they create and initialize structs. This is a Go naming convention, not a language feature. We return a pointer `(*EnlightenCloudClient)` because:
 1. the return type specifies a pointer type;
@@ -106,7 +106,7 @@ func NewEnlightenCloudClient(...) *EnlightenCloudClient {
 
 ### Struct Literal with Pointer
 
-**Location**: `internal/api/client.go:195-204`
+**Location**: `internal/api/client.go:204-213`
 
 `&EnlightenCloudClient{...}` creates a struct and returns a pointer to it. This is idiomatic Go - create struct, take address, return pointer.
 
@@ -132,7 +132,7 @@ metrics := &AggregatedMetrics{
 
 ### Nested Struct Initialization
 
-**Location**: `internal/api/client.go:201-203`
+**Location**: `internal/api/client.go:210-212`
 
 We initialize `httpClient` field with a struct literal. `http.Client` is from standard library - we set Timeout for safety.
 
@@ -248,7 +248,7 @@ rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name,
 
 ### Array to Slice Conversion
 
-**Location**: `internal/cache/cache.go:172-173`
+**Location**: `internal/cache/cache.go:184-185`
 
 `hash[:]` converts the `[32]byte` array to a `[]byte` slice. This is necessary because `hex.EncodeToString` expects `[]byte`, not `[32]byte`. The `[:]` syntax creates a slice that views the entire array.
 
@@ -516,7 +516,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Duration Literals
 
-**Location**: `internal/api/client.go:202`
+**Location**: `internal/api/client.go:211`
 
 `time.Second` is a typed constant (`time.Duration`). Multiplying an integer by `time.Second` — e.g. `30 * time.Second` — is idiomatic Go for expressing durations. In this codebase the value is extracted to `constants.APIRequestTimeout` for clarity.
 
@@ -975,7 +975,7 @@ var (
 
 ### Hash Functions and Array Slices
 
-**Location**: `internal/cache/cache.go:172-173`
+**Location**: `internal/cache/cache.go:184-185`
 
 `sha256.Sum256()` computes a SHA-256 hash and returns a `[32]byte` array (fixed size). We convert it to a string using hex encoding for a readable cache key.
 

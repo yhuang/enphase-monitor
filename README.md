@@ -529,14 +529,16 @@ The `refresh_interval` setting controls how often the application queries the AP
 
 ### Caching Strategy
 
-To respect these limits, the application implements intelligent caching:
+To respect these limits, the application combines disk caching with a sliding-window rate-limit counter and a per-query-type cache expiry policy:
 
-- **Automatic Disk Caching**: All API responses are cached in `cache/` directory
-- **Cache-First for Past Dates**: When querying historical dates, cached data is used if available (no API call)
-- **Fresh-Cache Reuse**: Repeated queries for the same URL within 60 seconds reuse the cache and skip the API call
-- **Recent-API Throttle**: If any live API call happened in the last 60 seconds (tracked via `cache/last_api_call`), the next query serves the most recent cached entry for the same endpoint and system — even when the new query asks for a different date. This keeps rapid back-to-back invocations (e.g. switching between `--date 2026-05` and `--date 2026-04`) from burning rate-limit budget.
-- **Default Refresh Interval**: 1 hour (3600 seconds) - queries each system once per hour
-- **429 Error Handling**: If rate limited, cached data is served as fallback; if no cache exists, the program displays wait time and exits gracefully
+- **Automatic Disk Caching**: All API responses are cached as JSON files in the `cache/` directory.
+- **Per-Query-Type Cache Expiry**: How long a cached response is reused depends on what was queried:
+  - **Past day / past month / past year / past true-up year** — *never expires.* The data won't change.
+  - **Today's day query** (`./enphase-monitor` with no args) — **1 hour.** Today's numbers change throughout the day, so we refresh hourly.
+  - **Month-to-date / Year-to-date / Current true-up year** — **24 hours.** These are large cumulative totals; a day-old refresh is fine.
+- **Sliding-Window Rate-Limit Counter**: Every live API response appends its timestamp to `cache/api_calls`. The available budget at any moment is `10 − count_of_timestamps_in_last_60s`. When budget reaches 0 the client prefers cache over a live call (cross-endpoint same-system match within the same `maxAge`); if no acceptable cache exists, it short-circuits to the 429 "wait 60 seconds" message instead of issuing a guaranteed-failed call.
+- **Default Refresh Interval**: 1 hour (3600 seconds) — queries each system once per hour in continuous mode.
+- **429 / 503 Fallback**: If the API returns a rate-limit or service-unavailable error, any cached data for that URL is served regardless of age. If no cache exists, the program surfaces the error to the user.
 
 ### Cache File Format and Naming
 
@@ -555,11 +557,11 @@ Each cache file contains:
 - `body`: Raw API response body (JSON bytes)
 - `cached_at`: Timestamp when the response was cached (ISO 8601 format)
 - `queried_date`: The date that was queried (YYYY-MM-DD format), if applicable
-- `endpoint`: API endpoint (e.g. `telemetry/production_meter`, `energy_lifetime`), used by the recent-API throttle to find the most recent cache for an endpoint
-- `system_id`: System ID from the request URL, paired with `endpoint` for the throttle lookup
+- `endpoint`: API endpoint (e.g. `telemetry/production_meter`, `energy_lifetime`), used for cross-date lookup when the rate-limit budget is exhausted
+- `system_id`: System ID from the request URL, paired with `endpoint` for the cross-date lookup
 
-**Throttle Marker:**
-The cache directory also contains a `last_api_call` file (no JSON extension) that records the timestamp of the most recent live API call. It is used by the recent-API throttle and is ignored by cache listing/clearing commands.
+**Rate-Limit Counter:**
+The cache directory also contains an `api_calls` file (no JSON extension) holding newline-separated RFC3339 timestamps of recent live API responses. Entries older than 60 seconds are pruned on each write. The remaining count is used to compute available rate-limit budget. The file is ignored by cache listing/clearing commands.
 
 **Cache Key Generation:**
 - Cache keys are generated from normalized API URLs
