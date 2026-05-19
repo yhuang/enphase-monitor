@@ -292,6 +292,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 type EnlightenCloudClient struct {
     baseURL     string         // Base URL for API requests (injectable for testing)
     systemID    string
+    systemName  string
     apiKey      string
     accessToken string
     timezone    *time.Location // Timezone for reporting/queries

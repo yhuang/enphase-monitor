@@ -703,12 +703,10 @@ enphase-monitor/
 ├── go.mod                                 # Go module definition
 ├── go.sum                                 # Go module checksums
 ├── scripts/                               # Utility scripts
-│   ├── generate-pdfs.sh                   # Script to generate PDFs from markdown files
 │   └── run-tests.sh                       # Test runner script
 ├── Makefile                               # Build automation
 ├── README.md                              # This file
-├── QUICKSTART.md                          # Quick start guide
-└── pdfs/                                  # Generated PDF documentation (created by generate-pdfs.sh)
+└── QUICKSTART.md                          # Quick start guide
 ```
 
 ## Testing
