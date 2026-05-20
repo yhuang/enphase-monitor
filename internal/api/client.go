@@ -532,7 +532,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	// will still make whatever live calls it can and fall back to cache for the
 	// rest, but alerting early helps the caller understand why results may be stale.
 	// Day queries always attempt battery (hasBattery=true for the conservative count).
-	if !timezone.IsPastPeriod(testDate, queryType, c.timezone) {
+	if cache.DebugMode() && !timezone.IsPastPeriod(testDate, queryType, c.timezone) {
 		needed := QueryCost(queryType, queryType == constants.QueryTypeDay)
 		remaining := cache.RemainingBudget()
 		if remaining < needed {

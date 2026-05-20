@@ -1036,14 +1036,18 @@ internal/
 │   ├── client.go                # HTTP client implementation
 │   ├── interface.go             # CloudClient interface definition
 │   ├── types.go                 # LocalMetrics type
+│   ├── cache_check.go           # Per-system/endpoint cache availability check (--cache mode)
 │   └── *_test.go                # Unit and functional tests
 ├── app/                         # Application setup and execution
 │   ├── setup.go                 # Configuration and initialization
 │   ├── runner.go                # Execution modes (once/continuous)
-│   └── *_test.go                # Setup and runner tests
+│   ├── trueup.go                # True-up year report
+│   ├── cache_report.go          # --cache mode: completeness check and cache-only run
+│   └── *_test.go                # Setup, runner, and true-up tests
 ├── cache/                       # Disk-based API response caching
 │   ├── cache.go                 # Core caching logic
 │   ├── cli.go                   # Cache inspection utilities
+│   ├── backup.go                # Cache backup and restore (--cache-backup, --cache-restore)
 │   └── *_test.go                # Cache and CLI tests
 ├── cli/                         # Command-line interface
 │   ├── flags.go                 # Flag parsing

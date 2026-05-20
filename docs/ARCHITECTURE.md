@@ -318,7 +318,7 @@ Before making any API calls, `GetMetricsFromCloud` compares the query cost again
 
 ```go
 // internal/api/client.go (inside GetMetricsFromCloud)
-if !timezone.IsPastPeriod(testDate, queryType, c.timezone) {
+if cache.DebugMode() && !timezone.IsPastPeriod(testDate, queryType, c.timezone) {
     needed := QueryCost(queryType, queryType == constants.QueryTypeDay)
     remaining := cache.RemainingBudget()
     if remaining < needed {
@@ -331,6 +331,7 @@ Key design decisions:
 - **Past periods are skipped entirely.** A past day/month/year always comes from immutable cache and never consumes any budget, so a preflight check would be misleading noise.
 - **Day queries use `hasBattery=true` (5 calls) as the conservative count.** At this point the client does not know whether the hardware has a battery, so it assumes the worst case. This ensures the warning fires early enough to be useful.
 - **The preflight only warns — it does not abort.** Each individual call will still try cache before giving up, so partial data is still possible even when the budget is tight.
+- **The warning is debug-only.** When `--debug` is off the check is skipped entirely so that normal report output is not cluttered with diagnostic noise.
 
 ### Layer 3: Per-request gate in `makeCachedAPIRequest`
 
@@ -358,7 +359,7 @@ The cross-endpoint fallback (step 3, middle branch) lets the client surface *som
 The preflight (Layer 2) fires once per `GetMetricsFromCloud` call and is a forward-looking warning. The per-request gate (Layer 3) fires once per endpoint and is the actual enforcement. Together:
 
 - If budget is full when the run starts and is exhausted mid-run (e.g. the first 4 calls succeed but the 5th lands after the window), Layer 3 handles it gracefully with a cache fallback.
-- If budget is already low before the run, Layer 2 warns the user up front so they understand why the output may show stale numbers.
+- If budget is already low before the run, Layer 2 warns the user up front (debug mode only) so they understand why the output may show stale numbers.
 - If budget is zero and no cache exists for the endpoint, `RateLimitError` is returned and the metric is shown as 0 in the output (non-fatal for optional metrics like grid import/export; fatal for production which is required).
 
 ### Observability: `--debug` mode
@@ -366,6 +367,8 @@ The preflight (Layer 2) fires once per `GetMetricsFromCloud` call and is a forwa
 When run with `--debug`, the application emits structured logs to stderr that expose Layer 2 and Layer 3 decisions:
 
 - **Startup banner** (`printDebugStartup` in [main.go](../main.go)) shows the current time, the most recent recorded API call (`cache.LastAPICallTime()`), how long until the 60-second window resets, and the remaining budget. This is the single best diagnostic for "why am I getting 429s?" because it answers "is the window still active?" before any work begins.
+- **Preflight warning** (Layer 2, in `GetMetricsFromCloud`) prints `WARNING: … Insufficient API budget …` to stdout when the remaining budget is smaller than the query cost for a current-period run. Only emitted in debug mode to avoid cluttering normal report output.
+- **Cache-only mode banner** (`RunCacheReport`) prints `CACHE MODE: Serving report from cache, no live API calls` when `--cache` finds a complete cache. Only emitted in debug mode for the same reason.
 - **Per-request trace** (`cache.Debugf` from `makeCachedAPIRequest` in [internal/api/client.go](../internal/api/client.go)) emits one line per URL describing the decision taken: serving past-period cache, serving within-maxAge cache, falling back due to budget exhaustion, making a live call, or hitting the 429 fallback paths. Each line includes the redacted URL and the cache age so traces are reproducible without leaking the API key.
 
 Debug mode also suppresses the terminal-clearing escape sequence in `fetchAndDisplay` so the trace remains visible after the report is printed. The `cache.Debugf` helper is a no-op when debug mode is off — callers do not need to guard the call sites.

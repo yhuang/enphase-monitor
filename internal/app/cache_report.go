@@ -59,7 +59,9 @@ func RunCacheReport(ctx context.Context, rc RunConfig, trueUpStart string) error
 	}
 
 	// All required endpoints are cached — enable test mode and run the normal path.
-	fmt.Println("CACHE MODE: Serving report from cache, no live API calls")
+	if rc.Debug {
+		fmt.Println("CACHE MODE: Serving report from cache, no live API calls")
+	}
 	cache.SetTestMode(true)
 
 	if trueUpStart != "" {

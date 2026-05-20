@@ -455,6 +455,8 @@ func TestBudgetExhausted_NoCache_ReturnsRateLimitError(t *testing.T) {
 func TestPreflightWarning_CurrentPeriod(t *testing.T) {
 	cache.ResetState()
 	defer cache.ResetState()
+	cache.SetDebugMode(true)
+	defer cache.SetDebugMode(false)
 
 	// Full mock that serves all five day-query endpoints so GetMetricsFromCloud
 	// can complete its prime call successfully.

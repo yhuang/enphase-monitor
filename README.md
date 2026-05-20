@@ -620,11 +620,11 @@ Sample output:
 [DEBUG] serving cache (budget exhausted, age 14m3s)
 ```
 
-Use it when you want to understand *why* a query returned cached vs live data, *when* the rate-limit window will reset, or *how much* of the 10 calls/60s budget remains. Debug mode also suppresses the screen-clearing escape sequence so the trace stays visible on subsequent runs.
+Use it when you want to understand *why* a query returned cached vs live data, *when* the rate-limit window will reset, or *how much* of the 10 calls/60s budget remains. Debug mode also: prints a `CACHE MODE` banner when `--cache` is used; prints a `WARNING: Insufficient API budget` preflight message when the budget is low; and suppresses the screen-clearing escape sequence so the trace stays visible on subsequent runs.
 
 ### Cache-Only Mode
 
-The `--cache` flag serves a report entirely from on-disk cache without making any live API calls. If the cache is complete it prints a confirmation and runs the report; if any required endpoint is missing it prints a per-system diagnostic and exits non-zero:
+The `--cache` flag serves a report entirely from on-disk cache without making any live API calls. If the cache is complete it runs the report; if any required endpoint is missing it prints a per-system diagnostic and exits non-zero:
 
 ```bash
 ./enphase-monitor --cache
@@ -632,7 +632,7 @@ The `--cache` flag serves a report entirely from on-disk cache without making an
 ./enphase-monitor --cache --true-up 2025-01-15
 ```
 
-**When cache is complete**, the report runs normally with a "CACHE MODE" banner.
+**When cache is complete**, the report runs normally. Adding `--debug` also prints a `CACHE MODE: Serving report from cache, no live API calls` banner.
 
 **When cache is incomplete**, the diagnostic lists each endpoint per system with its status and age:
 
