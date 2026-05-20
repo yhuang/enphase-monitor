@@ -153,16 +153,16 @@ func TestParseFlags_MultipleFlags(t *testing.T) {
 	}
 }
 
-func TestParseFlags_SetupOAuth(t *testing.T) {
+func TestParseFlags_OAuthSetup(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--setup-oauth"}
+	os.Args = []string{"cmd", "--oauth-setup"}
 
 	flags := ParseFlags()
 
-	if !flags.SetupOAuth {
-		t.Error("SetupOAuth should be true")
+	if !flags.OAuthSetup {
+		t.Error("OAuthSetup should be true")
 	}
 }
 

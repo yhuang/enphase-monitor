@@ -41,7 +41,7 @@ The project follows a pragmatic approach to testing:
 
 ### Why main.go Has 0% Coverage
 
-The `main.go` file is pure orchestration (~307 lines) and has 0% coverage by design. This is an **industry standard** because:
+The `main.go` file is pure orchestration (~324 lines) and has 0% coverage by design. This is an **industry standard** because:
 
 1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
 2. **All logic tested**: All functions `main.go` calls are tested in internal packages
@@ -674,7 +674,8 @@ These files test component interactions:
 | `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
 | `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 report types; preflight warning on/off |
 | `query_cost_test.go` | 3 test functions | `QueryCost` output for all query type × hasBattery combinations; 2-system budget constraint |
-| `rate_limit_test.go` | 7 test functions | `RecordAPICall`, `RemainingBudget`, old-entry pruning, `ClearAPICalls`, `LastAPICallTime` |
+| `rate_limit_test.go` | 8 test functions | `RecordAPICall`, `RemainingBudget`, old-entry pruning, `ClearAPICalls`, `LastAPICallTime` |
+| `testmain_test.go` | (no test functions) | `TestMain`: package-level setup redirecting all cache I/O to a temp dir so api tests never touch the production cache |
 
 ### OAuth Test Files
 

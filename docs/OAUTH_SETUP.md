@@ -331,7 +331,7 @@ This URL initiates the OAuth flow by redirecting the user to Enphase's authoriza
 
 **Run the setup wizard:**
 ```bash
-./enphase-monitor --setup-oauth
+./enphase-monitor --oauth-setup
 ```
 
 **Or manually construct the authorization URL:**
@@ -588,7 +588,7 @@ Once you have completed the setup, here is what happens automatically when your 
 **Solution**:
 - Check that your `refresh_token` in config.yaml is correct
 - If the refresh_token was revoked or is invalid, you will need to go through the setup process again (Steps 2-5)
-- Run `./enphase-monitor --setup-oauth` to regenerate your refresh token
+- Run `./enphase-monitor --oauth-setup` to regenerate your refresh token
 
 ### Token refresh fails
 

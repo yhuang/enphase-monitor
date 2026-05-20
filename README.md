@@ -176,7 +176,7 @@ This application uses OAuth 2.0 for authentication. You must complete a one-time
 ### Quick Setup
 
 ```bash
-./enphase-monitor --setup-oauth
+./enphase-monitor --oauth-setup
 ```
 Run the interactive setup wizard that will guid you through:
 1. Generating an authorization URL
@@ -307,9 +307,12 @@ Press `Ctrl+C` to stop.
 - `--continuous` - Run continuously with periodic refresh (default is run once and exit)
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
 - `--true-up <YYYY-MM-DD>` - Calculate true-up year energy report from this utility start date. Uses full calendar months; takes precedence over `--date`
-- `--setup-oauth` - Run OAuth setup wizard (one-time for developer plan)
+- `--oauth-setup` - Run OAuth setup wizard (one-time for developer plan)
 - `--test` - Test mode: use cache only, no live API calls, validate against expected values
 - `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429 rate limit)
+- `--cache` - Serve report from cache only; print diagnostic listing missing endpoints if cache is incomplete
+- `--cache-backup` - Back up current cache to `cache.bak/`
+- `--cache-restore` - Restore cache from `cache.bak/` backup (prints error if no backup exists)
 - `--clear-cache` - Clear cached API responses for today's date only
 - `--clear-all-cache` - Clear all cached API responses (all dates)
 - `--debug` - Print debug information: last run time, API budget remaining, and per-request cache/live decisions
@@ -482,11 +485,11 @@ colors:
 ### "API configuration required"
 - Make sure you have copied `config.yaml.example` to `config.yaml`
 - Verify you have filled in `api.key`, `api.client_id`, and `api.client_secret`
-- For developer plan, complete OAuth setup with `--setup-oauth` to get `refresh_token`
+- For developer plan, complete OAuth setup with `--oauth-setup` to get `refresh_token`
 
 ### "API request failed with status 401"
 - Your refresh token may have expired or been revoked
-- Re-run OAuth setup: `./enphase-monitor --setup-oauth`
+- Re-run OAuth setup: `./enphase-monitor --oauth-setup`
 - Verify your API credentials are correct
 
 ### "API request failed with status 404"
@@ -581,6 +584,12 @@ The cache directory also contains an `api_calls` file (no JSON extension) holdin
 
 # Clear all cached data
 ./enphase-monitor --clear-all-cache
+
+# Back up current cache to cache.bak/
+./enphase-monitor --cache-backup
+
+# Restore cache from cache.bak/ backup
+./enphase-monitor --cache-restore
 
 # Disable caching (always make live API calls)
 ./enphase-monitor --no-cache
@@ -693,7 +702,8 @@ enphase-monitor/
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
 │   │   ├── client_lifetime_test.go        # Lifetime endpoint tests (month/year/true-up queries)
 │   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 report types)
-│   │   └── query_cost_test.go             # QueryCost unit tests (all query type × hasBattery combos)
+│   │   ├── query_cost_test.go             # QueryCost unit tests (all query type × hasBattery combos)
+│   │   └── testmain_test.go               # TestMain: redirects cache I/O to temp dir for all api tests
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   ├── setup_test.go                  # Setup tests
@@ -704,6 +714,7 @@ enphase-monitor/
 │   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
+│   │   ├── backup.go                      # Cache backup and restore (--cache-backup, --cache-restore)
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
 │   │   ├── rate_limit_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
@@ -951,7 +962,7 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 This project follows Go best practices and coding standards:
 
 - **Test Coverage**: 80.1% overall, 100% for urlbuilder and constants, 95%+ for display, validation, parser, and config
-- **Test Suite**: 28 test files across 14 packages with comprehensive unit, integration, and edge case tests
+- **Test Suite**: 29 test files across 14 packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -963,7 +974,7 @@ This project follows Go best practices and coding standards:
 - Total Lines: ~5,500 (excluding tests)
 - Test Lines: ~11,500 (comprehensive test suite)
 - Packages: 14 internal packages
-- Test Files: 28 (unit, integration, functional, edge case, and benchmark tests)
+- Test Files: 29 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)
 
 ## License

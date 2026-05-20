@@ -272,49 +272,35 @@ func TestToHTTPResponse(t *testing.T) {
 }
 
 func TestSaveAndLoadCachedResponse(t *testing.T) {
-	// Note: This test uses the actual cache directory since getCacheDir is not mockable
-	// The test creates and cleans up a real cache file
+	useTempCacheDir(t)
 
 	tz := time.UTC
 	testURL := "https://api.example.com/test?key=testkey&start_at=1768896000"
 
-	// Create a test HTTP response
 	resp := &http.Response{
 		StatusCode: 200,
-		Header: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
 	}
 	bodyBytes := []byte(`{"test": "data"}`)
 
-	// Save the response
-	err := SaveCachedResponseFromBytes(testURL, resp, bodyBytes, tz)
-	if err != nil {
+	if err := SaveCachedResponseFromBytes(testURL, resp, bodyBytes, tz); err != nil {
 		t.Fatalf("SaveCachedResponseFromBytes() error = %v", err)
 	}
 
-	// Load the response
 	cached, err := LoadCachedResponse(testURL, tz)
 	if err != nil {
 		t.Fatalf("LoadCachedResponse() error = %v", err)
 	}
 
-	// Verify loaded response
 	if cached.StatusCode != 200 {
 		t.Errorf("LoadCachedResponse() StatusCode = %v, want 200", cached.StatusCode)
 	}
-
 	if string(cached.Body) != `{"test": "data"}` {
 		t.Errorf("LoadCachedResponse() Body = %v, want {\"test\": \"data\"}", string(cached.Body))
 	}
-
 	if cached.QueriedDate != "2026-01-20" {
 		t.Errorf("LoadCachedResponse() QueriedDate = %v, want 2026-01-20", cached.QueriedDate)
 	}
-
-	// Clean up - remove the test cache file
-	cachePath := GetCachePath(testURL, tz)
-	os.Remove(cachePath)
 }
 
 func TestLoadCachedResponse_NotFound(t *testing.T) {
@@ -333,6 +319,8 @@ func TestLoadCachedResponse_NotFound(t *testing.T) {
 }
 
 func TestSaveCachedResponse_CreatesDirectory(t *testing.T) {
+	useTempCacheDir(t)
+
 	tz := time.UTC
 	testURL := "https://api.example.com/createdir?key=test&start_at=1768896000"
 
@@ -342,21 +330,14 @@ func TestSaveCachedResponse_CreatesDirectory(t *testing.T) {
 	}
 	bodyBytes := []byte(`{"test": "directory creation"}`)
 
-	// Save should create directory if it doesn't exist
-	err := SaveCachedResponseFromBytes(testURL, resp, bodyBytes, tz)
-	if err != nil {
+	if err := SaveCachedResponseFromBytes(testURL, resp, bodyBytes, tz); err != nil {
 		t.Fatalf("SaveCachedResponseFromBytes() error = %v", err)
 	}
 
-	// Verify directory exists
 	cacheDir := getCacheDir()
 	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
 		t.Errorf("SaveCachedResponseFromBytes() should create cache directory %s", cacheDir)
 	}
-
-	// Clean up
-	cachePath := GetCachePath(testURL, tz)
-	os.Remove(cachePath)
 }
 
 func TestGetCacheDir(t *testing.T) {

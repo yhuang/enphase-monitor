@@ -52,7 +52,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go                                # Entry point (~307 lines) - orchestration only
+├── main.go                                # Entry point (~324 lines) - orchestration only
 ├── internal/
 │   ├── aggregator/                        # Multi-system data aggregation
 │   │   ├── types.go                       # Metric data structures (AggregatedMetrics, SystemMetrics)
@@ -68,7 +68,8 @@ enphase-monitor/
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
 │   │   ├── client_lifetime_test.go        # Lifetime endpoint tests (month/year/true-up queries)
 │   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 report types)
-│   │   └── query_cost_test.go             # QueryCost unit tests (all query type × hasBattery combos)
+│   │   ├── query_cost_test.go             # QueryCost unit tests (all query type × hasBattery combos)
+│   │   └── testmain_test.go               # TestMain: redirects cache I/O to temp dir for all api tests
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   ├── setup_test.go                  # Setup tests
@@ -79,6 +80,7 @@ enphase-monitor/
 │   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
+│   │   ├── backup.go                      # Cache backup and restore (--cache-backup, --cache-restore)
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
 │   │   ├── rate_limit_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
@@ -92,7 +94,7 @@ enphase-monitor/
 │   ├── config/                            # Configuration types
 │   │   ├── config.go                      # YAML loading & validation (uses type aliases)
 │   │   └── config_test.go                 # Configuration tests
-│   ├── constants/                         # Centralized constants (50+)
+│   ├── constants/                         # Centralized constants (45+)
 │   │   ├── constants.go                   # Application-wide constants
 │   │   └── constants_test.go              # Constants tests
 │   ├── display/                           # Terminal output formatting
@@ -164,7 +166,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │  1. ENTRY POINT (main.go)                                          │
 │     └─► cli.ParseFlags() from internal/cli                         │
 │     └─► Handle cache commands (internal/cli) or continue           │
-│     └─► If --setup-oauth: signal context, then oauth.Setup(ctx,    │
+│     └─► If --oauth-setup: signal context, then oauth.Setup(ctx,    │
 │         cfg) so Ctrl+C cancels token exchange                      │
 └────────────────────────────────────────────────────────────────────┘
                                     │
@@ -674,7 +676,7 @@ when possible to improve testability.
 | [internal/config/*](../internal/config/)             | Configuration types and utilities                 |
 | [internal/timezone/*](../internal/timezone/)         | Timezone handling and date boundaries             |
 | [internal/validation/*](../internal/validation/)     | Test mode validation with tolerance checks        |
-| [internal/constants/*](../internal/constants/)       | Centralized constants (50+ constants)             |
+| [internal/constants/*](../internal/constants/)       | Centralized constants (45+ constants)             |
 
 ### Internal Packages - Shared Types
 

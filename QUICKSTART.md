@@ -63,7 +63,7 @@ refresh_interval: 3600         # Query every hour (recommended)
 The application uses OAuth 2.0 for authentication. You need to complete a one-time OAuth setup:
 
 ```bash
-./enphase-monitor --setup-oauth
+./enphase-monitor --oauth-setup
 ```
 
 This interactive wizard will:
@@ -118,7 +118,7 @@ Press `Ctrl+C` to stop.
 → Make sure you have filled in `api.key`, `api.client_id`, and `api.client_secret` in `config.yaml`
 
 ### "API request failed with status 401"
-→ Your refresh token might be missing or expired. Complete OAuth setup: `./enphase-monitor --setup-oauth`
+→ Your refresh token might be missing or expired. Complete OAuth setup: `./enphase-monitor --oauth-setup`
 
 ### "system must have id"
 → You need to replace the example system IDs with your actual ones from Enlighten (see Step 3)

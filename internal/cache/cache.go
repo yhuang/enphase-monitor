@@ -14,7 +14,7 @@
 // The caching system:
 //   - Stores API responses on disk for reuse
 //   - Supports cache-only mode for testing (--test flag)
-//   - Provides cache inspection and management tools (--inspect-cache)
+//   - Provides cache inspection and management tools (--cache mode)
 //   - Handles past date queries with cache fallback
 //   - Normalizes URLs for consistent cache keys (timestamps → dates)
 //   - Tags each cache entry with its endpoint + system ID so the API client can
@@ -43,25 +43,25 @@ import (
 	"enphase-monitor/internal/constants"
 )
 
-// getCacheDir returns the cache directory path, resolving it relative to the project root.
-// This ensures cache files are always stored in cache/ at the project root,
-// regardless of where tests or the application are run from.
+// getCacheDir returns the cache directory path.
+// ENPHASE_CACHE_DIR overrides the default so tests can redirect cache I/O to
+// a temporary directory without touching the production cache.
 func getCacheDir() string {
-	// Try to find the project root by looking for go.mod
-	dir, err := os.Getwd()
-	if err != nil {
-		return "cache" // fallback to relative path
+	if override := os.Getenv("ENPHASE_CACHE_DIR"); override != "" {
+		return override
 	}
 
 	// Walk up the directory tree to find go.mod
+	dir, err := os.Getwd()
+	if err != nil {
+		return "cache"
+	}
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
 			return filepath.Join(dir, "cache")
 		}
-
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			// Reached root without finding go.mod, use relative path
 			return "cache"
 		}
 		dir = parent

@@ -20,7 +20,7 @@
 //  1. API Configuration (api:)
 //     - OAuth credentials (key, client_id, client_secret)
 //     - OAuth settings (authorization_url, redirect_uri)
-//     - Refresh token (obtained from --setup-oauth)
+//     - Refresh token (obtained from --oauth-setup)
 //
 //  2. Systems Configuration (systems:)
 //     - List of Enphase systems to monitor

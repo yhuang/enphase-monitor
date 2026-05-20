@@ -2,7 +2,6 @@ package cache
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,24 +10,17 @@ import (
 	"time"
 )
 
-// setupCacheDir creates a temporary cache directory for testing
-func setupCacheDir(t *testing.T) (string, func()) {
+// useTempCacheDir redirects all cache I/O to a fresh temp directory for the
+// duration of the test. It calls t.Setenv so the original value is restored
+// automatically when the test (and any sub-tests) finish.
+func useTempCacheDir(t *testing.T) string {
 	t.Helper()
-
-	tempDir := filepath.Join(os.TempDir(), fmt.Sprintf("enphase-cache-test-%d", time.Now().UnixNano()))
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-
-	// Set environment or use a method to override cache dir for tests
-	// For now, we'll work with the actual cache dir but document that these are integration-style tests
-
-	return tempDir, func() {
-		os.RemoveAll(tempDir)
-	}
+	dir := t.TempDir()
+	t.Setenv("ENPHASE_CACHE_DIR", dir)
+	return dir
 }
 
-// createMockCacheFile creates a mock cache file with specified content
+// createMockCacheFile writes a CachedResponse JSON file into dir.
 func createMockCacheFile(t *testing.T, dir, filename string, statusCode int, body string, cachedAt time.Time, queriedDate string) {
 	t.Helper()
 
@@ -52,61 +44,68 @@ func createMockCacheFile(t *testing.T, dir, filename string, statusCode int, bod
 }
 
 func TestClearTodayCache_NoDirectory(t *testing.T) {
-	// Test when cache directory doesn't exist
-	err := ClearTodayCache()
-	if err != nil {
+	// Point at a non-existent subdirectory so ClearTodayCache sees no dir.
+	dir := t.TempDir()
+	t.Setenv("ENPHASE_CACHE_DIR", filepath.Join(dir, "nonexistent"))
+
+	if err := ClearTodayCache(); err != nil {
 		t.Errorf("ClearTodayCache() should not error when directory doesn't exist: %v", err)
 	}
 }
 
 func TestClearTodayCache_EmptyDirectory(t *testing.T) {
-	// This tests the actual cache directory behavior
-	err := ClearTodayCache()
-	if err != nil {
+	useTempCacheDir(t)
+
+	if err := ClearTodayCache(); err != nil {
 		t.Errorf("ClearTodayCache() returned error: %v", err)
 	}
 }
 
 func TestClearAllCache_Execution(t *testing.T) {
-	// Test that ClearAllCache executes without error
-	// Note: This removes the actual cache directory
-	err := ClearAllCache()
-	if err != nil {
+	dir := useTempCacheDir(t)
+
+	// Create a dummy file so removal is non-trivial.
+	if err := os.WriteFile(filepath.Join(dir, "dummy.json"), []byte("{}"), 0644); err != nil {
+		t.Fatalf("Failed to create dummy file: %v", err)
+	}
+
+	if err := ClearAllCache(); err != nil {
 		t.Errorf("ClearAllCache() returned error: %v", err)
+	}
+
+	// The directory should no longer exist after ClearAllCache.
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("ClearAllCache() should have removed the cache directory")
 	}
 }
 
 func TestListCacheEntries_NoDirectory(t *testing.T) {
-	// Save original cache dir
-	origDir := getCacheDir()
+	// Point at a non-existent path — ListCacheEntries should return empty slice.
+	dir := t.TempDir()
+	t.Setenv("ENPHASE_CACHE_DIR", filepath.Join(dir, "nonexistent"))
 
-	// Test with non-existent directory
 	entries, err := ListCacheEntries()
 	if err != nil {
 		t.Errorf("ListCacheEntries() should not error when directory doesn't exist: %v", err)
 	}
-
 	if len(entries) != 0 {
 		t.Errorf("Expected 0 entries for non-existent directory, got %d", len(entries))
 	}
-
-	// Ensure we didn't break anything
-	_ = origDir
 }
 
 func TestListCacheEntries_WithFiles(t *testing.T) {
-	// Test with actual cache directory (may have files)
+	dir := useTempCacheDir(t)
+
+	// Seed one file so the test exercises the non-empty path.
+	createMockCacheFile(t, dir, "abc123.json", 200, `{"intervals":[]}`, time.Now(), "2026-01-15")
+
 	entries, err := ListCacheEntries()
 	if err != nil {
 		t.Errorf("ListCacheEntries() returned error: %v", err)
 	}
-
-	// Should return slice (may be empty)
 	if entries == nil {
 		t.Error("Expected non-nil slice from ListCacheEntries()")
 	}
-
-	// Validate entry structure if we have any
 	for _, entry := range entries {
 		if entry.Key == "" {
 			t.Error("Cache entry should have non-empty Key")
@@ -121,7 +120,6 @@ func TestListCacheEntries_WithFiles(t *testing.T) {
 }
 
 func TestLoadCachedResponseByPath_NotFound(t *testing.T) {
-	// Test with non-existent file
 	_, err := LoadCachedResponseByPath("/nonexistent/path/to/cache.json")
 	if err == nil {
 		t.Error("Expected error for non-existent cache file")
@@ -129,11 +127,8 @@ func TestLoadCachedResponseByPath_NotFound(t *testing.T) {
 }
 
 func TestLoadCachedResponseByPath_InvalidJSON(t *testing.T) {
-	// Create temp file with invalid JSON
-	tempDir, cleanup := setupCacheDir(t)
-	defer cleanup()
-
-	invalidPath := filepath.Join(tempDir, "invalid.json")
+	dir := t.TempDir()
+	invalidPath := filepath.Join(dir, "invalid.json")
 	if err := os.WriteFile(invalidPath, []byte("not valid json{{{"), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -145,33 +140,26 @@ func TestLoadCachedResponseByPath_InvalidJSON(t *testing.T) {
 }
 
 func TestLoadCachedResponseByPath_Valid(t *testing.T) {
-	// Create temp file with valid cache data
-	tempDir, cleanup := setupCacheDir(t)
-	defer cleanup()
-
-	validPath := filepath.Join(tempDir, "valid.json")
-	createMockCacheFile(t, tempDir, "valid.json", 200, `{"test": "data"}`, time.Now(), "2026-01-15")
+	dir := t.TempDir()
+	validPath := filepath.Join(dir, "valid.json")
+	createMockCacheFile(t, dir, "valid.json", 200, `{"test": "data"}`, time.Now(), "2026-01-15")
 
 	cached, err := LoadCachedResponseByPath(validPath)
 	if err != nil {
 		t.Errorf("LoadCachedResponseByPath() failed: %v", err)
 	}
-
 	if cached == nil {
 		t.Fatal("Expected non-nil cached response")
 	}
-
 	if cached.StatusCode != 200 {
 		t.Errorf("StatusCode = %d, want 200", cached.StatusCode)
 	}
-
 	if string(cached.Body) != `{"test": "data"}` {
 		t.Errorf("Body = %s, want %s", string(cached.Body), `{"test": "data"}`)
 	}
 }
 
 func TestParseCacheResponse_TelemetryBattery(t *testing.T) {
-	// Test parsing battery telemetry response
 	batteryJSON := `{
 		"intervals": [
 			{
@@ -187,26 +175,19 @@ func TestParseCacheResponse_TelemetryBattery(t *testing.T) {
 	if endpoint == "" {
 		t.Error("Expected non-empty endpoint for battery telemetry")
 	}
-
 	if date == "" {
 		t.Error("Expected non-empty date from battery telemetry")
 	}
-
-	// Validate that it identified as battery endpoint
 	if !strings.Contains(strings.ToLower(endpoint), "battery") {
 		t.Errorf("Expected battery endpoint, got: %s", endpoint)
 	}
-
-	// Summary should contain charge/discharge info
 	if summary != "" && !strings.Contains(strings.ToLower(summary), "interval") {
 		t.Logf("Summary: %s", summary)
 	}
-
-	_ = systemID // May be empty for telemetry
+	_ = systemID
 }
 
 func TestParseCacheResponse_ProductionMeter(t *testing.T) {
-	// Test parsing production meter response
 	productionJSON := `{
 		"intervals": [
 			{
@@ -221,44 +202,31 @@ func TestParseCacheResponse_ProductionMeter(t *testing.T) {
 	if endpoint == "" {
 		t.Error("Expected non-empty endpoint for production meter")
 	}
-
 	if date == "" {
 		t.Error("Expected non-empty date from production meter")
 	}
-
 	t.Logf("Parsed production: endpoint=%s, date=%s, summary=%s", endpoint, date, summary)
 }
 
 func TestParseCacheResponse_InvalidJSON(t *testing.T) {
-	// Test with invalid JSON
-	invalidJSON := `not valid json {{{`
-
-	endpoint, systemID, date, summary := parseCacheResponse([]byte(invalidJSON))
-
-	// Should not panic, but all values may be empty
+	endpoint, systemID, date, summary := parseCacheResponse([]byte(`not valid json {{{`))
 	_ = endpoint
 	_ = systemID
 	_ = date
 	_ = summary
-
 	t.Log("Invalid JSON handled gracefully (no panic)")
 }
 
 func TestParseCacheResponse_EmptyResponse(t *testing.T) {
-	// Test with empty response
 	endpoint, systemID, date, summary := parseCacheResponse([]byte("{}"))
-
-	// Should not panic
 	_ = endpoint
 	_ = systemID
 	_ = date
 	_ = summary
-
 	t.Log("Empty response handled gracefully")
 }
 
 func TestParseCacheResponse_ConsumptionMeter(t *testing.T) {
-	// Test parsing consumption meter response
 	consumptionJSON := `{
 		"intervals": [
 			{
@@ -273,12 +241,10 @@ func TestParseCacheResponse_ConsumptionMeter(t *testing.T) {
 	if date == "" {
 		t.Error("Expected non-empty date from consumption meter")
 	}
-
 	t.Logf("Parsed consumption: endpoint=%s, date=%s, summary=%s", endpoint, date, summary)
 }
 
 func TestCacheEntry_Structure(t *testing.T) {
-	// Test CacheEntry structure and field access
 	entry := CacheEntry{
 		Key:      "test_hash",
 		Path:     "/path/to/cache.json",
@@ -294,24 +260,21 @@ func TestCacheEntry_Structure(t *testing.T) {
 	if entry.Key != "test_hash" {
 		t.Errorf("Key = %s, want test_hash", entry.Key)
 	}
-
 	if entry.Endpoint != "telemetry/battery" {
 		t.Errorf("Endpoint = %s, want telemetry/battery", entry.Endpoint)
 	}
-
 	if entry.Size != 1024 {
 		t.Errorf("Size = %d, want 1024", entry.Size)
 	}
 }
 
 func TestListCacheEntries_SkipsMetadataFiles(t *testing.T) {
-	// Test that ListCacheEntries skips last_request.json
+	useTempCacheDir(t)
+
 	entries, err := ListCacheEntries()
 	if err != nil {
 		t.Errorf("ListCacheEntries() returned error: %v", err)
 	}
-
-	// Verify no entry has the metadata filename
 	for _, entry := range entries {
 		if strings.Contains(entry.Path, "last_request.json") || strings.Contains(entry.Path, "last_request") {
 			t.Errorf("ListCacheEntries() should skip metadata files, found: %s", entry.Path)
@@ -320,16 +283,13 @@ func TestListCacheEntries_SkipsMetadataFiles(t *testing.T) {
 }
 
 func TestClearTodayCache_Integration(t *testing.T) {
-	// Integration test - actually clears cache
-	// This is safe because it only clears today's cache
-	err := ClearTodayCache()
-	if err != nil {
+	useTempCacheDir(t)
+
+	if err := ClearTodayCache(); err != nil {
 		t.Errorf("ClearTodayCache() integration test failed: %v", err)
 	}
-
-	// Run again to verify idempotency
-	err = ClearTodayCache()
-	if err != nil {
+	// Idempotent
+	if err := ClearTodayCache(); err != nil {
 		t.Errorf("ClearTodayCache() should be idempotent: %v", err)
 	}
 }
@@ -340,42 +300,25 @@ func TestParseCacheResponse_EdgeCases(t *testing.T) {
 		json string
 		desc string
 	}{
-		{
-			name: "null intervals",
-			json: `{"intervals": null}`,
-			desc: "Should handle null intervals",
-		},
-		{
-			name: "empty intervals array",
-			json: `{"intervals": []}`,
-			desc: "Should handle empty intervals array",
-		},
-		{
-			name: "missing intervals key",
-			json: `{"other_field": "value"}`,
-			desc: "Should handle missing intervals key",
-		},
-		{
-			name: "mixed data",
-			json: `{"intervals": [{"end_at": 1737072000, "wh_del": 100, "enwh": 200}]}`,
-			desc: "Should handle intervals with multiple energy fields",
-		},
+		{"null intervals", `{"intervals": null}`, "Should handle null intervals"},
+		{"empty intervals array", `{"intervals": []}`, "Should handle empty intervals array"},
+		{"missing intervals key", `{"other_field": "value"}`, "Should handle missing intervals key"},
+		{"mixed data", `{"intervals": [{"end_at": 1737072000, "wh_del": 100, "enwh": 200}]}`, "Should handle multiple energy fields"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			endpoint, systemID, date, summary := parseCacheResponse([]byte(tt.json))
-
-			// Should not panic
 			t.Logf("%s: endpoint=%s, systemID=%s, date=%s, summary=%s",
 				tt.desc, endpoint, systemID, date, summary)
 		})
 	}
 }
 
-// TestListCacheEntries_WithRealFile tests the full ListCacheEntries path using a real cache file.
+// TestListCacheEntries_WithRealFile tests the full ListCacheEntries path using the real save mechanism.
 func TestListCacheEntries_WithRealFile(t *testing.T) {
-	// Create a real cache file using the actual save mechanism
+	useTempCacheDir(t)
+
 	tz := time.UTC
 	testURL := "https://api.enphaseenergy.com/api/v4/systems/99999/telemetry/production_meter?key=testkey&start_at=1700000000&end_at=1700086400"
 
@@ -389,15 +332,12 @@ func TestListCacheEntries_WithRealFile(t *testing.T) {
 		t.Fatalf("SaveCachedResponseFromBytes() failed: %v", err)
 	}
 	cachePath := GetCachePath(testURL, tz)
-	defer os.Remove(cachePath)
 
-	// Now ListCacheEntries should find the file we created
 	entries, err := ListCacheEntries()
 	if err != nil {
 		t.Fatalf("ListCacheEntries() error = %v", err)
 	}
 
-	// Find our entry by path
 	var found *CacheEntry
 	for i := range entries {
 		if entries[i].Path == cachePath {
@@ -414,5 +354,4 @@ func TestListCacheEntries_WithRealFile(t *testing.T) {
 	if found.CachedAt.IsZero() {
 		t.Error("ListCacheEntries() entry has zero CachedAt")
 	}
-
 }

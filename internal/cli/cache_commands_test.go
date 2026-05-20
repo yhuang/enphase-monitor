@@ -8,15 +8,22 @@ import (
 	"testing"
 )
 
+// useTempCacheDir redirects cache I/O to a temp directory for the test.
+func useTempCacheDir(t *testing.T) {
+	t.Helper()
+	t.Setenv("ENPHASE_CACHE_DIR", t.TempDir())
+}
+
 func TestHandleClearCache_Success(t *testing.T) {
-	// This tests the error path - clear cache on empty or existing cache should not error
-	err := HandleClearCache()
-	if err != nil {
+	useTempCacheDir(t)
+	if err := HandleClearCache(); err != nil {
 		t.Errorf("HandleClearCache() returned error: %v", err)
 	}
 }
 
 func TestHandleClearAllCache_Success(t *testing.T) {
+	useTempCacheDir(t)
+
 	// Capture stdout
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -31,46 +38,39 @@ func TestHandleClearAllCache_Success(t *testing.T) {
 		t.Errorf("HandleClearAllCache() returned error: %v", err)
 	}
 
-	// Read output
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, r); err != nil {
 		t.Fatalf("io.Copy: %v", err)
 	}
-	output := buf.String()
-
-	if !strings.Contains(output, "All cache cleared successfully") {
-		t.Errorf("Expected success message, got: %s", output)
+	if !strings.Contains(buf.String(), "All cache cleared successfully") {
+		t.Errorf("Expected success message, got: %s", buf.String())
 	}
 }
 
 func TestHandleClearCache_Idempotent(t *testing.T) {
-	// Clear cache multiple times should not error
+	useTempCacheDir(t)
 	for i := 0; i < 3; i++ {
-		err := HandleClearCache()
-		if err != nil {
+		if err := HandleClearCache(); err != nil {
 			t.Errorf("Iteration %d: HandleClearCache() returned error: %v", i, err)
 		}
 	}
 }
 
 func TestHandleClearAllCache_Idempotent(t *testing.T) {
-	// Capture stdout (suppress multiple success messages)
+	useTempCacheDir(t)
+
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	// Clear all cache multiple times should not error
 	for i := 0; i < 3; i++ {
-		err := HandleClearAllCache()
-		if err != nil {
+		if err := HandleClearAllCache(); err != nil {
 			t.Errorf("Iteration %d: HandleClearAllCache() returned error: %v", i, err)
 		}
 	}
 
 	w.Close()
 	os.Stdout = oldStdout
-
-	// Drain pipe
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)
 }

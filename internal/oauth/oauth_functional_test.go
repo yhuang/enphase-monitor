@@ -513,7 +513,7 @@ func TestGetAccessToken_UnauthorizedError(t *testing.T) {
 		{
 			name:              "with_refresh_token",
 			hasRefreshToken:   true,
-			expectedErrSubstr: "--setup-oauth",
+			expectedErrSubstr: "--oauth-setup",
 		},
 		{
 			name:              "without_refresh_token",
