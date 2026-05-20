@@ -2,13 +2,10 @@
 //
 // PURPOSE
 // -------
-// This file implements CLI commands for cache inspection and management.
-// Provides tools to list, inspect, and clear cached API responses.
+// This file implements CLI commands for cache management and entry listing.
 //
 // CACHE COMMANDS
 // --------------
-//   - --list-cache: List all cached responses with metadata
-//   - --inspect-cache <hash|date>: View detailed cache entry or all entries for a date
 //   - --clear-cache: Clear today's cache only (preserves historical)
 //   - --clear-all-cache: Clear all cached responses
 //
@@ -238,113 +235,6 @@ func LoadCachedResponseByPath(cachePath string) (*CachedResponse, error) {
 	}
 
 	return &cached, nil
-}
-
-// InspectCacheEntry displays detailed information about a cached response
-func InspectCacheEntry(hash string) error {
-	cachePath := filepath.Join(getCacheDir(), hash+constants.JSONExtension)
-	cached, err := LoadCachedResponseByPath(cachePath)
-	if err != nil {
-		return fmt.Errorf("failed to load cache file: %w", err)
-	}
-
-	endpoint, systemID, apiStartDate, summary := parseCacheResponse(cached.Body)
-
-	fmt.Printf("Cache Entry: %s\n", hash)
-	fmt.Printf("Path: %s\n", cachePath)
-	if endpoint != "" {
-		fmt.Printf("Endpoint: %s\n", endpoint)
-	}
-	if systemID != "" {
-		fmt.Printf("System ID: %s\n", systemID)
-	}
-	// Show both the queried date and the API's start_date (go-style-core: default + override)
-	queriedDateLine := "Queried Date: (not stored - this is an old cache entry)\n"
-	if cached.QueriedDate != "" {
-		queriedDateLine = fmt.Sprintf("Queried Date: %s (date requested in API call via --date parameter)\n", cached.QueriedDate)
-	}
-	fmt.Print(queriedDateLine)
-	if apiStartDate != "" {
-		fmt.Printf("API start_date: %s (system installation date)\n", apiStartDate)
-	}
-	if summary != "" {
-		fmt.Printf("Summary: %s\n", summary)
-	}
-	fmt.Printf("Cached At: %s\n", cached.CachedAt.Format(time.RFC3339))
-	fmt.Printf("Status Code: %d\n", cached.StatusCode)
-	fmt.Printf("Body Size: %d bytes\n", len(cached.Body))
-	fmt.Printf("\nHeaders:\n")
-	for k, v := range cached.Headers {
-		fmt.Printf("  %s: %s\n", k, v)
-	}
-
-	// Try to parse and pretty-print the JSON body
-	var jsonData interface{}
-	if err := json.Unmarshal(cached.Body, &jsonData); err != nil {
-		fmt.Printf("\nBody (raw):\n")
-		fmt.Printf("%s\n", string(cached.Body))
-		return nil
-	}
-	fmt.Printf("\nBody (JSON):\n")
-	prettyJSON, err := json.MarshalIndent(jsonData, "  ", "  ")
-	if err != nil {
-		fmt.Printf("  (failed to format JSON: %v)\n", err)
-		fmt.Printf("  Raw body: %s\n", string(cached.Body))
-		return nil
-	}
-	fmt.Printf("%s\n", string(prettyJSON))
-	return nil
-}
-
-// tryAppendEntryByCachedAt loads the cache file for entry and appends to matchingEntries if CachedAt date matches (go-style-core: max 2 levels).
-func tryAppendEntryByCachedAt(entry CacheEntry, tz *time.Location, targetDateStr string, matchingEntries *[]CacheEntry) {
-	cached, err := LoadCachedResponseByPath(entry.Path)
-	if err != nil {
-		return
-	}
-	if cached.CachedAt.In(tz).Format(constants.DateFormat) == targetDateStr {
-		*matchingEntries = append(*matchingEntries, entry)
-	}
-}
-
-// FindCacheEntriesByDate finds cache entries that match a specific date
-// If tz is nil, defaults to US/Pacific for cache operations (cache is system-agnostic)
-func FindCacheEntriesByDate(targetDate time.Time, tz *time.Location) ([]CacheEntry, error) {
-	allEntries, err := ListCacheEntries()
-	if err != nil {
-		return nil, err
-	}
-
-	// Use provided timezone or default to Pacific
-	if tz == nil {
-		tz, _ = time.LoadLocation("US/Pacific")
-	}
-
-	// Format the target date directly without timezone conversion
-	// The dates in cache entries are already in YYYY-MM-DD format and do not need timezone adjustment
-	targetDateStr := targetDate.Format(constants.DateFormat)
-
-	var matchingEntries []CacheEntry
-	for _, entry := range allEntries {
-		// Handle missing Date first: fall back to CachedAt from file (go-style-core: max 2 levels)
-		if entry.Date == "" {
-			tryAppendEntryByCachedAt(entry, tz, targetDateStr, &matchingEntries)
-			continue
-		}
-
-		// Normalize entry date: try primary format, then alt format (default + override)
-		entryDate := strings.TrimSpace(entry.Date)
-		if parsedDate, err := time.Parse(constants.DateFormat, entryDate); err == nil {
-			entryDate = parsedDate.Format(constants.DateFormat)
-		} else if parsedDate, err := time.Parse(constants.AltDateFormat, entryDate); err == nil {
-			entryDate = parsedDate.Format(constants.DateFormat)
-		}
-		if entryDate == targetDateStr {
-			matchingEntries = append(matchingEntries, entry)
-		}
-	}
-
-	return matchingEntries, nil
 }
 
 // parseCacheResponse attempts to parse the cached response body and extract useful information

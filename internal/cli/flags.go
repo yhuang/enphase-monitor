@@ -15,8 +15,7 @@ type Flags struct {
 	TrueUp        string
 	TestMode      bool
 	NoCache       bool
-	ListCache     bool
-	InspectCache  string
+	CacheOnly     bool
 	Debug         bool
 }
 
@@ -33,8 +32,7 @@ func ParseFlags() *Flags {
 	flag.StringVar(&flags.TrueUp, "true-up", "", "Calculate true-up year energy report. Provide your utility true-up start date in YYYY-MM-DD format (e.g. 2025-01-15). Covers full calendar months from that month through yesterday. Takes precedence over --date.")
 	flag.BoolVar(&flags.TestMode, "test", false, "Test mode: use cache only, no live API calls, validate against expected values")
 	flag.BoolVar(&flags.NoCache, "no-cache", false, "Bypass cache and always make live API calls")
-	flag.BoolVar(&flags.ListCache, "list-cache", false, "List all cached API responses")
-	flag.StringVar(&flags.InspectCache, "inspect-cache", "", "Inspect cached responses by hash or date (YYYY-MM-DD format). Use --list-cache to see hashes.")
+	flag.BoolVar(&flags.CacheOnly, "cache", false, "Serve report from cache only; list missing endpoints if cache is incomplete")
 	flag.BoolVar(&flags.Debug, "debug", false, "Print debug information: last run time, API budget, and cache/API decisions")
 
 	flag.Parse()

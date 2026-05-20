@@ -312,8 +312,6 @@ Press `Ctrl+C` to stop.
 - `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429 rate limit)
 - `--clear-cache` - Clear cached API responses for today's date only
 - `--clear-all-cache` - Clear all cached API responses (all dates)
-- `--list-cache` - List all cached API responses
-- `--inspect-cache <hash|date>` - Inspect cached responses by hash or date (YYYY-MM-DD format)
 - `--debug` - Print debug information: last run time, API budget remaining, and per-request cache/live decisions
 
 ### Examples
@@ -511,7 +509,7 @@ colors:
 ### No telemetry data returned
 - Some data may not be available for very recent time periods (try querying yesterday's data)
 - Ensure your systems are actively reporting to Enlighten
-- Check cache with `--list-cache` to see what data is available
+- Use `--cache` to check what data is available in the cache without making API calls
 
 ## Caching and Rate Limits
 
@@ -578,12 +576,6 @@ The cache directory also contains an `api_calls` file (no JSON extension) holdin
 ### Cache Management Commands
 
 ```bash
-# View all cached responses
-./enphase-monitor --list-cache
-
-# Inspect a specific cached response (by hash or date)
-./enphase-monitor --inspect-cache 2026-01-15
-
 # Clear today's cache only (preserves historical data)
 ./enphase-monitor --clear-cache
 
@@ -621,12 +613,44 @@ Sample output:
 
 Use it when you want to understand *why* a query returned cached vs live data, *when* the rate-limit window will reset, or *how much* of the 10 calls/60s budget remains. Debug mode also suppresses the screen-clearing escape sequence so the trace stays visible on subsequent runs.
 
+### Cache-Only Mode
+
+The `--cache` flag serves a report entirely from on-disk cache without making any live API calls. If the cache is complete it prints a confirmation and runs the report; if any required endpoint is missing it prints a per-system diagnostic and exits non-zero:
+
+```bash
+./enphase-monitor --cache
+./enphase-monitor --cache --date 2026-05
+./enphase-monitor --cache --true-up 2025-01-15
+```
+
+**When cache is complete**, the report runs normally with a "CACHE MODE" banner.
+
+**When cache is incomplete**, the diagnostic lists each endpoint per system with its status and age:
+
+```
+CACHE INCOMPLETE for today:
+
+  System "Left Subpanel" (5392556):
+    ✓  energy_import_telemetry              cached 3h12m ago
+    ✓  energy_export_telemetry              cached 3h12m ago
+    ✗  telemetry/production_meter           not cached
+    ✓  telemetry/consumption_meter          cached 3h12m ago
+    -  telemetry/battery                    not cached (optional)
+
+To populate the cache, run:
+  ./enphase-monitor
+```
+
+`✓` = cached (age shown), `✗` = required but missing, `-` = optional and missing.
+
+Use `--cache` when you want to verify what data is available locally before making API calls, or when you are offline and want to review historical data.
+
 ### Best Practices
 
 1. **Use Default Refresh Interval**: Use 1 hour to stay well within rate limits
 2. **Leverage Caching**: Query past dates frequently - they use cached data (no API calls)
 3. **Test Mode**: Use `--test` mode for validation against cached data without hitting API
-4. **Monitor Cache**: Use `--list-cache` to see what data is available before querying
+4. **Monitor Cache**: Use `--cache` to check what's available before querying
 
 ## Documentation
 
@@ -664,6 +688,7 @@ enphase-monitor/
 │   │   ├── client.go                      # Enlighten Cloud API client
 │   │   ├── types.go                       # API request/response types
 │   │   ├── interface.go                   # CloudClient interface for testability
+│   │   ├── cache_check.go                 # Per-system/endpoint cache availability check (--cache mode)
 │   │   ├── client_test.go                 # API client unit tests
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
 │   │   ├── client_lifetime_test.go        # Lifetime endpoint tests (month/year/true-up queries)
@@ -675,11 +700,13 @@ enphase-monitor/
 │   │   ├── runner.go                      # Execution modes (once/continuous)
 │   │   ├── runner_test.go                 # Runner tests
 │   │   ├── trueup.go                      # True-up year: single-batch lifetime query and report conversion
-│   │   └── trueup_test.go                 # True-up logic tests
+│   │   ├── trueup_test.go                 # True-up logic tests
+│   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
+│   │   ├── rate_limit_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
@@ -924,7 +951,7 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 This project follows Go best practices and coding standards:
 
 - **Test Coverage**: 80.1% overall, 100% for urlbuilder and constants, 95%+ for display, validation, parser, and config
-- **Test Suite**: 27 test files across 14 packages with comprehensive unit, integration, and edge case tests
+- **Test Suite**: 28 test files across 14 packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -936,7 +963,7 @@ This project follows Go best practices and coding standards:
 - Total Lines: ~5,500 (excluding tests)
 - Test Lines: ~11,500 (comprehensive test suite)
 - Packages: 14 internal packages
-- Test Files: 27 (unit, integration, functional, edge case, and benchmark tests)
+- Test Files: 28 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)
 
 ## License

@@ -91,6 +91,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -122,22 +123,6 @@ func main() {
 
 	if flags.ClearAllCache {
 		if err := cli.HandleClearAllCache(); err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	if flags.ListCache {
-		if err := cli.HandleListCache(); err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	if flags.InspectCache != "" {
-		if err := cli.HandleInspectCache(flags.InspectCache, flags.ConfigFile); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
 		}
@@ -179,6 +164,34 @@ func main() {
 	// Setup signal handling for graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// --cache: serve report from cache only; diagnose missing endpoints if incomplete.
+	// Handles --cache alone, --cache --date, and --cache --true-up.
+	if flags.CacheOnly {
+		app.ConfigureModes(false, false, flags.Debug)
+		printDebugStartup(flags.Debug, reportTZ)
+		parsedInput, err := app.ParseTestDate(flags.TestDate, reportTZ)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+			os.Exit(1)
+		}
+		rc := app.RunConfig{
+			Agg:       agg,
+			Disp:      disp,
+			Cfg:       cfg,
+			TestDate:  parsedInput.Date,
+			QueryType: parsedInput.QueryType,
+			ReportTZ:  reportTZ,
+			Debug:     flags.Debug,
+		}
+		if err := app.RunCacheReport(ctx, rc, flags.TrueUp); err != nil {
+			if !errors.Is(err, app.ErrCacheIncomplete) {
+				disp.ShowError(err)
+			}
+			os.Exit(1)
+		}
+		return
+	}
 
 	// --true-up takes precedence over --date; handle it early and exit.
 	if flags.TrueUp != "" {

@@ -41,7 +41,7 @@ The project follows a pragmatic approach to testing:
 
 ### Why main.go Has 0% Coverage
 
-The `main.go` file is pure orchestration (~294 lines) and has 0% coverage by design. This is an **industry standard** because:
+The `main.go` file is pure orchestration (~307 lines) and has 0% coverage by design. This is an **industry standard** because:
 
 1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
 2. **All logic tested**: All functions `main.go` calls are tested in internal packages
@@ -80,13 +80,12 @@ Most packages follow the simple convention where each source file has one corres
 
 For packages with extensive functionality or different test concerns, tests are split by category:
 
-**Cache Package** (3 test files):
-- `cache.go` → 3 test files:
-  - `cache_test.go` - State management tests
-  - `cache_functions_test.go` - Functionality tests
-  - `cli_test.go` - CLI utilities tests
-
-The sliding-window rate-limit functions (`RecordAPICall`, `RemainingBudget`, pruning) are exercised indirectly through `internal/api/preflight_test.go`, which primes the cache, drains the budget via `RecordAPICall`, and verifies that subsequent calls fall back to cache.
+**Cache Package** (4 test files):
+- `cache.go` → 4 test files:
+  - `cache_test.go` - State management tests (flags, ResetState)
+  - `cache_functions_test.go` - Core functionality tests (save, load, normalize, HasCacheForDate)
+  - `rate_limit_test.go` - Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning, LastAPICallTime)
+  - `cli_test.go` - CLI utilities tests (ListCacheEntries, ClearTodayCache)
 
 **OAuth Package** (3 test files):
 - `oauth.go` → 3 test files:
@@ -675,6 +674,7 @@ These files test component interactions:
 | `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
 | `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 report types; preflight warning on/off |
 | `query_cost_test.go` | 3 test functions | `QueryCost` output for all query type × hasBattery combinations; 2-system budget constraint |
+| `rate_limit_test.go` | 7 test functions | `RecordAPICall`, `RemainingBudget`, old-entry pruning, `ClearAPICalls`, `LastAPICallTime` |
 
 ### OAuth Test Files
 
@@ -805,7 +805,6 @@ Unit tests cover helpers introduced during go-style-core refactoring (reduce nes
 | Test File | Test(s) | Helper(s) | Purpose |
 |-----------|---------|-----------|---------|
 | `validation_test.go` | `TestFindSystemByID`, `TestRunMetricTests` | `findSystemByID`, `runMetricTests` | Validation loop helpers; table-driven cases. |
-| `cli_test.go` | `TestTryAppendEntryByCachedAt` | `tryAppendEntryByCachedAt` | FindCacheEntriesByDate fallback when `entry.Date` is empty (match / no match / load error). |
 | `client_test.go` | `TestTryLoadPastDateCache_InvalidURL`, `TestTryLoadPastDateCache_NoMatch` | `tryLoadPastDateCache` | Past-date cache fallback when primary lookup fails (invalid URL, no matching cache). |
 
 ---

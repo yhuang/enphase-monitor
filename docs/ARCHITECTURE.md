@@ -52,7 +52,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go                                # Entry point (~294 lines) - orchestration only
+├── main.go                                # Entry point (~307 lines) - orchestration only
 ├── internal/
 │   ├── aggregator/                        # Multi-system data aggregation
 │   │   ├── types.go                       # Metric data structures (AggregatedMetrics, SystemMetrics)
@@ -63,6 +63,7 @@ enphase-monitor/
 │   │   ├── client.go                      # Enlighten Cloud API client
 │   │   ├── types.go                       # API request/response types
 │   │   ├── interface.go                   # CloudClient interface for testability
+│   │   ├── cache_check.go                 # Per-system/endpoint cache availability check (--cache mode)
 │   │   ├── client_test.go                 # API client unit tests
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
 │   │   ├── client_lifetime_test.go        # Lifetime endpoint tests (month/year/true-up queries)
@@ -74,11 +75,13 @@ enphase-monitor/
 │   │   ├── runner.go                      # Execution modes (once/continuous)
 │   │   ├── runner_test.go                 # Runner tests
 │   │   ├── trueup.go                      # True-up year: single-batch lifetime query and report conversion
-│   │   └── trueup_test.go                 # True-up report conversion tests
+│   │   ├── trueup_test.go                 # True-up report conversion tests
+│   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
+│   │   ├── rate_limit_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
@@ -640,6 +643,7 @@ when possible to improve testability.
 | [internal/app/setup.go](../internal/app/setup.go)         | Application initialization & configuration        |
 | [internal/app/runner.go](../internal/app/runner.go)       | Execution modes (once/continuous)                 |
 | [internal/app/trueup.go](../internal/app/trueup.go)       | True-up year: single-batch lifetime query (QueryTypeTrueUp) and report conversion            |
+| [internal/app/cache_report.go](../internal/app/cache_report.go) | --cache mode: per-system endpoint check, diagnostic output, and cache-only run  |
 
 ### Internal Packages - CLI Layer
 
@@ -663,7 +667,8 @@ when possible to improve testability.
 | [internal/aggregator/types.go](../internal/aggregator/types.go)         | Metric data structures                            |
 | [internal/aggregator/aggregator.go](../internal/aggregator/aggregator.go) | Multi-system aggregation with DI                  |
 | [internal/display/display.go](../internal/display/display.go)           | Terminal output formatting with colors            |
-| [internal/api/*](../internal/api/)                   | HTTP client for Enphase Cloud API v4              |
+| [internal/api/client.go](../internal/api/client.go)              | HTTP client for Enphase Cloud API v4              |
+| [internal/api/cache_check.go](../internal/api/cache_check.go)    | Per-system/endpoint cache availability probe (used by --cache mode) |
 | [internal/cache/*](../internal/cache/)               | Disk-based response caching                       |
 | [internal/parser/*](../internal/parser/)             | JSON telemetry response parsing                   |
 | [internal/config/*](../internal/config/)             | Configuration types and utilities                 |

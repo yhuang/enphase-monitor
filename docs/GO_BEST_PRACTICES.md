@@ -846,7 +846,7 @@ This section summarizes data-structure conventions from the go-data-structures s
 
 ### In this codebase
 
-- **make with capacity** — `aggregator.GetAggregatedMetrics` uses `make([]SystemMetrics, 0, len(systems))`; `cache_commands.showAvailableDates` uses `make(map[string]bool, len(allEntries))` and `make([]string, 0, len(dateSet))`.
+- **make with capacity** — `aggregator.GetAggregatedMetrics` uses `make([]SystemMetrics, 0, len(systems))`.
 - **Nil slices for append** — `var allIntervals []TelemetryInterval` in parser.go and `var rateLimitErrors []string` in aggregator.go, then append; result is always assigned.
 - **Copy at boundaries** — `GetAggregatorTypes` returns a copy of the systems slice (see [Go Defensive Programming](#go-defensive-programming)).
 
@@ -974,7 +974,7 @@ This section summarizes the coding conventions and best practices followed throu
 - **Test functions start with `Test`** - `func TestFunctionName(t *testing.T)`
 - **Use table-driven tests** - Test multiple cases in one function
 - **Validate against expected values** - This codebase uses `internal/validation/validation.go`
-- **Test refactor helpers** - Helpers introduced during go-style-core refactoring (e.g. `findSystemByID`, `runMetricTests`, `tryAppendEntryByCachedAt`, `tryLoadPastDateCache`) have dedicated unit tests; see [TESTING.md](TESTING.md) § Testing Refactor Helpers.
+- **Test refactor helpers** - Helpers introduced during go-style-core refactoring (e.g. `findSystemByID`, `runMetricTests`, `tryLoadPastDateCache`) have dedicated unit tests; see [TESTING.md](TESTING.md) § Testing Refactor Helpers.
 
 #### Test File Organization
 

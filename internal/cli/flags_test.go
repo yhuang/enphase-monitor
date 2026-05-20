@@ -22,10 +22,8 @@
 // 3. Cache Command Tests
 //   - Test --clear-cache sets ClearCache to true
 //   - Test --clear-all-cache sets ClearAllCache to true
-//   - Test --list-cache sets ListCache to true
-//   - Test --inspect-cache captures argument
 //
-// TESTING APPROACH
+//TESTING APPROACH
 // ----------------
 // - Reset flag.CommandLine before each test (isolation)
 // - Mock os.Args to simulate command-line arguments
@@ -207,58 +205,16 @@ func TestParseFlags_NoCache(t *testing.T) {
 	}
 }
 
-func TestParseFlags_ListCache(t *testing.T) {
-	resetFlags(t)
-	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--list-cache"}
-
-	flags := ParseFlags()
-
-	if !flags.ListCache {
-		t.Error("ListCache should be true")
-	}
-}
-
-func TestParseFlags_InspectCache(t *testing.T) {
-	resetFlags(t)
-	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--inspect-cache", "abc123"}
-
-	flags := ParseFlags()
-
-	if flags.InspectCache != "abc123" {
-		t.Errorf("InspectCache = %v, want abc123", flags.InspectCache)
-	}
-}
-
-func TestParseFlags_InspectCacheByDate(t *testing.T) {
-	resetFlags(t)
-	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--inspect-cache", "2026-01-15"}
-
-	flags := ParseFlags()
-
-	if flags.InspectCache != "2026-01-15" {
-		t.Errorf("InspectCache = %v, want 2026-01-15", flags.InspectCache)
-	}
-}
-
 func TestParseFlags_CacheManagementFlags(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--clear-cache", "--list-cache", "--no-cache"}
+	os.Args = []string{"cmd", "--clear-cache", "--no-cache"}
 
 	flags := ParseFlags()
 
 	if !flags.ClearCache {
 		t.Error("ClearCache should be true")
-	}
-	if !flags.ListCache {
-		t.Error("ListCache should be true")
 	}
 	if !flags.NoCache {
 		t.Error("NoCache should be true")
@@ -269,15 +225,12 @@ func TestParseFlags_AllCacheFlags(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--clear-all-cache", "--inspect-cache", "test_hash"}
+	os.Args = []string{"cmd", "--clear-all-cache"}
 
 	flags := ParseFlags()
 
 	if !flags.ClearAllCache {
 		t.Error("ClearAllCache should be true")
-	}
-	if flags.InspectCache != "test_hash" {
-		t.Errorf("InspectCache = %v, want test_hash", flags.InspectCache)
 	}
 }
 
