@@ -661,6 +661,11 @@ These files test individual functions and methods in isolation. Per-package cove
 | `timezone_test.go` | `timezone.go` | Timezone loading, date boundaries |
 | `config_test.go` | `config.go` | YAML parsing, validation, color conversion |
 | `parser_test.go` | `parser.go` | JSON parsing, interval summing |
+| `flags_test.go` | `flags.go` | CLI flag parsing and defaults |
+| `cache_commands_test.go` | `cache_commands.go` | Cache management command handlers (backup, restore, clear) |
+| `runner_test.go` | `runner.go` | Execution modes (once/continuous), fetchAndDisplay |
+| `trueup_test.go` | `trueup.go` | `buildTrueUpReport` field mapping, net flow, per-system entries |
+| `aggregator_test.go` | `aggregator.go` | Multi-system aggregation with mock clients |
 
 ### Integration Test Files
 

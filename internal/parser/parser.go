@@ -91,7 +91,11 @@ func ParseNestedTelemetryResponse(bodyBytes []byte) ([]TelemetryInterval, error)
 	}
 
 	// Flatten the array of arrays into a single array
-	var allIntervals []TelemetryInterval
+	total := 0
+	for _, a := range data.Intervals {
+		total += len(a)
+	}
+	allIntervals := make([]TelemetryInterval, 0, total)
 	for _, intervalArray := range data.Intervals {
 		allIntervals = append(allIntervals, intervalArray...)
 	}

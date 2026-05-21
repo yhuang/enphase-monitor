@@ -204,12 +204,12 @@ This struct follows Go best practices:
 
 ### Slice Declaration
 
-**Location**: `internal/parser/parser.go:94`
+**Location**: `internal/parser/parser.go:98`
 
-`var name []Type` declares a nil slice (zero value for slices). We will append to it to build the flattened array.
+`make([]Type, 0, capacity)` creates a slice with zero length but pre-allocated capacity. We pre-count the total elements first, then allocate exactly the right capacity before appending.
 
 ```go
-var allIntervals []TelemetryInterval
+allIntervals := make([]TelemetryInterval, 0, total)
 ```
 
 ### Slice Capacity Hint
@@ -228,7 +228,7 @@ Systems: make([]SystemMetrics, 0, len(systems)),
 
 ### Variadic Append
 
-**Location**: `internal/parser/parser.go:96`
+**Location**: `internal/parser/parser.go:100`
 
 `append(slice, elements...)` can take multiple elements. `intervalArray...` spreads the slice into individual elements. This is equivalent to: `append(allIntervals, intervalArray[0], intervalArray[1], ...)`
 
@@ -248,7 +248,7 @@ rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name,
 
 ### Array to Slice Conversion
 
-**Location**: `internal/cache/cache.go:216-217`
+**Location**: `internal/cache/cache.go:224-225`
 
 `hash[:]` converts the `[32]byte` array to a `[]byte` slice. This is necessary because `hex.EncodeToString` expects `[]byte`, not `[32]byte`. The `[:]` syntax creates a slice that views the entire array.
 
@@ -263,7 +263,7 @@ return hex.EncodeToString(hash[:])
 
 ### Range Loop
 
-**Location**: `internal/parser/parser.go:95-97`
+**Location**: `internal/parser/parser.go:99-101`
 
 `for _, intervalArray := range data.Intervals` iterates over the slice. The `_` discards the index (we do not need it). `intervalArray` is each nested array in the array of arrays.
 
@@ -275,7 +275,7 @@ for _, intervalArray := range data.Intervals {
 
 ### Range Loop Over Slice
 
-**Location**: `internal/parser/parser.go:134`
+**Location**: `internal/parser/parser.go:138`
 
 `for _, interval := range intervals` iterates over each element. `_` discards the index (we do not need it). The body uses a `switch` to select the correct field (see Switch Statement below).
 
@@ -291,7 +291,7 @@ for _, interval := range intervals {
 
 ### Switch Statement
 
-**Location**: `internal/parser/parser.go:135-144`
+**Location**: `internal/parser/parser.go:139-148`
 
 `switch` is like `if/else` but cleaner for multiple conditions. It is idiomatic Go for handling multiple cases based on a single value. `switch` compares `fieldName` against each case and executes the matching one. This is more readable than multiple `if/else if` statements.
 
@@ -338,7 +338,7 @@ func ParseTestDate(dateStr string, reportTZ *time.Location) (ParseDateInput, err
 
 ### Zero Value Initialization
 
-**Location**: `internal/parser/parser.go:133`
+**Location**: `internal/parser/parser.go:137`
 
 `var total float64` initializes `total` to `0.0` (zero value for float64). Go's zero values mean we do not need explicit initialization for most types.
 
@@ -433,7 +433,7 @@ Ruby:   "I trust you can do X, we'll see at runtime."
 
 ### Interface Types in This Codebase
 
-**Location**: `internal/parser/parser.go:118`
+**Location**: `internal/parser/parser.go:122`
 
 `io.ReadCloser` is an interface that combines `io.Reader` and `io.Closer`. `http.Response.Body` satisfies this interface, so we can pass it here:
 
@@ -443,7 +443,7 @@ func ReadResponseBody(respBody io.ReadCloser) ([]byte, error) {
 }
 ```
 
-**Location**: `internal/parser/parser.go:119`
+**Location**: `internal/parser/parser.go:123`
 
 `io.ReadAll` accepts any `io.Reader` (interface type). `respBody` satisfies `io.Reader`, so we can pass it directly. This is the power of Go interfaces - code works with any type that has a `Read()` method:
 
@@ -973,7 +973,7 @@ var tokenCache *TokenCache
 
 ### Hash Functions and Array Slices
 
-**Location**: `internal/cache/cache.go:216-217`
+**Location**: `internal/cache/cache.go:224-225`
 
 `sha256.Sum256()` computes a SHA-256 hash and returns a `[32]byte` array (fixed size). We convert it to a string using hex encoding for a readable cache key.
 

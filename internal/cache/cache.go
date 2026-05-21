@@ -183,6 +183,14 @@ func ClearAPICalls() {
 	_ = os.Remove(filepath.Join(getCacheDir(), apiCallsFilename))
 }
 
+// cachedResponseMeta holds only the lookup fields of a CachedResponse.
+// Used by FindMostRecentByEndpoint to scan files without allocating response bodies.
+type cachedResponseMeta struct {
+	CachedAt time.Time `json:"cached_at"`
+	Endpoint string    `json:"endpoint,omitempty"`
+	SystemID string    `json:"system_id,omitempty"`
+}
+
 // CachedResponse stores a cached API response
 type CachedResponse struct {
 	StatusCode  int               `json:"status_code"`
@@ -408,29 +416,40 @@ func FindMostRecentByEndpoint(endpoint, systemID string, maxAge time.Duration) (
 	if err != nil {
 		return nil, err
 	}
-	var best *CachedResponse
+
+	// First pass: read only metadata (no body) to find the best matching path.
+	var bestPath string
+	var bestCachedAt time.Time
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), constants.JSONExtension) {
 			continue
 		}
-		cached, err := LoadCachedResponseByPath(filepath.Join(dir, entry.Name()))
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
 		}
-		if cached.Endpoint != endpoint || cached.SystemID != systemID {
+		var meta cachedResponseMeta
+		if err := json.Unmarshal(data, &meta); err != nil {
 			continue
 		}
-		if maxAge > 0 && time.Since(cached.CachedAt) > maxAge {
+		if meta.Endpoint != endpoint || meta.SystemID != systemID {
 			continue
 		}
-		if best == nil || cached.CachedAt.After(best.CachedAt) {
-			best = cached
+		if maxAge > 0 && time.Since(meta.CachedAt) > maxAge {
+			continue
+		}
+		if bestPath == "" || meta.CachedAt.After(bestCachedAt) {
+			bestPath = path
+			bestCachedAt = meta.CachedAt
 		}
 	}
-	if best == nil {
+	if bestPath == "" {
 		return nil, fmt.Errorf("no cache entry found for endpoint=%s system=%s", endpoint, systemID)
 	}
-	return best, nil
+
+	// Second pass: full load only for the winner.
+	return LoadCachedResponseByPath(bestPath)
 }
 
 // GetCachePath returns the file path for a cached response

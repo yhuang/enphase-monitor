@@ -62,7 +62,7 @@
 // -------------
 // This client uses the following Enlighten Cloud API v4 endpoints:
 //
-// INTERVAL-BASED ENDPOINTS (15-minute data, 7-day limit):
+// INTERVAL-BASED ENDPOINTS (15-minute data, single-day per call):
 //
 //	Production (Solar Generation):
 //	GET /api/v4/systems/{system_id}/telemetry/production_meter
@@ -102,9 +102,9 @@
 //	GET /api/v4/systems/{system_id}/energy_export_lifetime
 //	Returns: {"export": [18205, 20777, ...]} - array of daily Wh values
 //
-//	Battery Lifetime:
-//	GET /api/v4/systems/{system_id}/battery_lifetime
-//	Returns: {"charge": [...], "discharge": [...]} - arrays of daily Wh values
+// NOTE: battery_lifetime endpoint is NOT used. Battery data is fetched only via
+// the interval endpoint (telemetry/battery) and only for today's live day report.
+// Month/year/true-up queries skip battery entirely.
 //
 // ENDPOINT SELECTION STRATEGY:
 //   - Single-day queries: Use interval endpoints (better granularity, 96 data points).
@@ -131,9 +131,9 @@
 // This client relies on internal/cache for caching responses and on a
 // sliding-window counter to stay under the limit:
 //  1. Per-query-type cache expiry (see EnlightenCloudClient.cacheMaxAge):
-//       - past day / month / year / past true-up year: never expires
-//       - today's day query:                           1 hour
-//       - MTD / YTD / current true-up year:            24 hours
+//     - past day / month / year / past true-up year: never expires
+//     - today's day query:                           1 hour
+//     - MTD / YTD / current true-up year:            24 hours
 //     If a cache entry for the exact URL exists and is within its age bound,
 //     it is returned without an API call. Past periods (immutable totals)
 //     are served regardless of age.
@@ -366,17 +366,11 @@ func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDa
 	return consumptionWh / constants.WhToKWh, nil
 }
 
-// GetBatteryDataForDate gets battery charge, discharge, and State of Charge (SOC) for a specific date/period.
-// If testDate is zero, uses today. queryType determines the time range (day/month/year/true-up).
-// Returns charged kWh, discharged kWh, and SOC percentage from last_reported_aggregate_soc.
-// For month/year/true-up queries, uses battery_lifetime endpoint (daily aggregated, no 7-day API limit).
-// The result always covers complete days only (through yesterday for ongoing periods).
+// GetBatteryDataForDate gets battery charge, discharge, and State of Charge (SOC) for today.
+// Only called when testDate is zero (today's report). Returns charged kWh, discharged kWh,
+// and SOC percentage from last_reported_aggregate_soc.
 func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error) {
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear || queryType == constants.QueryTypeTrueUp {
-		return c.getBatteryLifetime(ctx, testDate, queryType)
-	}
-
-	// Single-day query: use interval endpoint.
+	// Interval endpoint for today's 15-minute battery telemetry.
 	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/battery", testDate, queryType)
 	if err != nil {
 		return 0, 0, 0, err
@@ -422,65 +416,6 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	return chargeWh / constants.WhToKWh, dischargeWh / constants.WhToKWh, socPercent, nil // Convert Wh to kWh
 }
 
-// getBatteryLifetime fetches battery data using the battery_lifetime endpoint (daily aggregated).
-// This endpoint has no 7-day limit and returns daily charge/discharge totals.
-func (c *EnlightenCloudClient) getBatteryLifetime(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error) {
-	periodStart, _ := timezone.GetBoundaries(testDate, queryType, c.timezone)
-	startDateStr := periodStart.Format(constants.DateFormat)
-
-	// Build URL for lifetime endpoint
-	reqURL := fmt.Sprintf("%s/%s/battery_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
-
-	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryType)
-	c.cacheUsed = cacheUsed
-	if err != nil {
-		// Battery data is optional - return zeros if it fails
-		return 0, 0, 0, nil
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := parser.ReadResponseBody(resp.Body)
-	if err != nil {
-		return 0, 0, 0, nil
-	}
-
-	// Parse the lifetime response
-	// Battery lifetime returns arrays like: {"charge": [...], "discharge": [...]}
-	var data struct {
-		SystemID  int64     `json:"system_id"`
-		StartDate string    `json:"start_date"`
-		Charge    []float64 `json:"charge"`
-		Discharge []float64 `json:"discharge"`
-	}
-
-	if err := json.Unmarshal(bodyBytes, &data); err != nil {
-		return 0, 0, 0, nil
-	}
-
-	// Calculate dates and sum values in range
-	startDate, err := time.Parse(constants.DateFormat, data.StartDate)
-	if err != nil {
-		return 0, 0, 0, nil
-	}
-
-	endDateStr := c.lifetimeEndDate(testDate, queryType)
-	var totalCharge, totalDischarge float64
-
-	for i := range data.Charge {
-		date := startDate.AddDate(0, 0, i)
-		dateStr := date.Format(constants.DateFormat)
-
-		// Filter by date range (inclusive)
-		if dateStr >= startDateStr && dateStr <= endDateStr {
-			totalCharge += data.Charge[i]
-			if i < len(data.Discharge) {
-				totalDischarge += data.Discharge[i]
-			}
-		}
-	}
-
-	return totalCharge / constants.WhToKWh, totalDischarge / constants.WhToKWh, 0, nil
-}
 
 // QueryCost returns the number of live API calls GetMetricsFromCloud will make
 // for a single system with the given query type. Callers can compare this value
@@ -488,7 +423,10 @@ func (c *EnlightenCloudClient) getBatteryLifetime(ctx context.Context, testDate 
 // fully live run is possible or whether cached data will be needed.
 //
 // hasBattery should be true when the system is known to have a battery device.
-// For QueryTypeDay the battery telemetry endpoint adds one extra call.
+// For QueryTypeDay with hasBattery=true this returns 5 (worst-case estimate):
+// GetMetricsFromCloud only calls the battery endpoint when testDate is zero
+// (today's live report), but QueryCost is used as a conservative preflight
+// check before we know the target date.
 // For QueryTypeMonth / QueryTypeYear / QueryTypeTrueUp the battery endpoint is
 // never called regardless of hasBattery.
 func QueryCost(queryType constants.QueryType, hasBattery bool) int {
@@ -587,9 +525,9 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	}
 	cacheUsed = cacheUsed || c.cacheUsed
 
-	// Battery data is only meaningful for single-day reports; skip the API call
-	// for month/year/true-up queries to save one of the 10 allowed requests/minute.
-	if queryType == constants.QueryTypeDay {
+	// Battery data is only meaningful for today's report; skip for historical dates
+	// and all month/year/true-up queries to save one of the 10 allowed requests/minute.
+	if queryType == constants.QueryTypeDay && testDate.IsZero() {
 		metrics.BatteryChargedToday, metrics.BatteryDischargedToday, metrics.BatterySOC, err = c.GetBatteryDataForDate(ctx, testDate, queryType)
 		if err != nil {
 			if err := checkCancelled(); err != nil {

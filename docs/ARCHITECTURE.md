@@ -201,7 +201,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │     └─► GetAggregatedMetrics() loops through systems               │
 │         └─► Uses internal/api for HTTP requests                    │
 │             └─► Fetches production, consumption, grid import/export│
-│                 battery data is fetched only for day queries        │
+│                 battery fetched only for today's live day query     │
 └────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -276,7 +276,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ┌────────────────────────────────────────────────────────────────────┐
 │              internal/aggregator/AggregatedMetrics                 │
 │   - Sums production, consumption across systems                    │
-│   - Battery tracked per system only (day queries); zero for others │
+│   - Battery tracked per system only (today's live day); zero otherwise │
 │   - Tracks cache usage flags (CacheUsed, AllFromCache)             │
 │   - TrueUpReport built from a single lifetime-endpoint batch       │
 └──────────────────────────┬─────────────────────────────────────────┘
@@ -306,9 +306,9 @@ The Enphase Cloud API enforces a budget of **10 requests per 60-second sliding w
 | Year       | 4               | 4               |
 | True-up    | 4               | 4               |
 
-The base of 4 covers: grid import, grid export, production, and consumption. Battery telemetry adds a 5th call **only for day queries** — month/year/true-up skip it because:
-1. The battery telemetry endpoint returns per-15-minute intervals; summing a month would require calling it for each day, blowing past the budget.
-2. The `battery_lifetime` endpoint only returns charge/discharge totals; SOC (state-of-charge) is not meaningful as a monthly aggregate, so the call is omitted entirely.
+The base of 4 covers: grid import, grid export, production, and consumption. Battery telemetry adds a 5th call **only for today's live day query** (`testDate.IsZero() && QueryTypeDay`) — all other cases skip it because:
+1. The battery telemetry endpoint returns per-15-minute intervals; fetching it for historical or multi-day periods would require one call per day, far exceeding the budget.
+2. Battery SOC is a point-in-time reading that is not meaningful as a historical or multi-day aggregate, so the call is omitted for any non-today query.
 
 This means 2 systems × 5 (day + battery) = **exactly 10** — the documented architectural limit. Adding a third system or a supplementary call would exceed it.
 

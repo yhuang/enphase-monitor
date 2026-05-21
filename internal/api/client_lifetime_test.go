@@ -152,46 +152,6 @@ func TestGetConsumptionForDate_Month(t *testing.T) {
 	}
 }
 
-// TestGetBatteryDataForDate_Month tests the battery_lifetime endpoint for month queries.
-func TestGetBatteryDataForDate_Month(t *testing.T) {
-	cache.SetCacheDisabled(true)
-	defer cache.SetCacheDisabled(false)
-
-	tz := mustLoadLocation(t, "US/Pacific")
-	target := pastMonth(tz)
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.URL.Path, "battery_lifetime") {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		startDate := target.Format("2006-01-02")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(fmt.Sprintf(
-			`{"system_id":12345,"start_date":%q,"charge":[1000.0,2000.0],"discharge":[500.0,750.0]}`,
-			startDate,
-		)))
-	}))
-	defer server.Close()
-
-	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
-	charged, discharged, soc, err := client.GetBatteryDataForDate(context.Background(), target, constants.QueryTypeMonth)
-	if err != nil {
-		t.Fatalf("GetBatteryDataForDate(month) error = %v", err)
-	}
-	// 1000 + 2000 = 3000 Wh = 3.0 kWh
-	if charged != 3.0 {
-		t.Errorf("GetBatteryDataForDate(month) charged = %v, want 3.0", charged)
-	}
-	// 500 + 750 = 1250 Wh = 1.25 kWh
-	if discharged != 1.25 {
-		t.Errorf("GetBatteryDataForDate(month) discharged = %v, want 1.25", discharged)
-	}
-	// Battery lifetime returns 0 for SOC
-	if soc != 0 {
-		t.Errorf("GetBatteryDataForDate(month) soc = %v, want 0", soc)
-	}
-}
 
 // TestGetEnergyImportForDate_Year tests year-level lifetime queries.
 func TestGetEnergyImportForDate_Year(t *testing.T) {

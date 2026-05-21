@@ -222,11 +222,11 @@ This application uses the **Enphase Enlighten Cloud API v4** exclusively to fetc
 
 The Enphase Cloud API v4 has the following technical limits:
 
-- **7-Day Request Limit for Interval Data**: Interval-based endpoints (15-minute data) cannot span more than 7 days per request
+- **Interval Endpoints Are Single-Day Only**: Interval-based endpoints (15-minute data) return exactly **one calendar day** of data per request — the API ignores the `end_at` parameter and always responds with `granularity=day`. Querying a full month via interval endpoints would require 28–31 separate calls, which would exceed the 10 calls/minute rate limit.
   - The application automatically uses **daily aggregated `_lifetime` endpoints** for month/year queries
-  - These endpoints have no 7-day limit and return one value per day instead of 96 intervals
+  - These endpoints return one value per calendar day and can span arbitrary date ranges in a single request
   - Example: Querying January 2026 (31 days) → **single API request** using `energy_lifetime` endpoint
-  - Single-day queries still use interval endpoints for better granularity
+  - Single-day queries still use interval endpoints for better granularity (96 data points vs 1 per day)
 - **Current Month/Year Data Coverage**: When querying the current (ongoing) month or year, data is reported through the **previous complete day** (yesterday). Today's partial data is excluded because the `_lifetime` endpoints only contain completed days. The query range displayed in the report reflects this — it ends at yesterday 11:59 PM, not the current time.
 - **Rate Limiting**: See [Rate Limits](#rate-limits) section below
 
@@ -445,9 +445,9 @@ The "True-Up Start" line shows the exact date you provided. The "Query Range" st
 - **Energy Consumed**: Total consumption for this system (kWh)
 - **Energy Imported**: Energy purchased from utility for this system (kWh)
 - **Energy Exported**: Energy sold back to utility from this system (kWh)
-- **Charged to Battery**: Energy stored in batteries for this system (kWh)
-- **Discharged from Battery**: Energy used from batteries for this system (kWh)
-- **Battery Charge Percentage**: Current state of charge (SOC) of the battery system, displayed as a percentage (0-100%). This metric is shown per-system only (not aggregated) and only for day queries. For month/year queries, battery SOC is omitted since it represents a point-in-time snapshot that isn't meaningful when aggregated over a period.
+- **Charged to Battery**: Energy stored in batteries for this system (kWh). Shown only for today's live day report (omitted for historical or month/year queries).
+- **Discharged from Battery**: Energy used from batteries for this system (kWh). Shown only for today's live day report.
+- **Battery Charge Percentage**: Current state of charge (SOC) of the battery system, displayed as a percentage (0-100%). This metric is shown per-system only (not aggregated) and **only for today's live day report** (i.e., running without `--date`). Historical day queries and all month/year/true-up queries omit battery metrics — SOC is a point-in-time reading that is not meaningful for past or multi-day periods.
 
 ### Individual System Metrics (True-Up Report)
 
@@ -527,9 +527,9 @@ The Enphase Enlighten Cloud API v4 enforces strict rate limits:
 The `refresh_interval` setting controls how often the application queries the API in continuous mode. To respect rate limits:
 
 - **Recommended**: `refresh_interval: 3600` (1 hour)
-- **Why**: Each query fetches 5 metrics per system (production, consumption, grid import, grid export, battery). With 2 systems that is exactly 10 requests per cycle — right at the limit. At 3600 seconds, that is ~10 requests per hour, well within limits.
+- **Why**: Each today's day query fetches 5 metrics per system (production, consumption, grid import, grid export, battery). With 2 systems that is exactly 10 requests per cycle — right at the limit. At 3600 seconds, that is ~10 requests per hour, well within limits. (Historical day or month/year queries omit battery and use 4 calls per system.)
 - **Not Recommended**: Values below 60 seconds (e.g., `refresh_interval: 5`) can quickly exceed the 10 requests/minute limit, especially with multiple systems.
-- **Calculation**: If you have N systems, each query makes N×5 requests. With 2 systems that is 10/cycle. At `refresh_interval: 5`, that is 10×12 = 120 requests per minute, far above the limit.
+- **Calculation**: If you have N systems, each today's day query makes N×5 requests. With 2 systems that is 10/cycle. At `refresh_interval: 5`, that is 10×12 = 120 requests per minute, far above the limit.
 
 ### Caching Strategy
 
@@ -955,7 +955,7 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 - **API Response Caching**: Reduces redundant API calls and respects rate limits
 - **Efficient JSON Parsing**: Optimized for 96 intervals/day (15-min intervals)
 - **Multi-System Aggregation**: Scales linearly with number of systems
-- **Zero External Dependencies**: Standard library only for performance and security
+- **Minimal Dependencies**: Only 1 external library (gopkg.in/yaml.v3 for config); all HTTP and I/O uses the standard library
 
 ## Code Quality
 
@@ -971,8 +971,8 @@ This project follows Go best practices and coding standards:
 - **Performance**: Benchmarks included for hot paths
 
 **Code Metrics:**
-- Total Lines: ~5,500 (excluding tests)
-- Test Lines: ~11,500 (comprehensive test suite)
+- Total Lines: ~5,700 (excluding tests)
+- Test Lines: ~10,800 (comprehensive test suite)
 - Packages: 14 internal packages
 - Test Files: 29 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)
