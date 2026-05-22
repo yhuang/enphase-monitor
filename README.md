@@ -143,7 +143,7 @@ Each system requires:
 - `refresh_interval`: How often to query the API in continuous mode (default: 3600 seconds = 1 hour)
   - **⚠️ Important**: Only applies when running in continuous mode (with `--continuous` flag)
   - **Recommended**: Use 3600 seconds (1 hour) to respect API rate limits
-  - **Rate Limit Consideration**: The API allows 10 requests per minute. With multiple systems, a low `refresh_interval` (e.g., 5 seconds) can quickly exceed this limit. For 2 systems, you would make 24 requests per minute (2 systems × 12 queries/minute), which exceeds the 10/minute limit.
+  - **Rate Limit Consideration**: The API allows 10 requests per minute. With multiple systems, a low `refresh_interval` (e.g., 5 seconds) can quickly exceed this limit. For 2 systems that is 10 API calls per cycle (2 systems × 5 metrics). At `refresh_interval: 5`, that is 10 × 12 = 120 requests per minute, far above the limit.
   - **Best Practice**: Use 3600 seconds (1 hour) or higher to stay well within rate limits
 - `timezone`: Timezone for reporting and display (optional)
   - **Default**: Uses your OS system timezone, or US/Pacific if OS timezone is UTC
@@ -299,7 +299,20 @@ Monitor with auto-refresh (uses `refresh_interval` from config):
 
 The application will query all systems at the configured `refresh_interval` (default: 3600 seconds = 1 hour) and display updated metrics.
 
+**Restrictions**: `--continuous` only applies to today's Day query. Month, Year, and past-date queries are silently downgraded to run once and exit, since historical data does not change.
+
+**Cache Mode recommendation**: Use the default Auto Cache Mode (no `--cache` or `--no-cache` flag). When the API Budget is temporarily exhausted at a refresh tick, Auto mode gracefully serves the most recent cached data. With `--no-cache`, budget exhaustion triggers a live call that is likely to 429; on a 429, the program falls back to cache if available (with a warning), or exits with an error if no cache exists.
+
 Press `Ctrl+C` to stop.
+
+### Validation Mode
+
+Validate cached metrics against a pre-recorded set of expected values:
+```bash
+./enphase-monitor --test --date 2026-01-19
+```
+
+Serves the report entirely from cache (no live API calls) and compares each metric against expected values stored in `test-data/`. Exits non-zero if any metric diverges. Requires `--date` to identify which expected-values file to load. Use this after code changes to confirm calculation logic has not drifted.
 
 ### Command-Line Options
 

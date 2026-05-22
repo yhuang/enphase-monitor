@@ -200,7 +200,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │     └─► GetAggregatedMetrics() loops through systems               │
 │         └─► Uses internal/api for HTTP requests                    │
 │             └─► Fetches production, consumption, grid import/export│
-│                 battery fetched only for today's live day query     │
+│                 battery fetched only for today's Day query          │
 └────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -305,7 +305,7 @@ The Enphase Cloud API enforces a budget of **10 requests per 60-second sliding w
 | Year       | 4               | 4               |
 | True-up    | 4               | 4               |
 
-The base of 4 covers: grid import, grid export, production, and consumption. Battery telemetry adds a 5th call **only for today's live day query** (`testDate.IsZero() && QueryTypeDay`) — all other cases skip it because:
+The base of 4 covers: grid import, grid export, production, and consumption. Battery telemetry adds a 5th call **only for today's Day query** (`testDate.IsZero() && QueryTypeDay`) — all other cases skip it because:
 1. The battery telemetry endpoint returns per-15-minute intervals; fetching it for historical or multi-day periods would require one call per day, far exceeding the budget.
 2. Battery SOC is a point-in-time reading that is not meaningful as a historical or multi-day aggregate, so the call is omitted for any non-today query.
 
