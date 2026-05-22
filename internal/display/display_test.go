@@ -112,7 +112,7 @@ func TestShowMetrics_ContainsHeader(t *testing.T) {
 		ConsumptionToday: 8.2,
 		GridImportToday:  2.0,
 		GridExportToday:  4.3,
-		NetImportToday:   -2.3, // Net export
+		NetFlowToday:   -2.3, // Net export
 	}
 
 	d.ShowMetrics(metrics)
@@ -165,7 +165,7 @@ func TestShowMetrics_CombinedSectionLabels(t *testing.T) {
 		ConsumptionToday: 8.2,
 		GridImportToday:  2.0,
 		GridExportToday:  4.3,
-		NetImportToday:   -2.3,
+		NetFlowToday:   -2.3,
 	}
 
 	d.ShowMetrics(metrics)
@@ -224,7 +224,7 @@ func TestShowMetrics_NetFlow(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		netImportToday float64
+		netFlowToday float64
 		expected       string
 	}{
 		{"net export", -5.0, "(export)"},
@@ -239,14 +239,14 @@ func TestShowMetrics_NetFlow(t *testing.T) {
 
 			metrics := &aggregator.AggregatedMetrics{
 				Timestamp:      time.Now(),
-				NetImportToday: tt.netImportToday,
+				NetFlowToday: tt.netFlowToday,
 			}
 
 			d.ShowMetrics(metrics)
 
 			output := buf.String()
 			if !strings.Contains(output, tt.expected) {
-				t.Errorf("Output should contain %q for netImportToday=%v", tt.expected, tt.netImportToday)
+				t.Errorf("Output should contain %q for netFlowToday=%v", tt.expected, tt.netFlowToday)
 			}
 		})
 	}

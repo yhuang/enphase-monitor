@@ -84,7 +84,7 @@ type ColorConfig struct {
 	Discharge     string `yaml:"discharge,omitempty"`      // Battery Discharge
 	Import        string `yaml:"import,omitempty"`         // Grid Import
 	Export        string `yaml:"export,omitempty"`         // Grid Export
-	NetImport     string `yaml:"net_import,omitempty"`     // Net Energy Flow (Import)
+	NetFlow       string `yaml:"net_flow,omitempty"`       // Net Energy Flow
 	NetExport     string `yaml:"net_export,omitempty"`     // Net Energy Flow (Export)
 	Headers       string `yaml:"headers,omitempty"`        // Report Headers
 	Charge        string `yaml:"charge,omitempty"`         // Battery Charge
@@ -105,7 +105,7 @@ func (c *ColorConfig) MergeWithDefaults(defaults ColorConfig) {
 		{&c.Discharge, &defaults.Discharge},
 		{&c.Import, &defaults.Import},
 		{&c.Export, &defaults.Export},
-		{&c.NetImport, &defaults.NetImport},
+		{&c.NetFlow, &defaults.NetFlow},
 		{&c.NetExport, &defaults.NetExport},
 		{&c.Headers, &defaults.Headers},
 		{&c.Charge, &defaults.Charge},
@@ -131,7 +131,7 @@ func (c *ColorConfig) convertHexFields() {
 		&c.Discharge,
 		&c.Import,
 		&c.Export,
-		&c.NetImport,
+		&c.NetFlow,
 		&c.NetExport,
 		&c.Headers,
 		&c.Charge,

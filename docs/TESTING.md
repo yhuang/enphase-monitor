@@ -74,7 +74,7 @@ Most packages follow the simple convention where each source file has one corres
 | `constants.go` | `constants_test.go` | Constants validation |
 | `display.go` | `display_test.go` | Display formatting tests (includes `ShowTrueUpReport` tests) |
 | `timezone.go` | `timezone_test.go` | Timezone handling tests |
-| `trueup.go` | `trueup_test.go` | True-up report conversion (`buildTrueUpReport`): field mapping, net flow, per-system entries |
+| `trueup.go` | `trueup_test.go` | True-up Window end-date logic (`trueUpWindowEnd`): in-progress vs closed cycle; `buildTrueUpReport` field mapping, net flow, per-system entries |
 
 #### Pattern 2: Complex 1:Many Mapping
 
@@ -662,7 +662,7 @@ These files test individual functions and methods in isolation. Per-package cove
 | `config_test.go` | `config.go` | YAML parsing, validation, color conversion |
 | `parser_test.go` | `parser.go` | JSON parsing, interval summing |
 | `flags_test.go` | `flags.go` | CLI flag parsing and defaults |
-| `cache_commands_test.go` | `cache_commands.go` | Cache management command handlers (backup, restore, clear) |
+| `cache_commands_test.go` | `cache_commands.go` | Cache management command handlers (clear today, clear all) |
 | `runner_test.go` | `runner.go` | Execution modes (once/continuous), fetchAndDisplay |
 | `trueup_test.go` | `trueup.go` | `buildTrueUpReport` field mapping, net flow, per-system entries |
 | `aggregator_test.go` | `aggregator.go` | Multi-system aggregation with mock clients |

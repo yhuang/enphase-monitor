@@ -110,7 +110,7 @@ go build -o enphase-monitor
      discharge: "#7acf38"          # Battery Discharge
      import: "#f63cb1"             # Grid Import
      export: "#06b6de"             # Grid Export
-     net_import: "#f63cb1"         # Net Energy Flow (Import)
+     net_flow: "#f63cb1"           # Net Energy Flow
      net_export: "#06b6de"         # Net Energy Flow (Export)
      headers: "#f37320"            # Report Headers
      charge: "#7acf38"             # Battery Charge
@@ -282,11 +282,11 @@ Calculate the energy balance for your utility true-up year. Provide the start da
 ./enphase-monitor --true-up 2025-01-15
 ```
 
-This covers **full calendar months** from the start month through yesterday. For example, a `2025-01-15` start date queries January 2025 through the most recent complete month.
+This covers the **True-Up Window**: full calendar months from the first day of the start month through the window end. The window end is `min(yesterday, start_month + 12 months − 1 day)` — for an in-progress cycle the end moves daily; for a closed historical cycle it is fixed at the last day of the 12-month period. For example, a `2025-01-15` start date covers January 2025 through December 31 2025 once that cycle closes.
 
 **How the query works:**
 
-A single API batch of 8 calls (2 systems × 4 metrics: import, export, production, consumption) is made against the `_lifetime` endpoints with `start_date` set to the first day of the start month. Battery data is not fetched for true-up queries. The API returns all daily values from that date through yesterday in one response; the application sums the relevant date range client-side. No inter-batch waits are needed. Subsequent runs are instant because the response is served from the disk cache.
+A single API batch of 8 calls (2 systems × 4 metrics: import, export, production, consumption) is made against the `_lifetime` endpoints with `start_date` set to the first day of the start month. Battery data is not fetched for true-up queries. The API returns all daily values from that start date onward; the application sums only the values within the True-Up Window client-side. No inter-batch waits are needed. Subsequent runs are instant because the response is served from the disk cache.
 
 **The `--true-up` flag takes precedence over `--date`** — if both are provided, `--date` is ignored.
 
@@ -306,13 +306,11 @@ Press `Ctrl+C` to stop.
 - `--config <path>` - Path to configuration file (default: `config.yaml`)
 - `--continuous` - Run continuously with periodic refresh (default is run once and exit)
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
-- `--true-up <YYYY-MM-DD>` - Calculate true-up year energy report from this utility start date. Uses full calendar months; takes precedence over `--date`
+- `--true-up <YYYY-MM-DD>` - Calculate true-up year energy report from this utility start date. Covers the 12-month True-Up Window (in-progress: through yesterday; closed cycle: through last day of 12-month window). Takes precedence over `--date`
 - `--oauth-setup` - Run OAuth setup wizard (one-time for developer plan)
 - `--test` - Test mode: use cache only, no live API calls, validate against expected values
 - `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429 rate limit)
 - `--cache` - Serve report from cache only; print diagnostic listing missing endpoints if cache is incomplete
-- `--cache-backup` - Back up current cache to `cache.bak/`
-- `--cache-restore` - Restore cache from `cache.bak/` backup (prints error if no backup exists)
 - `--clear-cache` - Clear cached API responses for today's date only
 - `--clear-all-cache` - Clear all cached API responses (all dates)
 - `--debug` - Print debug information: last run time, API budget remaining, and per-request cache/live decisions
@@ -464,8 +462,8 @@ colors:
   discharge: "#7acf38"          # Battery Discharge
   import: "#f63cb1"             # Grid Import
   export: "#06b6de"             # Grid Export
-  net_import: "#f63cb1"         # Net Energy Flow (Import)
-  net_export: "#06b6de"         # Net Energy Flow (Export)
+  net_flow: "#f63cb1"           # Net Energy Flow (net import color)
+  net_export: "#06b6de"         # Net Energy Flow (net export color)
   headers: "#f37320"            # Report Headers
   charge: "#7acf38"             # Battery Charge
   total_consumed: "#f37320"     # Total Consumed
@@ -584,12 +582,6 @@ The cache directory also contains an `api_calls` file (no JSON extension) holdin
 
 # Clear all cached data
 ./enphase-monitor --clear-all-cache
-
-# Back up current cache to cache.bak/
-./enphase-monitor --cache-backup
-
-# Restore cache from cache.bak/ backup
-./enphase-monitor --cache-restore
 
 # Disable caching (always make live API calls)
 ./enphase-monitor --no-cache
@@ -714,7 +706,6 @@ enphase-monitor/
 │   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
-│   │   ├── backup.go                      # Cache backup and restore (--cache-backup, --cache-restore)
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
 │   │   ├── rate_limit_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
@@ -915,7 +906,7 @@ The expected values JSON file should have this structure:
         "production": 14.6,
         "battery_discharged": 6.8,
         "battery_charged": 8.6,
-        "net_imported": 19.6,
+        "net_flow": 19.6,
         "consumption": 32.3
       }
     }

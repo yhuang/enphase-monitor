@@ -49,7 +49,7 @@ func SetupDisplay(cfg *config.Config, reportTZ *time.Location) *display.Display 
 		colors.Discharge = cfg.Colors.Discharge
 		colors.Import = cfg.Colors.Import
 		colors.Export = cfg.Colors.Export
-		colors.NetImport = cfg.Colors.NetImport
+		colors.NetFlow = cfg.Colors.NetFlow
 		colors.NetExport = cfg.Colors.NetExport
 		colors.Headers = cfg.Colors.Headers
 		colors.Charge = cfg.Colors.Charge

@@ -15,7 +15,7 @@ import (
 // RunTrueUp calculates and displays energy metrics for a true-up year period.
 // trueUpStartStr must be YYYY-MM-DD — the utility-defined start date of the true-up year.
 // Full calendar months are used; the query covers the first day of the start month
-// through yesterday in a single API batch (4 metrics per system, battery excluded).
+// through the True-Up Window end in a single API batch (4 metrics per system, battery excluded).
 func RunTrueUp(ctx context.Context, rc RunConfig, trueUpStartStr string) error {
 	startDate, err := timezone.ParseDateInTimezone(trueUpStartStr, rc.ReportTZ)
 	if err != nil {
@@ -26,8 +26,8 @@ func RunTrueUp(ctx context.Context, rc RunConfig, trueUpStartStr string) error {
 	trueUpStart := time.Date(startDate.Year(), startDate.Month(), 1, 0, 0, 0, 0, rc.ReportTZ)
 
 	now := time.Now().In(rc.ReportTZ)
-	yesterday := now.AddDate(0, 0, -1)
-	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, rc.ReportTZ)
+	endDay := trueUpWindowEnd(trueUpStart, now)
+	endDate := time.Date(endDay.Year(), endDay.Month(), endDay.Day(), 23, 59, 59, 0, rc.ReportTZ)
 
 	aggSystems, aggAPIConfig := GetAggregatorTypes(rc.Cfg)
 	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, trueUpStart, constants.QueryTypeTrueUp, rc.ReportTZ)
@@ -44,6 +44,18 @@ func RunTrueUp(ctx context.Context, rc RunConfig, trueUpStartStr string) error {
 	report := buildTrueUpReport(metrics, startDate, endDate)
 	rc.Disp.ShowTrueUpReport(report)
 	return nil
+}
+
+// trueUpWindowEnd returns the last day of a True-Up Window.
+// For in-progress cycles (cycle end is still in the future), this is yesterday.
+// For closed historical cycles, this is the last day of the 12-month window.
+func trueUpWindowEnd(trueUpStart, now time.Time) time.Time {
+	cycleEnd := trueUpStart.AddDate(1, 0, 0).AddDate(0, 0, -1)
+	yesterday := now.AddDate(0, 0, -1)
+	if yesterday.Before(cycleEnd) {
+		return yesterday
+	}
+	return cycleEnd
 }
 
 // buildTrueUpReport converts AggregatedMetrics from a single true-up batch into a TrueUpReport.

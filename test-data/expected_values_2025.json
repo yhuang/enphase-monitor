@@ -10,7 +10,7 @@
         "production": 5100,
         "battery_discharged": 1400,
         "battery_charged": 2100,
-        "net_imported": 3500,
+        "net_flow": 3500,
         "consumption": 7800
       }
     },
@@ -23,7 +23,7 @@
         "production": 5300,
         "battery_discharged": 2000,
         "battery_charged": 2800,
-        "net_imported": 5700,
+        "net_flow": 5700,
         "consumption": 10100
       }
     }

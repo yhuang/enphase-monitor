@@ -50,6 +50,37 @@ func makeTestMetrics() *aggregator.AggregatedMetrics {
 	}
 }
 
+func TestTrueUpWindowEnd_InProgressCycle(t *testing.T) {
+	start := time.Date(2025, time.June, 1, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2026, time.March, 15, 10, 0, 0, 0, time.UTC) // within the 12-month window
+	got := trueUpWindowEnd(start, now)
+	want := now.AddDate(0, 0, -1) // yesterday
+	if !got.Equal(want) {
+		t.Errorf("got %v, want yesterday %v", got, want)
+	}
+}
+
+func TestTrueUpWindowEnd_ClosedCycle(t *testing.T) {
+	start := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC) // well past the 12-month window
+	got := trueUpWindowEnd(start, now)
+	want := time.Date(2024, time.December, 31, 0, 0, 0, 0, time.UTC) // last day of 12-month window
+	if !got.Equal(want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestTrueUpWindowEnd_ExactBoundary(t *testing.T) {
+	start := time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)
+	// now = the day after the cycle end (2026-01-01); yesterday = 2025-12-31 = cycleEnd
+	now := time.Date(2026, time.January, 1, 10, 0, 0, 0, time.UTC)
+	got := trueUpWindowEnd(start, now)
+	want := time.Date(2025, time.December, 31, 0, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func TestBuildTrueUpReport_CombinedFieldsMapped(t *testing.T) {
 	m := makeTestMetrics()
 	report := buildTrueUpReport(m, trueUpStart, trueUpEnd)

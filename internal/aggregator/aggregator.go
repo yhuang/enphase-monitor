@@ -133,8 +133,8 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 			allFromCache = false
 		}
 
-		// Calculate net imported today
-		netImportedToday := localMetrics.GridImportToday - localMetrics.GridExportToday
+		// Calculate net flow today (positive = net import, negative = net export)
+		netFlowToday := localMetrics.GridImportToday - localMetrics.GridExportToday
 
 		systemMetrics := SystemMetrics{
 			Name:                   sys.Name,
@@ -146,7 +146,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 			GridExportToday:        localMetrics.GridExportToday,
 			BatteryChargedToday:    localMetrics.BatteryChargedToday,
 			BatteryDischargedToday: localMetrics.BatteryDischargedToday,
-			NetImportedToday:       netImportedToday,
+			NetFlowToday:           netFlowToday,
 		}
 
 		metrics.Systems = append(metrics.Systems, systemMetrics)
@@ -163,8 +163,8 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 		metrics.GridExportToday += localMetrics.GridExportToday
 	}
 
-	// Calculate net import (positive = net import, negative = net export)
-	metrics.NetImportToday = metrics.GridImportToday - metrics.GridExportToday
+	// Calculate net flow (positive = net import, negative = net export)
+	metrics.NetFlowToday = metrics.GridImportToday - metrics.GridExportToday
 
 	metrics.CacheUsed = anyCacheUsed
 	metrics.AllFromCache = allFromCache

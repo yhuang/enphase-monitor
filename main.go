@@ -129,22 +129,6 @@ func main() {
 		return
 	}
 
-	if flags.CacheBackup {
-		if err := cli.HandleCacheBackup(); err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	if flags.CacheRestore {
-		if err := cli.HandleCacheRestore(); err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
-
 	// Load configuration
 	cfg, err := config.LoadConfig(flags.ConfigFile)
 	if err != nil {
@@ -183,7 +167,7 @@ func main() {
 
 	// --cache: serve report from cache only; diagnose missing endpoints if incomplete.
 	// Handles --cache alone, --cache --date, and --cache --true-up.
-	if flags.CacheOnly {
+	if flags.CachedMode {
 		app.ConfigureModes(false, false, flags.Debug)
 		printDebugStartup(flags.Debug, reportTZ)
 		parsedInput, err := app.ParseTestDate(flags.TestDate, reportTZ)
