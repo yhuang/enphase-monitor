@@ -17,7 +17,7 @@ type AggregatedMetrics struct {
 	ConsumptionToday float64
 	GridImportToday  float64
 	GridExportToday  float64
-	NetImportToday   float64 // Grid Import - Grid Export (positive = import, negative = export)
+	NetFlowToday     float64 // Grid Import - Grid Export (positive = net import, negative = net export)
 
 	// Individual System Data
 	Systems []SystemMetrics
@@ -65,5 +65,5 @@ type SystemMetrics struct {
 	GridExportToday        float64
 	BatteryChargedToday    float64
 	BatteryDischargedToday float64
-	NetImportedToday       float64
+	NetFlowToday           float64
 }

@@ -25,7 +25,7 @@ func GetDefaultColors() config.ColorConfig {
 		Discharge:     "\033[38;5;34m",
 		Import:        "\033[38;5;39m",
 		Export:        "\033[38;5;220m",
-		NetImport:     "\033[38;5;39m",
+		NetFlow:       "\033[38;5;39m",
 		NetExport:     "\033[38;5;220m",
 		Headers:       "\033[38;5;51m",
 		Charge:        "\033[38;5;205m",
@@ -114,7 +114,7 @@ func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
 	fmt.Fprintf(d.writer, "\n   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Energy Flow", metrics.NetImportToday, "  ", 24, false, "\033[48;2;1;3;100m", "\033[48;2;114;0;102m")
+	d.printNetFlow("  Net Energy Flow", metrics.NetFlowToday, "  ", 24, false, "\033[48;2;1;3;100m", "\033[48;2;114;0;102m")
 	d.printMetric("Energy Produced", metrics.ProductionToday, d.colors.Production, "    ", 22, false)
 	d.printMetric("Energy Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 22, false)
 	d.printMetric("Energy Imported", metrics.GridImportToday, d.colors.Import, "    ", 22, false)
@@ -148,7 +148,7 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		if showBattery {
 			lw = 31
 		}
-		d.printNetFlow("Net Energy Flow", sys.NetImportedToday, "        ", lw, true, "", "")
+		d.printNetFlow("Net Energy Flow", sys.NetFlowToday, "        ", lw, true, "", "")
 		d.printMetric("Energy Produced", sys.ProductionToday, d.colors.Production, "        ", lw, true)
 		d.printMetric("Energy Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", lw, true)
 		d.printMetric("Energy Imported", sys.GridImportToday, d.colors.Import, "        ", lw, true)
@@ -188,7 +188,7 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 
 func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int, rightAlign bool, importBg, exportBg string) {
 	// Default to import (positive), override for export (negative)
-	color := d.colors.NetImport
+	color := d.colors.NetFlow
 	direction := "import"
 	displayValue := netValue
 

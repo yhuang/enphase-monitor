@@ -282,7 +282,7 @@ func BenchmarkGetAggregatedMetrics_MultiSystem(b *testing.B) {
 	}
 }
 
-// BenchmarkNetImportCalculation benchmarks the net import calculation
+// BenchmarkNetFlowCalculation benchmarks the net flow calculation
 //
 // MICRO-BENCHMARKS:
 // -----------------
@@ -294,7 +294,7 @@ func BenchmarkGetAggregatedMetrics_MultiSystem(b *testing.B) {
 //
 // CAUTION: Very fast operations (< 1 ns) can be optimized away by the
 // compiler if you're not careful. The `_ = result` prevents this.
-func BenchmarkNetImportCalculation(b *testing.B) {
+func BenchmarkNetFlowCalculation(b *testing.B) {
 	gridImport := 125.5
 	gridExport := 45.8
 

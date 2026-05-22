@@ -385,7 +385,7 @@ func TestMergeWithDefaults(t *testing.T) {
 		Discharge:     "default-discharge",
 		Import:        "default-import",
 		Export:        "default-export",
-		NetImport:     "default-netimport",
+		NetFlow:       "default-netflow",
 		NetExport:     "default-netexport",
 		Headers:       "default-headers",
 		Charge:        "default-charge",

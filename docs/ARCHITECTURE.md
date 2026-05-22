@@ -52,7 +52,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go                                # Entry point (~324 lines) - orchestration only
+├── main.go                                # Entry point (~307 lines) - orchestration only
 ├── internal/
 │   ├── aggregator/                        # Multi-system data aggregation
 │   │   ├── types.go                       # Metric data structures (AggregatedMetrics, SystemMetrics)
@@ -75,12 +75,11 @@ enphase-monitor/
 │   │   ├── setup_test.go                  # Setup tests
 │   │   ├── runner.go                      # Execution modes (once/continuous)
 │   │   ├── runner_test.go                 # Runner tests
-│   │   ├── trueup.go                      # True-up year: single-batch lifetime query and report conversion
-│   │   ├── trueup_test.go                 # True-up report conversion tests
+│   │   ├── trueup.go                      # True-up year: single-batch lifetime query, True-Up Window end-date logic, report conversion
+│   │   ├── trueup_test.go                 # True-up Window end-date logic (trueUpWindowEnd) and report conversion tests
 │   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
-│   │   ├── backup.go                      # Cache backup and restore (--cache-backup, --cache-restore)
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
 │   │   ├── rate_limit_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)

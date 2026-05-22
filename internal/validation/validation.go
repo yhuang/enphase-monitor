@@ -56,7 +56,7 @@ type ExpectedMetrics struct {
 	Production        float64 `json:"production"`
 	BatteryDischarged float64 `json:"battery_discharged"`
 	BatteryCharged    float64 `json:"battery_charged"`
-	NetImported       float64 `json:"net_imported"`
+	NetFlow           float64 `json:"net_flow"`
 	Consumption       float64 `json:"consumption"`
 }
 
@@ -84,7 +84,7 @@ func ValidateMetrics(w io.Writer, metrics *aggregator.AggregatedMetrics, dateStr
 				"          \"production\": 20.0,\n"+
 				"          \"battery_discharged\": 2.0,\n"+
 				"          \"battery_charged\": 3.0,\n"+
-				"          \"net_imported\": 5.0,\n"+
+				"          \"net_flow\": 5.0,\n"+
 				"          \"consumption\": 15.0\n"+
 				"        }\n"+
 				"      }\n"+
@@ -131,7 +131,7 @@ func ValidateMetrics(w io.Writer, metrics *aggregator.AggregatedMetrics, dateStr
 			{"Production", expectedSys.Expected.Production, actualSys.ProductionToday},
 			{"Battery Discharged", expectedSys.Expected.BatteryDischarged, actualSys.BatteryDischargedToday},
 			{"Battery Charged", expectedSys.Expected.BatteryCharged, actualSys.BatteryChargedToday},
-			{"Net Imported", expectedSys.Expected.NetImported, actualSys.NetImportedToday},
+			{"Net Flow", expectedSys.Expected.NetFlow, actualSys.NetFlowToday},
 			{"Consumption", expectedSys.Expected.Consumption, actualSys.ConsumptionToday},
 		}
 		total, passed, anyFailed := runMetricTests(w, tests)

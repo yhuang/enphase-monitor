@@ -282,10 +282,10 @@ func TestGetAggregatedMetrics_MultipleSystems(t *testing.T) {
 		t.Errorf("Expected grid export %v, got %v", expectedExport, metrics.GridExportToday)
 	}
 
-	// Net import = import - export = 4.0 - 7.0 = -3.0 (net export)
-	expectedNetImport := -3.0
-	if metrics.NetImportToday != expectedNetImport {
-		t.Errorf("Expected net import %v, got %v", expectedNetImport, metrics.NetImportToday)
+	// Net flow = import - export = 4.0 - 7.0 = -3.0 (net export)
+	expectedNetFlow := -3.0
+	if metrics.NetFlowToday != expectedNetFlow {
+		t.Errorf("Expected net flow %v, got %v", expectedNetFlow, metrics.NetFlowToday)
 	}
 
 	// Verify individual systems

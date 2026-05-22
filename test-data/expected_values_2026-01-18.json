@@ -10,7 +10,7 @@
         "production": 21.7,
         "battery_discharged": 5.4,
         "battery_charged": 8.0,
-        "net_imported": -1.4,
+        "net_flow": -1.4,
         "consumption": 17.7
       }
     },
@@ -23,7 +23,7 @@
         "production": 25.4,
         "battery_discharged": 2.9,
         "battery_charged": 2.6,
-        "net_imported": -8.9,
+        "net_flow": -8.9,
         "consumption": 13.6
       }
     }

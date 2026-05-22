@@ -68,7 +68,7 @@ func TestValidateMetrics_FullFlow_Success(t *testing.T) {
 				ProductionToday:        14.6,
 				BatteryDischargedToday: 6.8,
 				BatteryChargedToday:    8.6,
-				NetImportedToday:       19.6,
+				NetFlowToday:       19.6,
 				ConsumptionToday:       32.3,
 			},
 			{
@@ -79,7 +79,7 @@ func TestValidateMetrics_FullFlow_Success(t *testing.T) {
 				ProductionToday:        19.3,
 				BatteryDischargedToday: 5.5,
 				BatteryChargedToday:    8.1,
-				NetImportedToday:       -0.2,
+				NetFlowToday:       -0.2,
 				ConsumptionToday:       16.5,
 			},
 		},
@@ -128,7 +128,7 @@ func TestValidateMetrics_FullFlow_WithinTolerance(t *testing.T) {
 				ProductionToday:        14.5, // Within tolerance of 14.6
 				BatteryDischargedToday: 6.7,  // Within tolerance of 6.8
 				BatteryChargedToday:    8.5,  // Within tolerance of 8.6
-				NetImportedToday:       19.5, // Within tolerance of 19.6
+				NetFlowToday:       19.5, // Within tolerance of 19.6
 				ConsumptionToday:       32.2, // Within tolerance of 32.3
 			},
 			{
@@ -139,7 +139,7 @@ func TestValidateMetrics_FullFlow_WithinTolerance(t *testing.T) {
 				ProductionToday:        19.2,  // Within tolerance of 19.3
 				BatteryDischargedToday: 5.4,   // Within tolerance of 5.5
 				BatteryChargedToday:    8.0,   // Within tolerance of 8.1
-				NetImportedToday:       -0.15, // Within tolerance of -0.2
+				NetFlowToday:       -0.15, // Within tolerance of -0.2
 				ConsumptionToday:       16.4,  // Within tolerance of 16.5
 			},
 		},
@@ -188,7 +188,7 @@ func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
 				ProductionToday:        14.6, // Match
 				BatteryDischargedToday: 6.8,  // Match
 				BatteryChargedToday:    8.6,  // Match
-				NetImportedToday:       19.6, // Match
+				NetFlowToday:       19.6, // Match
 				ConsumptionToday:       32.3, // Match
 			},
 			{
@@ -199,7 +199,7 @@ func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
 				ProductionToday:        19.3,
 				BatteryDischargedToday: 5.5,
 				BatteryChargedToday:    8.1,
-				NetImportedToday:       -0.2,
+				NetFlowToday:       -0.2,
 				ConsumptionToday:       16.5,
 			},
 		},
@@ -252,7 +252,7 @@ func TestValidateMetrics_MissingSystem(t *testing.T) {
 				ProductionToday:        14.6,
 				BatteryDischargedToday: 6.8,
 				BatteryChargedToday:    8.6,
-				NetImportedToday:       19.6,
+				NetFlowToday:       19.6,
 				ConsumptionToday:       32.3,
 			},
 			// Missing second system
@@ -402,7 +402,7 @@ func TestValidateMetrics_RealWorldScenario(t *testing.T) {
 				ProductionToday:        14.58, // Slight variation
 				BatteryDischargedToday: 6.79,  // Slight variation
 				BatteryChargedToday:    8.62,  // Slight variation
-				NetImportedToday:       19.46, // Calculated value may vary
+				NetFlowToday:       19.46, // Calculated value may vary
 				ConsumptionToday:       32.28, // Calculated value may vary
 			},
 			{
@@ -413,7 +413,7 @@ func TestValidateMetrics_RealWorldScenario(t *testing.T) {
 				ProductionToday:        19.28, // Slight variation
 				BatteryDischargedToday: 5.52,  // Slight variation
 				BatteryChargedToday:    8.08,  // Slight variation
-				NetImportedToday:       -0.14, // Calculated value may vary
+				NetFlowToday:       -0.14, // Calculated value may vary
 				ConsumptionToday:       16.48, // Calculated value may vary
 			},
 		},
