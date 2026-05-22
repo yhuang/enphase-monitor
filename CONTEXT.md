@@ -24,6 +24,10 @@ _Avoid_: Interval endpoint, telemetry data
 API responses from the `energy_*_lifetime` endpoints. Returns cumulative daily totals for all completed past days, but never includes today's partial data. Used for Month, Year, and True-Up Mode queries.
 _Avoid_: Lifetime endpoint, historical data
 
+**API Budget**:
+The number of live API requests available in the current 60-second sliding window. The Enphase Cloud API enforces a limit of 10 requests per minute per API key. With 2 Systems × 5 metrics = 10 calls per run, one full run consumes the entire budget. The application tracks the budget locally; when exhausted, it falls back to cache rather than issuing a guaranteed-failed live call.
+_Avoid_: Rate limit, API quota, request quota
+
 ## Cache
 
 **Cache**:
@@ -36,6 +40,24 @@ The user-selected cache behavior for a run. Three modes:
 - **Cached** (`--cache`): serve the report entirely from Cache; list missing endpoints if incomplete. No live API calls.
 - **Live** (`--no-cache`): bypass Cache entirely; always make live API calls.
 _Avoid_: Cache-only mode, no-cache mode, cache flag
+
+## Run Modes
+
+**Validation Mode**:
+A run mode activated by `--test --date <date>` that serves the report entirely from cache (no live API calls) and then compares each metric against a pre-recorded set of expected values stored in `test-data/`. Exits non-zero if any metric diverges. Used for regression testing after code changes to confirm that calculation logic has not drifted.
+_Avoid_: Test mode, cache-validation mode, regression mode
+
+**Run-Once Mode**:
+The default behavior — execute one query, display the report, and exit. Works with all Query Modes and Cache Modes.
+_Avoid_: Single run, one-shot mode
+
+**Continuous Mode**:
+A run mode activated by `--continuous` that re-fetches and re-displays today's Day report on every Refresh Interval. Restricted to today's Day query — Month, Year, and past-date queries are silently downgraded to Run-Once Mode. Intended for use with Auto Cache Mode: when the API Budget is temporarily exhausted at a refresh tick, the program gracefully serves the most recent cached data rather than terminating. Using `--no-cache` with Continuous Mode is not recommended — it bypasses the pre-call budget short-circuit, so exhaustion triggers live calls that are likely to 429; on a 429 the program falls back to cache if available (with a warning), or exits with an error if no cache exists.
+_Avoid_: Loop mode, polling mode, watch mode
+
+**Refresh Interval**:
+The user-configured number of seconds between re-fetches in Continuous Mode. Set via `refresh_interval` in `config.yaml`; defaults to 3600 (1 hour). Must be at least 60 seconds to avoid exhausting the API Budget on every tick.
+_Avoid_: Polling interval, refresh rate, refresh period
 
 ## Query Modes
 
@@ -50,6 +72,14 @@ _Avoid_: Daily query, monthly query, yearly query
 **True-Up Mode**:
 A distinct Query Mode activated by the `--true-up` flag with a `YYYY-MM-DD` date set by the utility (PG&E). Unlike the date-granularity modes, the date is not inferred — it is the utility-defined start of the True-Up Period. Code identifier: `QueryTypeTrueUp`.
 _Avoid_: True-up query, annual query
+
+**Current Period**:
+A query date that includes today — today's Day query, the current calendar month, or the current calendar year. Data is still accumulating, so cache entries expire (1 hour for today's Day query; 24 hours for the current month or year) and re-fetches are meaningful. SOC is only available for today's Day query (a Current Period Day query). Continuous Mode is restricted to Current Period Day queries.
+_Avoid_: Active period, open period, in-progress period
+
+**Past Period**:
+A query date entirely before today — a completed day, month, or year. Data is immutable; cache entries never expire. Code identifier: `IsPastPeriod`.
+_Avoid_: Historical period, closed period, completed period
 
 ## True-Up
 
