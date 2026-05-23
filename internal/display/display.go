@@ -158,7 +158,7 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		if showBattery {
 			d.printMetric("Battery Charge", sys.BatteryChargedToday, d.colors.Charge, "        ", lw, true)
 			d.printMetric("Battery Discharge", sys.BatteryDischargedToday, d.colors.Discharge, "        ", lw, true)
-			fmt.Fprintf(d.writer, "        %sBattery State of Charge (SOC):%s   %s%d%%%s\n",
+			fmt.Fprintf(d.writer, "        %sBattery State of Charge:%s   %s%d%%%s\n",
 				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		}
 	}
@@ -299,11 +299,11 @@ func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, sys.Name, constants.Reset,
 			d.colors.SecondaryText, sys.ID, constants.Reset)
-		d.printNetFlow("Net Flow", sys.NetFlow, "      ", 21, true, "", "")
-		d.printMetric("Production", sys.Production, d.colors.Production, "      ", 21, true)
-		d.printMetric("Consumption", sys.Consumption, d.colors.TotalConsumed, "      ", 21, true)
-		d.printMetric("Grid Import", sys.GridImport, d.colors.Import, "      ", 21, true)
-		d.printMetric("Grid Export", sys.GridExport, d.colors.Export, "      ", 21, true)
+		d.printNetFlow("Net Flow", sys.NetFlow, "        ", 21, true, "", "")
+		d.printMetric("Production", sys.Production, d.colors.Production, "        ", 21, true)
+		d.printMetric("Consumption", sys.Consumption, d.colors.TotalConsumed, "        ", 21, true)
+		d.printMetric("Grid Import", sys.GridImport, d.colors.Import, "        ", 21, true)
+		d.printMetric("Grid Export", sys.GridExport, d.colors.Export, "        ", 21, true)
 	}
 }
 

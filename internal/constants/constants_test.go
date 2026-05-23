@@ -81,7 +81,7 @@ func TestQueryModeString(t *testing.T) {
 	}
 }
 
-// TestIsRateLimitError tests the isRateLimitError helper function
+// TestIsRateLimitError tests the IsRateLimitError helper function
 func TestIsRateLimitError(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -119,7 +119,7 @@ func TestIsRateLimitError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := IsRateLimitError(tt.err)
 			if result != tt.expected {
-				t.Errorf("isRateLimitError() = %v, want %v", result, tt.expected)
+				t.Errorf("IsRateLimitError() = %v, want %v", result, tt.expected)
 			}
 		})
 	}

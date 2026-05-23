@@ -82,14 +82,14 @@ func RedactURLKey(rawURL string) string {
 	return parsed.String()
 }
 
-// MinRequestInterval is the width of the API Budget window. It serves two
-// purposes:
-//  1. Cache staleness: for current-period queries, a cache entry younger than
-//     this is reused instead of refetched.
-//  2. Sliding-window budget: RecordAPICall logs each live call and
-//     RemainingBudget returns MaxRequestsPerWindow minus the count of logged
-//     calls newer than now - MinRequestInterval. When budget reaches zero the
-//     API client serves cache instead of issuing a call that would 429.
+// MinRequestInterval is the width of the sliding-window API Budget counter.
+// RecordAPICall logs each live call and RemainingBudget returns
+// MaxRequestsPerWindow minus the count of logged calls newer than
+// now - MinRequestInterval. When budget reaches zero the API client serves
+// cache instead of issuing a call that would 429.
+//
+// Per-query-mode cache staleness is a separate concern handled by
+// MaxCurrentDayCacheAge and MaxCurrentPeriodCacheAge.
 const MinRequestInterval = 1 * time.Minute
 
 // Package-level state for cache configuration.

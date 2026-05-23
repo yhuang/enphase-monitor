@@ -122,7 +122,7 @@ const (
 // These constants ensure consistent error identification across the codebase.
 const (
 	// RateLimitError is the identifier for rate limit (429) errors.
-	// Used in internal/aggregator/aggregator.go, main.go, and client.go for consistent error detection.
+	// Callers compare against this string via the IsRateLimitError helper below.
 	RateLimitError = "rate limit exceeded (429)"
 	// ErrAPIConfigRequired is returned when API configuration is missing
 	ErrAPIConfigRequired = "api configuration required"

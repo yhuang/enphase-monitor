@@ -301,7 +301,7 @@ Monitor with auto-refresh (uses `refresh_interval` from config):
 
 The application will query all systems at the configured `refresh_interval` (default: 3600 seconds = 1 hour) and display updated metrics.
 
-**Restrictions**: `--continuous` only applies to today's Day query. Month, Year, and Past Period queries are silently downgraded to run once and exit, since Past Period data is immutable.
+**Restrictions**: `--continuous` only applies to today's Day query. Month, Year, Past Period, and True-Up Mode queries are silently downgraded to run once and exit — Past Period data is immutable, and True-Up Mode uses a dedicated single-batch path that always runs once.
 
 **Cache Mode recommendation**: Use the default Auto Cache Mode (no `--cache` or `--no-cache` flag). When the API Budget is temporarily exhausted at a refresh tick, Auto mode gracefully serves the most recent cached data. With `--no-cache`, budget exhaustion triggers a live call that is likely to 429; on a 429, the program falls back to cache if available (with a warning), or exits with an error if no cache exists.
 
@@ -373,24 +373,24 @@ The application displays:
 ---------------------------------------------------------
 
   [1] Right Subpanel (5525881)
-      Net Flow:                       19.3 kWh (import)
-      Production:                     14.6 kWh
-      Consumption:                    32.1 kWh
-      Grid Import:                    23.1 kWh
-      Grid Export:                     3.8 kWh
-      Battery Charge:                  8.5 kWh
-      Battery Discharge:               6.8 kWh
-      Battery State of Charge (SOC):    63%
+      Net Flow:                   19.3 kWh (import)
+      Production:                 14.6 kWh
+      Consumption:                32.1 kWh
+      Grid Import:                23.1 kWh
+      Grid Export:                3.8 kWh
+      Battery Charge:             8.5 kWh
+      Battery Discharge:          6.8 kWh
+      Battery State of Charge:    63%
 
   [2] Left Subpanel (5392556)
-      Net Flow:                        0.2 kWh (export)
-      Production:                     18.9 kWh
-      Consumption:                    16.4 kWh
-      Grid Import:                     7.5 kWh
-      Grid Export:                     7.6 kWh
-      Battery Charge:                  8.1 kWh
-      Battery Discharge:               5.4 kWh
-      Battery State of Charge (SOC):    74%
+      Net Flow:                   0.2 kWh (export)
+      Production:                 18.9 kWh
+      Consumption:                16.4 kWh
+      Grid Import:                7.5 kWh
+      Grid Export:                7.6 kWh
+      Battery Charge:             8.1 kWh
+      Battery Discharge:          5.4 kWh
+      Battery State of Charge:    74%
 
 =========================================================
 ```
@@ -418,7 +418,7 @@ The `--true-up` flag produces a dedicated report:
 ---------------------------------------------------------
     Production:     3456.7 kWh
     Consumption:    2345.6 kWh
-    Grid Import:     800.0 kWh
+    Grid Import:    800.0 kWh
     Grid Export:    1911.1 kWh
     Net Flow:       1111.1 kWh (export)
 
@@ -426,10 +426,10 @@ The `--true-up` flag produces a dedicated report:
 ---------------------------------------------------------
 
   [1] Right Subpanel (5525881)
-      Net Flow:           600.0 kWh (export)
+      Net Flow:         600.0 kWh (export)
       Production:       1,700.0 kWh
       Consumption:      1,100.0 kWh
-      Grid Import:        600.0 kWh
+      Grid Import:      600.0 kWh
       Grid Export:      1,200.0 kWh
 
   [2] Left Subpanel (5392556)
@@ -472,20 +472,20 @@ You can customize the colors used in the terminal output by adding a `colors` se
 
 ```yaml
 colors:
-  production: "#f0b57c"         # Solar Production
-  discharge: "#7acf38"          # Battery Discharge
-  import: "#f63cb1"             # Grid Import
-  export: "#06b6de"             # Grid Export
+  production: "#f0b57c"             # Solar Production
+  discharge: "#7acf38"              # Battery Discharge
+  import: "#f63cb1"                 # Grid Import
+  export: "#06b6de"                 # Grid Export
   net_import_background: "#010469"  # Net Flow line background highlight (import direction) — 24-bit truecolor
   net_export_background: "#7D0069"  # Net Flow line background highlight (export direction) — 24-bit truecolor
-  net_import: "#f63cb1"         # Net Flow (foreground color when net is import)
-  net_export: "#06b6de"         # Net Flow (foreground color when net is export)
-  headers: "#f37320"            # Report Headers
-  charge: "#7acf38"             # Battery Charge
-  total_consumed: "#f37320"     # Total Consumed
-  secondary_text: "#808080"     # Secondary Text
-  primary_text: "#ffffff"       # Primary Text
-  error: "#ff0000"              # Error Text
+  net_import: "#f63cb1"             # Net Flow (foreground color when net is import)
+  net_export: "#06b6de"             # Net Flow (foreground color when net is export)
+  headers: "#f37320"                # Report Headers
+  charge: "#7acf38"                 # Battery Charge
+  total_consumed: "#f37320"         # Total Consumed
+  secondary_text: "#808080"         # Secondary Text
+  primary_text: "#ffffff"           # Primary Text
+  error: "#ff0000"                  # Error Text
 ```
 
 **Color Format Options:**
