@@ -441,7 +441,7 @@ func TestValidateMetrics_MissingFile_HelpfulError(t *testing.T) {
 
 	t.Run("contains skip validation hint", func(t *testing.T) {
 		// The error should tell the user how to skip validation if they don't want it
-		if !containsString(errMsg, "skip validation") || !containsString(errMsg, "omit the --test flag") {
+		if !containsString(errMsg, "without validation") || !containsString(errMsg, "omit the --test flag") {
 			t.Error("Error message should contain hint about skipping validation")
 		}
 	})

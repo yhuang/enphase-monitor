@@ -21,7 +21,7 @@
 //
 // 3. Error Handling Tests
 //   - Test 401 Unauthorized response
-//   - Test 429 Rate Limit response
+//   - Test 429 response
 //   - Test malformed JSON response
 //   - Test network errors
 //
@@ -39,7 +39,7 @@
 // - Testing: Uses httptest server URL
 //
 // This allows testing without:
-// - Real API calls (no rate limits)
+// - Real API calls (no API Budget constraints)
 // - Network dependencies (fast, deterministic)
 // - External service availability (always works)
 //
@@ -65,12 +65,12 @@ import (
 // TestEnlightenCloudClient_GetProductionForDate tests production data fetching with mock HTTP server
 // This test now works properly with the new baseURL dependency injection!
 func TestEnlightenCloudClient_GetProductionForDate(t *testing.T) {
-	// Reset the sliding-window rate-limit counter so this test is not affected
+	// Reset the sliding-window API Budget counter so this test is not affected
 	// by api_calls entries accumulated by earlier tests in the same run.
 	cache.ResetState()
 	defer cache.ResetState()
 
-	// Create mock HTTP server that returns test telemetry data
+	// Create mock HTTP server that returns test Interval Data
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check authorization header
 		if r.Header.Get("Authorization") != "Bearer test-token" {
@@ -79,7 +79,7 @@ func TestEnlightenCloudClient_GetProductionForDate(t *testing.T) {
 			return
 		}
 
-		// Return mock telemetry data (production_meter format)
+		// Return mock Interval Data (production_meter format)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"intervals": [
@@ -102,7 +102,7 @@ func TestEnlightenCloudClient_GetProductionForDate(t *testing.T) {
 
 	// Test GetProductionForDate with mock server
 	ctx := context.Background()
-	production, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryTypeDay) // Today
+	production, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryModeDay) // Today
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -141,7 +141,7 @@ func TestEnlightenCloudClient_RateLimitHandling(t *testing.T) {
 
 	// Test GetProductionForDate - should return error for 429
 	ctx := context.Background()
-	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	// Verify we got a rate limit error
 	if err == nil {

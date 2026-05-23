@@ -588,7 +588,7 @@ Call `os.Exit` or `log.Fatal` **only in `main()`**. All other code should return
 **In this codebase:**
 
 - **main.go** is the only file that calls `os.Exit(1)`. It handles errors from config, OAuth, cache commands, `RunOnce`, and `RunContinuous` by printing to stderr and exiting.
-- **internal/app/runner.go** – `RunOnce` and `RunContinuous` return `error` instead of exiting. `fetchAndDisplay` returns `error` so the continuous loop can stop on fatal errors (e.g. rate limit).
+- **internal/app/runner.go** – `RunOnce` and `RunContinuous` return `error` instead of exiting. `fetchAndDisplay` returns `error` so the continuous loop can stop on fatal errors (e.g. 429).
 - **internal/app/setup.go** – No `ExitWithError`; main performs the fprintf and exit.
 
 **Benefits:** Testable code (no exit in tests), predictable control flow, `defer` in helpers always runs.

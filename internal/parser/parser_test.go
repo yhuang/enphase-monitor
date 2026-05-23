@@ -252,7 +252,7 @@ func TestReadResponseBody(t *testing.T) {
 	})
 }
 
-// TestParseLifetimeResponse tests parsing of lifetime endpoint daily aggregated responses.
+// TestParseLifetimeResponse tests parsing of Lifetime Data endpoint daily aggregated responses.
 func TestParseLifetimeResponse(t *testing.T) {
 	tests := []struct {
 		name      string

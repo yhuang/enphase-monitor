@@ -41,7 +41,7 @@ The project follows a pragmatic approach to testing:
 
 ### Why main.go Has 0% Coverage
 
-The `main.go` file is pure orchestration (~324 lines) and has 0% coverage by design. This is an **industry standard** because:
+The `main.go` file is pure orchestration (~307 lines) and has 0% coverage by design. This is an **industry standard** because:
 
 1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
 2. **All logic tested**: All functions `main.go` calls are tested in internal packages
@@ -74,7 +74,7 @@ Most packages follow the simple convention where each source file has one corres
 | `constants.go` | `constants_test.go` | Constants validation |
 | `display.go` | `display_test.go` | Display formatting tests (includes `ShowTrueUpReport` tests) |
 | `timezone.go` | `timezone_test.go` | Timezone handling tests |
-| `trueup.go` | `trueup_test.go` | True-up Window end-date logic (`trueUpWindowEnd`): in-progress vs closed cycle; `buildTrueUpReport` field mapping, net flow, per-system entries |
+| `trueup.go` | `trueup_test.go` | True-up Window end-date logic (`trueUpWindowEnd`): Current Period vs Past True-Up Period; `buildTrueUpReport` field mapping, net flow, per-system entries |
 
 #### Pattern 2: Complex 1:Many Mapping
 
@@ -84,7 +84,7 @@ For packages with extensive functionality or different test concerns, tests are 
 - `cache.go` → 4 test files:
   - `cache_test.go` - State management tests (flags, ResetState)
   - `cache_functions_test.go` - Core functionality tests (save, load, normalize, HasCacheForDate)
-  - `rate_limit_test.go` - Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning, LastAPICallTime)
+  - `api_budget_test.go` - Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning, LastAPICallTime)
   - `cli_test.go` - CLI utilities tests (ListCacheEntries, ClearTodayCache)
 
 **OAuth Package** (3 test files):
@@ -179,7 +179,7 @@ type MockCloudClient struct {
     Err       error
 }
 
-func (m *MockCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*api.LocalMetrics, bool, error) {
+func (m *MockCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (*api.LocalMetrics, bool, error) {
     if m.Err != nil {
         return nil, false, m.Err
     }
@@ -230,7 +230,7 @@ func TestValidationTolerance(t *testing.T) {
 - Test real HTTP interactions without external dependencies
 - Control response codes, headers, and body content
 - Test error handling (timeouts, malformed responses, etc.)
-- No API rate limits or network issues
+- No API Budget constraints or network issues
 
 **Example** (`oauth_functional_test.go`):
 ```go
@@ -493,7 +493,7 @@ func TestGetAggregatedMetrics_ContextCancellation(t *testing.T) {
     cancel()
 
     // Should return context error
-    _, err := aggregator.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryTypeDay, tz)
+    _, err := aggregator.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryModeDay, tz)
     if err == nil || !errors.Is(err, context.Canceled) {
         t.Error("Expected context.Canceled error")
     }
@@ -675,11 +675,11 @@ These files test component interactions:
 |-----------|-------|---------|
 | `validation_integration_test.go` | 7 test functions | End-to-end validation with real cached data and expected values files |
 | `client_functional_test.go` | API client tests | HTTP interactions with mock server |
-| `client_lifetime_test.go` | Lifetime endpoint tests | Month/year queries via `_lifetime` API endpoints |
+| `client_lifetime_test.go` | Lifetime Data endpoint tests | Month/year queries via `_lifetime` API endpoints |
 | `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
 | `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 report types; preflight warning on/off |
-| `query_cost_test.go` | 3 test functions | `QueryCost` output for all query type × hasBattery combinations; 2-system budget constraint |
-| `rate_limit_test.go` | 8 test functions | `RecordAPICall`, `RemainingBudget`, old-entry pruning, `ClearAPICalls`, `LastAPICallTime` |
+| `query_cost_test.go` | 3 test functions | `QueryCost` output for all query mode × hasBattery combinations; 2-system budget constraint |
+| `api_budget_test.go` | 8 test functions | `RecordAPICall`, `RemainingBudget`, old-entry pruning, `ClearAPICalls`, `LastAPICallTime` |
 | `testmain_test.go` | (no test functions) | `TestMain`: package-level setup redirecting all cache I/O to a temp dir so api tests never touch the production cache |
 
 ### OAuth Test Files
@@ -745,14 +745,14 @@ go test -v ./internal/app/ -run TestValidateTestModeCache
 
 ### Integration Testing with --test Flag
 
-The `--test` flag enables cache-only mode with validation against expected values. This requires:
+The `--test` flag enables Validation Mode (cache only, with validation against expected values). This requires:
 
 1. **Cached API responses** - Run `./enphase-monitor` first to populate the cache
 2. **Expected values file** - Create `test-data/expected_values_YYYY-MM-DD.json`
 
 #### Early Cache Validation
 
-The application validates cache existence before running in test mode:
+The application validates cache existence before running in Validation Mode:
 
 ```bash
 # If cache doesn't exist for today:
@@ -794,9 +794,9 @@ Example format:
   }
 ```
 
-#### Testing the Test Mode Itself
+#### Testing Validation Mode Itself
 
-The test mode validation behavior is tested in:
+The Validation Mode behavior is tested in:
 
 | Test File | Test Functions | Purpose |
 |-----------|----------------|---------|

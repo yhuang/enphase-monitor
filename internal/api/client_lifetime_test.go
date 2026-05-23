@@ -13,14 +13,14 @@ import (
 	"enphase-monitor/internal/constants"
 )
 
-// pastMonth returns a time.Time in a reliably past month for lifetime endpoint tests.
+// pastMonth returns a time.Time in a reliably past month for Lifetime Data endpoint tests.
 // Using two months ago ensures IsPastPeriod returns true regardless of run date.
 func pastMonth(tz *time.Location) time.Time {
 	now := time.Now().In(tz)
 	return time.Date(now.Year(), now.Month()-2, 1, 0, 0, 0, 0, tz)
 }
 
-// TestGetEnergyImportForDate_Month tests the energy_import_lifetime endpoint for month queries.
+// TestGetEnergyImportForDate_Month tests the Lifetime Data endpoint (energy_import_lifetime) for month queries.
 func TestGetEnergyImportForDate_Month(t *testing.T) {
 	cache.SetCacheDisabled(true)
 	defer cache.SetCacheDisabled(false)
@@ -43,7 +43,7 @@ func TestGetEnergyImportForDate_Month(t *testing.T) {
 	defer server.Close()
 
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
-	got, err := client.GetEnergyImportForDate(context.Background(), target, constants.QueryTypeMonth)
+	got, err := client.GetEnergyImportForDate(context.Background(), target, constants.QueryModeMonth)
 	if err != nil {
 		t.Fatalf("GetEnergyImportForDate(month) error = %v", err)
 	}
@@ -53,7 +53,7 @@ func TestGetEnergyImportForDate_Month(t *testing.T) {
 	}
 }
 
-// TestGetEnergyExportForDate_Month tests the energy_export_lifetime endpoint for month queries.
+// TestGetEnergyExportForDate_Month tests the Lifetime Data endpoint (energy_export_lifetime) for month queries.
 func TestGetEnergyExportForDate_Month(t *testing.T) {
 	cache.SetCacheDisabled(true)
 	defer cache.SetCacheDisabled(false)
@@ -76,7 +76,7 @@ func TestGetEnergyExportForDate_Month(t *testing.T) {
 	defer server.Close()
 
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
-	got, err := client.GetEnergyExportForDate(context.Background(), target, constants.QueryTypeMonth)
+	got, err := client.GetEnergyExportForDate(context.Background(), target, constants.QueryModeMonth)
 	if err != nil {
 		t.Fatalf("GetEnergyExportForDate(month) error = %v", err)
 	}
@@ -86,7 +86,7 @@ func TestGetEnergyExportForDate_Month(t *testing.T) {
 	}
 }
 
-// TestGetProductionForDate_Month tests the energy_lifetime endpoint for month queries.
+// TestGetProductionForDate_Month tests the Lifetime Data endpoint (energy_lifetime) for month queries.
 func TestGetProductionForDate_Month(t *testing.T) {
 	cache.SetCacheDisabled(true)
 	defer cache.SetCacheDisabled(false)
@@ -109,7 +109,7 @@ func TestGetProductionForDate_Month(t *testing.T) {
 	defer server.Close()
 
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
-	got, err := client.GetProductionForDate(context.Background(), target, constants.QueryTypeMonth)
+	got, err := client.GetProductionForDate(context.Background(), target, constants.QueryModeMonth)
 	if err != nil {
 		t.Fatalf("GetProductionForDate(month) error = %v", err)
 	}
@@ -119,7 +119,7 @@ func TestGetProductionForDate_Month(t *testing.T) {
 	}
 }
 
-// TestGetConsumptionForDate_Month tests the consumption_lifetime endpoint for month queries.
+// TestGetConsumptionForDate_Month tests the Lifetime Data endpoint (consumption_lifetime) for month queries.
 func TestGetConsumptionForDate_Month(t *testing.T) {
 	cache.SetCacheDisabled(true)
 	defer cache.SetCacheDisabled(false)
@@ -142,7 +142,7 @@ func TestGetConsumptionForDate_Month(t *testing.T) {
 	defer server.Close()
 
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
-	got, err := client.GetConsumptionForDate(context.Background(), target, constants.QueryTypeMonth)
+	got, err := client.GetConsumptionForDate(context.Background(), target, constants.QueryModeMonth)
 	if err != nil {
 		t.Fatalf("GetConsumptionForDate(month) error = %v", err)
 	}
@@ -176,7 +176,7 @@ func TestGetEnergyImportForDate_Year(t *testing.T) {
 	defer server.Close()
 
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
-	got, err := client.GetEnergyImportForDate(context.Background(), target, constants.QueryTypeYear)
+	got, err := client.GetEnergyImportForDate(context.Background(), target, constants.QueryModeYear)
 	if err != nil {
 		t.Fatalf("GetEnergyImportForDate(year) error = %v", err)
 	}
@@ -186,7 +186,7 @@ func TestGetEnergyImportForDate_Year(t *testing.T) {
 	}
 }
 
-// TestLifetimeEndpoint_APIError tests that lifetime endpoints handle API errors gracefully.
+// TestLifetimeEndpoint_APIError tests that Lifetime Data endpoints handle API errors gracefully.
 func TestLifetimeEndpoint_APIError(t *testing.T) {
 	cache.SetCacheDisabled(true)
 	defer cache.SetCacheDisabled(false)
@@ -203,7 +203,7 @@ func TestLifetimeEndpoint_APIError(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	// Production (energy_lifetime) should error on API failure
-	_, err := client.GetProductionForDate(context.Background(), target, constants.QueryTypeMonth)
+	_, err := client.GetProductionForDate(context.Background(), target, constants.QueryModeMonth)
 	if err == nil {
 		t.Error("GetProductionForDate(month) with server error: want error, got nil")
 	}
@@ -235,11 +235,11 @@ func TestGetEnergyImportForDate_PastDateCacheHit(t *testing.T) {
 	// Pre-populate the cache for this client's URL by doing a live request first
 	// (this exercises the cache-save path too)
 	serverCalled = false
-	_, _ = client.GetEnergyImportForDate(context.Background(), target, constants.QueryTypeDay)
+	_, _ = client.GetEnergyImportForDate(context.Background(), target, constants.QueryModeDay)
 
 	// Second call for the same past date should use cache (server must not be called)
 	serverCalled = false
-	got, err := client.GetEnergyImportForDate(context.Background(), target, constants.QueryTypeDay)
+	got, err := client.GetEnergyImportForDate(context.Background(), target, constants.QueryModeDay)
 	if err != nil {
 		t.Fatalf("GetEnergyImportForDate (cached) error = %v", err)
 	}
@@ -265,7 +265,7 @@ func TestGetEnergyImportForDate_RateLimited(t *testing.T) {
 	defer setupServer.Close()
 
 	setupClient := NewEnlightenCloudClientWithBaseURL(setupServer.URL, "12345", "test-key", "test-token", tz)
-	_, _ = setupClient.GetEnergyImportForDate(context.Background(), target, constants.QueryTypeDay)
+	_, _ = setupClient.GetEnergyImportForDate(context.Background(), target, constants.QueryModeDay)
 
 	// Now create a 429 server and make a request — it should fall back to the saved cache
 	rateLimitServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -276,7 +276,7 @@ func TestGetEnergyImportForDate_RateLimited(t *testing.T) {
 	// The URLs must match what was cached so we can't directly test rate limit fallback
 	// without matching URLs, but we can verify the function handles 429 when there's no cache
 	rlClient := NewEnlightenCloudClientWithBaseURL(rateLimitServer.URL, "12345", "test-key", "test-token", tz)
-	_, err := rlClient.GetEnergyImportForDate(context.Background(), target, constants.QueryTypeDay)
+	_, err := rlClient.GetEnergyImportForDate(context.Background(), target, constants.QueryModeDay)
 	if err != nil {
 		// Expected: no cache for this URL + 429 = rate limit error
 		if !strings.Contains(err.Error(), "rate limit") {
@@ -292,14 +292,14 @@ func TestMaybeShowNoCacheFallbackWarning(t *testing.T) {
 
 	// First call should print (not suppressed)
 	maybeShowNoCacheFallbackWarning("test reason")
-	if !cache.RateLimitWarningShown() {
-		t.Error("maybeShowNoCacheFallbackWarning() should set RateLimitWarningShown to true")
+	if !cache.BudgetWarningShown() {
+		t.Error("maybeShowNoCacheFallbackWarning() should set BudgetWarningShown to true")
 	}
 
 	// Second call should be suppressed (already shown)
 	maybeShowNoCacheFallbackWarning("another reason")
 	// Still true — calling again should not change state
-	if !cache.RateLimitWarningShown() {
-		t.Error("RateLimitWarningShown should remain true after second call")
+	if !cache.BudgetWarningShown() {
+		t.Error("BudgetWarningShown should remain true after second call")
 	}
 }

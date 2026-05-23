@@ -75,13 +75,13 @@ func NewDataAggregatorWithFactory(getAccessToken OAuthTokenGetter, factory Cloud
 
 // GetAggregatedMetrics retrieves and combines data from all systems
 // If testDate is provided, uses that date instead of today
-// queryType specifies the query granularity (day/month/year)
+// queryMode specifies the Query Mode (day/month/year)
 // reportTimezone is the timezone to use for all systems' data queries (from config, system, or US/Pacific fallback)
-func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []SystemConfig, apiConfig *APIConfig, testDate time.Time, queryType constants.QueryType, reportTimezone *time.Location) (*AggregatedMetrics, error) {
+func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []SystemConfig, apiConfig *APIConfig, testDate time.Time, queryMode constants.QueryMode, reportTimezone *time.Location) (*AggregatedMetrics, error) {
 	metrics := &AggregatedMetrics{
 		Timestamp: time.Now(),
 		QueryDate: testDate,    // time.Time zero value means "today"
-		QueryType: queryType,   // Query granularity
+		QueryMode: queryMode,   // Query Mode
 		Systems:   make([]SystemMetrics, 0, len(systems)),
 	}
 	anyCacheUsed := false
@@ -112,7 +112,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 		cloudClient := a.createCloudClient(sys.ID, sys.Name, apiConfig.Key, accessToken, reportTimezone)
 
 		var cacheUsed bool
-		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryType)
+		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryMode)
 		if err != nil && constants.IsRateLimitError(err) {
 			rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
 			allFromCache = false

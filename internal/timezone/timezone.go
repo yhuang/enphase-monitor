@@ -25,10 +25,10 @@ import (
 	"enphase-monitor/internal/constants"
 )
 
-// ParseResult contains the parsed date and its query type.
+// ParseResult contains the parsed date and its query mode.
 type ParseResult struct {
 	Date      time.Time
-	QueryType constants.QueryType
+	QueryMode constants.QueryMode
 }
 
 // LoadTimezone loads a timezone location from a timezone string (e.g., "America/Los_Angeles").
@@ -106,7 +106,7 @@ func ParseDateInTimezone(dateStr string, tz *time.Location) (time.Time, error) {
 //   - YYYY-MM (month)
 //   - YYYY (year)
 //
-// Returns the parsed date and query type, or an error if format is invalid.
+// Returns the parsed date and query mode, or an error if format is invalid.
 func ParseDateString(dateStr string, tz *time.Location) (ParseResult, error) {
 	// Try YYYY-MM-DD first (most specific)
 	if parsed, err := time.ParseInLocation(constants.DateFormat, dateStr, tz); err == nil {
@@ -114,7 +114,7 @@ func ParseDateString(dateStr string, tz *time.Location) (ParseResult, error) {
 		if parsed.Format(constants.DateFormat) != dateStr {
 			return ParseResult{}, fmt.Errorf("invalid date: %s does not exist", dateStr)
 		}
-		return ParseResult{Date: parsed, QueryType: constants.QueryTypeDay}, nil
+		return ParseResult{Date: parsed, QueryMode: constants.QueryModeDay}, nil
 	}
 
 	// Try YYYY-MM (month)
@@ -122,7 +122,7 @@ func ParseDateString(dateStr string, tz *time.Location) (ParseResult, error) {
 		if parsed.Format(constants.MonthFormat) != dateStr {
 			return ParseResult{}, fmt.Errorf("invalid month: %s", dateStr)
 		}
-		return ParseResult{Date: parsed, QueryType: constants.QueryTypeMonth}, nil
+		return ParseResult{Date: parsed, QueryMode: constants.QueryModeMonth}, nil
 	}
 
 	// Try YYYY (year)
@@ -131,7 +131,7 @@ func ParseDateString(dateStr string, tz *time.Location) (ParseResult, error) {
 		if year < 1900 || year > 2100 {
 			return ParseResult{}, fmt.Errorf("invalid year: %s (must be between 1900-2100)", dateStr)
 		}
-		return ParseResult{Date: parsed, QueryType: constants.QueryTypeYear}, nil
+		return ParseResult{Date: parsed, QueryMode: constants.QueryModeYear}, nil
 	}
 
 	return ParseResult{}, fmt.Errorf("invalid date format: use YYYY-MM-DD, YYYY-MM, or YYYY")
@@ -199,15 +199,15 @@ func GetTrueUpBoundaries(trueUpStartDate time.Time, tz *time.Location) (start, e
 	return start, end
 }
 
-// GetBoundaries returns the start and end times based on query type.
+// GetBoundaries returns the start and end times based on query mode.
 // This is a unified boundary function that delegates to the appropriate handler.
-func GetBoundaries(targetDate time.Time, queryType constants.QueryType, tz *time.Location) (start, end time.Time) {
-	switch queryType {
-	case constants.QueryTypeMonth:
+func GetBoundaries(targetDate time.Time, queryMode constants.QueryMode, tz *time.Location) (start, end time.Time) {
+	switch queryMode {
+	case constants.QueryModeMonth:
 		return GetMonthBoundaries(targetDate, tz)
-	case constants.QueryTypeYear:
+	case constants.QueryModeYear:
 		return GetYearBoundaries(targetDate, tz)
-	case constants.QueryTypeTrueUp:
+	case constants.QueryModeTrueUp:
 		return GetTrueUpBoundaries(targetDate, tz)
 	default:
 		return GetDayBoundaries(targetDate, tz)
@@ -215,7 +215,7 @@ func GetBoundaries(targetDate time.Time, queryType constants.QueryType, tz *time
 }
 
 // IsPastPeriod checks if the given date's period (day/month/year) is in the past.
-func IsPastPeriod(targetDate time.Time, queryType constants.QueryType, tz *time.Location) bool {
+func IsPastPeriod(targetDate time.Time, queryMode constants.QueryMode, tz *time.Location) bool {
 	if targetDate.IsZero() {
 		return false
 	}
@@ -223,16 +223,16 @@ func IsPastPeriod(targetDate time.Time, queryType constants.QueryType, tz *time.
 	now := time.Now().In(tz)
 	target := targetDate.In(tz)
 
-	switch queryType {
-	case constants.QueryTypeYear:
+	switch queryMode {
+	case constants.QueryModeYear:
 		return target.Year() < now.Year()
-	case constants.QueryTypeMonth:
+	case constants.QueryModeMonth:
 		if target.Year() < now.Year() {
 			return true
 		}
 		return target.Year() == now.Year() && target.Month() < now.Month()
-	case constants.QueryTypeTrueUp:
-		// The true-up period is always treated as ongoing so the lifetime endpoints
+	case constants.QueryModeTrueUp:
+		// The true-up period is always treated as ongoing so Lifetime Data endpoints
 		// are re-fetched with fresh data each run (through yesterday).
 		return false
 	default:

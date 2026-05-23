@@ -12,7 +12,7 @@
 //   - ANSI font style constants (Reset, Bold)
 //   - Display formatting (SeparatorWidth)
 //   - Date and time formats (DateFormat, TimestampFormat)
-//   - HTTP client configuration (APIRequestTimeout, status codes, rate limits)
+//   - HTTP client configuration (APIRequestTimeout, status codes, API Budget)
 //   - Error messages (RateLimitError, API config errors)
 //   - Energy conversion (WhToKWh)
 //   - Telemetry field names (API JSON field constants)
@@ -67,30 +67,30 @@ const (
 	JSONExtension = ".json"
 )
 
-// QueryType represents the granularity of a date query (day, month, year, or true-up).
-type QueryType int
+// QueryMode represents the Query Mode for a date query (day, month, year, or true-up).
+type QueryMode int
 
 const (
-	// QueryTypeDay represents a query for a specific day (YYYY-MM-DD)
-	QueryTypeDay QueryType = iota
-	// QueryTypeMonth represents a query for a specific month (YYYY-MM)
-	QueryTypeMonth
-	// QueryTypeYear represents a query for a specific year (YYYY)
-	QueryTypeYear
-	// QueryTypeTrueUp represents a single-batch query spanning a full true-up year period.
+	// QueryModeDay represents a query for a specific day (YYYY-MM-DD)
+	QueryModeDay QueryMode = iota
+	// QueryModeMonth represents a query for a specific month (YYYY-MM)
+	QueryModeMonth
+	// QueryModeYear represents a query for a specific year (YYYY)
+	QueryModeYear
+	// QueryModeTrueUp represents a single-batch query spanning a full true-up year period.
 	// The start date is the first day of the utility true-up start month; data covers
-	// all complete days through yesterday using the lifetime endpoints.
-	QueryTypeTrueUp
+	// all complete days through yesterday using Lifetime Data endpoints.
+	QueryModeTrueUp
 )
 
-// String returns a human-readable name for the query type.
-func (qt QueryType) String() string {
+// String returns a human-readable name for the query mode.
+func (qt QueryMode) String() string {
 	switch qt {
-	case QueryTypeMonth:
+	case QueryModeMonth:
 		return "month"
-	case QueryTypeYear:
+	case QueryModeYear:
 		return "year"
-	case QueryTypeTrueUp:
+	case QueryModeTrueUp:
 		return "true-up"
 	default:
 		return "day"
@@ -101,10 +101,10 @@ func (qt QueryType) String() string {
 const (
 	// APIRequestTimeout is the timeout for API HTTP requests
 	APIRequestTimeout = 30 * time.Second
-	// APIRateLimitPerMinute is the free tier rate limit (10 requests/minute)
-	APIRateLimitPerMinute = 10
-	// APIRateLimitWaitSeconds is the recommended wait time after hitting rate limit
-	APIRateLimitWaitSeconds = 60
+	// APIBudgetPerMinute is the API Budget window size (10 requests/minute)
+	APIBudgetPerMinute = 10
+	// APIBudgetWindowSeconds is the sliding-window duration for the API Budget counter
+	APIBudgetWindowSeconds = 60
 	// APIMaxDateRangeDays is the maximum date range per API request (7 days)
 	// The Enphase API returns 422 errors for ranges exceeding this limit
 	APIMaxDateRangeDays = 7

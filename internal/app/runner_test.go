@@ -21,36 +21,36 @@ type mockCloudClient struct {
 	err     error
 }
 
-func (m *mockCloudClient) GetMetricsFromCloud(ctx context.Context, date time.Time, queryType constants.QueryType) (*api.LocalMetrics, bool, error) {
+func (m *mockCloudClient) GetMetricsFromCloud(ctx context.Context, date time.Time, queryMode constants.QueryMode) (*api.LocalMetrics, bool, error) {
 	if m.err != nil {
 		return nil, false, m.err
 	}
 	return m.metrics, false, nil
 }
 
-func (m *mockCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
+func (m *mockCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
 	return 0, nil
 }
 
-func (m *mockCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
+func (m *mockCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
 	return 0, nil
 }
 
-func (m *mockCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
+func (m *mockCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
 	return 0, nil
 }
 
-func (m *mockCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
+func (m *mockCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
 	return 0, nil
 }
 
-func (m *mockCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error) {
+func (m *mockCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (charged float64, discharged float64, soc int, err error) {
 	return 0, 0, 0, nil
 }
 
-// makeRunConfig creates a RunConfig for tests with QueryTypeDay and zero TestDate.
+// makeRunConfig creates a RunConfig for tests with QueryModeDay and zero TestDate.
 func makeRunConfig(agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, tz *time.Location) RunConfig {
-	return RunConfig{Agg: agg, Disp: disp, Cfg: cfg, QueryType: constants.QueryTypeDay, ReportTZ: tz}
+	return RunConfig{Agg: agg, Disp: disp, Cfg: cfg, QueryMode: constants.QueryModeDay, ReportTZ: tz}
 }
 
 // createMockAggregator creates an aggregator with a mock cloud client

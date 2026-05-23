@@ -13,7 +13,7 @@ import (
 )
 
 // mustLoadLocation loads a timezone for tests and clears the sliding-window
-// api_calls counter so each test starts with a fresh rate-limit budget. Most
+// api_calls counter so each test starts with a fresh API Budget. Most
 // tests in this package call this helper near the top, so clearing the
 // counter here avoids requiring every test to remember to do it manually. We
 // deliberately do NOT call ResetState(): tests that set their own state
@@ -55,7 +55,7 @@ func TestGetEnergyImportForDate(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	imported, err := client.GetEnergyImportForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	imported, err := client.GetEnergyImportForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -94,7 +94,7 @@ func TestGetEnergyExportForDate(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	exported, err := client.GetEnergyExportForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	exported, err := client.GetEnergyExportForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -131,7 +131,7 @@ func TestGetConsumptionForDate(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	consumption, err := client.GetConsumptionForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	consumption, err := client.GetConsumptionForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -189,7 +189,7 @@ func TestGetBatteryDataForDate(t *testing.T) {
 
 	ctx := context.Background()
 	// Use yesterday as testDate to ensure all intervals are included
-	charged, discharged, soc, err := client.GetBatteryDataForDate(ctx, yesterday, constants.QueryTypeDay)
+	charged, discharged, soc, err := client.GetBatteryDataForDate(ctx, yesterday, constants.QueryModeDay)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -239,7 +239,7 @@ func TestGetBatteryDataForDate_NoSOC(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	charged, discharged, soc, err := client.GetBatteryDataForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	charged, discharged, soc, err := client.GetBatteryDataForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -307,7 +307,7 @@ func TestGetMetricsFromCloud(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	metrics, cacheUsed, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryTypeDay)
+	metrics, cacheUsed, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -380,7 +380,7 @@ func TestGetMetricsFromCloud_PartialFailure(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	metrics, _, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryTypeDay)
+	metrics, _, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryModeDay)
 
 	// Should succeed despite optional failures
 	if err != nil {
@@ -431,7 +431,7 @@ func TestGetMetricsFromCloud_ProductionFailure(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	_, _, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryTypeDay)
+	_, _, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryModeDay)
 
 	// Production is required - failure should cause overall failure
 	if err == nil {
@@ -460,7 +460,7 @@ func TestGetMetricsFromCloud_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel before making request
 
-	_, _, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryTypeDay)
+	_, _, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryModeDay)
 
 	// Should get context cancellation error
 	if err == nil {
@@ -485,7 +485,7 @@ func TestGetProductionForDate_EmptyIntervals(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	production, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	production, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err != nil {
 		t.Fatalf("Expected no error for empty intervals, got: %v", err)
@@ -509,7 +509,7 @@ func TestGetEnergyImportForDate_EmptyIntervals(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	imported, err := client.GetEnergyImportForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	imported, err := client.GetEnergyImportForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err != nil {
 		t.Fatalf("Expected no error for empty intervals, got: %v", err)
@@ -533,7 +533,7 @@ func TestGetProductionForDate_InvalidJSON(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err == nil {
 		t.Fatal("Expected error for invalid JSON, got nil")
@@ -552,7 +552,7 @@ func TestGetBatteryDataForDate_InvalidJSON(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	_, _, _, err := client.GetBatteryDataForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	_, _, _, err := client.GetBatteryDataForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err == nil {
 		t.Fatal("Expected error for invalid JSON, got nil")
@@ -609,7 +609,7 @@ func TestGetMetricsFromCloud_ConsumptionFallback(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	metrics, _, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryTypeDay)
+	metrics, _, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -701,21 +701,21 @@ func TestNewEnlightenCloudClientWithBaseURL(t *testing.T) {
 // TestCacheUsedTracking tests that cacheUsed flag is properly tracked
 func TestCacheUsedTracking(t *testing.T) {
 	// Save original cache state
-	originalTestMode := cache.TestMode()
+	originalValidationMode := cache.ValidationMode()
 	originalCacheDisabled := cache.CacheDisabled()
 	defer func() {
 		cache.ResetState()
-		if originalTestMode {
-			cache.SetTestMode(true)
+		if originalValidationMode {
+			cache.SetValidationMode(true)
 		}
 		if originalCacheDisabled {
 			cache.SetCacheDisabled(true)
 		}
 	}()
 
-	// Disable cache and test mode for this test
+	// Disable cache and Validation Mode for this test
 	cache.SetCacheDisabled(true)
-	cache.SetTestMode(false)
+	cache.SetValidationMode(false)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -727,7 +727,7 @@ func TestCacheUsedTracking(t *testing.T) {
 	client := NewEnlightenCloudClientWithBaseURL(server.URL, "12345", "test-key", "test-token", tz)
 
 	ctx := context.Background()
-	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)

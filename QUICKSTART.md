@@ -17,7 +17,7 @@ Make sure you have:
   - API Key
   - Client ID
   - Client Secret
-- [ ] System IDs for your Enphase installations (see Step 3)
+- [ ] System IDs for your Enphase Systems (see Step 3)
 
 ## Step 2: Initial Setup
 
@@ -130,7 +130,7 @@ Press `Ctrl+C` to stop.
 
 Once it is working:
 
-- Query historical data: `./enphase-monitor --date 2026-01-15`
+- Query a Past Period: `./enphase-monitor --date 2026-01-15`
 - View your utility true-up year balance: `./enphase-monitor --true-up 2025-01-15` (use your utility's true-up start date)
 - Run on startup: Add to cron or systemd
 - Build a dashboard: Parse the output or extend the code

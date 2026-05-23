@@ -29,29 +29,29 @@ type RunConfig struct {
 	Disp      *display.Display
 	Cfg       *config.Config
 	TestDate  time.Time
-	QueryType constants.QueryType
+	QueryMode constants.QueryMode
 	ReportTZ  *time.Location
 	Debug     bool
 }
 
 // RunOnce executes a single query, displays results, and returns an error on failure.
 // The caller (main) is responsible for exiting with a non-zero code.
-func RunOnce(ctx context.Context, rc RunConfig, testMode bool) error {
+func RunOnce(ctx context.Context, rc RunConfig, validationMode bool) error {
 	aggSystems, aggAPIConfig := GetAggregatorTypes(rc.Cfg)
 
-	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, rc.TestDate, rc.QueryType, rc.ReportTZ)
+	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, rc.TestDate, rc.QueryMode, rc.ReportTZ)
 	if err != nil {
 		return err
 	}
 
 	rc.Disp.ShowMetrics(metrics)
 
-	// If in test mode and test date is provided, validate against expected values
-	if testMode {
+	// If in Validation Mode and test date is provided, validate against expected values
+	if validationMode {
 		if rc.TestDate.IsZero() {
 			return fmt.Errorf("--test flag requires --date flag to specify which date to validate")
 		}
-		testDateStr := FormatDateForQueryType(rc.TestDate, rc.QueryType)
+		testDateStr := FormatDateForQueryMode(rc.TestDate, rc.QueryMode)
 		if err := validation.ValidateMetrics(os.Stdout, metrics, testDateStr); err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
@@ -60,7 +60,7 @@ func RunOnce(ctx context.Context, rc RunConfig, testMode bool) error {
 }
 
 // RunContinuous executes continuous monitoring with periodic refresh.
-// It returns an error only on fatal failures (e.g. rate limit); normal shutdown returns nil.
+// It returns an error only on fatal failures (e.g. 429); normal shutdown returns nil.
 func RunContinuous(ctx context.Context, rc RunConfig) error {
 	rc.Disp.ShowInfo(fmt.Sprintf("Starting continuous monitoring (refresh every %d seconds)", rc.Cfg.RefreshIntervalSeconds))
 	rc.Disp.ShowInfo("Press Ctrl+C to stop")
@@ -90,18 +90,18 @@ func RunContinuous(ctx context.Context, rc RunConfig) error {
 }
 
 // fetchAndDisplay fetches metrics and displays them to the terminal.
-// Returns a non-nil error only on fatal failures (e.g. rate limit); caller may exit.
+// Returns a non-nil error only on fatal failures (e.g. 429); caller may exit.
 // On non-fatal errors it shows the error and returns nil so the loop can continue.
 func fetchAndDisplay(ctx context.Context, rc RunConfig) error {
 	aggSystems, aggAPIConfig := GetAggregatorTypes(rc.Cfg)
 
-	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, rc.TestDate, rc.QueryType, rc.ReportTZ)
+	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, rc.TestDate, rc.QueryMode, rc.ReportTZ)
 	if err != nil {
 		// If context was cancelled (shutdown in progress), exit silently
 		if ctx.Err() != nil {
 			return nil
 		}
-		// Rate limit is fatal: return so caller can exit
+		// 429 is fatal: return so caller can exit
 		if constants.IsRateLimitError(err) {
 			return err
 		}

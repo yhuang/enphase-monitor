@@ -51,75 +51,75 @@ type CloudClient interface {
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryType: Query granularity (day/month/year)
+	//   - queryMode: Query Mode (day/month/year)
 	//
 	// Returns:
 	//   - *LocalMetrics: All energy metrics for the period
 	//   - bool: Whether cached data was used (true = cache, false = live API)
 	//   - error: Any error encountered during fetching
-	GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*LocalMetrics, bool, error)
+	GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (*LocalMetrics, bool, error)
 
 	// GetEnergyImportForDate gets total energy imported from the grid for a specific date/period.
 	//
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryType: Query granularity (day/month/year)
+	//   - queryMode: Query Mode (day/month/year)
 	//
 	// Returns:
 	//   - float64: Energy imported in kWh
 	//   - error: Any error encountered
-	GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error)
+	GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error)
 
 	// GetEnergyExportForDate gets total energy exported to the grid for a specific date/period.
 	//
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryType: Query granularity (day/month/year)
+	//   - queryMode: Query Mode (day/month/year)
 	//
 	// Returns:
 	//   - float64: Energy exported in kWh
 	//   - error: Any error encountered
-	GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error)
+	GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error)
 
 	// GetProductionForDate gets total solar energy production for a specific date/period.
 	//
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryType: Query granularity (day/month/year)
+	//   - queryMode: Query Mode (day/month/year)
 	//
 	// Returns:
 	//   - float64: Energy produced in kWh
 	//   - error: Any error encountered
-	GetProductionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error)
+	GetProductionForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error)
 
 	// GetConsumptionForDate gets total energy consumption for a specific date/period.
 	//
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryType: Query granularity (day/month/year)
+	//   - queryMode: Query Mode (day/month/year)
 	//
 	// Returns:
 	//   - float64: Energy consumed in kWh
 	//   - error: Any error encountered
-	GetConsumptionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error)
+	GetConsumptionForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error)
 
 	// GetBatteryDataForDate gets battery charge, discharge, and state of charge for a specific date/period.
 	//
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryType: Query granularity (day/month/year)
+	//   - queryMode: Query Mode (day/month/year)
 	//
 	// Returns:
 	//   - charged: Energy charged to battery in kWh
 	//   - discharged: Energy discharged from battery in kWh
 	//   - soc: State of charge percentage (0-100)
 	//   - error: Any error encountered
-	GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error)
+	GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (charged float64, discharged float64, soc int, err error)
 }
 
 // Compile-time check that *EnlightenCloudClient implements CloudClient.

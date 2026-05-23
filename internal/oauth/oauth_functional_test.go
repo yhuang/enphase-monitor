@@ -36,7 +36,7 @@
 // - Testing real HTTP interactions without external dependencies
 // - Control over response codes, headers, and body content
 // - Fast, deterministic tests (no network latency or failures)
-// - No API rate limits or quota consumption
+// - No API Budget constraints or quota consumption
 //
 // TEST ORGANIZATION
 // -----------------

@@ -20,7 +20,7 @@
 //   - Test zero time value (use today)
 //
 // 3. Past Date Detection Tests
-//   - Test IsPastDate correctly identifies historical dates
+//   - Test IsPastDate correctly identifies past dates
 //   - Test today returns false
 //   - Test future dates return false
 //
@@ -244,7 +244,7 @@ func TestParseDateString(t *testing.T) {
 		name          string
 		dateStr       string
 		wantErr       bool
-		wantQueryType constants.QueryType
+		wantQueryMode constants.QueryMode
 		wantYear      int
 		wantMonth     time.Month
 		wantDay       int
@@ -252,7 +252,7 @@ func TestParseDateString(t *testing.T) {
 		{
 			name:          "YYYY-MM-DD day format",
 			dateStr:       "2026-01-15",
-			wantQueryType: constants.QueryTypeDay,
+			wantQueryMode: constants.QueryModeDay,
 			wantYear:      2026,
 			wantMonth:     time.January,
 			wantDay:       15,
@@ -260,7 +260,7 @@ func TestParseDateString(t *testing.T) {
 		{
 			name:          "YYYY-MM month format",
 			dateStr:       "2026-03",
-			wantQueryType: constants.QueryTypeMonth,
+			wantQueryMode: constants.QueryModeMonth,
 			wantYear:      2026,
 			wantMonth:     time.March,
 			wantDay:       1,
@@ -268,7 +268,7 @@ func TestParseDateString(t *testing.T) {
 		{
 			name:          "YYYY year format",
 			dateStr:       "2025",
-			wantQueryType: constants.QueryTypeYear,
+			wantQueryMode: constants.QueryModeYear,
 			wantYear:      2025,
 			wantMonth:     time.January,
 			wantDay:       1,
@@ -308,8 +308,8 @@ func TestParseDateString(t *testing.T) {
 				t.Errorf("ParseDateString(%q) unexpected error = %v", tt.dateStr, err)
 				return
 			}
-			if result.QueryType != tt.wantQueryType {
-				t.Errorf("ParseDateString(%q) QueryType = %v, want %v", tt.dateStr, result.QueryType, tt.wantQueryType)
+			if result.QueryMode != tt.wantQueryMode {
+				t.Errorf("ParseDateString(%q) QueryMode = %v, want %v", tt.dateStr, result.QueryMode, tt.wantQueryMode)
 			}
 			if result.Date.Year() != tt.wantYear || result.Date.Month() != tt.wantMonth || result.Date.Day() != tt.wantDay {
 				t.Errorf("ParseDateString(%q) date = %v, want %04d-%02d-%02d",
@@ -396,7 +396,7 @@ func TestGetBoundaries(t *testing.T) {
 	target := time.Date(2025, time.March, 15, 0, 0, 0, 0, tz)
 
 	// Day query: should return day boundaries
-	start, end := GetBoundaries(target, constants.QueryTypeDay, tz)
+	start, end := GetBoundaries(target, constants.QueryModeDay, tz)
 	if start.Day() != 15 || start.Hour() != 0 {
 		t.Errorf("GetBoundaries(day) start = %v, want 2025-03-15 00:00:00", start)
 	}
@@ -405,7 +405,7 @@ func TestGetBoundaries(t *testing.T) {
 	}
 
 	// Month query: should return month boundaries
-	start, end = GetBoundaries(target, constants.QueryTypeMonth, tz)
+	start, end = GetBoundaries(target, constants.QueryModeMonth, tz)
 	if start.Day() != 1 {
 		t.Errorf("GetBoundaries(month) start day = %d, want 1", start.Day())
 	}
@@ -414,7 +414,7 @@ func TestGetBoundaries(t *testing.T) {
 	}
 
 	// Year query: should return year boundaries
-	start, end = GetBoundaries(target, constants.QueryTypeYear, tz)
+	start, end = GetBoundaries(target, constants.QueryModeYear, tz)
 	if start.Month() != time.January || start.Day() != 1 {
 		t.Errorf("GetBoundaries(year) start = %v, want Jan 1", start)
 	}
@@ -435,79 +435,79 @@ func TestIsPastPeriod(t *testing.T) {
 	tests := []struct {
 		name       string
 		targetDate time.Time
-		queryType  constants.QueryType
+		queryMode  constants.QueryMode
 		want       bool
 	}{
 		{
 			name:       "zero time returns false",
 			targetDate: time.Time{},
-			queryType:  constants.QueryTypeDay,
+			queryMode:  constants.QueryModeDay,
 			want:       false,
 		},
 		{
 			name:       "past day",
 			targetDate: now.AddDate(0, 0, -1),
-			queryType:  constants.QueryTypeDay,
+			queryMode:  constants.QueryModeDay,
 			want:       true,
 		},
 		{
 			name:       "today is not past day",
 			targetDate: now,
-			queryType:  constants.QueryTypeDay,
+			queryMode:  constants.QueryModeDay,
 			want:       false,
 		},
 		{
 			name:       "past month (same year)",
 			targetDate: time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, tz),
-			queryType:  constants.QueryTypeMonth,
+			queryMode:  constants.QueryModeMonth,
 			want:       now.Month() > 1, // only true if we're not in January
 		},
 		{
 			name:       "current month is not past",
 			targetDate: time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, tz),
-			queryType:  constants.QueryTypeMonth,
+			queryMode:  constants.QueryModeMonth,
 			want:       false,
 		},
 		{
 			name:       "past year",
 			targetDate: time.Date(now.Year()-1, time.January, 1, 0, 0, 0, 0, tz),
-			queryType:  constants.QueryTypeYear,
+			queryMode:  constants.QueryModeYear,
 			want:       true,
 		},
 		{
 			name:       "current year is not past",
 			targetDate: time.Date(now.Year(), time.January, 1, 0, 0, 0, 0, tz),
-			queryType:  constants.QueryTypeYear,
+			queryMode:  constants.QueryModeYear,
 			want:       false,
 		},
-		// QueryTypeTrueUp always returns false regardless of date — the true-up
-		// period is treated as ongoing so lifetime endpoints are re-fetched each run.
+		// QueryModeTrueUp always returns false regardless of date — the true-up
+		// period is treated as ongoing so Lifetime Data endpoints are re-fetched each run.
 		{
 			name:       "true-up with past date is not past",
 			targetDate: time.Date(2025, time.January, 1, 0, 0, 0, 0, tz),
-			queryType:  constants.QueryTypeTrueUp,
+			queryMode:  constants.QueryModeTrueUp,
 			want:       false,
 		},
 		{
 			name:       "true-up with today is not past",
 			targetDate: now,
-			queryType:  constants.QueryTypeTrueUp,
+			queryMode:  constants.QueryModeTrueUp,
 			want:       false,
 		},
 		{
 			name:       "true-up with zero time is not past",
 			targetDate: time.Time{},
-			queryType:  constants.QueryTypeTrueUp,
+			queryMode:  constants.QueryModeTrueUp,
 			want:       false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := IsPastPeriod(tt.targetDate, tt.queryType, tz)
+			got := IsPastPeriod(tt.targetDate, tt.queryMode, tz)
 			if got != tt.want {
 				t.Errorf("IsPastPeriod(%v, %v) = %v, want %v",
-					tt.targetDate.Format("2006-01-02"), tt.queryType, got, tt.want)
+					tt.targetDate.Format("2006-01-02"), tt.queryMode, got, tt.want)
 			}
 		})
 	}
@@ -543,7 +543,7 @@ func TestGetTrueUpBoundaries(t *testing.T) {
 	}
 }
 
-// TestGetBoundaries_TrueUp verifies that GetBoundaries dispatches correctly for QueryTypeTrueUp.
+// TestGetBoundaries_TrueUp verifies that GetBoundaries dispatches correctly for QueryModeTrueUp.
 func TestGetBoundaries_TrueUp(t *testing.T) {
 	tz, err := time.LoadLocation("America/Los_Angeles")
 	if err != nil {
@@ -551,7 +551,7 @@ func TestGetBoundaries_TrueUp(t *testing.T) {
 	}
 
 	input := time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)
-	start, end := GetBoundaries(input, constants.QueryTypeTrueUp, tz)
+	start, end := GetBoundaries(input, constants.QueryModeTrueUp, tz)
 
 	if start.Year() != 2025 || start.Month() != time.January || start.Day() != 1 {
 		t.Errorf("GetBoundaries(true-up) start = %v, want 2025-01-01", start)

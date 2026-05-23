@@ -2,7 +2,7 @@
 //
 // PURPOSE
 // -------
-// Used in test mode (--test flag) to verify system metrics match expected values from JSON files.
+// Used in Validation Mode (--test flag) to verify system metrics match expected values from JSON files.
 //
 // VALIDATION APPROACH
 // -------------------
@@ -90,7 +90,7 @@ func ValidateMetrics(w io.Writer, metrics *aggregator.AggregatedMetrics, dateStr
 				"      }\n"+
 				"    ]\n"+
 				"  }\n\n"+
-				"To skip validation and just use cache-only mode, omit the --test flag:\n"+
+				"To run without validation, omit the --test flag:\n"+
 				"  ./enphase-monitor --date %s", dateStr, expectedPath, dateStr, dateStr)
 		}
 		return fmt.Errorf("failed to read expected values file: %w", err)

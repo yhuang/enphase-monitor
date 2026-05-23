@@ -126,27 +126,27 @@ type mockCloudClientBench struct {
 	metrics *api.LocalMetrics
 }
 
-func (m *mockCloudClientBench) GetMetricsFromCloud(ctx context.Context, date time.Time, queryType constants.QueryType) (*api.LocalMetrics, bool, error) {
+func (m *mockCloudClientBench) GetMetricsFromCloud(ctx context.Context, date time.Time, queryMode constants.QueryMode) (*api.LocalMetrics, bool, error) {
 	return m.metrics, false, nil
 }
 
-func (m *mockCloudClientBench) GetEnergyImportForDate(ctx context.Context, date time.Time, queryType constants.QueryType) (float64, error) {
+func (m *mockCloudClientBench) GetEnergyImportForDate(ctx context.Context, date time.Time, queryMode constants.QueryMode) (float64, error) {
 	return m.metrics.GridImportToday, nil
 }
 
-func (m *mockCloudClientBench) GetEnergyExportForDate(ctx context.Context, date time.Time, queryType constants.QueryType) (float64, error) {
+func (m *mockCloudClientBench) GetEnergyExportForDate(ctx context.Context, date time.Time, queryMode constants.QueryMode) (float64, error) {
 	return m.metrics.GridExportToday, nil
 }
 
-func (m *mockCloudClientBench) GetProductionForDate(ctx context.Context, date time.Time, queryType constants.QueryType) (float64, error) {
+func (m *mockCloudClientBench) GetProductionForDate(ctx context.Context, date time.Time, queryMode constants.QueryMode) (float64, error) {
 	return m.metrics.ProductionToday, nil
 }
 
-func (m *mockCloudClientBench) GetConsumptionForDate(ctx context.Context, date time.Time, queryType constants.QueryType) (float64, error) {
+func (m *mockCloudClientBench) GetConsumptionForDate(ctx context.Context, date time.Time, queryMode constants.QueryMode) (float64, error) {
 	return m.metrics.ConsumptionToday, nil
 }
 
-func (m *mockCloudClientBench) GetBatteryDataForDate(ctx context.Context, date time.Time, queryType constants.QueryType) (float64, float64, int, error) {
+func (m *mockCloudClientBench) GetBatteryDataForDate(ctx context.Context, date time.Time, queryMode constants.QueryMode) (float64, float64, int, error) {
 	return m.metrics.BatteryChargedToday, m.metrics.BatteryDischargedToday, m.metrics.BatterySOC, nil
 }
 
@@ -220,7 +220,7 @@ func BenchmarkGetAggregatedMetrics_SingleSystem(b *testing.B) {
 	// increases until the benchmark runs long enough for stable measurement.
 	// You MUST use b.N - don't hardcode a number like 1000.
 	for i := 0; i < b.N; i++ {
-		_, err := agg.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryTypeDay, reportTZ)
+		_, err := agg.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryModeDay, reportTZ)
 		if err != nil {
 			// b.Fatalf stops the benchmark if something breaks
 			// Use this instead of ignoring errors
@@ -275,7 +275,7 @@ func BenchmarkGetAggregatedMetrics_MultiSystem(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := agg.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryTypeDay, reportTZ)
+		_, err := agg.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryModeDay, reportTZ)
 		if err != nil {
 			b.Fatalf("GetAggregatedMetrics failed: %v", err)
 		}

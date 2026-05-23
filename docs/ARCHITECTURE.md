@@ -16,7 +16,7 @@ designed to help new engineers learn Go development patterns and best practices.
 2. [Module Structure](#module-structure)
 3. [Execution Flow](#execution-flow)
 4. [Data Flow Diagram](#data-flow-diagram)
-5. [Rate Limiting & In-Request Quota Checks](#rate-limiting--in-request-quota-checks)
+5. [API Budget Checks](#api-budget-checks)
 6. [Key Go Patterns Used](#key-go-patterns-used)
 7. [File Descriptions](#file-descriptions)
 8. [Next Steps for Learning](#next-steps-for-learning)
@@ -31,8 +31,8 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 - **Multi-System Monitoring**: Query and aggregate data from multiple independent Enphase systems
 - **Cloud API Integration**: Uses Enphase Enlighten Cloud API v4 exclusively (no local network access required)
-- **Intelligent Caching**: Disk-based response caching to respect API rate limits (10 calls/minute)
-- **Historical Data**: Query any past date with `--date` flag (auto-runs once since data won't change)
+- **Intelligent Caching**: Disk-based response caching to stay within the API Budget (10 calls/minute)
+- **Past Period Queries**: Query any past date with `--date` flag (auto-runs once since Past Period data is immutable)
 - **True-Up Year Report**: Query energy metrics across a full utility true-up year with `--true-up`
 - **Real-time Monitoring**: Continuous mode with configurable refresh interval (default: 1 hour)
 - **Color Customization**: Customize terminal output colors via YAML configuration
@@ -66,9 +66,9 @@ enphase-monitor/
 │   │   ├── cache_check.go                 # Per-system/endpoint cache availability check (--cache mode)
 │   │   ├── client_test.go                 # API client unit tests
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
-│   │   ├── client_lifetime_test.go        # Lifetime endpoint tests (month/year/true-up queries)
+│   │   ├── client_lifetime_test.go        # Lifetime Data endpoint tests (month/year/true-up queries)
 │   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 report types)
-│   │   ├── query_cost_test.go             # QueryCost unit tests (all query type × hasBattery combos)
+│   │   ├── query_cost_test.go             # QueryCost unit tests (all QueryMode × hasBattery combos)
 │   │   └── testmain_test.go               # TestMain: redirects cache I/O to temp dir for all api tests
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
@@ -82,7 +82,7 @@ enphase-monitor/
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
-│   │   ├── rate_limit_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
+│   │   ├── api_budget_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
@@ -117,7 +117,7 @@ enphase-monitor/
 │   ├── urlbuilder/                        # API URL construction
 │   │   ├── urlbuilder.go                  # URL building helpers
 │   │   └── urlbuilder_test.go             # URL builder tests
-│   └── validation/                        # Test mode validation
+│   └── validation/                        # Validation Mode (--test flag)
 │       ├── validation.go                  # Metrics validation logic (uses io.Writer for testability)
 │       ├── validation_test.go             # Unit tests (tolerance calculations, edge cases)
 │       └── validation_integration_test.go # Integration tests (real expected values)
@@ -188,7 +188,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │  ├─► Parse start date        │  │     └─► app.RunOnce(ctx, ...) or app.RunContinuous(ctx, ...)       │
 │  ├─► Normalize to month-1    │  │     └─► RunContinuous: synchronous for/select (ticker.C, ctx.Done) │
 │  ├─► GetAggregatedMetrics    │  │         (no goroutines spawned)                                    │
-│  │   (QueryTypeTrueUp,       │  │     └─► fetchAndDisplay(ctx, ...) calls aggregator                 │
+│  │   (QueryModeTrueUp,       │  │     └─► fetchAndDisplay(ctx, ...) calls aggregator                 │
 │  │   4 metrics/system,        │  └────────────────────────────────────────────────────────────────────┘
 │  ├─► buildTrueUpReport()     │
 │  └─► ShowTrueUpReport()      │
@@ -219,7 +219,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
                                     ▼
 ┌────────────────────────────────────────────────────────────────────┐
 │  6. RESPONSE PARSING (internal/parser)                             │
-│     └─► Parse JSON telemetry data                                  │
+│     └─► Parse JSON API response data                               │
 │         └─► Sum interval values for daily totals                   │
 │             └─► Convert Wh to kWh                                  │
 └────────────────────────────────────────────────────────────────────┘
@@ -259,14 +259,14 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ┌────────────────────────────────────────────────────────────────────┐
 │              internal/api/EnlightenCloudClient                     │
 │  - OAuth authentication (internal/oauth)                           │
-│  - Interval endpoints (15-min data, single-day queries)            │
-│  - Lifetime endpoints (daily totals, month/year/true-up queries)   │
+│  - Interval Data endpoints (15-min data, single-day queries)       │
+│  - Lifetime Data endpoints (daily totals, month/year/true-up)      │
 └────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
 ┌────────────────────────────────────────────────────────────────────┐
 │                  internal/cache/Cache Layer                        │
-│  - Sliding-window rate-limit counter (api_calls, 10/60s)           │
+│  - Sliding-window API Budget counter (api_calls, 10/60s)           │
 │  - Past periods: always from cache; current periods: live-first    │
 │  - Disk-based storage tagged with endpoint + system ID             │
 └────────────────────────────┬───────────────────────────────────────┘
@@ -290,24 +290,24 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 
 ---
 
-## Rate Limiting & In-Request Quota Checks
+## API Budget Checks
 
 The Enphase Cloud API enforces a budget of **10 requests per 60-second sliding window**. With two systems each making a full day query (5 endpoints each), that is exactly 10 calls — right at the limit. To stay within it, the client uses three cooperating layers: a cost estimator, a preflight warning, and a per-request gate.
 
 ### Layer 1: `QueryCost` — call-count estimator
 
-`QueryCost(queryType, hasBattery)` in [internal/api/client.go](../internal/api/client.go) returns the number of live API calls that `GetMetricsFromCloud` will make for a **single system**:
+`QueryCost(queryMode, hasBattery)` in [internal/api/client.go](../internal/api/client.go) returns the number of live API calls that `GetMetricsFromCloud` will make for a **single system**:
 
-| Query type | hasBattery=false | hasBattery=true |
+| Query mode | hasBattery=false | hasBattery=true |
 |------------|-----------------|-----------------|
 | Day        | 4               | 5               |
 | Month      | 4               | 4               |
 | Year       | 4               | 4               |
 | True-up    | 4               | 4               |
 
-The base of 4 covers: grid import, grid export, production, and consumption. Battery telemetry adds a 5th call **only for today's Day query** (`testDate.IsZero() && QueryTypeDay`) — all other cases skip it because:
-1. The battery telemetry endpoint returns per-15-minute intervals; fetching it for historical or multi-day periods would require one call per day, far exceeding the budget.
-2. Battery SOC is a point-in-time reading that is not meaningful as a historical or multi-day aggregate, so the call is omitted for any non-today query.
+The base of 4 covers: grid import, grid export, production, and consumption. Battery telemetry adds a 5th call **only for today's Day query** (`testDate.IsZero() && QueryModeDay`) — all other cases skip it because:
+1. The battery telemetry endpoint returns per-15-minute intervals; fetching it for Past Period or multi-day queries would require one call per day, far exceeding the budget.
+2. Battery SOC is a point-in-time reading that is not meaningful as a Past Period or multi-day aggregate, so the call is omitted for any non-today query.
 
 This means 2 systems × 5 (day + battery) = **exactly 10** — the documented architectural limit. Adding a third system or a supplementary call would exceed it.
 
@@ -317,8 +317,8 @@ Before making any API calls, `GetMetricsFromCloud` compares the query cost again
 
 ```go
 // internal/api/client.go (inside GetMetricsFromCloud)
-if cache.DebugMode() && !timezone.IsPastPeriod(testDate, queryType, c.timezone) {
-    needed := QueryCost(queryType, queryType == constants.QueryTypeDay)
+if cache.DebugMode() && !timezone.IsPastPeriod(testDate, queryMode, c.timezone) {
+    needed := QueryCost(queryMode, queryMode == constants.QueryModeDay)
     remaining := cache.RemainingBudget()
     if remaining < needed {
         fmt.Printf("WARNING: ... Insufficient API budget: need %d call(s), %d/%d remaining ...\n", ...)
@@ -340,7 +340,7 @@ The actual enforcement happens inside `makeCachedAPIRequest` for every URL. The 
 Is this a past period with a valid cache entry?
   YES → serve immutable cache, no budget consumed, done
   NO  ↓
-Is the cache entry within maxAge (1 h for today, 24 h for MTD/YTD)?
+Is the cache entry within maxAge (1 h for today, 24 h for MTD/YTD/current true-up year)?
   YES → serve cache, no live call
   NO  ↓
 Is budget exhausted (RemainingBudget() <= 0)?
@@ -367,7 +367,7 @@ When run with `--debug`, the application emits structured logs to stderr that ex
 
 - **Startup banner** (`printDebugStartup` in [main.go](../main.go)) shows the current time, the most recent recorded API call (`cache.LastAPICallTime()`), how long until the 60-second window resets, and the remaining budget. This is the single best diagnostic for "why am I getting 429s?" because it answers "is the window still active?" before any work begins.
 - **Preflight warning** (Layer 2, in `GetMetricsFromCloud`) prints `WARNING: … Insufficient API budget …` to stdout when the remaining budget is smaller than the query cost for a current-period run. Only emitted in debug mode to avoid cluttering normal report output.
-- **Cache-only mode banner** (`RunCacheReport`) prints `CACHE MODE: Serving report from cache, no live API calls` when `--cache` finds a complete cache. Only emitted in debug mode for the same reason.
+- **Cached mode banner** (`RunCacheReport`) prints `CACHE MODE: Serving report from cache, no live API calls` when `--cache` finds a complete cache. Only emitted in debug mode for the same reason.
 - **Per-request trace** (`cache.Debugf` from `makeCachedAPIRequest` in [internal/api/client.go](../internal/api/client.go)) emits one line per URL describing the decision taken: serving past-period cache, serving within-maxAge cache, falling back due to budget exhaustion, making a live call, or hitting the 429 fallback paths. Each line includes the redacted URL and the cache age so traces are reproducible without leaking the API key.
 
 Debug mode also suppresses the terminal-clearing escape sequence in `fetchAndDisplay` so the trace remains visible after the report is printed. The `cache.Debugf` helper is a no-op when debug mode is off — callers do not need to guard the call sites.
@@ -401,10 +401,10 @@ type EnlightenCloudClient struct {
     cacheUsed   bool           // Tracks if cache was used for the last request
 }
 
-func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*LocalMetrics, bool, error) {
+func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (*LocalMetrics, bool, error) {
     // 'c' is the receiver - access struct fields via c.systemID, etc.
     // ctx is used for request cancellation and timeout handling
-    // queryType specifies query granularity (day/month/year/true-up)
+    // queryMode specifies the Query Mode (day/month/year/true-up)
 }
 ```
 
@@ -646,8 +646,8 @@ when possible to improve testability.
 |---------------------------------------------------|---------------------------------------------------|
 | [internal/app/setup.go](../internal/app/setup.go)         | Application initialization & configuration        |
 | [internal/app/runner.go](../internal/app/runner.go)       | Execution modes (once/continuous)                 |
-| [internal/app/trueup.go](../internal/app/trueup.go)       | True-up year: single-batch lifetime query (QueryTypeTrueUp) and report conversion            |
-| [internal/app/cache_report.go](../internal/app/cache_report.go) | --cache mode: per-system endpoint check, diagnostic output, and cache-only run  |
+| [internal/app/trueup.go](../internal/app/trueup.go)       | True-up year: single-batch lifetime query (QueryModeTrueUp) and report conversion            |
+| [internal/app/cache_report.go](../internal/app/cache_report.go) | --cache mode: per-system endpoint check, diagnostic output, and cached run  |
 
 ### Internal Packages - CLI Layer
 
@@ -677,7 +677,7 @@ when possible to improve testability.
 | [internal/parser/*](../internal/parser/)             | JSON telemetry response parsing                   |
 | [internal/config/*](../internal/config/)             | Configuration types and utilities                 |
 | [internal/timezone/*](../internal/timezone/)         | Timezone handling and date boundaries             |
-| [internal/validation/*](../internal/validation/)     | Test mode validation with tolerance checks        |
+| [internal/validation/*](../internal/validation/)     | Validation Mode with tolerance-based checks       |
 | [internal/constants/*](../internal/constants/)       | Centralized constants (45+ constants)             |
 
 ### Internal Packages - Shared Types

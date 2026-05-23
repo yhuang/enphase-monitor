@@ -352,7 +352,7 @@ func TestShowMetrics_Battery_DayQuery(t *testing.T) {
 
 	metrics := &aggregator.AggregatedMetrics{
 		Timestamp: time.Now(),
-		QueryType: constants.QueryTypeDay,
+		QueryMode: constants.QueryModeDay,
 		Systems: []aggregator.SystemMetrics{
 			{Name: "Home System", ID: "12345", BatterySOC: 75, BatteryChargedToday: 5.0, BatteryDischargedToday: 3.0},
 			{Name: "Office System", ID: "67890", BatterySOC: 50, BatteryChargedToday: 2.0, BatteryDischargedToday: 1.0},
@@ -370,8 +370,8 @@ func TestShowMetrics_Battery_DayQuery(t *testing.T) {
 	if !strings.Contains(output, "Discharged from Battery") {
 		t.Error("Output should contain 'Discharged from Battery' for day query")
 	}
-	if !strings.Contains(output, "Battery Charge Percentage") {
-		t.Error("Output should contain 'Battery Charge Percentage' for day query")
+	if !strings.Contains(output, "Battery State of Charge (SOC)") {
+		t.Error("Output should contain 'Battery State of Charge (SOC)' for day query")
 	}
 }
 
@@ -384,7 +384,7 @@ func TestShowMetrics_Battery_MonthQuery(t *testing.T) {
 
 	metrics := &aggregator.AggregatedMetrics{
 		Timestamp: time.Now(),
-		QueryType: constants.QueryTypeMonth,
+		QueryMode: constants.QueryModeMonth,
 		Systems: []aggregator.SystemMetrics{
 			{Name: "Home System", ID: "12345", BatterySOC: 75},
 			{Name: "Office System", ID: "67890", BatterySOC: 50},
@@ -402,8 +402,8 @@ func TestShowMetrics_Battery_MonthQuery(t *testing.T) {
 	if strings.Contains(output, "Discharged from Battery") {
 		t.Error("Output should NOT contain 'Discharged from Battery' for month query")
 	}
-	if strings.Contains(output, "Battery Charge Percentage") {
-		t.Error("Output should NOT contain 'Battery Charge Percentage' for month query")
+	if strings.Contains(output, "Battery State of Charge (SOC)") {
+		t.Error("Output should NOT contain 'Battery State of Charge (SOC)' for month query")
 	}
 }
 
@@ -416,7 +416,7 @@ func TestShowMetrics_Battery_YearQuery(t *testing.T) {
 
 	metrics := &aggregator.AggregatedMetrics{
 		Timestamp: time.Now(),
-		QueryType: constants.QueryTypeYear,
+		QueryMode: constants.QueryModeYear,
 		Systems: []aggregator.SystemMetrics{
 			{Name: "Home System", ID: "12345", BatterySOC: 75},
 			{Name: "Office System", ID: "67890", BatterySOC: 50},
@@ -434,8 +434,8 @@ func TestShowMetrics_Battery_YearQuery(t *testing.T) {
 	if strings.Contains(output, "Discharged from Battery") {
 		t.Error("Output should NOT contain 'Discharged from Battery' for year query")
 	}
-	if strings.Contains(output, "Battery Charge Percentage") {
-		t.Error("Output should NOT contain 'Battery Charge Percentage' for year query")
+	if strings.Contains(output, "Battery State of Charge (SOC)") {
+		t.Error("Output should NOT contain 'Battery State of Charge (SOC)' for year query")
 	}
 }
 
@@ -624,7 +624,7 @@ func TestShowTrueUpReport_PerSystemMetrics(t *testing.T) {
 	}
 
 	// Battery metrics must be absent
-	batteryLabels := []string{"Battery", "Charged", "Discharged", "Battery Charge Percentage"}
+	batteryLabels := []string{"Battery", "Charged", "Discharged", "Battery State of Charge (SOC)"}
 	for _, label := range batteryLabels {
 		if strings.Contains(output, label) {
 			t.Errorf("output should NOT contain battery label %q in true-up report", label)

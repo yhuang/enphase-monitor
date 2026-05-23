@@ -1,0 +1,3589 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "enphase-monitor",
+    "languages": [
+      "go"
+    ],
+    "frameworks": [],
+    "description": "A Go application for monitoring and aggregating data from multiple Enphase solar systems via the Enphase Enlighten Cloud API v4.",
+    "analyzedAt": "2026-05-23T03:07:05.001977Z",
+    "gitCommitHash": "e14de2d665e8acbff86385a6876c2572e3e9b4e1"
+  },
+  "nodes": [
+    {
+      "id": "config:.golangci.yml",
+      "type": "config",
+      "name": ".golangci.yml",
+      "filePath": ".golangci.yml",
+      "summary": "GolangCI-Lint configuration enabling a curated set of linters (errcheck, govet, staticcheck, etc.) with gocognit complexity threshold and a default run timeout, ensuring code quality gates in CI.",
+      "tags": [
+        "configuration",
+        "linting",
+        "code-quality",
+        "ci-cd"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:CONTEXT.md",
+      "type": "document",
+      "name": "CONTEXT.md",
+      "filePath": "CONTEXT.md",
+      "summary": "Domain model reference for the project covering the Enphase API constraints, cache strategy, run modes, query modes, True-Up window, and energy flow terminology with a sample Q&A dialogue for contributors.",
+      "tags": [
+        "documentation",
+        "domain-model",
+        "architecture",
+        "api-schema"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "pipeline:Makefile",
+      "type": "pipeline",
+      "name": "Makefile",
+      "filePath": "Makefile",
+      "summary": "Build automation defining 14 targets including build, run, run-once, install, setup, test, test-coverage, lint, and help \u2014 the primary developer workflow entry point for the project.",
+      "tags": [
+        "build-system",
+        "ci-cd",
+        "deployment",
+        "development"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:QUICKSTART.md",
+      "type": "document",
+      "name": "QUICKSTART.md",
+      "filePath": "QUICKSTART.md",
+      "summary": "Seven-step getting-started guide covering prerequisites, OAuth 2.0 setup, system configuration, build, and first-run verification, with a troubleshooting section for common first-time errors.",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "installation",
+        "oauth"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "Comprehensive project documentation covering installation, OAuth setup, all usage modes (once, continuous, true-up, validation, cached, and live), output format, caching strategy, project structure, testing, and performance with 71 sections.",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "overview",
+        "api-schema"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:config.yaml.example",
+      "type": "config",
+      "name": "config.yaml.example",
+      "filePath": "config.yaml.example",
+      "summary": "Annotated example configuration file showing all required and optional YAML fields: Enphase API credentials, system definitions (ID, name, timezone, battery flag), display colors, and debug/test mode flags.",
+      "tags": [
+        "configuration",
+        "documentation",
+        "oauth",
+        "development"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:go.mod",
+      "type": "config",
+      "name": "go.mod",
+      "filePath": "go.mod",
+      "summary": "Go module definition declaring the module path and minimum Go version with a single external dependency (gopkg.in/yaml.v3 for config parsing).",
+      "tags": [
+        "configuration",
+        "build-system",
+        "dependency-management"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:go.sum",
+      "type": "config",
+      "name": "go.sum",
+      "filePath": "go.sum",
+      "summary": "Go module checksum file recording cryptographic hashes for the yaml.v3 dependency to ensure reproducible builds.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "security"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:internal/api/testmain_test.go",
+      "type": "file",
+      "name": "testmain_test.go",
+      "filePath": "internal/api/testmain_test.go",
+      "summary": "TestMain setup for the api package tests, configuring the cache in test mode before running the test suite.",
+      "tags": [
+        "test",
+        "api-handler",
+        "test-setup"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:internal/api/types.go",
+      "type": "file",
+      "name": "types.go",
+      "filePath": "internal/api/types.go",
+      "summary": "Defines the BatteryData struct holding SOC percentage and cumulative charged/discharged energy for a single system, used as the return type of GetBatteryDataForDate.",
+      "tags": [
+        "type-definition",
+        "data-model",
+        "api-handler"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:internal/app/trueup_test.go",
+      "type": "file",
+      "name": "trueup_test.go",
+      "filePath": "internal/app/trueup_test.go",
+      "summary": "Unit tests for True-Up logic covering window-end boundary conditions, TrueUpReport field mapping, net flow calculations, and per-system metric conversion.",
+      "tags": [
+        "test",
+        "reporting",
+        "date"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:internal/cache/cache.go",
+      "type": "file",
+      "name": "cache.go",
+      "filePath": "internal/cache/cache.go",
+      "summary": "Core caching layer for Enphase API responses: manages on-disk response storage keyed by URL and timezone, tracks API call rate-limit budget, provides test/debug mode globals, and supports per-date cache existence checks.",
+      "tags": [
+        "service",
+        "cache",
+        "api-handler",
+        "rate-limiting",
+        "tested"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Uses package-level variables protected by sync.Mutex for global state (test mode, cache disabled, debug mode, rate-limit stamps). Persists cached API responses as JSON files under a project-local cache directory."
+    },
+    {
+      "id": "class:internal/cache/cache.go:CachedResponse",
+      "type": "class",
+      "name": "CachedResponse",
+      "filePath": "internal/cache/cache.go",
+      "lineRange": [
+        195,
+        203
+      ],
+      "summary": "Represents a serialized HTTP response stored on disk, including status code, headers, body bytes, cache timestamp, queried date, endpoint path, and system ID.",
+      "tags": [
+        "data-model",
+        "cache",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:internal/cache/cache.go:NormalizeURLForCache",
+      "type": "function",
+      "name": "NormalizeURLForCache",
+      "filePath": "internal/cache/cache.go",
+      "lineRange": [
+        232,
+        263
+      ],
+      "summary": "Normalizes an Enphase API URL for cache key generation by converting Unix epoch start_at/end_at query parameters to human-readable date strings, ensuring timezone-aware cache hits.",
+      "tags": [
+        "cache",
+        "utility",
+        "normalization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/cache/cache.go:FindMostRecentByEndpoint",
+      "type": "function",
+      "name": "FindMostRecentByEndpoint",
+      "filePath": "internal/cache/cache.go",
+      "lineRange": [
+        410,
+        453
+      ],
+      "summary": "Scans the cache directory for the most recently written entry matching a given endpoint and system ID within a maximum age, returning the deserialized CachedResponse.",
+      "tags": [
+        "cache",
+        "search",
+        "utility"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:internal/cache/cache.go:SaveCachedResponseFromBytes",
+      "type": "function",
+      "name": "SaveCachedResponseFromBytes",
+      "filePath": "internal/cache/cache.go",
+      "lineRange": [
+        482,
+        523
+      ],
+      "summary": "Persists an HTTP response (headers + body bytes) to the cache directory as a JSON file, extracting the queried date, endpoint, and system ID from the request URL for metadata.",
+      "tags": [
+        "cache",
+        "persistence",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/cache/cache.go:HasCacheForDate",
+      "type": "function",
+      "name": "HasCacheForDate",
+      "filePath": "internal/cache/cache.go",
+      "lineRange": [
+        528,
+        565
+      ],
+      "summary": "Checks whether any cached response exists for a specific target date by scanning the cache directory and comparing the QueriedDate field in each entry's metadata.",
+      "tags": [
+        "cache",
+        "validation",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/cache/cache.go:RecordAPICall",
+      "type": "function",
+      "name": "RecordAPICall",
+      "filePath": "internal/cache/cache.go",
+      "lineRange": [
+        344,
+        351
+      ],
+      "summary": "Records a timestamp for a completed API call to the on-disk rate-limit log, enabling the sliding-window budget check.",
+      "tags": [
+        "rate-limiting",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:internal/cache/cache_functions_test.go",
+      "type": "file",
+      "name": "cache_functions_test.go",
+      "filePath": "internal/cache/cache_functions_test.go",
+      "summary": "Unit tests for cache.go utility functions including URL redaction, cache key generation, URL normalization, date extraction, path resolution, HTTP response conversion, and save/load round-trips.",
+      "tags": [
+        "test",
+        "cache",
+        "utility"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/cache/cache_test.go",
+      "type": "file",
+      "name": "cache_test.go",
+      "filePath": "internal/cache/cache_test.go",
+      "summary": "Tests for cache package global state management: ResetState, test mode getter/setter, cache-disabled getter/setter, and rate-limit warning flag.",
+      "tags": [
+        "test",
+        "cache",
+        "state-management"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:internal/cache/cli.go",
+      "type": "file",
+      "name": "cli.go",
+      "filePath": "internal/cache/cli.go",
+      "summary": "Provides CLI-facing cache management operations: clearing today's or all cached entries, listing cache contents with formatted output, and parsing cached API response bodies for display.",
+      "tags": [
+        "service",
+        "cache",
+        "cli",
+        "tested"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:internal/cache/cli.go:CacheEntry",
+      "type": "class",
+      "name": "CacheEntry",
+      "filePath": "internal/cache/cli.go",
+      "lineRange": [
+        138,
+        148
+      ],
+      "summary": "Data structure representing a single cache entry for CLI listing, holding the cache key, endpoint, system ID, queried date, cache timestamp, and file size.",
+      "tags": [
+        "data-model",
+        "cache",
+        "cli"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:internal/cache/cli.go:ClearTodayCache",
+      "type": "function",
+      "name": "ClearTodayCache",
+      "filePath": "internal/cache/cli.go",
+      "lineRange": [
+        44,
+        128
+      ],
+      "summary": "Deletes all cached files whose QueriedDate matches today's date in the report timezone, printing a summary of deleted and kept entries.",
+      "tags": [
+        "cache",
+        "cli",
+        "cleanup"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:internal/cache/cli.go:ListCacheEntries",
+      "type": "function",
+      "name": "ListCacheEntries",
+      "filePath": "internal/cache/cli.go",
+      "lineRange": [
+        151,
+        223
+      ],
+      "summary": "Scans the cache directory and returns a sorted slice of CacheEntry structs describing each cached response, suitable for CLI listing.",
+      "tags": [
+        "cache",
+        "cli",
+        "utility"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:internal/cache/cli.go:parseCacheResponse",
+      "type": "function",
+      "name": "parseCacheResponse",
+      "filePath": "internal/cache/cli.go",
+      "lineRange": [
+        242,
+        321
+      ],
+      "summary": "Parses raw JSON from a cached Enphase API response body (telemetry or production/consumption meter format) and formats the interval data as human-readable text for the CLI.",
+      "tags": [
+        "serialization",
+        "cache",
+        "display"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/cache/cli_test.go",
+      "type": "file",
+      "name": "cli_test.go",
+      "filePath": "internal/cache/cli_test.go",
+      "summary": "Comprehensive tests for cache CLI operations covering ClearTodayCache, ClearAllCache, ListCacheEntries, LoadCachedResponseByPath, and parseCacheResponse with various telemetry formats and edge cases.",
+      "tags": [
+        "test",
+        "cache",
+        "cli"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/cli/cache_commands.go",
+      "type": "file",
+      "name": "cache_commands.go",
+      "filePath": "internal/cli/cache_commands.go",
+      "summary": "Thin CLI command handlers that delegate cache clear and list operations to the cache package, bridging the cobra/flag layer to cache management logic.",
+      "tags": [
+        "api-handler",
+        "cli",
+        "utility",
+        "tested"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:internal/cli/cache_commands.go:HandleClearCache",
+      "type": "function",
+      "name": "HandleClearCache",
+      "filePath": "internal/cli/cache_commands.go",
+      "lineRange": [
+        19,
+        24
+      ],
+      "summary": "Invokes ClearTodayCache on the cache package to remove today's cached entries and prints the result to stdout.",
+      "tags": [
+        "cli",
+        "cache",
+        "api-handler"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:internal/cli/cache_commands_test.go",
+      "type": "file",
+      "name": "cache_commands_test.go",
+      "filePath": "internal/cli/cache_commands_test.go",
+      "summary": "Tests for CLI cache command handlers verifying that HandleClearCache and HandleClearAllCache behave correctly under different cache states.",
+      "tags": [
+        "test",
+        "cli",
+        "cache"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:internal/cli/flags.go",
+      "type": "file",
+      "name": "flags.go",
+      "filePath": "internal/cli/flags.go",
+      "summary": "Defines the Flags struct for CLI argument parsing and the ParseFlags function that reads command-line options including date, system filter, mode flags, and true-up start date.",
+      "tags": [
+        "cli",
+        "configuration",
+        "entry-point",
+        "tested"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:internal/cli/flags.go:ParseFlags",
+      "type": "function",
+      "name": "ParseFlags",
+      "filePath": "internal/cli/flags.go",
+      "lineRange": [
+        23,
+        41
+      ],
+      "summary": "Registers and parses all command-line flags for the Enphase Monitor tool, returning a populated Flags struct.",
+      "tags": [
+        "cli",
+        "configuration",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:internal/cli/flags_test.go",
+      "type": "file",
+      "name": "flags_test.go",
+      "filePath": "internal/cli/flags_test.go",
+      "summary": "Table-driven tests for ParseFlags covering default values, all flag combinations, edge cases like empty strings, and boolean flag behavior.",
+      "tags": [
+        "test",
+        "cli",
+        "configuration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:internal/config/config.go",
+      "type": "file",
+      "name": "config.go",
+      "filePath": "internal/config/config.go",
+      "summary": "Loads and validates the YAML configuration file describing Enphase system credentials, OAuth tokens, timezone, and optional display color overrides, converting hex color codes to ANSI escape sequences.",
+      "tags": [
+        "configuration",
+        "factory",
+        "serialization",
+        "tested"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:internal/config/config.go:Config",
+      "type": "class",
+      "name": "Config",
+      "filePath": "internal/config/config.go",
+      "lineRange": [
+        150,
+        156
+      ],
+      "summary": "Top-level configuration struct holding the list of Enphase system definitions, report timezone, and optional color configuration.",
+      "tags": [
+        "data-model",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:internal/config/config.go:ColorConfig",
+      "type": "class",
+      "name": "ColorConfig",
+      "filePath": "internal/config/config.go",
+      "lineRange": [
+        82,
+        95
+      ],
+      "summary": "Holds per-field terminal color settings for metric display, with methods to merge user-supplied hex codes over defaults and convert them to ANSI escape sequences.",
+      "tags": [
+        "data-model",
+        "display",
+        "configuration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/config/config.go:LoadConfig",
+      "type": "function",
+      "name": "LoadConfig",
+      "filePath": "internal/config/config.go",
+      "lineRange": [
+        159,
+        205
+      ],
+      "summary": "Reads the YAML config file from disk, unmarshals it into a Config struct, validates required fields, and applies color conversions before returning.",
+      "tags": [
+        "factory",
+        "configuration",
+        "validation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:internal/config/config.go:hexToANSI",
+      "type": "function",
+      "name": "hexToANSI",
+      "filePath": "internal/config/config.go",
+      "lineRange": [
+        228,
+        285
+      ],
+      "summary": "Converts a CSS-style hex color string (#RRGGBB) to the corresponding ANSI 24-bit terminal escape sequence for colored terminal output.",
+      "tags": [
+        "utility",
+        "display",
+        "color"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:internal/config/config_test.go",
+      "type": "file",
+      "name": "config_test.go",
+      "filePath": "internal/config/config_test.go",
+      "summary": "Tests for config loading covering valid YAML, missing required fields, invalid timezone, hex color conversion, malformed hex codes, and ColorConfig merging.",
+      "tags": [
+        "test",
+        "configuration",
+        "validation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/oauth/oauth.go",
+      "type": "file",
+      "name": "oauth.go",
+      "filePath": "internal/oauth/oauth.go",
+      "summary": "Implements the Enphase OAuth 2.0 Authorization Code flow: generates the authorization URL, exchanges the code for tokens, and manages token refresh and persistent on-disk token caching.",
+      "tags": [
+        "service",
+        "oauth",
+        "security",
+        "tested"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:internal/oauth/oauth.go:OAuthTokenResponse",
+      "type": "class",
+      "name": "OAuthTokenResponse",
+      "filePath": "internal/oauth/oauth.go",
+      "lineRange": [
+        76,
+        82
+      ],
+      "summary": "JSON-deserialization target for Enphase OAuth token endpoint responses, holding access token, refresh token, expiry, and token type.",
+      "tags": [
+        "data-model",
+        "oauth",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:internal/oauth/oauth.go:TokenCache",
+      "type": "class",
+      "name": "TokenCache",
+      "filePath": "internal/oauth/oauth.go",
+      "lineRange": [
+        85,
+        89
+      ],
+      "summary": "On-disk token cache structure storing the access token, refresh token, and expiry time to avoid repeated OAuth round-trips.",
+      "tags": [
+        "data-model",
+        "oauth",
+        "cache"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:internal/oauth/oauth.go:GetAccessToken",
+      "type": "function",
+      "name": "GetAccessToken",
+      "filePath": "internal/oauth/oauth.go",
+      "lineRange": [
+        178,
+        283
+      ],
+      "summary": "Retrieves a valid OAuth 2.0 access token: loads from disk cache if present and unexpired, automatically refreshes via the refresh token flow if expired, or exits with user instructions if no cached token exists.",
+      "tags": [
+        "oauth",
+        "security",
+        "service"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:internal/oauth/oauth.go:ExchangeAuthorizationCode",
+      "type": "function",
+      "name": "ExchangeAuthorizationCode",
+      "filePath": "internal/oauth/oauth.go",
+      "lineRange": [
+        121,
+        175
+      ],
+      "summary": "Exchanges an OAuth authorization code for access and refresh tokens, persisting the result to the on-disk token cache for subsequent requests.",
+      "tags": [
+        "oauth",
+        "security",
+        "api-handler"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:internal/oauth/oauth_edge_cases_test.go",
+      "type": "file",
+      "name": "oauth_edge_cases_test.go",
+      "filePath": "internal/oauth/oauth_edge_cases_test.go",
+      "summary": "Edge-case tests for the OAuth package covering expired tokens, invalid JSON in token cache, HTTP error responses, missing refresh tokens, and boundary conditions in the authorization flow.",
+      "tags": [
+        "test",
+        "oauth",
+        "security"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/oauth/oauth_functional_test.go",
+      "type": "file",
+      "name": "oauth_functional_test.go",
+      "filePath": "internal/oauth/oauth_functional_test.go",
+      "summary": "Functional end-to-end tests for OAuth flows using mock HTTP servers, covering valid token exchange, refresh token rotation, and GetAccessToken behavior under various cache states.",
+      "tags": [
+        "test",
+        "oauth",
+        "integration"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/oauth/oauth_test.go",
+      "type": "file",
+      "name": "oauth_test.go",
+      "filePath": "internal/oauth/oauth_test.go",
+      "summary": "Unit tests for GetAuthorizationURL construction and basic OAuth configuration validation against the expected Enphase OAuth endpoint format.",
+      "tags": [
+        "test",
+        "oauth",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:internal/oauth/setup.go",
+      "type": "file",
+      "name": "setup.go",
+      "filePath": "internal/oauth/setup.go",
+      "summary": "Implements the interactive OAuth 2.0 setup wizard for the Enphase Enlighten API, guiding the user through browser-based authorization, authorization code entry, token exchange, and credentials display.",
+      "tags": [
+        "oauth",
+        "authentication",
+        "setup",
+        "interactive",
+        "service"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Uses bufio.NewReader for stdin prompts and os/exec to open a browser cross-platform (macOS, Linux, Windows)."
+    },
+    {
+      "id": "function:internal/oauth/setup.go:Setup",
+      "type": "function",
+      "name": "Setup",
+      "filePath": "internal/oauth/setup.go",
+      "lineRange": [
+        58,
+        235
+      ],
+      "summary": "Exported interactive OAuth setup function that walks the user through the full authorization code flow: validates config, opens a browser, collects the redirect URL, exchanges the authorization code for tokens, and prints the resulting credentials for the user to save.",
+      "tags": [
+        "oauth",
+        "authentication",
+        "entry-point",
+        "interactive"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/parser/parser.go",
+      "type": "file",
+      "name": "parser.go",
+      "filePath": "internal/parser/parser.go",
+      "summary": "Provides JSON parsing and aggregation utilities for Enphase Enlighten API responses, including telemetry interval data, nested battery/meter telemetry, and lifetime energy production/consumption data.",
+      "tags": [
+        "parser",
+        "utility",
+        "serialization",
+        "api-handler",
+        "tested"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Defines five exported struct types (TelemetryResponse, TelemetryResponseNested, TelemetryInterval, LifetimeResponse, DailyInterval) alongside six parsing and summation functions."
+    },
+    {
+      "id": "class:internal/parser/parser.go:TelemetryResponse",
+      "type": "class",
+      "name": "TelemetryResponse",
+      "filePath": "internal/parser/parser.go",
+      "lineRange": [
+        33,
+        36
+      ],
+      "summary": "Struct representing a flat telemetry API response with battery state-of-charge and interval array fields.",
+      "tags": [
+        "data-model",
+        "type-definition",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:internal/parser/parser.go:TelemetryResponseNested",
+      "type": "class",
+      "name": "TelemetryResponseNested",
+      "filePath": "internal/parser/parser.go",
+      "lineRange": [
+        40,
+        42
+      ],
+      "summary": "Struct representing a nested telemetry API response that holds a slice of inner interval arrays.",
+      "tags": [
+        "data-model",
+        "type-definition",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:internal/parser/parser.go:TelemetryInterval",
+      "type": "class",
+      "name": "TelemetryInterval",
+      "filePath": "internal/parser/parser.go",
+      "lineRange": [
+        45,
+        58
+      ],
+      "summary": "Struct representing a single 15-minute telemetry interval with energy delivery, receipt, import, export, net energy, and battery charge/discharge fields.",
+      "tags": [
+        "data-model",
+        "type-definition",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:internal/parser/parser.go:LifetimeResponse",
+      "type": "class",
+      "name": "LifetimeResponse",
+      "filePath": "internal/parser/parser.go",
+      "lineRange": [
+        64,
+        72
+      ],
+      "summary": "Struct representing a lifetime energy API response containing system ID, start date, and per-day energy arrays for production, consumption, import, export, and daily intervals.",
+      "tags": [
+        "data-model",
+        "type-definition",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:internal/parser/parser.go:DailyInterval",
+      "type": "class",
+      "name": "DailyInterval",
+      "filePath": "internal/parser/parser.go",
+      "lineRange": [
+        76,
+        79
+      ],
+      "summary": "Struct representing a single daily interval with a date string and energy-in-watt-hours value.",
+      "tags": [
+        "data-model",
+        "type-definition"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:internal/parser/parser.go:ParseNestedTelemetryResponse",
+      "type": "function",
+      "name": "ParseNestedTelemetryResponse",
+      "filePath": "internal/parser/parser.go",
+      "lineRange": [
+        83,
+        104
+      ],
+      "summary": "Parses a nested telemetry JSON response (used for battery and meter endpoints) and flattens all inner interval arrays into a single slice of TelemetryInterval.",
+      "tags": [
+        "parser",
+        "serialization",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/parser/parser.go:ParseLifetimeResponse",
+      "type": "function",
+      "name": "ParseLifetimeResponse",
+      "filePath": "internal/parser/parser.go",
+      "lineRange": [
+        156,
+        203
+      ],
+      "summary": "Parses a lifetime energy JSON response, validates the data arrays, and produces a LifetimeResponse with a generated DailyInterval slice spanning start-date to end.",
+      "tags": [
+        "parser",
+        "serialization",
+        "utility"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:internal/parser/parser.go:SumIntervalValues",
+      "type": "function",
+      "name": "SumIntervalValues",
+      "filePath": "internal/parser/parser.go",
+      "lineRange": [
+        136,
+        151
+      ],
+      "summary": "Sums a named numeric field across a slice of TelemetryInterval structs using reflection-like field lookup via a fieldName string.",
+      "tags": [
+        "utility",
+        "aggregation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/parser/parser.go:SumDailyIntervals",
+      "type": "function",
+      "name": "SumDailyIntervals",
+      "filePath": "internal/parser/parser.go",
+      "lineRange": [
+        207,
+        216
+      ],
+      "summary": "Sums energy values across DailyInterval entries whose dates fall within a start-to-end date range.",
+      "tags": [
+        "utility",
+        "aggregation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:internal/parser/parser_bench_test.go",
+      "type": "file",
+      "name": "parser_bench_test.go",
+      "filePath": "internal/parser/parser_bench_test.go",
+      "summary": "Benchmark tests for the parser package covering telemetry parsing, nested telemetry parsing, interval summation (normal and large datasets), response body reading, and combined unmarshal+sum workflows.",
+      "tags": [
+        "test",
+        "benchmark",
+        "parser"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Uses the Go testing.B harness with b.ResetTimer to isolate setup from the benchmarked hot path."
+    },
+    {
+      "id": "file:internal/parser/parser_test.go",
+      "type": "file",
+      "name": "parser_test.go",
+      "filePath": "internal/parser/parser_test.go",
+      "summary": "Unit tests for all parser package functions, including table-driven subtests for telemetry response parsing, nested telemetry parsing, response body reading, lifetime response parsing, daily interval summation, and interval value summation.",
+      "tags": [
+        "test",
+        "parser",
+        "unit-test"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/types/types.go",
+      "type": "file",
+      "name": "types.go",
+      "filePath": "internal/types/types.go",
+      "summary": "Defines the shared domain types used across the application, including SystemConfig (name and system ID) and APIConfig (API key, OAuth client credentials, and token fields).",
+      "tags": [
+        "type-definition",
+        "data-model",
+        "configuration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/types/types.go:SystemConfig",
+      "type": "class",
+      "name": "SystemConfig",
+      "filePath": "internal/types/types.go",
+      "lineRange": [
+        82,
+        85
+      ],
+      "summary": "Struct holding an Enphase system's display name and numeric system ID.",
+      "tags": [
+        "data-model",
+        "type-definition",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:internal/types/types.go:APIConfig",
+      "type": "class",
+      "name": "APIConfig",
+      "filePath": "internal/types/types.go",
+      "lineRange": [
+        89,
+        98
+      ],
+      "summary": "Struct holding all Enphase API credentials: API key, OAuth client ID/secret, authorization URL, redirect URI, refresh token, and username/password.",
+      "tags": [
+        "data-model",
+        "type-definition",
+        "configuration",
+        "security"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:internal/urlbuilder/urlbuilder.go",
+      "type": "file",
+      "name": "urlbuilder.go",
+      "filePath": "internal/urlbuilder/urlbuilder.go",
+      "summary": "Provides a single exported function for constructing Enphase Enlighten telemetry API URLs with system ID, endpoint path, API key, and Unix timestamp boundaries.",
+      "tags": [
+        "utility",
+        "api-handler",
+        "tested"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:internal/urlbuilder/urlbuilder.go:BuildTelemetryURL",
+      "type": "function",
+      "name": "BuildTelemetryURL",
+      "filePath": "internal/urlbuilder/urlbuilder.go",
+      "lineRange": [
+        26,
+        31
+      ],
+      "summary": "Builds a fully-formatted Enphase API telemetry URL string from a system ID, endpoint name, API key, and day start/end time boundaries converted to Unix timestamps.",
+      "tags": [
+        "utility",
+        "api-handler"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:internal/urlbuilder/urlbuilder_test.go",
+      "type": "file",
+      "name": "urlbuilder_test.go",
+      "filePath": "internal/urlbuilder/urlbuilder_test.go",
+      "summary": "Unit tests for BuildTelemetryURL verifying correct URL construction, Unix timestamp conversion, and handling of API keys containing special characters.",
+      "tags": [
+        "test",
+        "unit-test",
+        "api-handler"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/validation/validation.go",
+      "type": "file",
+      "name": "validation.go",
+      "filePath": "internal/validation/validation.go",
+      "summary": "Implements metric validation logic that reads expected-values JSON fixtures from the test-data directory, compares computed energy metrics against expected values with tolerance thresholds, and writes a formatted pass/fail report.",
+      "tags": [
+        "validation",
+        "test",
+        "utility",
+        "tested"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Uses a relative tolerance of max(5%, 10 Wh) so small absolute errors on near-zero values do not cause false failures."
+    },
+    {
+      "id": "class:internal/validation/validation.go:ExpectedValues",
+      "type": "class",
+      "name": "ExpectedValues",
+      "filePath": "internal/validation/validation.go",
+      "lineRange": [
+        40,
+        43
+      ],
+      "summary": "Top-level struct for a validation fixture file, containing a date string and an array of ExpectedSystem entries.",
+      "tags": [
+        "data-model",
+        "type-definition",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:internal/validation/validation.go:ExpectedSystem",
+      "type": "class",
+      "name": "ExpectedSystem",
+      "filePath": "internal/validation/validation.go",
+      "lineRange": [
+        46,
+        50
+      ],
+      "summary": "Struct representing one system's expected validation data, including system ID, name, and a nested ExpectedMetrics set.",
+      "tags": [
+        "data-model",
+        "type-definition",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:internal/validation/validation.go:ExpectedMetrics",
+      "type": "class",
+      "name": "ExpectedMetrics",
+      "filePath": "internal/validation/validation.go",
+      "lineRange": [
+        53,
+        61
+      ],
+      "summary": "Struct holding expected float64 energy values for all tracked metrics: GridImport, GridExport, Production, BatteryDischarged, BatteryCharged, NetFlow, and Consumption.",
+      "tags": [
+        "data-model",
+        "type-definition",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:internal/validation/validation.go:ValidateMetrics",
+      "type": "function",
+      "name": "ValidateMetrics",
+      "filePath": "internal/validation/validation.go",
+      "lineRange": [
+        65,
+        159
+      ],
+      "summary": "Main validation entry point that loads the expected-values fixture file for a given date, matches each system in the actual metrics against the expected values, runs per-metric tolerance checks, and writes a tabular pass/fail report to the provided writer.",
+      "tags": [
+        "validation",
+        "utility",
+        "entry-point"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/validation/validation_integration_test.go",
+      "type": "file",
+      "name": "validation_integration_test.go",
+      "filePath": "internal/validation/validation_integration_test.go",
+      "summary": "Integration tests for ValidateMetrics exercising the full file-load-and-compare workflow, including success, tolerance boundary, outside-tolerance, missing system, date mismatch, multiple fixture files, and real-world scenario cases \u2014 skipping automatically when test-data fixtures are absent.",
+      "tags": [
+        "test",
+        "integration-test",
+        "validation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:internal/validation/validation_test.go",
+      "type": "file",
+      "name": "validation_test.go",
+      "filePath": "internal/validation/validation_test.go",
+      "summary": "Unit tests for the validation package's internal helper functions and the main ValidateMetrics function, covering exact match, within/outside tolerance, zero/negative values, missing files, invalid JSON, tolerance calculation correctness, system lookup, and metric test runner behavior.",
+      "tags": [
+        "test",
+        "unit-test",
+        "validation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:test-data/expected_values_2025-12.json",
+      "type": "config",
+      "name": "expected_values_2025-12.json",
+      "filePath": "test-data/expected_values_2025-12.json",
+      "summary": "Validation fixture defining expected energy metric values for both monitored Enphase systems for the month of December 2025.",
+      "tags": [
+        "configuration",
+        "validation",
+        "test-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:test-data/expected_values_2025.json",
+      "type": "config",
+      "name": "expected_values_2025.json",
+      "filePath": "test-data/expected_values_2025.json",
+      "summary": "Validation fixture defining expected energy metric values for both monitored Enphase systems for the full year 2025.",
+      "tags": [
+        "configuration",
+        "validation",
+        "test-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:test-data/expected_values_2026-01-14.json",
+      "type": "config",
+      "name": "expected_values_2026-01-14.json",
+      "filePath": "test-data/expected_values_2026-01-14.json",
+      "summary": "Validation fixture defining expected energy metric values for both monitored Enphase systems for January 14, 2026.",
+      "tags": [
+        "configuration",
+        "validation",
+        "test-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:test-data/expected_values_2026-01-15.json",
+      "type": "config",
+      "name": "expected_values_2026-01-15.json",
+      "filePath": "test-data/expected_values_2026-01-15.json",
+      "summary": "Validation fixture defining expected energy metric values for both monitored Enphase systems for January 15, 2026.",
+      "tags": [
+        "configuration",
+        "validation",
+        "test-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:test-data/expected_values_2026-01-16.json",
+      "type": "config",
+      "name": "expected_values_2026-01-16.json",
+      "filePath": "test-data/expected_values_2026-01-16.json",
+      "summary": "Validation fixture defining expected energy metric values for both monitored Enphase systems for January 16, 2026.",
+      "tags": [
+        "configuration",
+        "validation",
+        "test-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:test-data/expected_values_2026-01-17.json",
+      "type": "config",
+      "name": "expected_values_2026-01-17.json",
+      "filePath": "test-data/expected_values_2026-01-17.json",
+      "summary": "Validation fixture defining expected energy metric values for both monitored Enphase systems for January 17, 2026.",
+      "tags": [
+        "configuration",
+        "validation",
+        "test-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:test-data/expected_values_2026-01-18.json",
+      "type": "config",
+      "name": "expected_values_2026-01-18.json",
+      "filePath": "test-data/expected_values_2026-01-18.json",
+      "summary": "Validation fixture defining expected energy metric values for both monitored Enphase systems for January 18, 2026.",
+      "tags": [
+        "configuration",
+        "validation",
+        "test-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:test-data/expected_values_2026-01-19.json",
+      "type": "config",
+      "name": "expected_values_2026-01-19.json",
+      "filePath": "test-data/expected_values_2026-01-19.json",
+      "summary": "Validation fixture defining expected energy metric values for both monitored Enphase systems for January 19, 2026.",
+      "tags": [
+        "configuration",
+        "validation",
+        "test-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:test-data/expected_values_2026-01-20.json",
+      "type": "config",
+      "name": "expected_values_2026-01-20.json",
+      "filePath": "test-data/expected_values_2026-01-20.json",
+      "summary": "Validation fixture defining expected energy metric values for both monitored Enphase systems for January 20, 2026.",
+      "tags": [
+        "configuration",
+        "validation",
+        "test-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:test-data/expected_values_2026-01.json",
+      "type": "config",
+      "name": "expected_values_2026-01.json",
+      "filePath": "test-data/expected_values_2026-01.json",
+      "summary": "Validation fixture defining expected energy metric values for both monitored Enphase systems for the month of January 2026.",
+      "tags": [
+        "configuration",
+        "validation",
+        "test-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:internal/constants/constants.go:QueryMode",
+      "type": "class",
+      "name": "QueryMode",
+      "filePath": "internal/constants/constants.go",
+      "summary": "Enum type (int) representing query granularity: QueryModeDay, QueryModeMonth, QueryModeYear, QueryModeTrueUp.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/aggregator/types.go:AggregatedMetrics",
+      "type": "class",
+      "name": "AggregatedMetrics",
+      "filePath": "internal/aggregator/types.go",
+      "summary": "Combined energy metrics from all systems: production, consumption, grid import/export, net flow, battery, query date and QueryMode, cache status.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/aggregator/types.go:TrueUpReport",
+      "type": "class",
+      "name": "TrueUpReport",
+      "filePath": "internal/aggregator/types.go",
+      "summary": "Energy totals for a true-up year: start/end date, per-metric sums, per-system breakdown.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/aggregator/types.go:TrueUpSystemReport",
+      "type": "class",
+      "name": "TrueUpSystemReport",
+      "filePath": "internal/aggregator/types.go",
+      "summary": "Per-system energy metrics for the true-up period.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/aggregator/types.go:SystemMetrics",
+      "type": "class",
+      "name": "SystemMetrics",
+      "filePath": "internal/aggregator/types.go",
+      "summary": "Per-system energy metrics: production, consumption, grid import/export, battery charge/discharge/SOC, net flow.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/aggregator/aggregator.go:DataAggregator",
+      "type": "class",
+      "name": "DataAggregator",
+      "filePath": "internal/aggregator/aggregator.go",
+      "summary": "Service object with dependency injection for OAuth token getter and cloud client factory. Orchestrates metric collection across multiple systems.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/api/interface.go:CloudClient",
+      "type": "class",
+      "name": "CloudClient",
+      "filePath": "internal/api/interface.go",
+      "summary": "Interface defining all metric-fetch methods (GetMetricsFromCloud, GetEnergyImportForDate, GetEnergyExportForDate, GetProductionForDate, GetConsumptionForDate, GetBatteryDataForDate). All accept QueryMode.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/api/client.go:EnlightenCloudClient",
+      "type": "class",
+      "name": "EnlightenCloudClient",
+      "filePath": "internal/api/client.go",
+      "summary": "HTTP client implementing CloudClient for Enphase API v4. Manages auth, caching, rate-limit budget, and all five metric endpoints.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/api/cache_check.go:EndpointStatus",
+      "type": "class",
+      "name": "EndpointStatus",
+      "filePath": "internal/api/cache_check.go",
+      "summary": "Cache status for one API endpoint: presence, age, required flag.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/api/cache_check.go:SystemCacheStatus",
+      "type": "class",
+      "name": "SystemCacheStatus",
+      "filePath": "internal/api/cache_check.go",
+      "summary": "Aggregates EndpointStatus for all endpoints of one system. AllRequiredPresent() returns true when all required endpoints are cached.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/app/runner.go:RunConfig",
+      "type": "class",
+      "name": "RunConfig",
+      "filePath": "internal/app/runner.go",
+      "summary": "Groups execution parameters: aggregator, display, config, test date, QueryMode, report timezone, debug flag.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/app/setup.go:ParseDateInput",
+      "type": "class",
+      "name": "ParseDateInput",
+      "filePath": "internal/app/setup.go",
+      "summary": "Result of ParseTestDate: parsed time.Time and corresponding QueryMode.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/display/display.go:Display",
+      "type": "class",
+      "name": "Display",
+      "filePath": "internal/display/display.go",
+      "summary": "Terminal output formatter with dependency-injected io.Writer. Renders energy metrics with ANSI colors and timezone-aware date ranges.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:internal/timezone/timezone.go:ParseResult",
+      "type": "class",
+      "name": "ParseResult",
+      "filePath": "internal/timezone/timezone.go",
+      "summary": "Result of ParseDateString: parsed Date and QueryMode for day/month/year inputs.",
+      "tags": [
+        "type-definition"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:internal/aggregator/aggregator.go:NewDataAggregator",
+      "type": "function",
+      "name": "NewDataAggregator",
+      "filePath": "internal/aggregator/aggregator.go",
+      "summary": "Creates DataAggregator with OAuth token getter using default cloud client factory.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        60,
+        60
+      ]
+    },
+    {
+      "id": "function:internal/aggregator/aggregator.go:NewDataAggregatorWithFactory",
+      "type": "function",
+      "name": "NewDataAggregatorWithFactory",
+      "filePath": "internal/aggregator/aggregator.go",
+      "summary": "Creates DataAggregator with custom cloud client factory for testing.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        69,
+        69
+      ]
+    },
+    {
+      "id": "function:internal/aggregator/aggregator.go:GetAggregatedMetrics",
+      "type": "function",
+      "name": "GetAggregatedMetrics",
+      "filePath": "internal/aggregator/aggregator.go",
+      "summary": "Fetches and aggregates energy metrics from all systems. Accepts QueryMode for day/month/year/true-up granularity. Handles rate-limit errors per system.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        80,
+        80
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:NewEnlightenCloudClient",
+      "type": "function",
+      "name": "NewEnlightenCloudClient",
+      "filePath": "internal/api/client.go",
+      "summary": "Creates EnlightenCloudClient with production API URL.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        203,
+        203
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:NewEnlightenCloudClientWithBaseURL",
+      "type": "function",
+      "name": "NewEnlightenCloudClientWithBaseURL",
+      "filePath": "internal/api/client.go",
+      "summary": "Creates EnlightenCloudClient with injectable base URL for testing.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        218,
+        218
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:GetMetricsFromCloud",
+      "type": "function",
+      "name": "GetMetricsFromCloud",
+      "filePath": "internal/api/client.go",
+      "summary": "Fetches all metrics (import, export, production, consumption, battery for day mode). QueryMode controls which endpoints and lifetime vs interval strategy.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        447,
+        447
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:GetEnergyImportForDate",
+      "type": "function",
+      "name": "GetEnergyImportForDate",
+      "filePath": "internal/api/client.go",
+      "summary": "Returns total grid import energy in kWh. Month/year/true-up queries use lifetime endpoint; day queries use interval endpoint.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        278,
+        278
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:GetEnergyExportForDate",
+      "type": "function",
+      "name": "GetEnergyExportForDate",
+      "filePath": "internal/api/client.go",
+      "summary": "Returns total grid export energy in kWh. Month/year/true-up queries use lifetime endpoint; day queries use interval endpoint.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        303,
+        303
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:GetProductionForDate",
+      "type": "function",
+      "name": "GetProductionForDate",
+      "filePath": "internal/api/client.go",
+      "summary": "Returns total solar production in kWh. Month/year/true-up: energy_lifetime; day: production_meter interval.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        326,
+        326
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:GetConsumptionForDate",
+      "type": "function",
+      "name": "GetConsumptionForDate",
+      "filePath": "internal/api/client.go",
+      "summary": "Returns total consumption in kWh. Month/year/true-up: consumption_lifetime; day: consumption_meter interval.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        351,
+        351
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:GetBatteryDataForDate",
+      "type": "function",
+      "name": "GetBatteryDataForDate",
+      "filePath": "internal/api/client.go",
+      "summary": "Returns battery charged/discharged kWh and SOC%. Only called for QueryModeDay with zero testDate (today's live report).",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        372,
+        372
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:QueryCost",
+      "type": "function",
+      "name": "QueryCost",
+      "filePath": "internal/api/client.go",
+      "summary": "Returns number of live API calls a single-system fetch will make for a given QueryMode. Used for preflight budget check.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        432,
+        432
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:makeCachedAPIRequest",
+      "type": "function",
+      "name": "makeCachedAPIRequest",
+      "filePath": "internal/api/client.go",
+      "summary": "Core caching decision engine: test mode \u2192 cache only; no-cache \u2192 live; past period \u2192 immutable cache; budget exhausted \u2192 cross-endpoint fallback; else live API call.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        733,
+        733
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:cacheMaxAge",
+      "type": "function",
+      "name": "cacheMaxAge",
+      "filePath": "internal/api/client.go",
+      "summary": "Returns max acceptable cache age for a query (0=never expires for past, 1h for today, 24h for current MTD/YTD).",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        590,
+        590
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:lifetimeEndDate",
+      "type": "function",
+      "name": "lifetimeEndDate",
+      "filePath": "internal/api/client.go",
+      "summary": "Returns the end date string for lifetime API requests: yesterday for ongoing periods, period end for past periods.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        235,
+        235
+      ]
+    },
+    {
+      "id": "function:internal/api/client.go:fetchTelemetryData",
+      "type": "function",
+      "name": "fetchTelemetryData",
+      "filePath": "internal/api/client.go",
+      "summary": "Helper that calls buildTelemetryURL, makeCachedAPIRequest, tracks cache usage, and reads body.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        248,
+        248
+      ]
+    },
+    {
+      "id": "function:internal/api/cache_check.go:CheckCacheForSystem",
+      "type": "function",
+      "name": "CheckCacheForSystem",
+      "filePath": "internal/api/cache_check.go",
+      "summary": "Checks on-disk cache for all endpoints needed by QueryMode (day: interval endpoints; month/year/true-up: lifetime endpoints). No network calls.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        42,
+        42
+      ]
+    },
+    {
+      "id": "function:internal/app/runner.go:RunOnce",
+      "type": "function",
+      "name": "RunOnce",
+      "filePath": "internal/app/runner.go",
+      "summary": "Single query execution: fetches aggregated metrics, displays results, optionally validates in test mode.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        39,
+        39
+      ]
+    },
+    {
+      "id": "function:internal/app/runner.go:RunContinuous",
+      "type": "function",
+      "name": "RunContinuous",
+      "filePath": "internal/app/runner.go",
+      "summary": "Continuous monitoring loop with ticker-based refresh. Returns on context cancellation or fatal rate-limit error.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        64,
+        64
+      ]
+    },
+    {
+      "id": "function:internal/app/setup.go:ParseTestDate",
+      "type": "function",
+      "name": "ParseTestDate",
+      "filePath": "internal/app/setup.go",
+      "summary": "Parses date string (YYYY-MM-DD, YYYY-MM, YYYY) and returns ParseDateInput with Date and QueryMode.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        84,
+        84
+      ]
+    },
+    {
+      "id": "function:internal/app/setup.go:FormatDateForQueryMode",
+      "type": "function",
+      "name": "FormatDateForQueryMode",
+      "filePath": "internal/app/setup.go",
+      "summary": "Formats a date according to its QueryMode (day\u2192YYYY-MM-DD, month\u2192YYYY-MM, year\u2192YYYY).",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        105,
+        105
+      ]
+    },
+    {
+      "id": "function:internal/app/setup.go:CreateOAuthAdapter",
+      "type": "function",
+      "name": "CreateOAuthAdapter",
+      "filePath": "internal/app/setup.go",
+      "summary": "Returns OAuthTokenGetter adapter wrapping oauth.GetAccessToken.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        36,
+        36
+      ]
+    },
+    {
+      "id": "function:internal/app/setup.go:SetupDisplay",
+      "type": "function",
+      "name": "SetupDisplay",
+      "filePath": "internal/app/setup.go",
+      "summary": "Creates Display instance with colors from config and report timezone.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        44,
+        44
+      ]
+    },
+    {
+      "id": "function:internal/app/setup.go:ConfigureModes",
+      "type": "function",
+      "name": "ConfigureModes",
+      "filePath": "internal/app/setup.go",
+      "summary": "Sets test mode, no-cache mode, and debug mode flags based on CLI arguments.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        65,
+        65
+      ]
+    },
+    {
+      "id": "function:internal/app/setup.go:ValidateTestModeCache",
+      "type": "function",
+      "name": "ValidateTestModeCache",
+      "filePath": "internal/app/setup.go",
+      "summary": "Checks if on-disk cache exists for target date; returns error with populate instructions if missing.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        132,
+        132
+      ]
+    },
+    {
+      "id": "function:internal/app/setup.go:GetAggregatorTypes",
+      "type": "function",
+      "name": "GetAggregatorTypes",
+      "filePath": "internal/app/setup.go",
+      "summary": "Extracts aggregator-compatible systems slice and API config from main config.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        120,
+        120
+      ]
+    },
+    {
+      "id": "function:internal/app/trueup.go:RunTrueUp",
+      "type": "function",
+      "name": "RunTrueUp",
+      "filePath": "internal/app/trueup.go",
+      "summary": "Calculates true-up year energy metrics via single-batch lifetime query using QueryModeTrueUp. Normalizes to first-of-month. Displays TrueUpReport.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        19,
+        19
+      ]
+    },
+    {
+      "id": "function:internal/app/trueup.go:buildTrueUpReport",
+      "type": "function",
+      "name": "buildTrueUpReport",
+      "filePath": "internal/app/trueup.go",
+      "summary": "Converts AggregatedMetrics from a true-up batch into TrueUpReport with per-system breakdown.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        62,
+        62
+      ]
+    },
+    {
+      "id": "function:internal/app/cache_report.go:RunCacheReport",
+      "type": "function",
+      "name": "RunCacheReport",
+      "filePath": "internal/app/cache_report.go",
+      "summary": "Checks cache coverage for all systems; if complete enables test mode and runs normal path; otherwise prints per-endpoint diagnostic.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        26,
+        26
+      ]
+    },
+    {
+      "id": "function:internal/constants/constants.go:IsRateLimitError",
+      "type": "function",
+      "name": "IsRateLimitError",
+      "filePath": "internal/constants/constants.go",
+      "summary": "Helper that checks if an error message contains RateLimitError string.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        210,
+        210
+      ]
+    },
+    {
+      "id": "function:internal/constants/constants.go:QueryMode.String",
+      "type": "function",
+      "name": "QueryMode.String",
+      "filePath": "internal/constants/constants.go",
+      "summary": "Returns human-readable string for QueryMode: day/month/year/true-up.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        87,
+        87
+      ]
+    },
+    {
+      "id": "function:internal/display/display.go:ShowMetrics",
+      "type": "function",
+      "name": "ShowMetrics",
+      "filePath": "internal/display/display.go",
+      "summary": "Formats and prints AggregatedMetrics: header with date range, combined energy report, optional per-system section.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        75,
+        75
+      ]
+    },
+    {
+      "id": "function:internal/display/display.go:ShowTrueUpReport",
+      "type": "function",
+      "name": "ShowTrueUpReport",
+      "filePath": "internal/display/display.go",
+      "summary": "Formats and prints TrueUpReport with header, combined energy, and per-system breakdown.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        239,
+        239
+      ]
+    },
+    {
+      "id": "function:internal/timezone/timezone.go:GetBoundaries",
+      "type": "function",
+      "name": "GetBoundaries",
+      "filePath": "internal/timezone/timezone.go",
+      "summary": "Unified boundary dispatcher: delegates to GetDayBoundaries/GetMonthBoundaries/GetYearBoundaries/GetTrueUpBoundaries based on QueryMode.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        204,
+        204
+      ]
+    },
+    {
+      "id": "function:internal/timezone/timezone.go:IsPastPeriod",
+      "type": "function",
+      "name": "IsPastPeriod",
+      "filePath": "internal/timezone/timezone.go",
+      "summary": "Returns true if the given date's period (day/month/year) is entirely in the past. Always false for QueryModeTrueUp.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        218,
+        218
+      ]
+    },
+    {
+      "id": "function:internal/timezone/timezone.go:IsPastDate",
+      "type": "function",
+      "name": "IsPastDate",
+      "filePath": "internal/timezone/timezone.go",
+      "summary": "Returns true if the given date is strictly before today.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        82,
+        82
+      ]
+    },
+    {
+      "id": "function:internal/timezone/timezone.go:ParseDateString",
+      "type": "function",
+      "name": "ParseDateString",
+      "filePath": "internal/timezone/timezone.go",
+      "summary": "Parses YYYY-MM-DD/YYYY-MM/YYYY and returns ParseResult with Date and QueryMode.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        110,
+        110
+      ]
+    },
+    {
+      "id": "function:internal/timezone/timezone.go:LoadTimezone",
+      "type": "function",
+      "name": "LoadTimezone",
+      "filePath": "internal/timezone/timezone.go",
+      "summary": "Loads timezone location with fallback to system TZ then US/Pacific.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        37,
+        37
+      ]
+    },
+    {
+      "id": "function:internal/timezone/timezone.go:GetDayBoundaries",
+      "type": "function",
+      "name": "GetDayBoundaries",
+      "filePath": "internal/timezone/timezone.go",
+      "summary": "Returns day start/end times in timezone; end capped to now to prevent 422 API errors.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        61,
+        61
+      ]
+    },
+    {
+      "id": "function:internal/timezone/timezone.go:GetMonthBoundaries",
+      "type": "function",
+      "name": "GetMonthBoundaries",
+      "filePath": "internal/timezone/timezone.go",
+      "summary": "Returns month start/end times, end capped to now for current month.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        143,
+        143
+      ]
+    },
+    {
+      "id": "function:internal/timezone/timezone.go:GetYearBoundaries",
+      "type": "function",
+      "name": "GetYearBoundaries",
+      "filePath": "internal/timezone/timezone.go",
+      "summary": "Returns year start/end times, end capped to now for current year.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        170,
+        170
+      ]
+    },
+    {
+      "id": "function:internal/timezone/timezone.go:GetTrueUpBoundaries",
+      "type": "function",
+      "name": "GetTrueUpBoundaries",
+      "filePath": "internal/timezone/timezone.go",
+      "summary": "Returns true-up period start (start date) through yesterday end.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        192,
+        192
+      ]
+    },
+    {
+      "id": "function:main.go:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "main.go",
+      "summary": "Entry point: parses flags, loads config, dispatches to RunCacheReport/RunTrueUp/RunOnce/RunContinuous based on flags.",
+      "tags": [
+        "utility"
+      ],
+      "complexity": "moderate",
+      "lineRange": [
+        111,
+        111
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "class:internal/cache/cache.go:CachedResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "function:internal/cache/cache.go:NormalizeURLForCache",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "function:internal/cache/cache.go:FindMostRecentByEndpoint",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "function:internal/cache/cache.go:SaveCachedResponseFromBytes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "function:internal/cache/cache.go:HasCacheForDate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "function:internal/cache/cache.go:RecordAPICall",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "class:internal/cache/cache.go:CachedResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "function:internal/cache/cache.go:NormalizeURLForCache",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "function:internal/cache/cache.go:FindMostRecentByEndpoint",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "function:internal/cache/cache.go:SaveCachedResponseFromBytes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "function:internal/cache/cache.go:HasCacheForDate",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "function:internal/cache/cache.go:RecordAPICall",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "file:internal/cache/cache_functions_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:internal/cache/cache.go",
+      "target": "file:internal/cache/cache_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:internal/cache/cli.go",
+      "target": "class:internal/cache/cli.go:CacheEntry",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cache/cli.go",
+      "target": "function:internal/cache/cli.go:ClearTodayCache",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cache/cli.go",
+      "target": "function:internal/cache/cli.go:ListCacheEntries",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cache/cli.go",
+      "target": "function:internal/cache/cli.go:parseCacheResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cache/cli.go",
+      "target": "class:internal/cache/cli.go:CacheEntry",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cache/cli.go",
+      "target": "function:internal/cache/cli.go:ClearTodayCache",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cache/cli.go",
+      "target": "function:internal/cache/cli.go:ListCacheEntries",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cache/cli.go",
+      "target": "file:internal/cache/cli_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:internal/cli/cache_commands.go",
+      "target": "function:internal/cli/cache_commands.go:HandleClearCache",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cli/cache_commands.go",
+      "target": "function:internal/cli/cache_commands.go:HandleClearCache",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cli/cache_commands.go",
+      "target": "file:internal/cache/cache.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/cli/cache_commands.go",
+      "target": "file:internal/cli/cache_commands_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:internal/cli/flags.go",
+      "target": "function:internal/cli/flags.go:ParseFlags",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/cli/flags.go",
+      "target": "function:internal/cli/flags.go:ParseFlags",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/cli/flags.go",
+      "target": "file:internal/cli/flags_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:internal/config/config.go",
+      "target": "class:internal/config/config.go:Config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/config/config.go",
+      "target": "class:internal/config/config.go:ColorConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/config/config.go",
+      "target": "function:internal/config/config.go:LoadConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/config/config.go",
+      "target": "function:internal/config/config.go:hexToANSI",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/config/config.go",
+      "target": "class:internal/config/config.go:Config",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/config/config.go",
+      "target": "class:internal/config/config.go:ColorConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/config/config.go",
+      "target": "function:internal/config/config.go:LoadConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/config/config.go",
+      "target": "file:internal/types/types.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/config/config.go",
+      "target": "file:internal/config/config_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:internal/oauth/oauth.go",
+      "target": "class:internal/oauth/oauth.go:OAuthTokenResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/oauth/oauth.go",
+      "target": "class:internal/oauth/oauth.go:TokenCache",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/oauth/oauth.go",
+      "target": "function:internal/oauth/oauth.go:GetAccessToken",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/oauth/oauth.go",
+      "target": "function:internal/oauth/oauth.go:ExchangeAuthorizationCode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/oauth/oauth.go",
+      "target": "function:internal/oauth/oauth.go:GetAccessToken",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/oauth/oauth.go",
+      "target": "function:internal/oauth/oauth.go:ExchangeAuthorizationCode",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/oauth/oauth.go",
+      "target": "file:internal/types/types.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/oauth/oauth.go",
+      "target": "file:internal/oauth/oauth_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:internal/oauth/oauth.go",
+      "target": "file:internal/oauth/oauth_edge_cases_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:internal/oauth/oauth.go",
+      "target": "file:internal/oauth/oauth_functional_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:internal/oauth/oauth_edge_cases_test.go",
+      "target": "file:internal/config/config.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/oauth/oauth_edge_cases_test.go",
+      "target": "file:internal/types/types.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/oauth/oauth_functional_test.go",
+      "target": "file:internal/types/types.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/oauth/oauth_test.go",
+      "target": "file:internal/config/config.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/oauth/setup.go",
+      "target": "file:internal/config/config.go",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:internal/oauth/setup.go",
+      "target": "function:internal/oauth/setup.go:Setup",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/oauth/setup.go",
+      "target": "function:internal/oauth/setup.go:Setup",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "class:internal/parser/parser.go:TelemetryResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "class:internal/parser/parser.go:TelemetryResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "class:internal/parser/parser.go:TelemetryResponseNested",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "class:internal/parser/parser.go:TelemetryResponseNested",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "class:internal/parser/parser.go:TelemetryInterval",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "class:internal/parser/parser.go:TelemetryInterval",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "class:internal/parser/parser.go:LifetimeResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "class:internal/parser/parser.go:LifetimeResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "class:internal/parser/parser.go:DailyInterval",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "class:internal/parser/parser.go:DailyInterval",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "function:internal/parser/parser.go:ParseNestedTelemetryResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "function:internal/parser/parser.go:ParseNestedTelemetryResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "function:internal/parser/parser.go:ParseLifetimeResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "function:internal/parser/parser.go:ParseLifetimeResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "function:internal/parser/parser.go:SumIntervalValues",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "function:internal/parser/parser.go:SumIntervalValues",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "function:internal/parser/parser.go:SumDailyIntervals",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "function:internal/parser/parser.go:SumDailyIntervals",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "file:internal/parser/parser_bench_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5,
+      "description": "Direction corrected (was test \u2192 production)"
+    },
+    {
+      "source": "file:internal/parser/parser.go",
+      "target": "file:internal/parser/parser_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5,
+      "description": "Direction corrected (was test \u2192 production)"
+    },
+    {
+      "source": "file:internal/types/types.go",
+      "target": "class:internal/types/types.go:SystemConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/types/types.go",
+      "target": "class:internal/types/types.go:SystemConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/types/types.go",
+      "target": "class:internal/types/types.go:APIConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/types/types.go",
+      "target": "class:internal/types/types.go:APIConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/urlbuilder/urlbuilder.go",
+      "target": "function:internal/urlbuilder/urlbuilder.go:BuildTelemetryURL",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/urlbuilder/urlbuilder.go",
+      "target": "function:internal/urlbuilder/urlbuilder.go:BuildTelemetryURL",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/urlbuilder/urlbuilder.go",
+      "target": "file:internal/urlbuilder/urlbuilder_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5,
+      "description": "Direction corrected (was test \u2192 production)"
+    },
+    {
+      "source": "file:internal/validation/validation.go",
+      "target": "class:internal/validation/validation.go:ExpectedValues",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/validation/validation.go",
+      "target": "class:internal/validation/validation.go:ExpectedValues",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/validation/validation.go",
+      "target": "class:internal/validation/validation.go:ExpectedSystem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/validation/validation.go",
+      "target": "class:internal/validation/validation.go:ExpectedSystem",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/validation/validation.go",
+      "target": "class:internal/validation/validation.go:ExpectedMetrics",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/validation/validation.go",
+      "target": "class:internal/validation/validation.go:ExpectedMetrics",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/validation/validation.go",
+      "target": "function:internal/validation/validation.go:ValidateMetrics",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:internal/validation/validation.go",
+      "target": "function:internal/validation/validation.go:ValidateMetrics",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:internal/validation/validation.go",
+      "target": "file:internal/validation/validation_integration_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5,
+      "description": "Direction corrected (was test \u2192 production)"
+    },
+    {
+      "source": "file:internal/validation/validation.go",
+      "target": "file:internal/validation/validation_test.go",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5,
+      "description": "Direction corrected (was test \u2192 production)"
+    },
+    {
+      "source": "config:test-data/expected_values_2025-12.json",
+      "target": "file:internal/validation/validation.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:test-data/expected_values_2025.json",
+      "target": "file:internal/validation/validation.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:test-data/expected_values_2026-01-14.json",
+      "target": "file:internal/validation/validation.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:test-data/expected_values_2026-01-15.json",
+      "target": "file:internal/validation/validation.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:test-data/expected_values_2026-01-16.json",
+      "target": "file:internal/validation/validation.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:test-data/expected_values_2026-01-17.json",
+      "target": "file:internal/validation/validation.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:test-data/expected_values_2026-01-18.json",
+      "target": "file:internal/validation/validation.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:test-data/expected_values_2026-01-19.json",
+      "target": "file:internal/validation/validation.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:test-data/expected_values_2026-01-20.json",
+      "target": "file:internal/validation/validation.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:test-data/expected_values_2026-01.json",
+      "target": "file:internal/validation/validation.go",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "class:internal/api/interface.go:CloudClient",
+      "direction": "forward",
+      "type": "implements",
+      "weight": 0.9
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:GetMetricsFromCloud",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:GetEnergyImportForDate",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:GetEnergyExportForDate",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:GetProductionForDate",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:GetConsumptionForDate",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:GetBatteryDataForDate",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:QueryCost",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:makeCachedAPIRequest",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:cacheMaxAge",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:lifetimeEndDate",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/client.go:EnlightenCloudClient",
+      "target": "function:internal/api/client.go:fetchTelemetryData",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/aggregator/aggregator.go:DataAggregator",
+      "target": "function:internal/aggregator/aggregator.go:GetAggregatedMetrics",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/api/cache_check.go:SystemCacheStatus",
+      "target": "function:internal/api/cache_check.go:CheckCacheForSystem",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/display/display.go:Display",
+      "target": "function:internal/display/display.go:ShowMetrics",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/display/display.go:Display",
+      "target": "function:internal/display/display.go:ShowTrueUpReport",
+      "direction": "forward",
+      "type": "contains",
+      "weight": 0.5
+    },
+    {
+      "source": "function:main.go:main",
+      "target": "function:internal/app/runner.go:RunOnce",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:main.go:main",
+      "target": "function:internal/app/runner.go:RunContinuous",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:main.go:main",
+      "target": "function:internal/app/trueup.go:RunTrueUp",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:main.go:main",
+      "target": "function:internal/app/cache_report.go:RunCacheReport",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:main.go:main",
+      "target": "function:internal/app/setup.go:ParseTestDate",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:main.go:main",
+      "target": "function:internal/app/setup.go:CreateOAuthAdapter",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:main.go:main",
+      "target": "function:internal/app/setup.go:SetupDisplay",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:main.go:main",
+      "target": "function:internal/app/setup.go:ConfigureModes",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/app/runner.go:RunOnce",
+      "target": "function:internal/aggregator/aggregator.go:GetAggregatedMetrics",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/app/runner.go:RunContinuous",
+      "target": "function:internal/aggregator/aggregator.go:GetAggregatedMetrics",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/aggregator/aggregator.go:GetAggregatedMetrics",
+      "target": "function:internal/api/client.go:GetMetricsFromCloud",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:GetMetricsFromCloud",
+      "target": "function:internal/api/client.go:GetEnergyImportForDate",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:GetMetricsFromCloud",
+      "target": "function:internal/api/client.go:GetEnergyExportForDate",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:GetMetricsFromCloud",
+      "target": "function:internal/api/client.go:GetProductionForDate",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:GetMetricsFromCloud",
+      "target": "function:internal/api/client.go:GetConsumptionForDate",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:GetMetricsFromCloud",
+      "target": "function:internal/api/client.go:GetBatteryDataForDate",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:GetEnergyImportForDate",
+      "target": "function:internal/api/client.go:fetchTelemetryData",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:GetEnergyExportForDate",
+      "target": "function:internal/api/client.go:fetchTelemetryData",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:GetProductionForDate",
+      "target": "function:internal/api/client.go:fetchTelemetryData",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:GetConsumptionForDate",
+      "target": "function:internal/api/client.go:fetchTelemetryData",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:GetBatteryDataForDate",
+      "target": "function:internal/api/client.go:fetchTelemetryData",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:fetchTelemetryData",
+      "target": "function:internal/api/client.go:makeCachedAPIRequest",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/app/trueup.go:RunTrueUp",
+      "target": "function:internal/aggregator/aggregator.go:GetAggregatedMetrics",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/app/trueup.go:RunTrueUp",
+      "target": "function:internal/app/trueup.go:buildTrueUpReport",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/app/cache_report.go:RunCacheReport",
+      "target": "function:internal/api/cache_check.go:CheckCacheForSystem",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/app/cache_report.go:RunCacheReport",
+      "target": "function:internal/app/runner.go:RunOnce",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/app/cache_report.go:RunCacheReport",
+      "target": "function:internal/app/trueup.go:RunTrueUp",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/timezone/timezone.go:GetBoundaries",
+      "target": "function:internal/timezone/timezone.go:GetDayBoundaries",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/timezone/timezone.go:GetBoundaries",
+      "target": "function:internal/timezone/timezone.go:GetMonthBoundaries",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/timezone/timezone.go:GetBoundaries",
+      "target": "function:internal/timezone/timezone.go:GetYearBoundaries",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/timezone/timezone.go:GetBoundaries",
+      "target": "function:internal/timezone/timezone.go:GetTrueUpBoundaries",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/app/setup.go:ParseTestDate",
+      "target": "function:internal/timezone/timezone.go:ParseDateString",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/app/runner.go:RunOnce",
+      "target": "function:internal/display/display.go:ShowMetrics",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/app/trueup.go:RunTrueUp",
+      "target": "function:internal/display/display.go:ShowTrueUpReport",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:makeCachedAPIRequest",
+      "target": "function:internal/api/client.go:cacheMaxAge",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:makeCachedAPIRequest",
+      "target": "function:internal/timezone/timezone.go:IsPastPeriod",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:cacheMaxAge",
+      "target": "function:internal/timezone/timezone.go:IsPastPeriod",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:lifetimeEndDate",
+      "target": "function:internal/timezone/timezone.go:IsPastPeriod",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/api/client.go:lifetimeEndDate",
+      "target": "function:internal/timezone/timezone.go:GetBoundaries",
+      "direction": "forward",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:internal/aggregator/aggregator.go:GetAggregatedMetrics",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:GetMetricsFromCloud",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:GetEnergyImportForDate",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:GetEnergyExportForDate",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:GetProductionForDate",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:GetConsumptionForDate",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:GetBatteryDataForDate",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:QueryCost",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:makeCachedAPIRequest",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:cacheMaxAge",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:lifetimeEndDate",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/client.go:fetchTelemetryData",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/api/cache_check.go:CheckCacheForSystem",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/app/runner.go:RunOnce",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/app/setup.go:ParseTestDate",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/app/setup.go:FormatDateForQueryMode",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/timezone/timezone.go:GetBoundaries",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/timezone/timezone.go:IsPastPeriod",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/app/trueup.go:RunTrueUp",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/app/cache_report.go:RunCacheReport",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/aggregator/types.go:AggregatedMetrics",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/app/runner.go:RunConfig",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/app/setup.go:ParseDateInput",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "class:internal/timezone/timezone.go:ParseResult",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/display/display.go:ShowMetrics",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    },
+    {
+      "source": "function:internal/app/trueup.go:buildTrueUpReport",
+      "target": "class:internal/constants/constants.go:QueryMode",
+      "direction": "forward",
+      "type": "depends_on",
+      "weight": 0.5
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:entry-and-app",
+      "name": "Application Entry & Orchestration",
+      "description": "Main entry point and app setup/runner orchestration",
+      "nodeIds": [
+        "file:internal/app/trueup_test.go"
+      ]
+    },
+    {
+      "id": "layer:cli",
+      "name": "CLI Interface",
+      "description": "Command-line argument parsing and CLI setup",
+      "nodeIds": [
+        "file:internal/cli/flags.go",
+        "file:internal/cli/flags_test.go",
+        "file:internal/cli/cache_commands.go",
+        "file:internal/cli/cache_commands_test.go"
+      ]
+    },
+    {
+      "id": "layer:api-client",
+      "name": "Enphase API Client",
+      "description": "Enphase API HTTP client, interface, cache checking, and tests",
+      "nodeIds": [
+        "file:internal/api/types.go",
+        "file:internal/api/testmain_test.go"
+      ]
+    },
+    {
+      "id": "layer:aggregator",
+      "name": "Metric Aggregator",
+      "description": "Multi-system metric aggregation and types",
+      "nodeIds": []
+    },
+    {
+      "id": "layer:cache",
+      "name": "Response Cache",
+      "description": "API response caching layer",
+      "nodeIds": [
+        "file:internal/cache/cache.go",
+        "file:internal/cache/cli.go",
+        "file:internal/cache/cache_functions_test.go",
+        "file:internal/cache/cache_test.go",
+        "file:internal/cache/cli_test.go"
+      ]
+    },
+    {
+      "id": "layer:oauth",
+      "name": "OAuth Authentication",
+      "description": "OAuth 2.0 token management",
+      "nodeIds": [
+        "file:internal/oauth/oauth.go",
+        "file:internal/oauth/setup.go",
+        "file:internal/oauth/oauth_test.go",
+        "file:internal/oauth/oauth_edge_cases_test.go",
+        "file:internal/oauth/oauth_functional_test.go"
+      ]
+    },
+    {
+      "id": "layer:display",
+      "name": "Terminal Display",
+      "description": "Terminal output and rendering",
+      "nodeIds": []
+    },
+    {
+      "id": "layer:foundation",
+      "name": "Foundation & Shared Utilities",
+      "description": "Shared constants, timezone, config, types, parser",
+      "nodeIds": [
+        "file:internal/config/config.go",
+        "file:internal/config/config_test.go",
+        "file:internal/types/types.go",
+        "file:internal/parser/parser.go",
+        "file:internal/parser/parser_test.go",
+        "file:internal/parser/parser_bench_test.go",
+        "file:internal/urlbuilder/urlbuilder.go",
+        "file:internal/urlbuilder/urlbuilder_test.go"
+      ]
+    },
+    {
+      "id": "layer:validation",
+      "name": "Validation & Test Fixtures",
+      "description": "Test infrastructure and validation",
+      "nodeIds": [
+        "file:internal/validation/validation.go",
+        "file:internal/validation/validation_test.go",
+        "file:internal/validation/validation_integration_test.go",
+        "config:test-data/expected_values_2025-12.json",
+        "config:test-data/expected_values_2025.json",
+        "config:test-data/expected_values_2026-01-14.json",
+        "config:test-data/expected_values_2026-01-15.json",
+        "config:test-data/expected_values_2026-01-16.json",
+        "config:test-data/expected_values_2026-01-17.json",
+        "config:test-data/expected_values_2026-01-18.json",
+        "config:test-data/expected_values_2026-01-19.json",
+        "config:test-data/expected_values_2026-01-20.json",
+        "config:test-data/expected_values_2026-01.json"
+      ]
+    },
+    {
+      "id": "layer:project-support",
+      "name": "Project Support & Documentation",
+      "description": "Docs, config files, CI, project support",
+      "nodeIds": [
+        "document:README.md",
+        "document:CONTEXT.md",
+        "document:QUICKSTART.md",
+        "pipeline:Makefile",
+        "config:.golangci.yml",
+        "config:go.mod",
+        "config:go.sum",
+        "config:config.yaml.example"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Project Overview",
+      "description": "Start with the README to understand what enphase-monitor does: it polls multiple Enphase solar systems via the Enlighten Cloud API v4, aggregates energy metrics (production, consumption, import, export, battery), and presents them in the terminal. The README covers all run modes (once, continuous, true-up, validation, cached, and live), the caching strategy, and the 10-requests-per-minute rate-limit constraint that shapes the entire architecture.",
+      "nodeIds": [
+        "document:README.md"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "Getting Started Guide",
+      "description": "Follow QUICKSTART.md to understand the seven prerequisite steps: obtaining Enphase API credentials, completing the OAuth 2.0 Authorization Code flow, writing config.yaml, building the binary, and running it for the first time. This guide also surfaces the most common first-run errors and their fixes.",
+      "nodeIds": [
+        "document:QUICKSTART.md"
+      ]
+    },
+    {
+      "order": 3,
+      "title": "Project Configuration & Module",
+      "description": "Examine config.yaml.example to see every required and optional YAML field \u2014 API credentials, per-system definitions (ID, name, timezone, battery flag), display color overrides, and debug/test mode flags. Then check go.mod to confirm the module path and that the only external runtime dependency is gopkg.in/yaml.v3.",
+      "nodeIds": [
+        "config:config.yaml.example",
+        "config:go.mod"
+      ]
+    },
+    {
+      "order": 4,
+      "title": "Shared Domain Types",
+      "description": "Read internal/types/types.go to learn the two foundational structs that flow through every layer: SystemConfig (human name + Enphase system ID) and APIConfig (API key plus OAuth client credentials and token fields). These are the lingua franca imported by config, oauth, and the API client.",
+      "nodeIds": [
+        "file:internal/types/types.go"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "Configuration Loading",
+      "description": "internal/config/config.go parses the YAML file into a Config struct (which embeds APIConfig and a slice of SystemConfig), validates required fields, resolves timezones, and converts hex color strings to ANSI escape sequences for the terminal renderer. This is the first thing main calls before any network or cache activity.",
+      "nodeIds": [
+        "file:internal/config/config.go",
+        "file:internal/config/config_test.go"
+      ]
+    },
+    {
+      "order": 6,
+      "title": "CLI Flags & Cache Commands",
+      "description": "internal/cli/flags.go defines the Flags struct and ParseFlags, which reads --date, --system, --once, --continuous, --true-up, --validate, and --cache from os.Args. internal/cli/cache_commands.go is a thin bridge that wires the --clear-cache and --list-cache flags to the cache package operations. Together these two files form the complete CLI surface.",
+      "nodeIds": [
+        "file:internal/cli/flags.go",
+        "file:internal/cli/cache_commands.go"
+      ]
+    },
+    {
+      "order": 7,
+      "title": "OAuth 2.0 Authentication",
+      "description": "internal/oauth/oauth.go implements the full Enphase OAuth 2.0 Authorization Code flow: GetAuthorizationURL builds the consent URL, ExchangeAuthorizationCode swaps the code for tokens, and GetAccessToken handles token refresh and on-disk token caching. internal/oauth/setup.go provides the interactive first-time setup wizard that guides a user through the browser-based consent step.",
+      "nodeIds": [
+        "file:internal/oauth/oauth.go",
+        "file:internal/oauth/setup.go"
+      ]
+    },
+    {
+      "order": 8,
+      "title": "URL Construction",
+      "description": "internal/urlbuilder/urlbuilder.go exposes a single function, BuildTelemetryURL, which assembles the full Enphase Enlighten API endpoint URL from a system ID, endpoint path, API key, and Unix timestamp boundaries. Understanding this function is key before diving into the API client, because the timestamps it produces are what the cache layer keys on.",
+      "nodeIds": [
+        "file:internal/urlbuilder/urlbuilder.go",
+        "file:internal/urlbuilder/urlbuilder_test.go"
+      ]
+    },
+    {
+      "order": 9,
+      "title": "Response Cache",
+      "description": "internal/cache/cache.go is the heart of the rate-limit strategy. It stores raw API responses on disk keyed by normalized URL, tracks the 10-requests-per-minute budget via RecordAPICall, exposes HasCacheForDate for cached supplement reads, and provides test/debug mode globals. internal/cache/cli.go adds the user-facing ClearTodayCache and ListCacheEntries operations used by the --clear-cache and --list-cache flags.",
+      "nodeIds": [
+        "file:internal/cache/cache.go",
+        "file:internal/cache/cli.go"
+      ]
+    },
+    {
+      "order": 10,
+      "title": "API Response Parser",
+      "description": "internal/parser/parser.go decodes every shape of Enphase API JSON: TelemetryResponse (flat 15-minute intervals), TelemetryResponseNested (battery/meter telemetry with nested arrays), LifetimeResponse (historical daily totals), and the helper functions SumIntervalValues and SumDailyIntervals that reduce those arrays to single energy totals. The API client delegates all JSON work to this package.",
+      "nodeIds": [
+        "file:internal/parser/parser.go",
+        "file:internal/parser/parser_test.go"
+      ]
+    },
+    {
+      "order": 11,
+      "title": "Domain Model Reference",
+      "description": "CONTEXT.md is the authoritative domain glossary for contributors. It defines the Enphase API constraints (interval endpoints are single-day only; lifetime endpoints miss today), the cache supplement strategy, all run modes, and the energy-flow terminology (Production, Consumption, NetFlow, Import, Export). The QueryMode enum (Day/Month/Year) \u2014 the renamed successor of the old QueryType \u2014 is central to every decision in the API client and aggregator.",
+      "nodeIds": [
+        "document:CONTEXT.md"
+      ]
+    },
+    {
+      "order": 12,
+      "title": "API Client & Battery Types",
+      "description": "internal/api/types.go defines BatteryData, the return type for GetBatteryDataForDate holding SOC percentage and cumulative charged/discharged energy. This small file anchors the battery metric path through the system. Read it alongside the API client to see how battery data differs from the meter-based metrics.",
+      "nodeIds": [
+        "file:internal/api/types.go",
+        "file:internal/api/testmain_test.go"
+      ]
+    },
+    {
+      "order": 13,
+      "title": "Validation & Test Fixtures",
+      "description": "internal/validation/validation.go implements ValidateMetrics, which loads JSON fixture files from test-data/ (keyed by date string like 2026-01-14 or 2026-01), compares computed energy totals against expected values with a tolerance threshold, and prints a pass/fail report. The test-data/ fixtures for 2025 and 2026 are the golden values that confirm the API client and parser produce correct results.",
+      "nodeIds": [
+        "file:internal/validation/validation.go",
+        "config:test-data/expected_values_2025.json",
+        "config:test-data/expected_values_2026-01.json"
+      ]
+    },
+    {
+      "order": 14,
+      "title": "Build Automation & Linting",
+      "description": "The Makefile defines 14 targets \u2014 build, run, run-once, install, setup, test, test-coverage, lint, and help \u2014 and is the primary developer workflow entry point. .golangci.yml configures the linting pipeline (errcheck, govet, staticcheck, gocognit complexity threshold) that the lint target invokes. Understanding these two files tells you how the project is built, tested, and quality-gated in CI.",
+      "nodeIds": [
+        "pipeline:Makefile",
+        "config:.golangci.yml"
+      ]
+    }
+  ]
+}

@@ -10,7 +10,7 @@
 // --------------
 // The Enlighten Cloud API v4 provides:
 //   - Remote access: Works from anywhere with internet (no local network required)
-//   - Historical data: Query any past date (not just today)
+//   - Past Period queries: Query any past date (not just today)
 //   - Reliable data: Aggregated and validated by Enphase servers
 //   - Standardized format: Consistent JSON responses across all systems
 //
@@ -25,7 +25,7 @@
 //
 // DATA FORMAT
 // -----------
-// The API returns telemetry data in 15-minute intervals. Each interval contains:
+// The API returns Interval Data in 15-minute intervals. Each interval contains:
 //   - end_at: Unix timestamp of interval end
 //   - enwh: Energy in watt-hours for that interval
 //   - devices_reporting: Number of devices that reported data
@@ -62,9 +62,9 @@
 // -------------
 // This client uses the following Enlighten Cloud API v4 endpoints:
 //
-// INTERVAL-BASED ENDPOINTS (15-minute data, single-day per call):
+// INTERVAL DATA ENDPOINTS (15-minute data, single-day per call):
 //
-//	Production (Solar Generation):
+//	Production (Solar):
 //	GET /api/v4/systems/{system_id}/telemetry/production_meter
 //	Returns: Array of intervals with enwh (energy produced)
 //
@@ -84,7 +84,7 @@
 //	GET /api/v4/systems/{system_id}/telemetry/battery
 //	Returns: Array of intervals with charge/discharge/soc data
 //
-// LIFETIME ENDPOINTS (daily aggregated data, no 7-day limit):
+// LIFETIME DATA ENDPOINTS (daily aggregated data, no 7-day limit):
 //
 //	Production Lifetime:
 //	GET /api/v4/systems/{system_id}/energy_lifetime
@@ -103,34 +103,34 @@
 //	Returns: {"export": [18205, 20777, ...]} - array of daily Wh values
 //
 // NOTE: battery_lifetime endpoint is NOT used. Battery data is fetched only via
-// the interval endpoint (telemetry/battery) and only for today's live day report.
+// the Interval Data endpoint (telemetry/battery) and only for today's live day report.
 // Month/year/true-up queries skip battery entirely.
 //
 // ENDPOINT SELECTION STRATEGY:
-//   - Single-day queries: Use interval endpoints (better granularity, 96 data points).
-//   - Month/year/true-up queries: Use lifetime endpoints (daily aggregated, no 7-day limit).
-//     NOTE: The interval endpoints only return one calendar day per call regardless of
+//   - Single-day queries: Use Interval Data endpoints (better granularity, 96 data points).
+//   - Month/year/true-up queries: Use Lifetime Data endpoints (daily aggregated, no 7-day limit).
+//     NOTE: The Interval Data endpoints only return one calendar day per call regardless of
 //     the end_at parameter (API returns granularity=day and ignores wider ranges).
 //   - Ongoing periods (current month/year/true-up): Data is capped to yesterday (the last
-//     complete day). Today's partial data is excluded — the lifetime endpoints only contain
+//     complete day). Today's partial data is excluded — the Lifetime Data endpoints only contain
 //     completed days. Use lifetimeEndDate() to get the correct end date.
 //
-// All interval endpoints accept query parameters:
+// All Interval Data endpoints accept query parameters:
 //   - start_at: Unix timestamp (start of date range)
 //   - end_at: Unix timestamp (end of date range)
 //   - key: API key (required)
 //
-// All lifetime endpoints accept query parameters:
+// All Lifetime Data endpoints accept query parameters:
 //   - start_date: Date string in YYYY-MM-DD format
 //   - key: API key (required)
 //
-// RATE LIMITING
-// -------------
+// RATE LIMITING & API BUDGET
+// --------------------------
 // The Enphase Cloud API v4 enforces a per-API-key budget of
 // cache.MaxRequestsPerWindow requests per cache.MinRequestInterval (10 / 60s).
 // This client relies on internal/cache for caching responses and on a
 // sliding-window counter to stay under the limit:
-//  1. Per-query-type cache expiry (see EnlightenCloudClient.cacheMaxAge):
+//  1. Per-query-mode cache expiry (see EnlightenCloudClient.cacheMaxAge):
 //     - past day / month / year / past true-up year: never expires
 //     - today's day query:                           1 hour
 //     - MTD / YTD / current true-up year:            24 hours
@@ -230,11 +230,11 @@ func NewEnlightenCloudClientWithBaseURL(baseURL, systemID, apiKey, accessToken s
 
 // lifetimeEndDate returns the end date string to use when filtering lifetime API responses.
 // For ongoing periods it returns yesterday so the total covers only complete days —
-// the lifetime endpoint does not contain today's partial data.
+// Lifetime Data does not contain today's partial data.
 // For past periods the period's own end date is used (all days are already complete).
-func (c *EnlightenCloudClient) lifetimeEndDate(testDate time.Time, queryType constants.QueryType) string {
-	if timezone.IsPastPeriod(testDate, queryType, c.timezone) {
-		_, periodEnd := timezone.GetBoundaries(testDate, queryType, c.timezone)
+func (c *EnlightenCloudClient) lifetimeEndDate(testDate time.Time, queryMode constants.QueryMode) string {
+	if timezone.IsPastPeriod(testDate, queryMode, c.timezone) {
+		_, periodEnd := timezone.GetBoundaries(testDate, queryMode, c.timezone)
 		return periodEnd.Format(constants.DateFormat)
 	}
 	yesterday := time.Now().In(c.timezone).AddDate(0, 0, -1)
@@ -244,13 +244,13 @@ func (c *EnlightenCloudClient) lifetimeEndDate(testDate time.Time, queryType con
 // fetchTelemetryData is a helper method that reduces redundant code across Get*ForDate methods.
 // It handles the common pattern of: make request, track cache usage, read body, close response.
 // This helper eliminates ~15 lines of boilerplate per method (5 methods = ~75 lines saved).
-// queryType determines the date boundaries (day/month/year).
-func (c *EnlightenCloudClient) fetchTelemetryData(ctx context.Context, endpoint string, testDate time.Time, queryType constants.QueryType) ([]byte, error) {
-	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryType, c.timezone)
+// queryMode determines the date boundaries (day/month/year).
+func (c *EnlightenCloudClient) fetchTelemetryData(ctx context.Context, endpoint string, testDate time.Time, queryMode constants.QueryMode) ([]byte, error) {
+	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryMode, c.timezone)
 	// Use client's baseURL for dependency injection (testability)
 	reqURL := c.buildTelemetryURL(endpoint, periodStart, periodEnd)
 
-	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryType)
+	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
 	c.cacheUsed = cacheUsed
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", endpoint, err)
@@ -272,16 +272,16 @@ func (c *EnlightenCloudClient) buildTelemetryURL(endpoint string, dayStart, dayE
 // LocalMetrics is exported in types.go
 //
 // GetEnergyImportForDate gets the total energy imported from the grid for a specific date/period.
-// If testDate is zero, uses today. queryType determines the time range (day/month/year/true-up).
-// For month/year/true-up queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
+// If testDate is zero, uses today. queryMode determines the time range (day/month/year/true-up).
+// For month/year/true-up queries, uses the Lifetime Data endpoint (daily aggregated, no 7-day API limit).
 // The result always covers complete days only (through yesterday for ongoing periods).
-func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear || queryType == constants.QueryTypeTrueUp {
-		return c.getEnergyImportLifetime(ctx, testDate, queryType)
+func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
+	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear || queryMode == constants.QueryModeTrueUp {
+		return c.getEnergyImportLifetime(ctx, testDate, queryMode)
 	}
 
-	// Single-day query: use interval endpoint (better granularity, 96 data points)
-	bodyBytes, err := c.fetchTelemetryData(ctx, "energy_import_telemetry", testDate, queryType)
+	// Single-day query: use Interval Data endpoint (better granularity, 96 data points)
+	bodyBytes, err := c.fetchTelemetryData(ctx, "energy_import_telemetry", testDate, queryMode)
 	if err != nil {
 		return 0, err
 	}
@@ -297,16 +297,16 @@ func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testD
 }
 
 // GetEnergyExportForDate gets the total energy exported to the grid for a specific date/period.
-// If testDate is zero, uses today. queryType determines the time range (day/month/year/true-up).
-// For month/year/true-up queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
+// If testDate is zero, uses today. queryMode determines the time range (day/month/year/true-up).
+// For month/year/true-up queries, uses the Lifetime Data endpoint (daily aggregated, no 7-day API limit).
 // The result always covers complete days only (through yesterday for ongoing periods).
-func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear || queryType == constants.QueryTypeTrueUp {
-		return c.getEnergyExportLifetime(ctx, testDate, queryType)
+func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
+	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear || queryMode == constants.QueryModeTrueUp {
+		return c.getEnergyExportLifetime(ctx, testDate, queryMode)
 	}
 
-	// Single-day query: use interval endpoint
-	bodyBytes, err := c.fetchTelemetryData(ctx, "energy_export_telemetry", testDate, queryType)
+	// Single-day query: use Interval Data endpoint
+	bodyBytes, err := c.fetchTelemetryData(ctx, "energy_export_telemetry", testDate, queryMode)
 	if err != nil {
 		return 0, err
 	}
@@ -319,17 +319,17 @@ func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testD
 }
 
 // GetProductionForDate gets the total energy production for a specific date/period.
-// If testDate is zero, uses today. queryType determines the time range (day/month/year/true-up).
-// For month/year/true-up queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
+// If testDate is zero, uses today. queryMode determines the time range (day/month/year/true-up).
+// For month/year/true-up queries, uses the Lifetime Data endpoint (daily aggregated, no 7-day API limit).
 // The result always covers complete days only (through yesterday for ongoing periods).
 // Returns the aggregated sum of all wh_del values from the API response.
-func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear || queryType == constants.QueryTypeTrueUp {
-		return c.getEnergyLifetime(ctx, testDate, queryType)
+func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
+	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear || queryMode == constants.QueryModeTrueUp {
+		return c.getEnergyLifetime(ctx, testDate, queryMode)
 	}
 
-	// Single-day query: use interval endpoint
-	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/production_meter", testDate, queryType)
+	// Single-day query: use Interval Data endpoint
+	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/production_meter", testDate, queryMode)
 	if err != nil {
 		return 0, err
 	}
@@ -345,16 +345,16 @@ func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDat
 }
 
 // GetConsumptionForDate gets the total energy consumption for a specific date/period.
-// If testDate is zero, uses today. queryType determines the time range (day/month/year/true-up).
-// For month/year/true-up queries, uses the _lifetime endpoint (daily aggregated, no 7-day API limit).
+// If testDate is zero, uses today. queryMode determines the time range (day/month/year/true-up).
+// For month/year/true-up queries, uses the Lifetime Data endpoint (daily aggregated, no 7-day API limit).
 // The result always covers complete days only (through yesterday for ongoing periods).
-func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear || queryType == constants.QueryTypeTrueUp {
-		return c.getConsumptionLifetime(ctx, testDate, queryType)
+func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
+	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear || queryMode == constants.QueryModeTrueUp {
+		return c.getConsumptionLifetime(ctx, testDate, queryMode)
 	}
 
-	// Single-day query: use interval endpoint
-	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/consumption_meter", testDate, queryType)
+	// Single-day query: use Interval Data endpoint
+	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/consumption_meter", testDate, queryMode)
 	if err != nil {
 		return 0, err
 	}
@@ -369,9 +369,9 @@ func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDa
 // GetBatteryDataForDate gets battery charge, discharge, and State of Charge (SOC) for today.
 // Only called when testDate is zero (today's report). Returns charged kWh, discharged kWh,
 // and SOC percentage from last_reported_aggregate_soc.
-func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryType constants.QueryType) (charged float64, discharged float64, soc int, err error) {
-	// Interval endpoint for today's 15-minute battery telemetry.
-	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/battery", testDate, queryType)
+func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (charged float64, discharged float64, soc int, err error) {
+	// Interval Data endpoint for today's 15-minute battery telemetry.
+	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/battery", testDate, queryMode)
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -397,7 +397,7 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	// - discharge.enwh = energy discharged from battery (Wh) per interval
 	// These are incremental values per 15-minute interval, so we sum them
 	// Filter by configured timezone (periodStart to periodEnd)
-	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryType, c.timezone)
+	periodStart, periodEnd := timezone.GetBoundaries(testDate, queryMode, c.timezone)
 	var chargeWh, dischargeWh float64
 
 	for _, interval := range data.Intervals {
@@ -418,21 +418,21 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 
 
 // QueryCost returns the number of live API calls GetMetricsFromCloud will make
-// for a single system with the given query type. Callers can compare this value
+// for a single system with the given query mode. Callers can compare this value
 // against cache.RemainingBudget() before starting a fetch to decide whether a
 // fully live run is possible or whether cached data will be needed.
 //
 // hasBattery should be true when the system is known to have a battery device.
-// For QueryTypeDay with hasBattery=true this returns 5 (worst-case estimate):
+// For QueryModeDay with hasBattery=true this returns 5 (worst-case estimate):
 // GetMetricsFromCloud only calls the battery endpoint when testDate is zero
 // (today's live report), but QueryCost is used as a conservative preflight
 // check before we know the target date.
-// For QueryTypeMonth / QueryTypeYear / QueryTypeTrueUp the battery endpoint is
+// For QueryModeMonth / QueryModeYear / QueryModeTrueUp the battery endpoint is
 // never called regardless of hasBattery.
-func QueryCost(queryType constants.QueryType, hasBattery bool) int {
+func QueryCost(queryMode constants.QueryMode, hasBattery bool) int {
 	// Fixed set per system: grid import, grid export, production, consumption.
 	const baseCalls = 4
-	if queryType == constants.QueryTypeDay && hasBattery {
+	if queryMode == constants.QueryModeDay && hasBattery {
 		return baseCalls + 1
 	}
 	return baseCalls
@@ -440,11 +440,11 @@ func QueryCost(queryType constants.QueryType, hasBattery bool) int {
 
 // GetMetricsFromCloud fetches all metrics from the Cloud API for the specified period.
 // If testDate is provided, uses that date instead of today.
-// queryType determines the time range (day/month/year/true-up).
-// Battery data (charged, discharged, SOC) is only fetched for QueryTypeDay; all other
-// query types leave those fields as zero and skip the battery API call entirely.
+// queryMode determines the time range (day/month/year/true-up).
+// Battery data (charged, discharged, SOC) is only fetched for QueryModeDay; all other
+// query modes leave those fields as zero and skip the battery API call entirely.
 // Returns metrics and a boolean indicating if any cache was used.
-func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryType constants.QueryType) (*LocalMetrics, bool, error) {
+func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (*LocalMetrics, bool, error) {
 	metrics := &LocalMetrics{
 		Timestamp: time.Now(),
 	}
@@ -452,7 +452,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 
 	// Helper to handle optional metrics that may fail (grid import/export, battery)
 	shouldLogError := func(err error) bool {
-		if timezone.IsPastPeriod(testDate, queryType, c.timezone) {
+		if timezone.IsPastPeriod(testDate, queryMode, c.timezone) {
 			return false // Silently use 0 for past periods
 		}
 		// For current period, log only non-rate-limit errors
@@ -470,8 +470,8 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	// will still make whatever live calls it can and fall back to cache for the
 	// rest, but alerting early helps the caller understand why results may be stale.
 	// Day queries always attempt battery (hasBattery=true for the conservative count).
-	if cache.DebugMode() && !timezone.IsPastPeriod(testDate, queryType, c.timezone) {
-		needed := QueryCost(queryType, queryType == constants.QueryTypeDay)
+	if cache.DebugMode() && !timezone.IsPastPeriod(testDate, queryMode, c.timezone) {
+		needed := QueryCost(queryMode, queryMode == constants.QueryModeDay)
 		remaining := cache.RemainingBudget()
 		if remaining < needed {
 			fmt.Printf("WARNING: %sInsufficient API budget: need %d call(s), %d/%d remaining — results may use cached data\n",
@@ -490,7 +490,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	// Fetch all metrics - make grid import/export optional (they may fail with 500)
 	var err error
 
-	metrics.GridImportToday, err = c.GetEnergyImportForDate(ctx, testDate, queryType)
+	metrics.GridImportToday, err = c.GetEnergyImportForDate(ctx, testDate, queryMode)
 	if err != nil {
 		if err := checkCancelled(); err != nil {
 			return nil, false, err
@@ -503,7 +503,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	}
 	cacheUsed = cacheUsed || c.cacheUsed
 
-	metrics.GridExportToday, err = c.GetEnergyExportForDate(ctx, testDate, queryType)
+	metrics.GridExportToday, err = c.GetEnergyExportForDate(ctx, testDate, queryMode)
 	if err != nil {
 		if err := checkCancelled(); err != nil {
 			return nil, false, err
@@ -516,7 +516,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	}
 	cacheUsed = cacheUsed || c.cacheUsed
 
-	metrics.ProductionToday, err = c.GetProductionForDate(ctx, testDate, queryType)
+	metrics.ProductionToday, err = c.GetProductionForDate(ctx, testDate, queryMode)
 	if err != nil {
 		if err := checkCancelled(); err != nil {
 			return nil, false, err
@@ -525,10 +525,10 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	}
 	cacheUsed = cacheUsed || c.cacheUsed
 
-	// Battery data is only meaningful for today's report; skip for historical dates
+	// Battery data is only meaningful for today's report; skip for past dates
 	// and all month/year/true-up queries to save one of the 10 allowed requests/minute.
-	if queryType == constants.QueryTypeDay && testDate.IsZero() {
-		metrics.BatteryChargedToday, metrics.BatteryDischargedToday, metrics.BatterySOC, err = c.GetBatteryDataForDate(ctx, testDate, queryType)
+	if queryMode == constants.QueryModeDay && testDate.IsZero() {
+		metrics.BatteryChargedToday, metrics.BatteryDischargedToday, metrics.BatterySOC, err = c.GetBatteryDataForDate(ctx, testDate, queryMode)
 		if err != nil {
 			if err := checkCancelled(); err != nil {
 				return nil, false, err
@@ -542,7 +542,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	}
 
 	// Get consumption from API (more accurate than calculation)
-	metrics.ConsumptionToday, err = c.GetConsumptionForDate(ctx, testDate, queryType)
+	metrics.ConsumptionToday, err = c.GetConsumptionForDate(ctx, testDate, queryMode)
 	if err != nil {
 		if err := checkCancelled(); err != nil {
 			return nil, false, err
@@ -562,14 +562,14 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 // maybeShowNoCacheFallbackWarning prints a one-time warning when returning cached
 // data despite --no-cache (e.g. on API error or 429). reason is used in the message.
 func maybeShowNoCacheFallbackWarning(reason string) {
-	if cache.RateLimitWarningShown() {
+	if cache.BudgetWarningShown() {
 		return
 	}
 	fmt.Printf("WARNING: %s - returning cached data despite --no-cache flag\n", reason)
-	cache.SetRateLimitWarningShown(true)
+	cache.SetBudgetWarningShown(true)
 }
 
-// budgetExhausted reports whether the per-API-key rate-limit budget for the
+// budgetExhausted reports whether the per-API-key API Budget for the
 // current MinRequestInterval window has been used up. When true, the client
 // prefers cache over a live API call for any URL that has one.
 func budgetExhausted() bool {
@@ -577,19 +577,19 @@ func budgetExhausted() bool {
 }
 
 // cacheMaxAge returns the maximum age at which a cached response for a given
-// query type and target date is still considered valid:
+// query mode and target date is still considered valid:
 //   - past periods (already-ended day / month / year / true-up year) -> 0
 //     ("never expires" — the data won't change)
 //   - today's day query                                              -> 1 hour
 //   - current MTD / YTD / current true-up year                       -> 24 hours
 //
-// Note: timezone.IsPastPeriod always returns false for QueryTypeTrueUp by
-// design (so its lifetime endpoints are refreshed each run). For cache
+// Note: timezone.IsPastPeriod always returns false for QueryModeTrueUp by
+// design (so its Lifetime Data endpoints are refreshed each run). For cache
 // purposes we override that here: a true-up year whose start + 1 year is
 // in the past is treated as past, since its totals are immutable.
-func (c *EnlightenCloudClient) cacheMaxAge(targetDate time.Time, queryType constants.QueryType) time.Duration {
-	isPast := timezone.IsPastPeriod(targetDate, queryType, c.timezone)
-	if !isPast && queryType == constants.QueryTypeTrueUp && !targetDate.IsZero() {
+func (c *EnlightenCloudClient) cacheMaxAge(targetDate time.Time, queryMode constants.QueryMode) time.Duration {
+	isPast := timezone.IsPastPeriod(targetDate, queryMode, c.timezone)
+	if !isPast && queryMode == constants.QueryModeTrueUp && !targetDate.IsZero() {
 		trueUpEnd := targetDate.AddDate(1, 0, 0).In(c.timezone)
 		if trueUpEnd.Before(time.Now().In(c.timezone)) {
 			isPast = true
@@ -598,14 +598,14 @@ func (c *EnlightenCloudClient) cacheMaxAge(targetDate time.Time, queryType const
 	if isPast {
 		return 0
 	}
-	if queryType == constants.QueryTypeDay {
+	if queryMode == constants.QueryModeDay {
 		return cache.MaxCurrentDayCacheAge
 	}
 	return cache.MaxCurrentPeriodCacheAge
 }
 
 // cacheServable reports whether the cached response is within the acceptable
-// age window for this query type. maxAge of 0 means "no upper bound".
+// age window for this query mode. maxAge of 0 means "no upper bound".
 func cacheServable(cached *cache.CachedResponse, maxAge time.Duration) bool {
 	if cached == nil {
 		return false
@@ -690,7 +690,8 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 // │         │                                                               │
 // │         ▼                                                               │
 // │  ┌─────────────┐                                                        │
-// │  │ Test Mode?  │──YES──► Return cache only (fail if no cache)           │
+// │  │ Validation  │──YES──► Return cache only (fail if no cache)           │
+// │  │    Mode?    │
 // │  └──────┬──────┘                                                        │
 // │         │ NO                                                            │
 // │         ▼                                                               │
@@ -722,7 +723,7 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 // Parameters:
 //   - url: The full API URL to request
 //   - targetDate: The date being queried (zero value means today)
-//   - queryType: The query granularity (day/month/year), used to determine if
+//   - queryMode: The Query Mode (day/month/year), used to determine if
 //     the period is in the past (e.g., current month is not a past period even
 //     though its start date is before today)
 //
@@ -730,7 +731,7 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 //   - *http.Response: The response (from cache or live)
 //   - bool: true if cache was used, false if fresh API call
 //   - error: Any error encountered
-func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url string, targetDate time.Time, queryType constants.QueryType) (*http.Response, bool, error) {
+func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url string, targetDate time.Time, queryMode constants.QueryMode) (*http.Response, bool, error) {
 	// ─────────────────────────────────────────────────────────────────────────
 	// SECTION 1: INITIALIZATION
 	// Determine if we are querying a past period (affects caching strategy).
@@ -739,7 +740,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// testDate=2026-03-01 is the current month, not a past period, even
 	// though March 1 is before today.
 	// ─────────────────────────────────────────────────────────────────────────
-	isDateInPast := timezone.IsPastPeriod(targetDate, queryType, c.timezone)
+	isDateInPast := timezone.IsPastPeriod(targetDate, queryMode, c.timezone)
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// SECTION 2: CACHE LOOKUP
@@ -755,23 +756,23 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
-	// SECTION 4: TEST MODE HANDLING
-	// In test mode, ONLY use cache - never make live API calls.
+	// SECTION 4: VALIDATION MODE HANDLING
+	// In Validation Mode, ONLY use cache - never make live API calls.
 	// This allows validating behavior without hitting the real API.
 	// ─────────────────────────────────────────────────────────────────────────
-	if cache.TestMode() {
+	if cache.ValidationMode() {
 		if cacheErr == nil {
 			resp := cached.ToHTTPResponse()
-			return resp, true, nil // Cache was used (test mode)
+			return resp, true, nil // Cache was used (Validation Mode)
 		}
-		// In test mode, provide more detailed error about missing cache
+		// In Validation Mode, provide more detailed error about missing cache
 		cachePath := cache.GetCachePath(url, c.timezone)
 		normalizedURL := cache.NormalizeURLForCache(url, c.timezone)
-		return nil, false, fmt.Errorf("test mode: no cached response available; cache path: %s, normalized URL: %s", cachePath, cache.RedactURLKey(normalizedURL))
+		return nil, false, fmt.Errorf("validation mode: no cached response available; cache path: %s, normalized URL: %s", cachePath, cache.RedactURLKey(normalizedURL))
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
-	// SECTION 5: NO-CACHE MODE HANDLING
+	// SECTION 5: LIVE CACHE MODE HANDLING (--no-cache)
 	// When cache is disabled, skip cache lookup and always make live API calls.
 	// Note: We still fall back to cache on 429 errors as a safety measure.
 	// ─────────────────────────────────────────────────────────────────────────
@@ -830,7 +831,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 
 	// isPast is true for periods whose data is immutable (ended day/month/year/true-up).
 	// maxAge == 0 is the sentinel for "never expires" returned by cacheMaxAge for past periods.
-	isPast := c.cacheMaxAge(targetDate, queryType) == 0
+	isPast := c.cacheMaxAge(targetDate, queryMode) == 0
 
 	// Past periods: always serve from cache — the data will never change, so a
 	// live call would waste budget and return identical results.
@@ -912,7 +913,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// Handle other non-OK status codes: serve cache as a best-effort fallback
 	// when available, otherwise surface the error. Age is not gated here —
 	// when the API itself is failing, any cache we have is better than
-	// nothing, and the per-query-type freshness policy was already applied
+	// nothing, and the per-query-mode freshness policy was already applied
 	// at the top of this function before we attempted the live call.
 	if resp.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
@@ -952,19 +953,19 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	}, false, nil // Cache was NOT used (fresh API call)
 }
 
-// getEnergyLifetime fetches production data using the energy_lifetime endpoint (daily aggregated).
-// This endpoint has no 7-day limit and returns daily totals instead of 15-minute intervals.
-func (c *EnlightenCloudClient) getEnergyLifetime(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	periodStart, _ := timezone.GetBoundaries(testDate, queryType, c.timezone)
+// getEnergyLifetime fetches production data using the Lifetime Data endpoint (energy_lifetime, daily aggregated).
+// This Lifetime Data endpoint has no 7-day limit and returns daily totals instead of 15-minute intervals.
+func (c *EnlightenCloudClient) getEnergyLifetime(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
+	periodStart, _ := timezone.GetBoundaries(testDate, queryMode, c.timezone)
 	startDateStr := periodStart.Format(constants.DateFormat)
 	// Cap to yesterday for ongoing periods so the total covers only complete days.
 	// For past periods, the period end is already a complete day so we use it directly.
-	endDateStr := c.lifetimeEndDate(testDate, queryType)
+	endDateStr := c.lifetimeEndDate(testDate, queryMode)
 
-	// Build URL for lifetime endpoint
+	// Build URL for Lifetime Data endpoint
 	reqURL := fmt.Sprintf("%s/%s/energy_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
 
-	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryType)
+	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
 	c.cacheUsed = cacheUsed
 	if err != nil {
 		return 0, err
@@ -986,15 +987,15 @@ func (c *EnlightenCloudClient) getEnergyLifetime(ctx context.Context, testDate t
 	return totalWh / constants.WhToKWh, nil
 }
 
-// getConsumptionLifetime fetches consumption data using the consumption_lifetime endpoint.
-func (c *EnlightenCloudClient) getConsumptionLifetime(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	periodStart, _ := timezone.GetBoundaries(testDate, queryType, c.timezone)
+// getConsumptionLifetime fetches consumption data using the Lifetime Data endpoint (consumption_lifetime).
+func (c *EnlightenCloudClient) getConsumptionLifetime(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
+	periodStart, _ := timezone.GetBoundaries(testDate, queryMode, c.timezone)
 	startDateStr := periodStart.Format(constants.DateFormat)
-	endDateStr := c.lifetimeEndDate(testDate, queryType)
+	endDateStr := c.lifetimeEndDate(testDate, queryMode)
 
 	reqURL := fmt.Sprintf("%s/%s/consumption_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
 
-	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryType)
+	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
 	c.cacheUsed = cacheUsed
 	if err != nil {
 		return 0, err
@@ -1015,15 +1016,15 @@ func (c *EnlightenCloudClient) getConsumptionLifetime(ctx context.Context, testD
 	return totalWh / constants.WhToKWh, nil
 }
 
-// getEnergyImportLifetime fetches grid import data using the energy_import_lifetime endpoint.
-func (c *EnlightenCloudClient) getEnergyImportLifetime(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	periodStart, _ := timezone.GetBoundaries(testDate, queryType, c.timezone)
+// getEnergyImportLifetime fetches grid import data using the Lifetime Data endpoint (energy_import_lifetime).
+func (c *EnlightenCloudClient) getEnergyImportLifetime(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
+	periodStart, _ := timezone.GetBoundaries(testDate, queryMode, c.timezone)
 	startDateStr := periodStart.Format(constants.DateFormat)
-	endDateStr := c.lifetimeEndDate(testDate, queryType)
+	endDateStr := c.lifetimeEndDate(testDate, queryMode)
 
 	reqURL := fmt.Sprintf("%s/%s/energy_import_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
 
-	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryType)
+	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
 	c.cacheUsed = cacheUsed
 	if err != nil {
 		return 0, err
@@ -1044,15 +1045,15 @@ func (c *EnlightenCloudClient) getEnergyImportLifetime(ctx context.Context, test
 	return totalWh / constants.WhToKWh, nil
 }
 
-// getEnergyExportLifetime fetches grid export data using the energy_export_lifetime endpoint.
-func (c *EnlightenCloudClient) getEnergyExportLifetime(ctx context.Context, testDate time.Time, queryType constants.QueryType) (float64, error) {
-	periodStart, _ := timezone.GetBoundaries(testDate, queryType, c.timezone)
+// getEnergyExportLifetime fetches grid export data using the Lifetime Data endpoint (energy_export_lifetime).
+func (c *EnlightenCloudClient) getEnergyExportLifetime(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
+	periodStart, _ := timezone.GetBoundaries(testDate, queryMode, c.timezone)
 	startDateStr := periodStart.Format(constants.DateFormat)
-	endDateStr := c.lifetimeEndDate(testDate, queryType)
+	endDateStr := c.lifetimeEndDate(testDate, queryMode)
 
 	reqURL := fmt.Sprintf("%s/%s/energy_export_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
 
-	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryType)
+	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
 	c.cacheUsed = cacheUsed
 	if err != nil {
 		return 0, err

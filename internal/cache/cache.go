@@ -13,7 +13,7 @@
 // ------------
 // The caching system:
 //   - Stores API responses on disk for reuse
-//   - Supports cache-only mode for testing (--test flag)
+//   - Supports Validation Mode (--test flag)
 //   - Provides cache inspection and management tools (--cache mode)
 //   - Handles past date queries with cache fallback
 //   - Normalizes URLs for consistent cache keys (timestamps → dates)
@@ -82,7 +82,7 @@ func RedactURLKey(rawURL string) string {
 	return parsed.String()
 }
 
-// MinRequestInterval is the width of the rate-limit window. It serves two
+// MinRequestInterval is the width of the API Budget window. It serves two
 // purposes:
 //  1. Cache staleness: for current-period queries, a cache entry younger than
 //     this is reused instead of refetched.
@@ -96,20 +96,20 @@ const MinRequestInterval = 1 * time.Minute
 // These flags are set once at startup before any concurrent operations begin,
 // so no mutex protection is needed.
 var (
-	testMode              bool
-	cacheDisabled         bool
-	debugMode             bool
-	rateLimitWarningShown bool
+	validationMode    bool
+	cacheDisabled     bool
+	debugMode         bool
+	budgetWarningShown bool
 )
 
-// TestMode returns whether test mode is enabled.
-func TestMode() bool {
-	return testMode
+// ValidationMode returns whether Validation Mode is enabled.
+func ValidationMode() bool {
+	return validationMode
 }
 
-// SetTestMode enables or disables test mode.
-func SetTestMode(enabled bool) {
-	testMode = enabled
+// SetValidationMode enables or disables Validation Mode.
+func SetValidationMode(enabled bool) {
+	validationMode = enabled
 }
 
 // CacheDisabled returns whether cache is disabled.
@@ -154,14 +154,14 @@ func LastAPICallTime() (time.Time, bool) {
 	return latest, true
 }
 
-// RateLimitWarningShown returns whether a rate limit warning has been shown.
-func RateLimitWarningShown() bool {
-	return rateLimitWarningShown
+// BudgetWarningShown returns whether an API budget warning has been shown.
+func BudgetWarningShown() bool {
+	return budgetWarningShown
 }
 
-// SetRateLimitWarningShown sets the rate limit warning flag.
-func SetRateLimitWarningShown(shown bool) {
-	rateLimitWarningShown = shown
+// SetBudgetWarningShown sets the API budget warning flag.
+func SetBudgetWarningShown(shown bool) {
+	budgetWarningShown = shown
 }
 
 // ResetState resets all cache state flags to their default values and removes
@@ -169,16 +169,16 @@ func SetRateLimitWarningShown(shown bool) {
 // clean state between tests; safe to call in production (it only clears
 // throttling state, never cache entries themselves).
 func ResetState() {
-	testMode = false
+	validationMode = false
 	cacheDisabled = false
 	debugMode = false
-	rateLimitWarningShown = false
+	budgetWarningShown = false
 	ClearAPICalls()
 }
 
 // ClearAPICalls removes the sliding-window api_calls file. Use this in tests
-// when you want a clean rate-limit budget but want to preserve the other
-// state flags (TestMode, CacheDisabled, etc.).
+// when you want a clean API budget but want to preserve the other
+// state flags (ValidationMode, CacheDisabled, etc.).
 func ClearAPICalls() {
 	_ = os.Remove(filepath.Join(getCacheDir(), apiCallsFilename))
 }

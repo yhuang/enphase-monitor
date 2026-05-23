@@ -27,6 +27,7 @@ _Avoid_: Lifetime endpoint, historical data
 **API Budget**:
 The number of live API requests available in the current 60-second sliding window. The Enphase Cloud API enforces a limit of 10 requests per minute per API key. With 2 Systems × 5 metrics = 10 calls per run, one full run consumes the entire budget. The application tracks the budget locally; when exhausted, it falls back to cache rather than issuing a guaranteed-failed live call.
 _Avoid_: Rate limit, API quota, request quota
+_Why_: "Rate limit" describes the HTTP-layer enforcement mechanism (HTTP 429 from Enphase). "API Budget" describes the application-level concept — how many requests the app has available to spend in the current window. The distinction matters in code: constants and functions that deal with the HTTP 429 response correctly use "rate limit" (e.g. `RateLimitError`, `IsRateLimitError`), while functions that track the app's remaining capacity use "budget" (e.g. `RemainingBudget`, `BudgetWarningShown`).
 
 ## Cache
 
@@ -46,6 +47,7 @@ _Avoid_: Cache-only mode, no-cache mode, cache flag
 **Validation Mode**:
 A run mode activated by `--test --date <date>` that serves the report entirely from cache (no live API calls) and then compares each metric against a pre-recorded set of expected values stored in `test-data/`. Exits non-zero if any metric diverges. Used for regression testing after code changes to confirm that calculation logic has not drifted.
 _Avoid_: Test mode, cache-validation mode, regression mode
+_Why_: The CLI flag is `--test`, which makes "test mode" a natural derivation. But the codebase also has `_test.go` files throughout, and calling a run mode "test mode" creates ambiguity — a reader cannot tell whether "test mode" refers to this run mode or to unit testing. "Validation Mode" names what the mode actually does: it validates that metrics match recorded expected values. Code identifiers follow suit: `ValidationMode()`, `SetValidationMode()`, `ValidateValidationModeCache()`.
 
 **Run-Once Mode**:
 The default behavior — execute one query, display the report, and exit. Works with all Query Modes and Cache Modes.
@@ -62,7 +64,7 @@ _Avoid_: Polling interval, refresh rate, refresh period
 ## Query Modes
 
 **Query Mode**:
-How the app determines what data to fetch and display. Inferred from the CLI flags the user supplies — never stated explicitly. Four modes: Day, Month, Year, and True-Up. Code identifier: `QueryType`.
+How the app determines what data to fetch and display. Inferred from the CLI flags the user supplies — never stated explicitly. Four modes: Day, Month, Year, and True-Up. Code identifier: `QueryMode`.
 _Avoid_: Granularity, query type, report type
 
 **Day Mode** / **Month Mode** / **Year Mode**:
@@ -70,7 +72,7 @@ The three date-granularity modes, inferred from the format of the `--date` flag:
 _Avoid_: Daily query, monthly query, yearly query
 
 **True-Up Mode**:
-A distinct Query Mode activated by the `--true-up` flag with a `YYYY-MM-DD` date set by the utility (PG&E). Unlike the date-granularity modes, the date is not inferred — it is the utility-defined start of the True-Up Period. Code identifier: `QueryTypeTrueUp`.
+A distinct Query Mode activated by the `--true-up` flag with a `YYYY-MM-DD` date set by the utility (PG&E). Unlike the date-granularity modes, the date is not inferred — it is the utility-defined start of the True-Up Period. Code identifier: `QueryModeTrueUp`.
 _Avoid_: True-up query, annual query
 
 **Current Period**:

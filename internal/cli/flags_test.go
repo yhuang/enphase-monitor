@@ -14,7 +14,7 @@
 //
 // 2. Flag Parsing Tests
 //   - Test --continuous flag sets Continuous to true
-//   - Test --test flag sets TestMode to true
+//   - Test --test flag sets Validation to true
 //   - Test --date flag parses date string
 //   - Test --config flag overrides default path
 //   - Test --no-cache flag sets NoCache to true
@@ -74,8 +74,8 @@ func TestParseFlags_Defaults(t *testing.T) {
 	if flags.Continuous {
 		t.Errorf("ParseFlags() Continuous = %v, want false", flags.Continuous)
 	}
-	if flags.TestMode {
-		t.Errorf("ParseFlags() TestMode = %v, want false", flags.TestMode)
+	if flags.Validation {
+		t.Errorf("ParseFlags() Validation = %v, want false", flags.Validation)
 	}
 }
 
@@ -105,7 +105,7 @@ func TestParseFlags_Continuous(t *testing.T) {
 	}
 }
 
-func TestParseFlags_TestMode(t *testing.T) {
+func TestParseFlags_Validation(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
@@ -113,8 +113,8 @@ func TestParseFlags_TestMode(t *testing.T) {
 
 	flags := ParseFlags()
 
-	if !flags.TestMode {
-		t.Error("TestMode should be true")
+	if !flags.Validation {
+		t.Error("Validation should be true")
 	}
 }
 
@@ -145,8 +145,8 @@ func TestParseFlags_MultipleFlags(t *testing.T) {
 	if !flags.Continuous {
 		t.Error("Continuous should be true")
 	}
-	if !flags.TestMode {
-		t.Error("TestMode should be true")
+	if !flags.Validation {
+		t.Error("Validation should be true")
 	}
 	if flags.TestDate != "2026-01-20" {
 		t.Errorf("TestDate = %v, want 2026-01-20", flags.TestDate)
@@ -258,8 +258,8 @@ func TestParseFlags_ComplexCombination(t *testing.T) {
 	if flags.TestDate != "2026-01-20" {
 		t.Errorf("TestDate = %v, want 2026-01-20", flags.TestDate)
 	}
-	if !flags.TestMode {
-		t.Error("TestMode should be true")
+	if !flags.Validation {
+		t.Error("Validation should be true")
 	}
 	if !flags.NoCache {
 		t.Error("NoCache should be true")

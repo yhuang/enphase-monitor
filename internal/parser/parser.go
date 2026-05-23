@@ -57,7 +57,7 @@ type TelemetryInterval struct {
 	} `json:"discharge"`
 }
 
-// LifetimeResponse represents the response from _lifetime endpoints (daily aggregated data).
+// LifetimeResponse represents the response from Lifetime Data endpoints (daily aggregated data).
 // These endpoints return daily totals as arrays of numbers instead of 15-minute intervals.
 // The array starts from start_date and each element represents one day's energy in Wh.
 // Different endpoints use different field names for the data array.

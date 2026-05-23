@@ -21,8 +21,8 @@
 //   - Cloud API Integration: Uses Enphase Enlighten Cloud API v4 exclusively
 //   - OAuth 2.0 Authentication: Secure token-based authentication with automatic refresh
 //   - Multi-System Aggregation: Combines metrics from multiple independent systems
-//   - Intelligent Caching: Disk-based caching to respect API rate limits (10 calls/minute)
-//   - Historical Data: Query any past date with --date flag
+//   - Intelligent Caching: Disk-based caching to stay within the API Budget (10 calls/minute)
+//   - Past Period Queries: Query any past date with --date flag
 //   - Color Customization: Customize terminal output colors via config.yaml
 //   - Validation Mode: Test against expected values without making API calls
 //
@@ -63,7 +63,7 @@
 //	- internal/parser: JSON telemetry response parsing
 //	- internal/timezone: Timezone handling and date boundary calculations
 //	- internal/urlbuilder: API URL construction with proper date ranges
-//	- internal/validation: Test mode validation with tolerance-based comparison
+//	- internal/validation: Validation Mode (--test flag) with tolerance-based comparison
 //
 // EXECUTION FLOW
 // --------------
@@ -73,7 +73,7 @@
 //  4. Handle OAuth setup via internal/oauth if requested
 //  5. Create DataAggregator with OAuth adapter from internal/app
 //  6. Setup display with colors from internal/app
-//  7. Configure modes (test/cache) via internal/app
+//  7. Configure modes (Validation Mode, Cache Mode) via internal/app
 //  8. If --true-up: call app.RunTrueUp (single-batch lifetime query, no battery) and exit.
 //     Otherwise, run the standard execution mode:
 //     - For each system in config:
@@ -81,12 +81,12 @@
 //     b. Create API client via internal/api for the system
 //     c. Fetch metrics via Cloud API (with caching from internal/cache)
 //     - Aggregate metrics via internal/aggregator
-//     - Validate if in test mode via internal/validation
+//     - Validate if in Validation Mode via internal/validation
 //     - Display formatted report via internal/display
 //
 // For continuous mode, step 8 repeats at the configured refresh interval.
 // Note: If a past date is supplied via --date, the program automatically runs once
-// since historical data doesn't change over time.
+// since Past Period data is immutable.
 package main
 
 import (
@@ -180,7 +180,7 @@ func main() {
 			Disp:      disp,
 			Cfg:       cfg,
 			TestDate:  parsedInput.Date,
-			QueryType: parsedInput.QueryType,
+			QueryMode: parsedInput.QueryMode,
 			ReportTZ:  reportTZ,
 			Debug:     flags.Debug,
 		}
@@ -195,7 +195,7 @@ func main() {
 
 	// --true-up takes precedence over --date; handle it early and exit.
 	if flags.TrueUp != "" {
-		app.ConfigureModes(flags.TestMode, flags.NoCache, flags.Debug)
+		app.ConfigureModes(flags.Validation, flags.NoCache, flags.Debug)
 		printDebugStartup(flags.Debug, reportTZ)
 		rc := app.RunConfig{
 			Agg:      agg,
@@ -207,7 +207,7 @@ func main() {
 		if err := app.RunTrueUp(ctx, rc, flags.TrueUp); err != nil {
 			if constants.IsRateLimitError(err) {
 				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-				fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", constants.APIRateLimitWaitSeconds)
+				fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", constants.APIBudgetWindowSeconds)
 			} else {
 				disp.ShowError(err)
 			}
@@ -216,33 +216,33 @@ func main() {
 		return
 	}
 
-	// Parse test date (returns date and query type)
+	// Parse test date (returns date and query mode)
 	parsedInput, err := app.ParseTestDate(flags.TestDate, reportTZ)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(1)
 	}
 	testDateParsed := parsedInput.Date
-	queryType := parsedInput.QueryType
+	queryMode := parsedInput.QueryMode
 
-	// Validate cache exists when in test mode (before configuring modes)
-	if flags.TestMode {
-		if err := app.ValidateTestModeCache(testDateParsed, reportTZ); err != nil {
+	// Validate cache exists when in Validation Mode (before configuring modes)
+	if flags.Validation {
+		if err := app.ValidateValidationModeCache(testDateParsed, reportTZ); err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 			os.Exit(1)
 		}
 	}
 
-	// Configure test mode and cache mode
-	app.ConfigureModes(flags.TestMode, flags.NoCache, flags.Debug)
+	// Configure Validation Mode and cache mode
+	app.ConfigureModes(flags.Validation, flags.NoCache, flags.Debug)
 	printDebugStartup(flags.Debug, reportTZ)
 
 	// Default is run-once; --continuous enables periodic refresh.
 	// Month/year queries and past-date queries always run once regardless of --continuous.
 	runContinuous := flags.Continuous
-	if queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear {
+	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear {
 		runContinuous = false
-	} else if !testDateParsed.IsZero() && timezone.IsPastPeriod(testDateParsed, queryType, reportTZ) {
+	} else if !testDateParsed.IsZero() && timezone.IsPastPeriod(testDateParsed, queryMode, reportTZ) {
 		runContinuous = false
 	}
 
@@ -251,17 +251,17 @@ func main() {
 		Disp:      disp,
 		Cfg:       cfg,
 		TestDate:  testDateParsed,
-		QueryType: queryType,
+		QueryMode: queryMode,
 		ReportTZ:  reportTZ,
 		Debug:     flags.Debug,
 	}
 
 	// Default: run once and exit. With --continuous, loop with periodic refresh.
 	if !runContinuous {
-		if err := app.RunOnce(ctx, rc, flags.TestMode); err != nil {
+		if err := app.RunOnce(ctx, rc, flags.Validation); err != nil {
 			if constants.IsRateLimitError(err) {
 				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-				fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", constants.APIRateLimitWaitSeconds)
+				fmt.Fprintf(os.Stderr, "Please wait %d seconds before rerunning the program.\n", constants.APIBudgetWindowSeconds)
 			} else {
 				disp.ShowError(err)
 			}
@@ -275,7 +275,7 @@ func main() {
 	}
 }
 
-// printDebugStartup prints the rate-limit status when debug mode is on.
+// printDebugStartup prints the API Budget status when debug mode is on.
 // It shows the last recorded API call time (so the user knows if they are
 // still inside the 60-second cooling-off window) and the remaining budget.
 func printDebugStartup(debug bool, reportTZ *time.Location) {

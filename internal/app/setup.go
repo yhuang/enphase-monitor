@@ -6,7 +6,7 @@
 // These functions extract common initialization logic from main() to improve readability:
 //   - CreateOAuthAdapter: Creates OAuth token adapter for aggregator
 //   - SetupDisplay: Configures display with colors from config
-//   - ConfigureModes: Sets up test mode and cache mode flags
+//   - ConfigureModes: Sets up Validation Mode and cache mode flags
 //   - ParseTestDate: Parses and validates test date parameter
 package app
 
@@ -27,7 +27,7 @@ import (
 // ParseDateInput represents the result of parsing a date input string.
 type ParseDateInput struct {
 	Date      time.Time
-	QueryType constants.QueryType
+	QueryMode constants.QueryMode
 }
 
 // CreateOAuthAdapter creates an adapter function for OAuth token retrieval.
@@ -61,16 +61,16 @@ func SetupDisplay(cfg *config.Config, reportTZ *time.Location) *display.Display 
 	return display.NewDisplayWithColorsAndTimezone(colors, reportTZ)
 }
 
-// ConfigureModes sets up test mode, cache mode, and debug mode based on flags.
-func ConfigureModes(testMode, noCache, debug bool) {
-	if testMode {
-		cache.SetTestMode(true)
-		fmt.Println("TEST MODE: Using cache only, no live API calls")
+// ConfigureModes sets up Validation Mode, cache mode, and debug mode based on flags.
+func ConfigureModes(validationMode, noCache, debug bool) {
+	if validationMode {
+		cache.SetValidationMode(true)
+		fmt.Println("VALIDATION MODE: Using cache only, no live API calls")
 	}
 
 	if noCache {
 		cache.SetCacheDisabled(true)
-		fmt.Println("NO-CACHE MODE: Bypassing cache, making live API calls")
+		fmt.Println("LIVE MODE: Bypassing cache, making live API calls")
 	}
 
 	if debug {
@@ -78,14 +78,14 @@ func ConfigureModes(testMode, noCache, debug bool) {
 	}
 }
 
-// ParseTestDate parses the test date string and returns the date and query type.
+// ParseTestDate parses the test date string and returns the date and query mode.
 // Supports YYYY-MM-DD (day), YYYY-MM (month), and YYYY (year) formats.
 // Returns zero values if date string is empty (meaning use today as a day query).
 func ParseTestDate(dateStr string, reportTZ *time.Location) (ParseDateInput, error) {
 	if dateStr == "" {
 		return ParseDateInput{
 			Date:      time.Time{},
-			QueryType: constants.QueryTypeDay,
+			QueryMode: constants.QueryModeDay,
 		}, nil
 	}
 
@@ -97,16 +97,16 @@ func ParseTestDate(dateStr string, reportTZ *time.Location) (ParseDateInput, err
 
 	return ParseDateInput{
 		Date:      result.Date,
-		QueryType: result.QueryType,
+		QueryMode: result.QueryMode,
 	}, nil
 }
 
-// FormatDateForQueryType formats a date according to its query type.
-func FormatDateForQueryType(date time.Time, queryType constants.QueryType) string {
-	switch queryType {
-	case constants.QueryTypeYear:
+// FormatDateForQueryMode formats a date according to its query mode.
+func FormatDateForQueryMode(date time.Time, queryMode constants.QueryMode) string {
+	switch queryMode {
+	case constants.QueryModeYear:
 		return date.Format(constants.YearFormat)
-	case constants.QueryTypeMonth:
+	case constants.QueryModeMonth:
 		return date.Format(constants.MonthFormat)
 	default:
 		return date.Format(constants.DateFormat)
@@ -126,10 +126,10 @@ func GetAggregatorTypes(cfg *config.Config) ([]aggregator.SystemConfig, *aggrega
 	return systems, cfg.API
 }
 
-// ValidateTestModeCache checks if cache exists for the target date when in test mode.
+// ValidateValidationModeCache checks if cache exists for the target date when in Validation Mode.
 // Returns an error with a helpful message if no cache exists for the date.
 // This prevents confusing errors when running --test without populated cache.
-func ValidateTestModeCache(targetDate time.Time, reportTZ *time.Location) error {
+func ValidateValidationModeCache(targetDate time.Time, reportTZ *time.Location) error {
 	// Determine the date string to check: default to specified date, override for today if none
 	dateStr := targetDate.Format("2006-01-02")
 	if targetDate.IsZero() {
@@ -150,7 +150,7 @@ func ValidateTestModeCache(targetDate time.Time, reportTZ *time.Location) error 
 			"To populate the cache, run:\n"+
 			"  ./enphase-monitor\n\n"+
 			"Then retry with --test\n\n"+
-			"For historical dates with expected values, use:\n"+
+			"For past dates with expected values, use:\n"+
 			"  ./enphase-monitor --date %s\n"+
 			"  ./enphase-monitor --test --date %s", dateStr, dateStr, dateStr)
 	}

@@ -10,7 +10,7 @@ import (
 type AggregatedMetrics struct {
 	Timestamp time.Time
 	QueryDate time.Time             // The date being queried (zero value means today)
-	QueryType constants.QueryType   // The query granularity (day/month/year/true-up)
+	QueryMode constants.QueryMode   // The Query Mode (day/month/year/true-up)
 
 	// Today's Energy (kWh)
 	ProductionToday  float64

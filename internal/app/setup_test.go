@@ -18,17 +18,17 @@
 //   - Test timezone is set correctly
 //
 // 3. Mode Configuration Tests
-//   - Test ConfigureModes sets test mode flag
+//   - Test ConfigureModes sets Validation Mode flag
 //   - Test ConfigureModes sets cache disabled flag
-//   - Test mode flags are mutually independent
+//   - Validation Mode flags are mutually independent
 //
 // 4. Date Parsing Tests
 //   - Test ParseTestDate with valid date string
 //   - Test ParseTestDate with empty string returns zero time
 //   - Test ParseTestDate with invalid format returns error
 //
-// 5. Test Mode Cache Validation Tests
-//   - Test ValidateTestModeCache returns error for missing cache
+// 5. Validation Mode Cache Validation Tests
+//   - Test ValidateValidationModeCache returns error for missing cache
 //   - Test error message contains target date
 //   - Test error message contains helpful instructions
 //
@@ -44,8 +44,8 @@
 // Setup functions orchestrate multiple components:
 // - OAuth token management
 // - Display with color configuration
-// - Operating modes (test, cache)
-// - Date parsing for historical queries
+// - Operating modes (validation, cache)
+// - Date parsing for Past Period queries
 //
 // Testing ensures all components are initialized correctly before use.
 //
@@ -72,7 +72,7 @@
 //     (TestParseTestDate_EmptyString, TestParseTestDate_InvalidDate)
 //
 //  4. SUBTESTS WITH t.Run() - Grouping related assertions
-//     (TestValidateTestModeCache uses t.Run for each scenario)
+//     (TestValidateValidationModeCache uses t.Run for each scenario)
 //
 //  5. TABLE-DRIVEN TESTS - Testing multiple cases with same logic
 //     (TestConfigureModes uses a test table)
@@ -111,24 +111,24 @@ import (
 //
 // =============================================================================
 
-// TestFormatDateForQueryType tests date formatting for each query type.
-func TestFormatDateForQueryType(t *testing.T) {
+// TestFormatDateForQueryMode tests date formatting for each query mode.
+func TestFormatDateForQueryMode(t *testing.T) {
 	date := time.Date(2026, time.March, 15, 0, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		queryType constants.QueryType
+		queryMode constants.QueryMode
 		want      string
 	}{
-		{constants.QueryTypeDay, "2026-03-15"},
-		{constants.QueryTypeMonth, "2026-03"},
-		{constants.QueryTypeYear, "2026"},
+		{constants.QueryModeDay, "2026-03-15"},
+		{constants.QueryModeMonth, "2026-03"},
+		{constants.QueryModeYear, "2026"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.queryType.String(), func(t *testing.T) {
-			got := FormatDateForQueryType(date, tt.queryType)
+		t.Run(tt.queryMode.String(), func(t *testing.T) {
+			got := FormatDateForQueryMode(date, tt.queryMode)
 			if got != tt.want {
-				t.Errorf("FormatDateForQueryType(%v) = %q, want %q", tt.queryType, got, tt.want)
+				t.Errorf("FormatDateForQueryMode(%v) = %q, want %q", tt.queryMode, got, tt.want)
 			}
 		})
 	}
@@ -271,9 +271,9 @@ func TestParseTestDate_ValidDate(t *testing.T) {
 	if !parsed.Date.Equal(expected) {
 		t.Errorf("ParseTestDate() = %v, want %v", parsed.Date, expected)
 	}
-	// Verify query type is day for YYYY-MM-DD format
-	if parsed.QueryType != constants.QueryTypeDay {
-		t.Errorf("ParseTestDate() QueryType = %v, want QueryTypeDay", parsed.QueryType)
+	// Verify query mode is day for YYYY-MM-DD format
+	if parsed.QueryMode != constants.QueryModeDay {
+		t.Errorf("ParseTestDate() QueryMode = %v, want QueryModeDay", parsed.QueryMode)
 	}
 }
 
@@ -372,7 +372,7 @@ func TestRunOnce_ContextCancelled(t *testing.T) {
 	disp := SetupDisplay(cfg, tz)
 
 	// RunOnce with cancelled context should return error (no os.Exit)
-	err := RunOnce(ctx, RunConfig{Agg: agg, Disp: disp, Cfg: cfg, QueryType: constants.QueryTypeDay, ReportTZ: tz}, false)
+	err := RunOnce(ctx, RunConfig{Agg: agg, Disp: disp, Cfg: cfg, QueryMode: constants.QueryModeDay, ReportTZ: tz}, false)
 	if err == nil {
 		t.Fatal("RunOnce() with cancelled context: error = nil, want non-nil")
 	}
@@ -397,7 +397,7 @@ func TestRunOnce_ContextCancelled(t *testing.T) {
 //
 // BOOLEAN COMBINATION TESTING:
 // ----------------------------
-// With 2 boolean flags (testMode, noCache), there are 4 possible states:
+// With 2 boolean flags (validationMode, noCache), there are 4 possible states:
 // - false, false
 // - true, false
 // - false, true
@@ -413,56 +413,56 @@ func TestConfigureModes(t *testing.T) {
 	// This struct is here to satisfy the compiler - in a real scenario,
 	// you'd verify the cache package state
 	cache := &struct {
-		testMode      bool
-		cacheDisabled bool
+		validationMode bool
+		cacheDisabled  bool
 	}{}
 
 	// TABLE: Define all boolean combinations
 	// Each row is one test case with inputs and expected outputs
 	tests := []struct {
-		name      string // Descriptive name for test output
-		testMode  bool   // Input: --test flag
-		noCache   bool   // Input: --no-cache flag
-		wantTest  bool   // Expected: cache.TestMode() value
-		wantCache bool   // Expected: cache.CacheDisabled() value
+		name           string // Descriptive name for test output
+		validationMode bool   // Input: --test flag
+		noCache        bool   // Input: --no-cache flag
+		wantValidation bool   // Expected: cache.ValidationMode() value
+		wantCache      bool   // Expected: cache.CacheDisabled() value
 	}{
 		{
-			name:      "both false",
-			testMode:  false,
-			noCache:   false,
-			wantTest:  false,
-			wantCache: false,
+			name:           "both false",
+			validationMode: false,
+			noCache:        false,
+			wantValidation: false,
+			wantCache:      false,
 		},
 		{
-			name:      "test mode enabled",
-			testMode:  true,
-			noCache:   false,
-			wantTest:  true,
-			wantCache: false,
+			name:           "validation mode enabled",
+			validationMode: true,
+			noCache:        false,
+			wantValidation: true,
+			wantCache:      false,
 		},
 		{
-			name:      "no cache enabled",
-			testMode:  false,
-			noCache:   true,
-			wantTest:  false,
-			wantCache: true,
+			name:           "no cache enabled",
+			validationMode: false,
+			noCache:        true,
+			wantValidation: false,
+			wantCache:      true,
 		},
 		{
-			name:      "both enabled",
-			testMode:  true,
-			noCache:   true,
-			wantTest:  true,
-			wantCache: true,
+			name:           "both enabled",
+			validationMode: true,
+			noCache:        true,
+			wantValidation: true,
+			wantCache:      true,
 		},
 	}
 
 	// LOOP: Run each test case as a subtest
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Note: ConfigureModes calls cache.SetTestMode and cache.SetCacheDisabled
+			// Note: ConfigureModes calls cache.SetValidationMode and cache.SetCacheDisabled
 			// We can't easily test the actual state changes without mocking,
 			// but we can verify the function doesn't panic
-			ConfigureModes(tt.testMode, tt.noCache, false)
+			ConfigureModes(tt.validationMode, tt.noCache, false)
 			_ = cache // Use the mock struct to avoid unused variable
 		})
 	}
@@ -490,9 +490,9 @@ func TestConfigureModes(t *testing.T) {
 //
 // =============================================================================
 
-// TestValidateTestModeCache tests the cache validation for test mode.
+// TestValidateValidationModeCache tests the cache validation for Validation Mode.
 // This function provides early detection when --test is used without cached data.
-func TestValidateTestModeCache(t *testing.T) {
+func TestValidateValidationModeCache(t *testing.T) {
 	tz := time.UTC
 
 	// SUBTEST 1: Verify error is returned for missing cache
@@ -500,11 +500,11 @@ func TestValidateTestModeCache(t *testing.T) {
 		// Use a date that definitely won't have cache (in the past)
 		testDate := time.Date(1999, 1, 1, 0, 0, 0, 0, tz)
 
-		err := ValidateTestModeCache(testDate, tz)
+		err := ValidateValidationModeCache(testDate, tz)
 
 		// ASSERTION: We expect an error
 		if err == nil {
-			t.Error("ValidateTestModeCache() should return error when no cache exists")
+			t.Error("ValidateValidationModeCache() should return error when no cache exists")
 		}
 
 		// ASSERTION: Error message should be helpful
@@ -527,10 +527,10 @@ func TestValidateTestModeCache(t *testing.T) {
 		// So we test with a date far in the future that won't have cache
 		futureDate := time.Date(2099, 12, 31, 0, 0, 0, 0, tz)
 
-		err := ValidateTestModeCache(futureDate, tz)
+		err := ValidateValidationModeCache(futureDate, tz)
 
 		if err == nil {
-			t.Error("ValidateTestModeCache() should return error for future date with no cache")
+			t.Error("ValidateValidationModeCache() should return error for future date with no cache")
 		}
 	})
 
@@ -539,7 +539,7 @@ func TestValidateTestModeCache(t *testing.T) {
 	t.Run("error message contains helpful instructions", func(t *testing.T) {
 		testDate := time.Date(2050, 6, 15, 0, 0, 0, 0, tz)
 
-		err := ValidateTestModeCache(testDate, tz)
+		err := ValidateValidationModeCache(testDate, tz)
 
 		// t.Fatal vs t.Error:
 		// - t.Fatal: Stop this subtest immediately (can't continue)
@@ -564,7 +564,7 @@ func TestValidateTestModeCache(t *testing.T) {
 			t.Error("Error should contain instructions to populate cache")
 		}
 
-		// Should contain instructions for historical dates (alternative fix)
+		// Should contain instructions for past dates (alternative fix)
 		if !strings.Contains(errMsg, "--date") {
 			t.Error("Error should contain --date flag instruction")
 		}

@@ -21,32 +21,32 @@ var ErrCacheIncomplete = errors.New("cached report unavailable: one or more endp
 // serves a fully-cached report or prints a diagnostic listing what is missing.
 // No live API calls are made regardless of the outcome.
 //
-// trueUpStart, when non-empty, selects the true-up query path (mirrors RunTrueUp).
-// Otherwise rc.TestDate and rc.QueryType drive the query type.
+// trueUpStart, when non-empty, selects the True-Up Mode path (mirrors RunTrueUp).
+// Otherwise rc.TestDate and rc.QueryMode drive the query mode.
 func RunCacheReport(ctx context.Context, rc RunConfig, trueUpStart string) error {
 	systems, apiConfig := GetAggregatorTypes(rc.Cfg)
 	if apiConfig == nil || apiConfig.Key == "" {
 		return fmt.Errorf("api.key required to check cache")
 	}
 
-	// Determine the effective date and query type for the cache pre-check.
+	// Determine the effective date and query mode for the cache pre-check.
 	// For true-up, mirror the normalization RunTrueUp applies: first of start month.
 	effectiveDate := rc.TestDate
-	effectiveQueryType := rc.QueryType
+	effectiveQueryMode := rc.QueryMode
 	if trueUpStart != "" {
 		startDate, err := timezone.ParseDateInTimezone(trueUpStart, rc.ReportTZ)
 		if err != nil {
 			return fmt.Errorf("invalid --true-up date %q: use YYYY-MM-DD format", trueUpStart)
 		}
 		effectiveDate = time.Date(startDate.Year(), startDate.Month(), 1, 0, 0, 0, 0, rc.ReportTZ)
-		effectiveQueryType = constants.QueryTypeTrueUp
+		effectiveQueryMode = constants.QueryModeTrueUp
 	}
 
 	// Check each system's cache coverage.
 	statuses := make([]api.SystemCacheStatus, 0, len(systems))
 	allComplete := true
 	for _, sys := range systems {
-		s := api.CheckCacheForSystem(sys.ID, sys.Name, apiConfig.Key, effectiveDate, effectiveQueryType, rc.ReportTZ)
+		s := api.CheckCacheForSystem(sys.ID, sys.Name, apiConfig.Key, effectiveDate, effectiveQueryMode, rc.ReportTZ)
 		statuses = append(statuses, s)
 		if !s.AllRequiredPresent() {
 			allComplete = false
@@ -54,15 +54,15 @@ func RunCacheReport(ctx context.Context, rc RunConfig, trueUpStart string) error
 	}
 
 	if !allComplete {
-		printCacheDiagnostic(statuses, effectiveDate, effectiveQueryType, trueUpStart, rc.TestDate)
+		printCacheDiagnostic(statuses, effectiveDate, effectiveQueryMode, trueUpStart, rc.TestDate)
 		return ErrCacheIncomplete
 	}
 
-	// All required endpoints are cached — enable test mode and run the normal path.
+	// All required endpoints are cached — enable Validation Mode and run the normal path.
 	if rc.Debug {
 		fmt.Println("CACHE MODE: Serving report from cache, no live API calls")
 	}
-	cache.SetTestMode(true)
+	cache.SetValidationMode(true)
 
 	if trueUpStart != "" {
 		return RunTrueUp(ctx, rc, trueUpStart)
@@ -70,8 +70,8 @@ func RunCacheReport(ctx context.Context, rc RunConfig, trueUpStart string) error
 	return RunOnce(ctx, rc, false)
 }
 
-func printCacheDiagnostic(statuses []api.SystemCacheStatus, effectiveDate time.Time, effectiveQueryType constants.QueryType, trueUpStart string, originalDate time.Time) {
-	label := describePeriod(effectiveDate, effectiveQueryType, trueUpStart)
+func printCacheDiagnostic(statuses []api.SystemCacheStatus, effectiveDate time.Time, effectiveQueryMode constants.QueryMode, trueUpStart string, originalDate time.Time) {
+	label := describePeriod(effectiveDate, effectiveQueryMode, trueUpStart)
 	fmt.Printf("CACHE INCOMPLETE for %s:\n\n", label)
 
 	for _, s := range statuses {
@@ -99,37 +99,37 @@ func printCacheDiagnostic(statuses []api.SystemCacheStatus, effectiveDate time.T
 	}
 
 	fmt.Println("To populate the cache, run:")
-	fmt.Printf("  %s\n", populateCommand(trueUpStart, originalDate, effectiveQueryType))
+	fmt.Printf("  %s\n", populateCommand(trueUpStart, originalDate, effectiveQueryMode))
 }
 
-func describePeriod(date time.Time, queryType constants.QueryType, trueUpStart string) string {
+func describePeriod(date time.Time, queryMode constants.QueryMode, trueUpStart string) string {
 	if trueUpStart != "" {
 		return trueUpStart + " (true-up)"
 	}
 	if date.IsZero() {
 		return "today"
 	}
-	switch queryType {
-	case constants.QueryTypeYear:
+	switch queryMode {
+	case constants.QueryModeYear:
 		return date.Format("2006")
-	case constants.QueryTypeMonth:
+	case constants.QueryModeMonth:
 		return date.Format("2006-01")
 	default:
 		return date.Format("2006-01-02")
 	}
 }
 
-func populateCommand(trueUpStart string, originalDate time.Time, queryType constants.QueryType) string {
+func populateCommand(trueUpStart string, originalDate time.Time, queryMode constants.QueryMode) string {
 	if trueUpStart != "" {
 		return "./enphase-monitor --true-up " + trueUpStart
 	}
 	if originalDate.IsZero() {
 		return "./enphase-monitor"
 	}
-	switch queryType {
-	case constants.QueryTypeYear:
+	switch queryMode {
+	case constants.QueryModeYear:
 		return "./enphase-monitor --date " + originalDate.Format("2006")
-	case constants.QueryTypeMonth:
+	case constants.QueryModeMonth:
 		return "./enphase-monitor --date " + originalDate.Format("2006-01")
 	default:
 		return "./enphase-monitor --date " + originalDate.Format("2006-01-02")

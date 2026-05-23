@@ -6,14 +6,14 @@
 //
 // REPORT TYPES COVERED
 // --------------------
-//  1. Current date     (today, zero testDate, QueryTypeDay)
-//  2. Specific date    (past day,             QueryTypeDay)
-//  3. Month-to-date    (current month,        QueryTypeMonth)
-//  4. Specific month   (past month,           QueryTypeMonth)
-//  5. Year-to-date     (current year,         QueryTypeYear)
-//  6. Specific year    (past year,            QueryTypeYear)
-//  7. Current true-up  (active period,        QueryTypeTrueUp)
-//  8. Past true-up     (completed period,     QueryTypeTrueUp)
+//  1. Current date     (today, zero testDate, QueryModeDay)
+//  2. Specific date    (past day,             QueryModeDay)
+//  3. Month-to-date    (current month,        QueryModeMonth)
+//  4. Specific month   (past month,           QueryModeMonth)
+//  5. Year-to-date     (current year,         QueryModeYear)
+//  6. Specific year    (past year,            QueryModeYear)
+//  7. Current true-up  (Current Period,        QueryModeTrueUp)
+//  8. Past true-up     (Past Period,           QueryModeTrueUp)
 //
 // TESTING PATTERN
 // ---------------
@@ -113,7 +113,7 @@ func captureStdout(fn func()) string {
 }
 
 // =============================================================================
-// 1. Current date — QueryTypeDay, today (zero testDate)
+// 1. Current date — QueryModeDay, today (zero testDate)
 // =============================================================================
 
 // TestBudgetExhausted_CurrentDate verifies that when the budget is fully
@@ -130,7 +130,7 @@ func TestBudgetExhausted_CurrentDate(t *testing.T) {
 	ctx := context.Background()
 
 	// Prime: live call populates cache.
-	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryModeDay)
 	if err != nil {
 		t.Fatalf("prime call: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestBudgetExhausted_CurrentDate(t *testing.T) {
 	exhaustBudget()
 
 	// Probe: must use cache, not hit the server again.
-	_, err = client.GetProductionForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	_, err = client.GetProductionForDate(ctx, time.Time{}, constants.QueryModeDay)
 	if err != nil {
 		t.Fatalf("probe call: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestBudgetExhausted_CurrentDate(t *testing.T) {
 }
 
 // =============================================================================
-// 2. Specific date — QueryTypeDay, past day
+// 2. Specific date — QueryModeDay, past day
 // =============================================================================
 
 // TestBudgetExhausted_SpecificDate verifies that a past-day result is always
@@ -170,7 +170,7 @@ func TestBudgetExhausted_SpecificDate(t *testing.T) {
 	ctx := context.Background()
 
 	// Prime: no cache → live call.
-	_, err := client.GetProductionForDate(ctx, pastDay, constants.QueryTypeDay)
+	_, err := client.GetProductionForDate(ctx, pastDay, constants.QueryModeDay)
 	if err != nil {
 		t.Fatalf("prime call: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestBudgetExhausted_SpecificDate(t *testing.T) {
 
 	// Probe: past period + cache exists → short-circuits to immutable cache,
 	// never reaches the budget check.
-	_, err = client.GetProductionForDate(ctx, pastDay, constants.QueryTypeDay)
+	_, err = client.GetProductionForDate(ctx, pastDay, constants.QueryModeDay)
 	if err != nil {
 		t.Fatalf("probe call: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestBudgetExhausted_SpecificDate(t *testing.T) {
 }
 
 // =============================================================================
-// 3. Month-to-date — QueryTypeMonth, current month
+// 3. Month-to-date — QueryModeMonth, current month
 // =============================================================================
 
 // TestBudgetExhausted_MonthToDate verifies that a current-month query falls
@@ -208,7 +208,7 @@ func TestBudgetExhausted_MonthToDate(t *testing.T) {
 	// Any date within the current month works; use today.
 	ctx := context.Background()
 
-	_, err := client.GetProductionForDate(ctx, time.Now().In(tz), constants.QueryTypeMonth)
+	_, err := client.GetProductionForDate(ctx, time.Now().In(tz), constants.QueryModeMonth)
 	if err != nil {
 		t.Fatalf("prime call: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestBudgetExhausted_MonthToDate(t *testing.T) {
 
 	exhaustBudget()
 
-	_, err = client.GetProductionForDate(ctx, time.Now().In(tz), constants.QueryTypeMonth)
+	_, err = client.GetProductionForDate(ctx, time.Now().In(tz), constants.QueryModeMonth)
 	if err != nil {
 		t.Fatalf("probe call: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestBudgetExhausted_MonthToDate(t *testing.T) {
 }
 
 // =============================================================================
-// 4. Specific month — QueryTypeMonth, past month
+// 4. Specific month — QueryModeMonth, past month
 // =============================================================================
 
 // TestBudgetExhausted_SpecificMonth verifies that a completed past-month result
@@ -244,7 +244,7 @@ func TestBudgetExhausted_SpecificMonth(t *testing.T) {
 	pastMonth := time.Now().In(tz).AddDate(0, -2, 0)
 	ctx := context.Background()
 
-	_, err := client.GetProductionForDate(ctx, pastMonth, constants.QueryTypeMonth)
+	_, err := client.GetProductionForDate(ctx, pastMonth, constants.QueryModeMonth)
 	if err != nil {
 		t.Fatalf("prime call: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestBudgetExhausted_SpecificMonth(t *testing.T) {
 
 	exhaustBudget()
 
-	_, err = client.GetProductionForDate(ctx, pastMonth, constants.QueryTypeMonth)
+	_, err = client.GetProductionForDate(ctx, pastMonth, constants.QueryModeMonth)
 	if err != nil {
 		t.Fatalf("probe call: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestBudgetExhausted_SpecificMonth(t *testing.T) {
 }
 
 // =============================================================================
-// 5. Year-to-date — QueryTypeYear, current year
+// 5. Year-to-date — QueryModeYear, current year
 // =============================================================================
 
 // TestBudgetExhausted_YearToDate verifies that a current-year query falls back
@@ -279,7 +279,7 @@ func TestBudgetExhausted_YearToDate(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := client.GetProductionForDate(ctx, time.Now().In(tz), constants.QueryTypeYear)
+	_, err := client.GetProductionForDate(ctx, time.Now().In(tz), constants.QueryModeYear)
 	if err != nil {
 		t.Fatalf("prime call: %v", err)
 	}
@@ -289,7 +289,7 @@ func TestBudgetExhausted_YearToDate(t *testing.T) {
 
 	exhaustBudget()
 
-	_, err = client.GetProductionForDate(ctx, time.Now().In(tz), constants.QueryTypeYear)
+	_, err = client.GetProductionForDate(ctx, time.Now().In(tz), constants.QueryModeYear)
 	if err != nil {
 		t.Fatalf("probe call: %v", err)
 	}
@@ -299,7 +299,7 @@ func TestBudgetExhausted_YearToDate(t *testing.T) {
 }
 
 // =============================================================================
-// 6. Specific year — QueryTypeYear, past year
+// 6. Specific year — QueryModeYear, past year
 // =============================================================================
 
 // TestBudgetExhausted_SpecificYear verifies that a completed past-year result
@@ -315,7 +315,7 @@ func TestBudgetExhausted_SpecificYear(t *testing.T) {
 	pastYear := time.Now().In(tz).AddDate(-2, 0, 0)
 	ctx := context.Background()
 
-	_, err := client.GetProductionForDate(ctx, pastYear, constants.QueryTypeYear)
+	_, err := client.GetProductionForDate(ctx, pastYear, constants.QueryModeYear)
 	if err != nil {
 		t.Fatalf("prime call: %v", err)
 	}
@@ -325,7 +325,7 @@ func TestBudgetExhausted_SpecificYear(t *testing.T) {
 
 	exhaustBudget()
 
-	_, err = client.GetProductionForDate(ctx, pastYear, constants.QueryTypeYear)
+	_, err = client.GetProductionForDate(ctx, pastYear, constants.QueryModeYear)
 	if err != nil {
 		t.Fatalf("probe call: %v", err)
 	}
@@ -335,12 +335,12 @@ func TestBudgetExhausted_SpecificYear(t *testing.T) {
 }
 
 // =============================================================================
-// 7. Current true-up — QueryTypeTrueUp, active period
+// 7. Current true-up — QueryModeTrueUp, Current Period
 // =============================================================================
 
-// TestBudgetExhausted_CurrentTrueUp verifies that an active true-up query
+// TestBudgetExhausted_CurrentTrueUp verifies that a Current Period True-Up Mode query
 // falls back to the lifetime-endpoint cache when the budget is exhausted.
-// IsPastPeriod always returns false for QueryTypeTrueUp; cacheMaxAge also
+// IsPastPeriod always returns false for QueryModeTrueUp; cacheMaxAge also
 // treats it as current when trueUpStart + 1 year is still in the future.
 func TestBudgetExhausted_CurrentTrueUp(t *testing.T) {
 	cache.ResetState()
@@ -354,7 +354,7 @@ func TestBudgetExhausted_CurrentTrueUp(t *testing.T) {
 	activeTrueUpStart := time.Now().In(tz).AddDate(0, -6, 0)
 	ctx := context.Background()
 
-	_, err := client.GetProductionForDate(ctx, activeTrueUpStart, constants.QueryTypeTrueUp)
+	_, err := client.GetProductionForDate(ctx, activeTrueUpStart, constants.QueryModeTrueUp)
 	if err != nil {
 		t.Fatalf("prime call: %v", err)
 	}
@@ -364,7 +364,7 @@ func TestBudgetExhausted_CurrentTrueUp(t *testing.T) {
 
 	exhaustBudget()
 
-	_, err = client.GetProductionForDate(ctx, activeTrueUpStart, constants.QueryTypeTrueUp)
+	_, err = client.GetProductionForDate(ctx, activeTrueUpStart, constants.QueryModeTrueUp)
 	if err != nil {
 		t.Fatalf("probe call: %v", err)
 	}
@@ -374,7 +374,7 @@ func TestBudgetExhausted_CurrentTrueUp(t *testing.T) {
 }
 
 // =============================================================================
-// 8. Past true-up — QueryTypeTrueUp, completed period
+// 8. Past true-up — QueryModeTrueUp, Past Period
 // =============================================================================
 
 // TestBudgetExhausted_PastTrueUp verifies that a completed true-up year is
@@ -393,7 +393,7 @@ func TestBudgetExhausted_PastTrueUp(t *testing.T) {
 	pastTrueUpStart := time.Now().In(tz).AddDate(-2, 0, 0)
 	ctx := context.Background()
 
-	_, err := client.GetProductionForDate(ctx, pastTrueUpStart, constants.QueryTypeTrueUp)
+	_, err := client.GetProductionForDate(ctx, pastTrueUpStart, constants.QueryModeTrueUp)
 	if err != nil {
 		t.Fatalf("prime call: %v", err)
 	}
@@ -403,7 +403,7 @@ func TestBudgetExhausted_PastTrueUp(t *testing.T) {
 
 	exhaustBudget()
 
-	_, err = client.GetProductionForDate(ctx, pastTrueUpStart, constants.QueryTypeTrueUp)
+	_, err = client.GetProductionForDate(ctx, pastTrueUpStart, constants.QueryModeTrueUp)
 	if err != nil {
 		t.Fatalf("probe call: %v", err)
 	}
@@ -431,7 +431,7 @@ func TestBudgetExhausted_NoCache_ReturnsRateLimitError(t *testing.T) {
 	exhaustBudget()
 
 	ctx := context.Background()
-	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryTypeDay)
+	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryModeDay)
 
 	if err == nil {
 		t.Fatal("expected error when budget exhausted and no cache, got nil")
@@ -484,19 +484,19 @@ func TestPreflightWarning_CurrentPeriod(t *testing.T) {
 	ctx := context.Background()
 
 	// Prime: populates cache for all five endpoints.
-	_, _, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryTypeDay)
+	_, _, err := client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryModeDay)
 	if err != nil {
 		t.Fatalf("prime call: %v", err)
 	}
 
-	// Leave exactly 1 call in the budget (< 5 needed for QueryTypeDay+battery).
+	// Leave exactly 1 call in the budget (< 5 needed for QueryModeDay+battery).
 	for cache.RemainingBudget() > 1 {
 		cache.RecordAPICall()
 	}
 
 	// Probe: preflight should warn because remaining (1) < needed (5).
 	output := captureStdout(func() {
-		_, _, _ = client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryTypeDay)
+		_, _, _ = client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryModeDay)
 	})
 
 	if !strings.Contains(output, "Insufficient API budget") {
@@ -511,7 +511,7 @@ func TestPreflightWarning_PastPeriod(t *testing.T) {
 	cache.ResetState()
 	defer cache.ResetState()
 
-	// Mock that serves the interval endpoint for the past day prime call.
+	// Mock that serves the Interval Data endpoint for the past day prime call.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
 		switch {
@@ -537,7 +537,7 @@ func TestPreflightWarning_PastPeriod(t *testing.T) {
 	ctx := context.Background()
 
 	// Prime: populates cache for the past day.
-	_, _, err := client.GetMetricsFromCloud(ctx, pastDay, constants.QueryTypeDay)
+	_, _, err := client.GetMetricsFromCloud(ctx, pastDay, constants.QueryModeDay)
 	if err != nil {
 		t.Fatalf("prime call: %v", err)
 	}
@@ -547,7 +547,7 @@ func TestPreflightWarning_PastPeriod(t *testing.T) {
 
 	// Probe: past period → no preflight warning expected.
 	output := captureStdout(func() {
-		_, _, _ = client.GetMetricsFromCloud(ctx, pastDay, constants.QueryTypeDay)
+		_, _, _ = client.GetMetricsFromCloud(ctx, pastDay, constants.QueryModeDay)
 	})
 
 	if strings.Contains(output, "Insufficient API budget") {

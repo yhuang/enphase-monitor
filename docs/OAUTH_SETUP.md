@@ -61,7 +61,7 @@ These two seem similar—both identify your application and both are public. How
 | Aspect | API Key | Client ID |
 |--------|---------|-----------|
 | **Purpose** | Track and control API usage | Prove app identity during OAuth |
-| **Used for** | Rate limiting, quotas, analytics | Authorization flow, token exchange |
+| **Used for** | API Budget enforcement, analytics | Authorization flow, token exchange |
 | **Where** | Query param on every API request | Authorization URLs, HTTP Basic Auth |
 | **Think of it as** | A metered access pass | A username (paired with `client_secret`) |
 
@@ -86,7 +86,7 @@ These two seem similar—both identify your application and both are public. How
 
 This separation allows Enphase to:
 - **Revoke OAuth access** without affecting your API key (e.g., user removes app permission)
-- **Rate limit by API key** independently of OAuth tokens
+- **Enforce API Budget per API key** independently of OAuth tokens
 - **Track usage per app** even when multiple users authorize the same app
 - **Change OAuth credentials** without reissuing API keys (or vice versa)
 
@@ -141,7 +141,7 @@ GET /api/v4/systems/12345/telemetry/production_meter?key=YOUR_API_KEY&start_at=.
 ```
 
 **Why**: Identifies which application is making the request. The API server uses this to:
-- Track usage and enforce rate limits
+- Track usage and enforce the API Budget
 - Apply application-specific settings
 - Log requests for debugging
 
@@ -290,7 +290,7 @@ Once you have a refresh token, your application can make API requests:
 ### Why This Two-factor Approach?
 
 1. **API Key**: Identifies **which application** is making the request
-   - Enables rate limiting per application
+   - Enables API Budget enforcement per application
    - Allows Enphase to track usage
    - Applies application-specific settings
 
@@ -391,7 +391,7 @@ When you exchange the code, the Enphase token endpoint requires:
 
 2. **API Key header** (`key: YOUR_API_KEY`)
    - Identifies which application is making the request
-   - Used for rate limiting and usage tracking
+   - Used for API Budget enforcement and usage tracking
 
 3. **Request body** with:
    - `grant_type=authorization_code`: Tells the server you are exchanging a code

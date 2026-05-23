@@ -14,7 +14,7 @@ A Go application for monitoring and aggregating data from multiple Enphase solar
 - [Usage](#usage)
 - [Output Format](#output-format)
 - [API Configuration](#api-configuration)
-- [Caching and Rate Limits](#caching-and-rate-limits)
+- [Caching and API Budget](#caching-and-api-budget)
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
 - [Documentation](#documentation)
@@ -32,14 +32,14 @@ A Go application for monitoring and aggregating data from multiple Enphase solar
 
 - **Multi-System Monitoring**: Query and combine metrics from multiple independent Enphase systems
 - **Comprehensive Metrics**: Track production, consumption, battery usage, grid import/export, and net energy flow
-- **Flexible Querying**: Query historical dates or monitor real-time with auto-refresh
+- **Flexible Querying**: Query past dates or monitor real-time with auto-refresh
 - **True-Up Year Report**: Query energy metrics across a full utility true-up year period (`--true-up`)
 - **Clean Display**: Formatted terminal output with customizable colors
 - **API Caching**: Automatic caching of API responses to reduce API calls and enable offline validation
 - **Color Customization**: Customize terminal colors using hex codes or ANSI escape codes
 - **Cloud API v4**: Uses Enphase Enlighten Cloud API v4 for reliable data access
 - **OAuth Support**: Full OAuth 2.0 support for developer plan authentication
-- **Test Mode**: Validation mode for testing against expected values without making API calls
+- **Validation Mode**: Validate metrics against expected values without making API calls (`--test` flag)
 
 ## Prerequisites
 
@@ -142,9 +142,9 @@ Each system requires:
 
 - `refresh_interval`: How often to query the API in continuous mode (default: 3600 seconds = 1 hour)
   - **⚠️ Important**: Only applies when running in continuous mode (with `--continuous` flag)
-  - **Recommended**: Use 3600 seconds (1 hour) to respect API rate limits
-  - **Rate Limit Consideration**: The API allows 10 requests per minute. With multiple systems, a low `refresh_interval` (e.g., 5 seconds) can quickly exceed this limit. For 2 systems that is 10 API calls per cycle (2 systems × 5 metrics). At `refresh_interval: 5`, that is 10 × 12 = 120 requests per minute, far above the limit.
-  - **Best Practice**: Use 3600 seconds (1 hour) or higher to stay well within rate limits
+  - **Recommended**: Use 3600 seconds (1 hour) to stay within the API Budget
+  - **API Budget Consideration**: The API Budget is 10 calls per minute. With multiple systems, a low `refresh_interval` (e.g., 5 seconds) can quickly exhaust it. For 2 systems that is 10 API calls per cycle (2 systems × 5 metrics). At `refresh_interval: 5`, that is 10 × 12 = 120 requests per minute, far above the budget.
+  - **Best Practice**: Use 3600 seconds (1 hour) or higher to stay well within the API Budget
 - `timezone`: Timezone for reporting and display (optional)
   - **Default**: Uses your OS system timezone, or US/Pacific if OS timezone is UTC
   - **Format**: IANA timezone identifier (e.g., `"US/Pacific"`, `"America/New_York"`, `"Europe/London"`)
@@ -213,7 +213,7 @@ This application uses the **Enphase Enlighten Cloud API v4** exclusively to fetc
 ### What the Cloud API Provides
 
 - **Direct Daily Values**: The API returns pre-calculated daily totals - no need for state files or cumulative meter tracking
-- **Historical Data**: Query any past date (not limited to today)
+- **Past Period Queries**: Query any past date (not limited to today)
 - **Real-time Updates**: Data is typically updated every 15 minutes
 - **Reliable Access**: Works from anywhere with internet (no local network required)
 - **Standardized Format**: Consistent JSON responses across all system types
@@ -222,15 +222,15 @@ This application uses the **Enphase Enlighten Cloud API v4** exclusively to fetc
 
 The Enphase Cloud API v4 has the following technical limits:
 
-- **Interval Endpoints Are Single-Day Only**: Interval-based endpoints (15-minute data) return exactly **one calendar day** of data per request — the API ignores the `end_at` parameter and always responds with `granularity=day`. Querying a full month via interval endpoints would require 28–31 separate calls, which would exceed the 10 calls/minute rate limit.
+- **Interval Data: Single-Day Only**: Interval Data endpoints (15-minute data) return exactly **one calendar day** of data per request — the API ignores the `end_at` parameter and always responds with `granularity=day`. Querying a full month via Interval Data endpoints would require 28–31 separate calls, which would exceed the API Budget (10 calls/minute).
   - The application automatically uses **daily aggregated `_lifetime` endpoints** for month/year queries
   - These endpoints return one value per calendar day and can span arbitrary date ranges in a single request
   - Example: Querying January 2026 (31 days) → **single API request** using `energy_lifetime` endpoint
-  - Single-day queries still use interval endpoints for better granularity (96 data points vs 1 per day)
+  - Single-day queries still use Interval Data endpoints for better granularity (96 data points vs 1 per day)
 - **Current Month/Year Data Coverage**: When querying the current (ongoing) month or year, data is reported through the **previous complete day** (yesterday). Today's partial data is excluded because the `_lifetime` endpoints only contain completed days. The query range displayed in the report reflects this — it ends at yesterday 11:59 PM, not the current time.
-- **Rate Limiting**: See [Rate Limits](#rate-limits) section below
+- **API Budget**: See [API Budget](#api-budget) section below
 
-### Rate Limits
+### API Budget
 
 The free developer plan has the following limits:
 - **10 requests per minute** per API key
@@ -257,7 +257,7 @@ Query today's data and exit:
 ./enphase-monitor
 ```
 
-Query a specific historical date:
+Query a Past Period:
 ```bash
 ./enphase-monitor --date 2026-01-15
 ```
@@ -272,7 +272,7 @@ Query an entire year:
 ./enphase-monitor --date 2025
 ```
 
-> **Note:** When querying a past date/period, the program automatically runs once since historical data doesn't change over time.
+> **Note:** When querying a Past Period, the program automatically runs once since Past Period data is immutable.
 
 ### True-Up Year Report
 
@@ -282,7 +282,7 @@ Calculate the energy balance for your utility true-up year. Provide the start da
 ./enphase-monitor --true-up 2025-01-15
 ```
 
-This covers the **True-Up Window**: full calendar months from the first day of the start month through the window end. The window end is `min(yesterday, start_month + 12 months − 1 day)` — for an in-progress cycle the end moves daily; for a closed historical cycle it is fixed at the last day of the 12-month period. For example, a `2025-01-15` start date covers January 2025 through December 31 2025 once that cycle closes.
+This covers the **True-Up Window**: full calendar months from the first day of the start month through the window end. The window end is `min(yesterday, start_month + 12 months − 1 day)` — for a Current Period the end moves daily; for a Past True-Up Period it is fixed at the last day of the 12-month period. For example, a `2025-01-15` start date covers January 2025 through December 31 2025 once the True-Up Period ends.
 
 **How the query works:**
 
@@ -299,7 +299,7 @@ Monitor with auto-refresh (uses `refresh_interval` from config):
 
 The application will query all systems at the configured `refresh_interval` (default: 3600 seconds = 1 hour) and display updated metrics.
 
-**Restrictions**: `--continuous` only applies to today's Day query. Month, Year, and past-date queries are silently downgraded to run once and exit, since historical data does not change.
+**Restrictions**: `--continuous` only applies to today's Day query. Month, Year, and Past Period queries are silently downgraded to run once and exit, since Past Period data is immutable.
 
 **Cache Mode recommendation**: Use the default Auto Cache Mode (no `--cache` or `--no-cache` flag). When the API Budget is temporarily exhausted at a refresh tick, Auto mode gracefully serves the most recent cached data. With `--no-cache`, budget exhaustion triggers a live call that is likely to 429; on a 429, the program falls back to cache if available (with a warning), or exits with an error if no cache exists.
 
@@ -319,10 +319,10 @@ Serves the report entirely from cache (no live API calls) and compares each metr
 - `--config <path>` - Path to configuration file (default: `config.yaml`)
 - `--continuous` - Run continuously with periodic refresh (default is run once and exit)
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
-- `--true-up <YYYY-MM-DD>` - Calculate true-up year energy report from this utility start date. Covers the 12-month True-Up Window (in-progress: through yesterday; closed cycle: through last day of 12-month window). Takes precedence over `--date`
+- `--true-up <YYYY-MM-DD>` - Calculate true-up year energy report from this utility start date. Covers the 12-month True-Up Window (Current Period: through yesterday; Past True-Up Period: through last day of 12-month window). Takes precedence over `--date`
 - `--oauth-setup` - Run OAuth setup wizard (one-time for developer plan)
-- `--test` - Test mode: use cache only, no live API calls, validate against expected values
-- `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429 rate limit)
+- `--test` - Validation Mode: use cache only, no live API calls, validate against expected values
+- `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429)
 - `--cache` - Serve report from cache only; print diagnostic listing missing endpoints if cache is incomplete
 - `--clear-cache` - Clear cached API responses for today's date only
 - `--clear-all-cache` - Clear all cached API responses (all dates)
@@ -371,24 +371,24 @@ The application displays:
 ---------------------------------------------------------
 
   [1] Right Subpanel (5525881)
-      Net Energy Flow:                19.3 kWh (import)
-      Energy Produced:                14.6 kWh
-      Energy Consumed:                32.1 kWh
-      Energy Imported:                23.1 kWh
-      Energy Exported:                 3.8 kWh
-      Charged to Battery:              8.5 kWh
-      Discharged from Battery:         6.8 kWh
-      Battery Charge Percentage:           63%
+      Net Energy Flow:                 19.3 kWh (import)
+      Energy Produced:                 14.6 kWh
+      Energy Consumed:                 32.1 kWh
+      Energy Imported:                 23.1 kWh
+      Energy Exported:                  3.8 kWh
+      Charged to Battery:               8.5 kWh
+      Discharged from Battery:          6.8 kWh
+      Battery State of Charge (SOC):    63%
 
   [2] Left Subpanel (5392556)
-      Net Energy Flow:                 0.2 kWh (export)
-      Energy Produced:                18.9 kWh
-      Energy Consumed:                16.4 kWh
-      Energy Imported:                 7.5 kWh
-      Energy Exported:                 7.6 kWh
-      Charged to Battery:              8.1 kWh
-      Discharged from Battery:         5.4 kWh
-      Battery Charge Percentage:           74%
+      Net Energy Flow:                  0.2 kWh (export)
+      Energy Produced:                 18.9 kWh
+      Energy Consumed:                 16.4 kWh
+      Energy Imported:                  7.5 kWh
+      Energy Exported:                  7.6 kWh
+      Charged to Battery:               8.1 kWh
+      Discharged from Battery:          5.4 kWh
+      Battery State of Charge (SOC):    74%
 
 =========================================================
 ```
@@ -441,7 +441,7 @@ The "True-Up Start" line shows the exact date you provided. The "Query Range" st
 ## Metrics Explained
 
 ### Combined Energy Report
-- **Energy Produced**: Total solar generation from all systems (kWh)
+- **Energy Produced**: Total solar Production from all systems (kWh)
 - **Energy Consumed**: Total household consumption from all systems (kWh)
 - **Energy Imported**: Total energy purchased from the grid across all systems (kWh)
 - **Energy Exported**: Total energy sold back to the grid across all systems (kWh)
@@ -452,13 +452,13 @@ The "True-Up Start" line shows the exact date you provided. The "Query Range" st
 
 ### Individual System Metrics (Standard Report)
 - **Net Energy Flow**: Net import/export for this system (kWh) with (import) or (export) suffix
-- **Energy Produced**: Solar generation for this system (kWh)
+- **Energy Produced**: Solar Production for this system (kWh)
 - **Energy Consumed**: Total consumption for this system (kWh)
 - **Energy Imported**: Energy purchased from utility for this system (kWh)
 - **Energy Exported**: Energy sold back to utility from this system (kWh)
-- **Charged to Battery**: Energy stored in batteries for this system (kWh). Shown only for today's live day report (omitted for historical or month/year queries).
+- **Charged to Battery**: Energy stored in batteries for this system (kWh). Shown only for today's live day report (omitted for Past Period day queries or month/year queries).
 - **Discharged from Battery**: Energy used from batteries for this system (kWh). Shown only for today's live day report.
-- **Battery Charge Percentage**: Current state of charge (SOC) of the battery system, displayed as a percentage (0-100%). This metric is shown per-system only (not aggregated) and **only for today's live day report** (i.e., running without `--date`). Historical day queries and all month/year/true-up queries omit battery metrics — SOC is a point-in-time reading that is not meaningful for past or multi-day periods.
+- **State of Charge (SOC)**: Current battery State of Charge, displayed as a percentage (0-100%). This metric is shown per-system only (not aggregated) and **only for today's live day report** (i.e., running without `--date`). Past Period day queries and all month/year/true-up queries omit battery metrics — SOC is a point-in-time reading that is not meaningful for past or multi-day periods.
 
 ### Individual System Metrics (True-Up Report)
 
@@ -509,7 +509,7 @@ colors:
 - Ensure the system IDs are strings (quoted in YAML)
 
 ### "rate limit exceeded (429)"
-- The API has a rate limit of 10 calls per minute
+- The API Budget is 10 calls per minute
 - The program will display how many seconds to wait before retrying
 - Consider increasing `refresh_interval` in your config
 - Use `--test` mode to validate against cached data without making API calls
@@ -520,37 +520,37 @@ colors:
 - The program automatically caps dates to the current time
 - Try querying a past date: `--date 2026-01-15`
 
-### No telemetry data returned
+### No Interval Data returned
 - Some data may not be available for very recent time periods (try querying yesterday's data)
 - Ensure your systems are actively reporting to Enlighten
 - Use `--cache` to check what data is available in the cache without making API calls
 
-## Caching and Rate Limits
+## Caching and API Budget
 
-### Rate Limits
+### API Budget
 
-The Enphase Enlighten Cloud API v4 enforces strict rate limits:
+The Enphase Enlighten Cloud API v4 enforces a strict API Budget:
 - **10 requests per minute** per API key
 - **1000 requests per month** total (free developer plan)
 
 **⚠️ Refresh Interval Recommendation**: 
 
-The `refresh_interval` setting controls how often the application queries the API in continuous mode. To respect rate limits:
+The `refresh_interval` setting controls how often the application queries the API in continuous mode. To stay within the API Budget:
 
 - **Recommended**: `refresh_interval: 3600` (1 hour)
-- **Why**: Each today's day query fetches 5 metrics per system (production, consumption, grid import, grid export, battery). With 2 systems that is exactly 10 requests per cycle — right at the limit. At 3600 seconds, that is ~10 requests per hour, well within limits. (Historical day or month/year queries omit battery and use 4 calls per system.)
+- **Why**: Each today's day query fetches 5 metrics per system (production, consumption, grid import, grid export, battery). With 2 systems that is exactly 10 requests per cycle — right at the limit. At 3600 seconds, that is ~10 requests per hour, well within limits. (Past Period day or month/year queries omit battery and use 4 calls per system.)
 - **Not Recommended**: Values below 60 seconds (e.g., `refresh_interval: 5`) can quickly exceed the 10 requests/minute limit, especially with multiple systems.
 - **Calculation**: If you have N systems, each today's day query makes N×5 requests. With 2 systems that is 10/cycle. At `refresh_interval: 5`, that is 10×12 = 120 requests per minute, far above the limit.
 
 ### Caching Strategy
 
-To respect these limits, the application combines disk caching with a sliding-window rate-limit counter and a live-first serving policy:
+To respect these limits, the application combines disk caching with a sliding-window API Budget counter and a live-first serving policy:
 
 - **Automatic Disk Caching**: All API responses are cached as JSON files in the `cache/` directory.
-- **Live-First for Current Periods, Cache-Only for Past Periods**:
+- **Live-First for Current Periods, Cached for Past Periods**:
   - **Past day / past month / past year / past true-up year** — always served from cache. The data is immutable; a live call would waste budget and return identical results.
-  - **Current periods** (today's day query, month-to-date, year-to-date, active true-up year) — a live API call is made whenever budget allows. Cache is the fallback only when the budget is exhausted.
-- **Sliding-Window Rate-Limit Counter**: Every live API response appends its timestamp to `cache/api_calls`. The available budget at any moment is `10 − count_of_timestamps_in_last_60s`. When budget reaches 0 the client falls back to cache (exact-URL match, then cross-endpoint same-system match at any age); if no cache exists, it short-circuits to the 429 "wait 60 seconds" message instead of issuing a guaranteed-failed call.
+  - **Current periods** (today's day query, month-to-date, year-to-date, Current Period true-up year) — a live API call is made whenever budget allows. Cache is the fallback only when the budget is exhausted.
+- **Sliding-Window API Budget Counter**: Every live API response appends its timestamp to `cache/api_calls`. The available budget at any moment is `10 − count_of_timestamps_in_last_60s`. When budget reaches 0 the client falls back to cache (exact-URL match, then cross-endpoint same-system match at any age); if no cache exists, it short-circuits to the 429 "wait 60 seconds" message instead of issuing a guaranteed-failed call.
 - **Default Refresh Interval**: 1 hour (3600 seconds) — queries each system once per hour in continuous mode.
 - **429 / 503 Fallback**: If the API returns a rate-limit or service-unavailable error, any cached data is served — first an exact-URL match, then any prior cache for the same endpoint and system regardless of age. If no cache exists at all, the program surfaces the error to the user.
 
@@ -571,11 +571,11 @@ Each cache file contains:
 - `body`: Raw API response body (JSON bytes)
 - `cached_at`: Timestamp when the response was cached (ISO 8601 format)
 - `queried_date`: The date that was queried (YYYY-MM-DD format), if applicable
-- `endpoint`: API endpoint (e.g. `telemetry/production_meter`, `energy_lifetime`), used for cross-date lookup when the rate-limit budget is exhausted
+- `endpoint`: API endpoint (e.g. `telemetry/production_meter`, `energy_lifetime`), used for cross-date lookup when the API Budget is exhausted
 - `system_id`: System ID from the request URL, paired with `endpoint` for the cross-date lookup
 
-**Rate-Limit Counter:**
-The cache directory also contains an `api_calls` file (no JSON extension) holding newline-separated RFC3339 timestamps of recent live API responses. Entries older than 60 seconds are pruned on each write. The remaining count is used to compute available rate-limit budget. The file is ignored by cache listing/clearing commands.
+**API Budget Counter:**
+The cache directory also contains an `api_calls` file (no JSON extension) holding newline-separated RFC3339 timestamps of recent live API responses. Entries older than 60 seconds are pruned on each write. The remaining count is used to compute the available API Budget. The file is ignored by cache listing/clearing commands.
 
 **Cache Key Generation:**
 - Cache keys are generated from normalized API URLs
@@ -590,7 +590,7 @@ The cache directory also contains an `api_calls` file (no JSON extension) holdin
 ### Cache Management Commands
 
 ```bash
-# Clear today's cache only (preserves historical data)
+# Clear today's cache only (preserves data for past dates)
 ./enphase-monitor --clear-cache
 
 # Clear all cached data
@@ -599,7 +599,7 @@ The cache directory also contains an `api_calls` file (no JSON extension) holdin
 # Disable caching (always make live API calls)
 ./enphase-monitor --no-cache
 
-# Test mode (use cache only, no live API calls)
+# Validation Mode (use cache only, no live API calls)
 ./enphase-monitor --test --date 2026-01-15
 ```
 
@@ -625,9 +625,9 @@ Sample output:
 [DEBUG] serving cache (budget exhausted, age 14m3s)
 ```
 
-Use it when you want to understand *why* a query returned cached vs live data, *when* the rate-limit window will reset, or *how much* of the 10 calls/60s budget remains. Debug mode also: prints a `CACHE MODE` banner when `--cache` is used; prints a `WARNING: Insufficient API budget` preflight message when the budget is low; and suppresses the screen-clearing escape sequence so the trace stays visible on subsequent runs.
+Use it when you want to understand *why* a query returned cached vs live data, *when* the API Budget window will reset, or *how much* of the 10 calls/60s budget remains. Debug mode also: prints a `CACHE MODE` banner when `--cache` is used; prints a `WARNING: Insufficient API budget` preflight message when the budget is low; and suppresses the screen-clearing escape sequence so the trace stays visible on subsequent runs.
 
-### Cache-Only Mode
+### Cached Mode
 
 The `--cache` flag serves a report entirely from on-disk cache without making any live API calls. If the cache is complete it runs the report; if any required endpoint is missing it prints a per-system diagnostic and exits non-zero:
 
@@ -657,13 +657,13 @@ To populate the cache, run:
 
 `✓` = cached (age shown), `✗` = required but missing, `-` = optional and missing.
 
-Use `--cache` when you want to verify what data is available locally before making API calls, or when you are offline and want to review historical data.
+Use `--cache` when you want to verify what data is available locally before making API calls, or when you are offline and want to review data for past dates.
 
 ### Best Practices
 
-1. **Use Default Refresh Interval**: Use 1 hour to stay well within rate limits
+1. **Use Default Refresh Interval**: Use 1 hour to stay well within the API Budget
 2. **Leverage Caching**: Query past dates frequently - they use cached data (no API calls)
-3. **Test Mode**: Use `--test` mode for validation against cached data without hitting API
+3. **Validation Mode**: Use `--test` flag for validation against cached data without hitting the API
 4. **Monitor Cache**: Use `--cache` to check what's available before querying
 
 ## Documentation
@@ -705,9 +705,9 @@ enphase-monitor/
 │   │   ├── cache_check.go                 # Per-system/endpoint cache availability check (--cache mode)
 │   │   ├── client_test.go                 # API client unit tests
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
-│   │   ├── client_lifetime_test.go        # Lifetime endpoint tests (month/year/true-up queries)
+│   │   ├── client_lifetime_test.go        # Lifetime Data endpoint tests (month/year/true-up queries)
 │   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 report types)
-│   │   ├── query_cost_test.go             # QueryCost unit tests (all query type × hasBattery combos)
+│   │   ├── query_cost_test.go             # QueryCost unit tests (all query mode × hasBattery combos)
 │   │   └── testmain_test.go               # TestMain: redirects cache I/O to temp dir for all api tests
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
@@ -721,7 +721,7 @@ enphase-monitor/
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                  # Cache state management tests
 │   │   ├── cache_functions_test.go        # Cache functionality tests
-│   │   ├── rate_limit_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
+│   │   ├── api_budget_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
@@ -756,7 +756,7 @@ enphase-monitor/
 │   ├── urlbuilder/                        # API URL construction
 │   │   ├── urlbuilder.go                  # URL building helpers
 │   │   └── urlbuilder_test.go             # URL builder tests
-│   └── validation/                        # Test mode validation
+│   └── validation/                        # Validation Mode (--test flag)
 │       ├── validation.go                  # Metrics validation logic (uses io.Writer for testability)
 │       ├── validation_test.go             # Unit tests (tolerance calculations, edge cases)
 │       └── validation_integration_test.go # Integration tests (real expected values)
@@ -782,7 +782,7 @@ enphase-monitor/
 
 ## Testing
 
-The project includes a comprehensive test suite with **80.1% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without hitting API rate limits.
+The project includes a comprehensive test suite with **80.1% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
 
 ### Test Coverage by Package
 
@@ -832,9 +832,9 @@ make lint
 
 CI is not yet configured. Run `make lint` and `go test ./...` locally before committing.
 
-### Test Mode (Cache Only)
+### Validation Mode
 
-Run in test mode using only cached responses (no live API calls):
+Run in Validation Mode using only cached responses (no live API calls):
 
 ```bash
 ./enphase-monitor --test --date 2026-01-20
@@ -869,7 +869,7 @@ To run validation, create the file:
 Example format:
   { "date": "2026-01-01", "systems": [...] }
 
-To skip validation and just use cache-only mode, omit the --test flag:
+To run without validation, omit the --test flag:
   ./enphase-monitor --date 2026-01-01
 ```
 
@@ -883,7 +883,7 @@ To skip validation and just use cache-only mode, omit the --test flag:
    ```
    This script will:
    - Check which test dates have cached responses
-   - Generate missing cache by making live API calls (waiting 60 seconds between calls to respect rate limits)
+   - Generate missing cache by making live API calls (waiting 60 seconds between calls to respect the API Budget)
    - Run validation tests for all dates (2026-01-14 through 2026-01-20)
    - Display a summary of all test results
 
@@ -895,12 +895,12 @@ To skip validation and just use cache-only mode, omit the --test flag:
 
 3. **Update `expected_values_YYYY-MM-DD.json`** with the correct values from the Enphase app
 
-4. **Now you can iterate rapidly using test mode** (uses cache only, no API calls):
+4. **Now you can iterate rapidly using Validation Mode** (uses cache only, no API calls):
    ```bash
    ./enphase-monitor --test --date 2026-01-20
    ```
 
-**Note:** Test mode uses the cache from `cache/`. The `scripts/run-tests.sh` script ensures all test dates have cached responses available.
+**Note:** Validation Mode uses the cache from `cache/`. The `scripts/run-tests.sh` script ensures all test dates have cached responses available.
 
 ### Expected Values Format
 
@@ -956,7 +956,7 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 ```
 
 **Key Performance Characteristics:**
-- **API Response Caching**: Reduces redundant API calls and respects rate limits
+- **API Response Caching**: Reduces redundant API calls and respects the API Budget
 - **Efficient JSON Parsing**: Optimized for 96 intervals/day (15-min intervals)
 - **Multi-System Aggregation**: Scales linearly with number of systems
 - **Minimal Dependencies**: Only 1 external library (gopkg.in/yaml.v3 for config); all HTTP and I/O uses the standard library

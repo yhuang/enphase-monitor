@@ -73,23 +73,23 @@ func NewDisplayWithWriter(colors config.ColorConfig, tz *time.Location, w io.Wri
 
 // ShowMetrics displays the aggregated metrics in a formatted output.
 func (d *Display) ShowMetrics(metrics *aggregator.AggregatedMetrics) {
-	d.printHeader(metrics.Timestamp, metrics.CacheUsed, metrics.QueryDate, metrics.QueryType)
+	d.printHeader(metrics.Timestamp, metrics.CacheUsed, metrics.QueryDate, metrics.QueryMode)
 	d.printTodayEnergy(metrics)
 	d.printIndividualSystems(metrics)
 	d.printSeparator()
 }
 
-func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate time.Time, queryType constants.QueryType) {
+func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate time.Time, queryMode constants.QueryMode) {
 	fmt.Fprintln(d.writer, "\n  "+d.colors.Headers+d.separatorLine+constants.Reset)
 	fmt.Fprintf(d.writer, "    %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
 
-	// Calculate date range based on query type (day/month/year).
+	// Calculate date range based on query mode (day/month/year).
 	// For ongoing month/year periods, cap the display end to yesterday (last complete day)
-	// to match the lifetime endpoint data coverage — today's partial day is not included.
-	periodStart, periodEnd := timezone.GetBoundaries(queryDate, queryType, d.timezone)
-	if (queryType == constants.QueryTypeMonth || queryType == constants.QueryTypeYear) &&
-		!timezone.IsPastPeriod(queryDate, queryType, d.timezone) {
+	// to match Lifetime Data coverage — today's partial day is not included.
+	periodStart, periodEnd := timezone.GetBoundaries(queryDate, queryMode, d.timezone)
+	if (queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear) &&
+		!timezone.IsPastPeriod(queryDate, queryMode, d.timezone) {
 		yesterday := time.Now().In(d.timezone).AddDate(0, 0, -1)
 		periodEnd = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, d.timezone)
 	}
@@ -140,13 +140,13 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 			prefix, d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
-		// labelWidth anchors on the longest visible label + 5-space gap:
-		// today's report shows "Battery Charge Percentage:" (26 chars) → 31
-		// all other reports show "Energy Exported:" (16 chars) → 21
-		showBattery := metrics.QueryType == constants.QueryTypeDay && metrics.QueryDate.IsZero()
-		lw := 21
+		// labelWidth anchors on the longest visible label + 7-space gap:
+		// today's report shows "Discharged from Battery:" (24 chars) → 33
+		// all other reports show "Energy Exported:" (16 chars) → 23
+		showBattery := metrics.QueryMode == constants.QueryModeDay && metrics.QueryDate.IsZero()
+		lw := 23
 		if showBattery {
-			lw = 31
+			lw = 33
 		}
 		d.printNetFlow("Net Energy Flow", sys.NetFlowToday, "        ", lw, true, "", "")
 		d.printMetric("Energy Produced", sys.ProductionToday, d.colors.Production, "        ", lw, true)
@@ -156,7 +156,7 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		if showBattery {
 			d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", lw, true)
 			d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "        ", lw, true)
-			fmt.Fprintf(d.writer, "        %sBattery Charge Percentage:%s     %s%d%%%s\n",
+			fmt.Fprintf(d.writer, "        %sBattery State of Charge (SOC):%s   %s%d%%%s\n",
 				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		}
 	}
@@ -215,7 +215,7 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 
 	if highlightBg != "" {
 		bg := highlightBg
-		r := constants.Reset + bg  // reset fg then re-apply bg so it persists across color changes
+		r := constants.Reset + bg // reset fg then re-apply bg so it persists across color changes
 
 		// Separate leading spaces from visible label text so the background starts
 		// exactly one space before the first character and ends one space after the last.
@@ -297,11 +297,11 @@ func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, sys.Name, constants.Reset,
 			d.colors.SecondaryText, sys.ID, constants.Reset)
-		d.printNetFlow("Net Energy Flow", sys.NetFlow, "        ", 21, true, "", "")
-		d.printMetric("Energy Produced", sys.Production, d.colors.Production, "        ", 21, true)
-		d.printMetric("Energy Consumed", sys.Consumption, d.colors.TotalConsumed, "        ", 21, true)
-		d.printMetric("Energy Imported", sys.GridImport, d.colors.Import, "        ", 21, true)
-		d.printMetric("Energy Exported", sys.GridExport, d.colors.Export, "        ", 21, true)
+		d.printNetFlow("Net Energy Flow", sys.NetFlow, "      ", 21, true, "", "")
+		d.printMetric("Energy Produced", sys.Production, d.colors.Production, "      ", 21, true)
+		d.printMetric("Energy Consumed", sys.Consumption, d.colors.TotalConsumed, "      ", 21, true)
+		d.printMetric("Energy Imported", sys.GridImport, d.colors.Import, "      ", 21, true)
+		d.printMetric("Energy Exported", sys.GridExport, d.colors.Export, "      ", 21, true)
 	}
 }
 

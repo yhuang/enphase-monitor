@@ -1,5 +1,5 @@
-// trueup.go implements the --true-up query mode, which fetches energy metrics
-// for a full true-up year period in a single API batch using the lifetime endpoints.
+// trueup.go implements True-Up Mode (--true-up flag), which fetches energy metrics
+// for a full true-up year period in a single API batch using Lifetime Data endpoints.
 package app
 
 import (
@@ -30,7 +30,7 @@ func RunTrueUp(ctx context.Context, rc RunConfig, trueUpStartStr string) error {
 	endDate := time.Date(endDay.Year(), endDay.Month(), endDay.Day(), 23, 59, 59, 0, rc.ReportTZ)
 
 	aggSystems, aggAPIConfig := GetAggregatorTypes(rc.Cfg)
-	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, trueUpStart, constants.QueryTypeTrueUp, rc.ReportTZ)
+	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, trueUpStart, constants.QueryModeTrueUp, rc.ReportTZ)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil
@@ -47,8 +47,8 @@ func RunTrueUp(ctx context.Context, rc RunConfig, trueUpStartStr string) error {
 }
 
 // trueUpWindowEnd returns the last day of a True-Up Window.
-// For in-progress cycles (cycle end is still in the future), this is yesterday.
-// For closed historical cycles, this is the last day of the 12-month window.
+// For Current Periods (cycle end is still in the future), this is yesterday.
+// For Past True-Up Periods, this is the last day of the 12-month window.
 func trueUpWindowEnd(trueUpStart, now time.Time) time.Time {
 	cycleEnd := trueUpStart.AddDate(1, 0, 0).AddDate(0, 0, -1)
 	yesterday := now.AddDate(0, 0, -1)

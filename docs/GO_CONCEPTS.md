@@ -329,10 +329,10 @@ func ParseTestDate(dateStr string, reportTZ *time.Location) (ParseDateInput, err
     if dateStr == "" {
         return ParseDateInput{
             Date:      time.Time{},  // Returns zero value
-            QueryType: constants.QueryTypeDay,
+            QueryMode: constants.QueryModeDay,
         }, nil
     }
-    // ... parse and return non-zero time with query type
+    // ... parse and return non-zero time with query mode
 }
 ```
 
@@ -1010,10 +1010,10 @@ var rateLimitErrors []string
 
 **Location**: `internal/aggregator/aggregator.go:115`
 
-Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for rate limiting).
+Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for API Budget tracking).
 
 ```go
-localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryType)
+localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryMode)
 ```
 
 ---
@@ -1042,12 +1042,11 @@ internal/
 │   ├── setup.go                 # Configuration and initialization
 │   ├── runner.go                # Execution modes (once/continuous)
 │   ├── trueup.go                # True-up year report
-│   ├── cache_report.go          # --cache mode: completeness check and cache-only run
+│   ├── cache_report.go          # --cache mode: completeness check and cached run
 │   └── *_test.go                # Setup, runner, and true-up tests
 ├── cache/                       # Disk-based API response caching
 │   ├── cache.go                 # Core caching logic
 │   ├── cli.go                   # Cache inspection utilities
-│   ├── backup.go                # Cache backup and restore (--cache-backup, --cache-restore)
 │   └── *_test.go                # Cache and CLI tests
 ├── cli/                         # Command-line interface
 │   ├── flags.go                 # Flag parsing
@@ -1067,7 +1066,7 @@ internal/
 │   ├── setup.go                 # Interactive setup wizard
 │   └── *_test.go                # Unit, functional, and edge case tests
 ├── parser/                      # JSON response parsing
-│   ├── parser.go                # Telemetry data parsing
+│   ├── parser.go                # API response data parsing
 │   └── *_test.go                # Parser tests and benchmarks
 ├── timezone/                    # Timezone handling
 │   ├── timezone.go              # Day boundaries calculation
@@ -1077,7 +1076,7 @@ internal/
 ├── urlbuilder/                  # API URL construction
 │   ├── urlbuilder.go            # URL building utilities
 │   └── urlbuilder_test.go       # URL builder tests
-└── validation/                  # Test mode validation
+└── validation/                  # Validation Mode
     ├── validation.go            # Metrics comparison (uses io.Writer for testability)
     └── *_test.go                # Unit and integration tests
 ```
@@ -1134,7 +1133,7 @@ func (c *Client) GetMetrics() (*LocalMetrics, error) {
 
 // interface.go - Contains interface definitions
 type CloudClient interface {
-    GetMetricsFromCloud(ctx context.Context, date time.Time, queryType constants.QueryType) (*LocalMetrics, bool, error)
+    GetMetricsFromCloud(ctx context.Context, date time.Time, queryMode constants.QueryMode) (*LocalMetrics, bool, error)
 }
 ```
 

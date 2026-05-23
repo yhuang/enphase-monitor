@@ -60,22 +60,22 @@ func (e *testError) Error() string {
 	return e.msg
 }
 
-// TestQueryTypeString tests the String() method on QueryType.
-func TestQueryTypeString(t *testing.T) {
+// TestQueryModeString tests the String() method on QueryMode.
+func TestQueryModeString(t *testing.T) {
 	tests := []struct {
-		qt   QueryType
+		qt   QueryMode
 		want string
 	}{
-		{QueryTypeDay, "day"},
-		{QueryTypeMonth, "month"},
-		{QueryTypeYear, "year"},
-		{QueryTypeTrueUp, "true-up"},
-		{QueryType(99), "day"}, // unknown falls through to default
+		{QueryModeDay, "day"},
+		{QueryModeMonth, "month"},
+		{QueryModeYear, "year"},
+		{QueryModeTrueUp, "true-up"},
+		{QueryMode(99), "day"}, // unknown falls through to default
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			if got := tt.qt.String(); got != tt.want {
-				t.Errorf("QueryType(%d).String() = %q, want %q", tt.qt, got, tt.want)
+				t.Errorf("QueryMode(%d).String() = %q, want %q", tt.qt, got, tt.want)
 			}
 		})
 	}

@@ -38,8 +38,8 @@ func (s SystemCacheStatus) AllRequiredPresent() bool {
 // is available in the on-disk cache. No network requests are made.
 //
 // The URLs it builds are identical to those GetMetricsFromCloud would request, so
-// a hit here guarantees that running in test mode will succeed without API calls.
-func CheckCacheForSystem(systemID, systemName, apiKey string, testDate time.Time, queryType constants.QueryType, tz *time.Location) SystemCacheStatus {
+// a hit here guarantees that running in Validation Mode will succeed without API calls.
+func CheckCacheForSystem(systemID, systemName, apiKey string, testDate time.Time, queryMode constants.QueryMode, tz *time.Location) SystemCacheStatus {
 	status := SystemCacheStatus{
 		SystemID:   systemID,
 		SystemName: systemName,
@@ -54,8 +54,8 @@ func CheckCacheForSystem(systemID, systemName, apiKey string, testDate time.Time
 	base := constants.EnphaseAPIv4SystemsURL
 	var eps []ep
 
-	if queryType == constants.QueryTypeDay {
-		periodStart, periodEnd := timezone.GetBoundaries(testDate, queryType, tz)
+	if queryMode == constants.QueryModeDay {
+		periodStart, periodEnd := timezone.GetBoundaries(testDate, queryMode, tz)
 		build := func(name string, required bool) ep {
 			return ep{
 				name:     name,
@@ -71,8 +71,8 @@ func CheckCacheForSystem(systemID, systemName, apiKey string, testDate time.Time
 			build("telemetry/battery", false),
 		}
 	} else {
-		// month / year / true-up → lifetime endpoints
-		periodStart, _ := timezone.GetBoundaries(testDate, queryType, tz)
+		// month / year / true-up → Lifetime Data endpoints
+		periodStart, _ := timezone.GetBoundaries(testDate, queryMode, tz)
 		startDate := periodStart.Format(constants.DateFormat)
 		build := func(name string, required bool) ep {
 			return ep{
@@ -87,7 +87,7 @@ func CheckCacheForSystem(systemID, systemName, apiKey string, testDate time.Time
 			build("energy_lifetime", true),
 			build("consumption_lifetime", true),
 			// battery_lifetime is NOT used: battery data is only fetched for today's
-			// live day query via the interval endpoint; month/year/true-up queries
+			// live day query via the Interval Data endpoint; month/year/true-up queries
 			// skip battery entirely.
 		}
 	}
