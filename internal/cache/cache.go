@@ -6,15 +6,15 @@
 // Cache files are stored in cache/ with SHA256 hashed filenames.
 //
 // For details on the caching strategy and rate limiting, see:
-//   - ARCHITECTURE.md: "Intelligent Caching" section
-//   - README.md: "Caching and Rate Limits" section
+//   - docs/ARCHITECTURE.md: "API Budget Checks" section
+//   - README.md: "Caching and API Budget" section
 //
 // KEY FEATURES
 // ------------
 // The caching system:
 //   - Stores API responses on disk for reuse
-//   - Supports Validation Mode (--test flag)
-//   - Provides cache inspection and management tools (--cache mode)
+//   - Supports Validation Mode (--test flag) and Cached Mode (--cache flag)
+//   - Exposes inspection and clear-cache helpers (cli.go) used by --clear-cache and --clear-all-cache
 //   - Handles past date queries with cache fallback
 //   - Normalizes URLs for consistent cache keys (timestamps → dates)
 //   - Tags each cache entry with its endpoint + system ID so the API client can

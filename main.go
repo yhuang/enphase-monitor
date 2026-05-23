@@ -37,6 +37,7 @@
 //	- setup.go: Application initialization, OAuth adapter, display setup, mode configuration
 //	- runner.go: Execution modes (once/continuous), metric fetching and display
 //	- trueup.go: True-Up Mode report via single-batch Lifetime Data query and report conversion
+//	- cache_report.go: --cache mode — checks per-System endpoint coverage and runs a fully-cached report
 //
 //	CLI Layer (internal/cli):
 //	- flags.go: Command-line flag parsing and definitions
@@ -56,12 +57,13 @@
 //	- interface.go: API client interfaces
 //
 //	Supporting Services:
-//	- internal/cache: Disk-based response caching with URL normalization
+//	- internal/cache: Disk-based response caching with URL normalization and the sliding-window API Budget counter
 //	- internal/config: YAML configuration loading, validation, color conversion
-//	- internal/constants: Application-wide constants (ANSI codes, error messages, etc.)
+//	- internal/constants: Application-wide constants (ANSI codes, error messages, QueryMode enum, etc.)
 //	- internal/display: Terminal output formatting with customizable colors
-//	- internal/parser: JSON telemetry response parsing
-//	- internal/timezone: Timezone handling and date boundary calculations
+//	- internal/parser: JSON telemetry response parsing (Interval Data and Lifetime Data shapes)
+//	- internal/timezone: Timezone handling, Past Period detection, and date boundary calculations
+//	- internal/types: Shared type definitions (SystemConfig, APIConfig) that break circular dependencies
 //	- internal/urlbuilder: API URL construction with proper date ranges
 //	- internal/validation: Validation Mode (--test flag) with tolerance-based comparison
 //
@@ -74,19 +76,21 @@
 //  5. Create DataAggregator with OAuth adapter from internal/app
 //  6. Setup display with colors from internal/app
 //  7. Configure modes (Validation Mode, Cache Mode) via internal/app
-//  8. If --true-up: call app.RunTrueUp (single-batch lifetime query, no battery) and exit.
-//     Otherwise, run the standard execution mode:
-//     - For each system in config:
-//     a. Get OAuth access token via internal/oauth (cached or refreshed)
-//     b. Create API client via internal/api for the system
-//     c. Fetch metrics via Cloud API (with caching from internal/cache)
-//     - Aggregate metrics via internal/aggregator
-//     - Validate if in Validation Mode via internal/validation
-//     - Display formatted report via internal/display
+//  8. Dispatch to one of three run paths and exit:
+//     a. If --cache: call app.RunCacheReport (cache-only run; lists missing endpoints if incomplete) and exit.
+//     b. Else if --true-up: call app.RunTrueUp (single-batch lifetime query, no battery) and exit.
+//     c. Otherwise, run the standard execution mode:
+//        - For each system in config:
+//          i.   Get OAuth access token via internal/oauth (cached or refreshed)
+//          ii.  Create API client via internal/api for the system
+//          iii. Fetch metrics via Cloud API (with caching from internal/cache)
+//        - Aggregate metrics via internal/aggregator
+//        - Validate if in Validation Mode via internal/validation
+//        - Display formatted report via internal/display
 //
-// For continuous mode, step 8 repeats at the configured refresh interval.
-// Note: If a past date is supplied via --date, the program automatically runs once
-// since Past Period data is immutable.
+// For continuous mode, step 8c repeats at the configured refresh interval. Continuous mode
+// is restricted to today's Day Mode query — Month, Year, Past Period, and True-Up Mode
+// queries are silently downgraded to run once and exit.
 package main
 
 import (

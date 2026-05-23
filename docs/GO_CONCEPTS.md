@@ -579,7 +579,7 @@ When running in continuous mode, the program needs to:
 #### Step 1 & 2: Create Context with Signal Handling
 
 ```go
-// main.go:165-166
+// main.go:169-170
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
 ```
