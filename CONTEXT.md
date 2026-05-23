@@ -122,7 +122,7 @@ Energy stored into a System's batteries. Code identifier: `BatteryCharged`.
 Energy drawn from a System's batteries. Code identifier: `BatteryDischarged`.
 
 **State of Charge (SOC)**:
-The battery charge level of a System, expressed as a percentage (0–100). Only available for Day Mode queries on the current day. Code identifier: `BatterySOC`.
+The battery charge level of a System, expressed as a percentage (0–100). Only available for today's live Day Mode query — the exact gate in `internal/api/client.go` is `queryMode == QueryModeDay && testDate.IsZero()`, so an explicit `--date <today>` does *not* fetch SOC (testDate is non-zero). Code identifier: `BatterySOC`.
 _Avoid_: Battery percentage, battery level, charge percentage
 
 **Net Flow**:

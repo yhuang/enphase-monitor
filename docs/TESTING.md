@@ -27,7 +27,7 @@ The project follows a pragmatic approach to testing:
 | display | 99.2% | ✅ Near-full - output formatting |
 | validation | 95.5% | ✅ Near-full - metrics validation |
 | parser | 94.8% | ✅ Near-full - JSON parsing |
-| config | 92.8% | ✅ Near-full - YAML parsing |
+| config | 83.1% | ✅ High - YAML parsing |
 | timezone | 92.0% | ✅ High - timezone handling |
 | cli | 90.5% | ✅ High - CLI interface |
 | aggregator | 78.3% | ✅ Adequate - data aggregation |
@@ -665,6 +665,7 @@ These files test individual functions and methods in isolation. Per-package cove
 | `flags_test.go` | `flags.go` | CLI flag parsing and defaults |
 | `cache_commands_test.go` | `cache_commands.go` | Cache management command handlers (clear today, clear all) |
 | `runner_test.go` | `runner.go` | Execution modes (once/continuous), fetchAndDisplay |
+| `setup_test.go` | `setup.go` | `FormatDateForQueryMode`, `CreateOAuthAdapter`, `SetupDisplay`, `ParseTestDate`, `ConfigureModes`, `ValidateValidationModeCache`, `GetAggregatorTypes`, plus `RunOnce` context-cancellation guard |
 | `trueup_test.go` | `trueup.go` | `buildTrueUpReport` field mapping, net flow, per-system entries |
 | `aggregator_test.go` | `aggregator.go` | Multi-system aggregation with mock clients |
 

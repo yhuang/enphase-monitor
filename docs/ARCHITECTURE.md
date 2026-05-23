@@ -93,7 +93,7 @@ enphase-monitor/
 │   ├── config/                            # Configuration types
 │   │   ├── config.go                      # YAML loading & validation (uses type aliases)
 │   │   └── config_test.go                 # Configuration tests
-│   ├── constants/                         # Centralized constants (45+)
+│   ├── constants/                         # Centralized constants
 │   │   ├── constants.go                   # Application-wide constants
 │   │   └── constants_test.go              # Constants tests
 │   ├── display/                           # Terminal output formatting
@@ -681,7 +681,7 @@ when possible to improve testability.
 | [internal/config/*](../internal/config/)             | Configuration types and utilities                 |
 | [internal/timezone/*](../internal/timezone/)         | Timezone handling and date boundaries             |
 | [internal/validation/*](../internal/validation/)     | Validation Mode with tolerance-based checks       |
-| [internal/constants/*](../internal/constants/)       | Centralized constants (45+ constants)             |
+| [internal/constants/*](../internal/constants/)       | Centralized constants                             |
 
 ### Internal Packages - Shared Types
 

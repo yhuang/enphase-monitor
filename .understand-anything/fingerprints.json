@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "e14de2d665e8acbff86385a6876c2572e3e9b4e1",
-  "generatedAt": "2026-05-23T03:08:21.919Z",
+  "gitCommitHash": "e447f94996b4c5a70e17d5230b93df1f9361e768",
+  "generatedAt": "2026-05-23T08:32:31.837Z",
   "files": {
     ".golangci.yml": {
       "filePath": ".golangci.yml",
@@ -15,12 +15,12 @@
     },
     "CONTEXT.md": {
       "filePath": "CONTEXT.md",
-      "contentHash": "bf70d262895b0b3c5b3c55036ff58d17e6705f80b1dbd989d34a5b2e7bd59abe",
+      "contentHash": "f7fef90225f305b2b6977c3a35d34d60eea97c50c20ac3acd3c835ff58204e92",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 145,
+      "totalLines": 147,
       "hasStructuralAnalysis": true
     },
     "Makefile": {
@@ -35,7 +35,7 @@
     },
     "QUICKSTART.md": {
       "filePath": "QUICKSTART.md",
-      "contentHash": "83355beafe514e688e0fbc4e0d26c32c39960577eaaa67a1da2b6189ce5c2b53",
+      "contentHash": "e19c6e49ea0812f4fbecd884535857a54b4ab0f926d12aaba701d43447210f08",
       "functions": [],
       "classes": [],
       "imports": [],
@@ -45,22 +45,22 @@
     },
     "README.md": {
       "filePath": "README.md",
-      "contentHash": "199ad180fc370f9784dde2b69be99b47612bcc133afbb11bc2bff48cabfa3852",
+      "contentHash": "01814d1455a94469783cf8f4237e1ea958bef8f8a6f30542d2bb57fc936cdf3d",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 987,
+      "totalLines": 998,
       "hasStructuralAnalysis": true
     },
     "config.yaml.example": {
       "filePath": "config.yaml.example",
-      "contentHash": "bfaddbcb17307258982c4e9f3fcc084ed047d854c389623ccbdb00ba09160e9f",
+      "contentHash": "5a3ffe7fff99282776337b78fb7ba72189610605dc2c455bb3dbad7eb1a5810b",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 49,
+      "totalLines": 51,
       "hasStructuralAnalysis": false
     },
     "go.mod": {
@@ -82,6 +82,1942 @@
       "exports": [],
       "totalLines": 5,
       "hasStructuralAnalysis": false
+    },
+    "internal/aggregator/aggregator.go": {
+      "filePath": "internal/aggregator/aggregator.go",
+      "contentHash": "415f9e1b0a64ebea9acef9d3de845c587d6639de3c181fb7a51554cd72b01441",
+      "functions": [
+        {
+          "name": "defaultCloudClientFactory",
+          "params": [
+            "systemID",
+            "systemName",
+            "apiKey",
+            "accessToken",
+            "tz"
+          ],
+          "returnType": "api.CloudClient",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "NewDataAggregator",
+          "params": [
+            "getAccessToken"
+          ],
+          "returnType": "*DataAggregator",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "NewDataAggregatorWithFactory",
+          "params": [
+            "getAccessToken",
+            "factory"
+          ],
+          "returnType": "*DataAggregator",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "GetAggregatedMetrics",
+          "params": [
+            "ctx",
+            "systems",
+            "apiConfig",
+            "testDate",
+            "queryMode",
+            "reportTimezone"
+          ],
+          "returnType": "(*AggregatedMetrics, error)",
+          "exported": true,
+          "lineCount": 99
+        }
+      ],
+      "classes": [
+        {
+          "name": "DataAggregator",
+          "methods": [
+            "GetAggregatedMetrics"
+          ],
+          "properties": [
+            "getAccessToken",
+            "createCloudClient"
+          ],
+          "exported": true,
+          "lineCount": 4
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/api",
+          "specifiers": [
+            "api"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/types",
+          "specifiers": [
+            "types"
+          ]
+        }
+      ],
+      "exports": [
+        "DataAggregator",
+        "NewDataAggregator",
+        "NewDataAggregatorWithFactory",
+        "GetAggregatedMetrics"
+      ],
+      "totalLines": 179,
+      "hasStructuralAnalysis": true
+    },
+    "internal/aggregator/aggregator_bench_test.go": {
+      "filePath": "internal/aggregator/aggregator_bench_test.go",
+      "contentHash": "b15c28972845e58d9fde66711c5b9b0c6f66b0b9757e00201cc019bfbef61857",
+      "functions": [
+        {
+          "name": "GetMetricsFromCloud",
+          "params": [
+            "ctx",
+            "date",
+            "queryMode"
+          ],
+          "returnType": "(*api.LocalMetrics, bool, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "GetEnergyImportForDate",
+          "params": [
+            "ctx",
+            "date",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "GetEnergyExportForDate",
+          "params": [
+            "ctx",
+            "date",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "GetProductionForDate",
+          "params": [
+            "ctx",
+            "date",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "GetConsumptionForDate",
+          "params": [
+            "ctx",
+            "date",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "GetBatteryDataForDate",
+          "params": [
+            "ctx",
+            "date",
+            "queryMode"
+          ],
+          "returnType": "(float64, float64, int, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "BenchmarkGetAggregatedMetrics_SingleSystem",
+          "params": [
+            "b"
+          ],
+          "exported": true,
+          "lineCount": 63
+        },
+        {
+          "name": "BenchmarkGetAggregatedMetrics_MultiSystem",
+          "params": [
+            "b"
+          ],
+          "exported": true,
+          "lineCount": 45
+        },
+        {
+          "name": "BenchmarkNetFlowCalculation",
+          "params": [
+            "b"
+          ],
+          "exported": true,
+          "lineCount": 11
+        }
+      ],
+      "classes": [
+        {
+          "name": "mockCloudClientBench",
+          "methods": [
+            "GetMetricsFromCloud",
+            "GetEnergyImportForDate",
+            "GetEnergyExportForDate",
+            "GetProductionForDate",
+            "GetConsumptionForDate",
+            "GetBatteryDataForDate"
+          ],
+          "properties": [
+            "metrics"
+          ],
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/api",
+          "specifiers": [
+            "api"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/types",
+          "specifiers": [
+            "types"
+          ]
+        }
+      ],
+      "exports": [
+        "GetMetricsFromCloud",
+        "GetEnergyImportForDate",
+        "GetEnergyExportForDate",
+        "GetProductionForDate",
+        "GetConsumptionForDate",
+        "GetBatteryDataForDate",
+        "BenchmarkGetAggregatedMetrics_SingleSystem",
+        "BenchmarkGetAggregatedMetrics_MultiSystem",
+        "BenchmarkNetFlowCalculation"
+      ],
+      "totalLines": 308,
+      "hasStructuralAnalysis": true
+    },
+    "internal/aggregator/aggregator_test.go": {
+      "filePath": "internal/aggregator/aggregator_test.go",
+      "contentHash": "9ffc037e104e5cc0ee1a21c412a7eeac5e629b27485d326f9f2faa06e5651799",
+      "functions": [
+        {
+          "name": "mustLoadLocation",
+          "params": [
+            "t",
+            "name"
+          ],
+          "returnType": "*time.Location",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "GetMetricsFromCloud",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(*api.LocalMetrics, bool, error)",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "GetEnergyImportForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "GetEnergyExportForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "GetProductionForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "GetConsumptionForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "GetBatteryDataForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(charged float64, discharged float64, soc int, err error)",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "TestNewDataAggregator",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "TestNewDataAggregatorWithFactory",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "TestGetAggregatedMetrics_SingleSystem",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 50
+        },
+        {
+          "name": "TestGetAggregatedMetrics_MultipleSystems",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 88
+        },
+        {
+          "name": "TestGetAggregatedMetrics_MissingAPIConfig",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "TestGetAggregatedMetrics_MissingAPIKey",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "TestGetAggregatedMetrics_TokenError",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "TestGetAggregatedMetrics_ContextCancellation",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 21
+        }
+      ],
+      "classes": [
+        {
+          "name": "MockCloudClient",
+          "methods": [
+            "GetMetricsFromCloud",
+            "GetEnergyImportForDate",
+            "GetEnergyExportForDate",
+            "GetProductionForDate",
+            "GetConsumptionForDate",
+            "GetBatteryDataForDate"
+          ],
+          "properties": [
+            "Metrics",
+            "CacheUsed",
+            "Err"
+          ],
+          "exported": true,
+          "lineCount": 5
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/api",
+          "specifiers": [
+            "api"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "MockCloudClient",
+        "GetMetricsFromCloud",
+        "GetEnergyImportForDate",
+        "GetEnergyExportForDate",
+        "GetProductionForDate",
+        "GetConsumptionForDate",
+        "GetBatteryDataForDate",
+        "TestNewDataAggregator",
+        "TestNewDataAggregatorWithFactory",
+        "TestGetAggregatedMetrics_SingleSystem",
+        "TestGetAggregatedMetrics_MultipleSystems",
+        "TestGetAggregatedMetrics_MissingAPIConfig",
+        "TestGetAggregatedMetrics_MissingAPIKey",
+        "TestGetAggregatedMetrics_TokenError",
+        "TestGetAggregatedMetrics_ContextCancellation"
+      ],
+      "totalLines": 385,
+      "hasStructuralAnalysis": true
+    },
+    "internal/aggregator/types.go": {
+      "filePath": "internal/aggregator/types.go",
+      "contentHash": "4a3f4edeb252be0168db894f1e6dd5256fcc5ce4afe2a4cae75e8f7c1bb24dcd",
+      "functions": [],
+      "classes": [
+        {
+          "name": "AggregatedMetrics",
+          "methods": [],
+          "properties": [
+            "Timestamp",
+            "QueryDate",
+            "QueryMode",
+            "ProductionToday",
+            "ConsumptionToday",
+            "GridImportToday",
+            "GridExportToday",
+            "NetFlowToday",
+            "Systems",
+            "CacheUsed",
+            "AllFromCache"
+          ],
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "TrueUpReport",
+          "methods": [],
+          "properties": [
+            "StartDate",
+            "EndDate",
+            "Timestamp",
+            "CacheUsed",
+            "GridImport",
+            "GridExport",
+            "Production",
+            "Consumption",
+            "NetFlow",
+            "Systems"
+          ],
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "TrueUpSystemReport",
+          "methods": [],
+          "properties": [
+            "Name",
+            "ID",
+            "GridImport",
+            "GridExport",
+            "Production",
+            "Consumption",
+            "NetFlow"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "SystemMetrics",
+          "methods": [],
+          "properties": [
+            "Name",
+            "ID",
+            "ProductionToday",
+            "ConsumptionToday",
+            "BatterySOC",
+            "GridImportToday",
+            "GridExportToday",
+            "BatteryChargedToday",
+            "BatteryDischargedToday",
+            "NetFlowToday"
+          ],
+          "exported": true,
+          "lineCount": 16
+        }
+      ],
+      "imports": [
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "AggregatedMetrics",
+        "TrueUpReport",
+        "TrueUpSystemReport",
+        "SystemMetrics"
+      ],
+      "totalLines": 74,
+      "hasStructuralAnalysis": true
+    },
+    "internal/api/cache_check.go": {
+      "filePath": "internal/api/cache_check.go",
+      "contentHash": "6d83f411f0bee015a1ae537ae27220260b9be9ca05fd9a8324e83f67f2777033",
+      "functions": [
+        {
+          "name": "AllRequiredPresent",
+          "params": [],
+          "returnType": "bool",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "CheckCacheForSystem",
+          "params": [
+            "systemID",
+            "systemName",
+            "apiKey",
+            "testDate",
+            "queryMode",
+            "tz"
+          ],
+          "returnType": "SystemCacheStatus",
+          "exported": true,
+          "lineCount": 73
+        }
+      ],
+      "classes": [
+        {
+          "name": "EndpointStatus",
+          "methods": [],
+          "properties": [
+            "Endpoint",
+            "Present",
+            "Age",
+            "Required"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "SystemCacheStatus",
+          "methods": [
+            "AllRequiredPresent"
+          ],
+          "properties": [
+            "SystemID",
+            "SystemName",
+            "Endpoints"
+          ],
+          "exported": true,
+          "lineCount": 5
+        }
+      ],
+      "imports": [
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/timezone",
+          "specifiers": [
+            "timezone"
+          ]
+        }
+      ],
+      "exports": [
+        "EndpointStatus",
+        "SystemCacheStatus",
+        "AllRequiredPresent",
+        "CheckCacheForSystem"
+      ],
+      "totalLines": 115,
+      "hasStructuralAnalysis": true
+    },
+    "internal/api/client.go": {
+      "filePath": "internal/api/client.go",
+      "contentHash": "f5cb5fc2300d688cbede81a9fedf9eaae4e2d510ddc8f156da961bc918d28926",
+      "functions": [
+        {
+          "name": "WithSystemName",
+          "params": [
+            "name"
+          ],
+          "returnType": "*EnlightenCloudClient",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "NewEnlightenCloudClient",
+          "params": [
+            "systemID",
+            "apiKey",
+            "accessToken",
+            "timezone"
+          ],
+          "returnType": "*EnlightenCloudClient",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "NewEnlightenCloudClientWithBaseURL",
+          "params": [
+            "baseURL",
+            "systemID",
+            "apiKey",
+            "accessToken",
+            "timezone"
+          ],
+          "returnType": "*EnlightenCloudClient",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "lifetimeEndDate",
+          "params": [
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "fetchTelemetryData",
+          "params": [
+            "ctx",
+            "endpoint",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "([]byte, error)",
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "buildTelemetryURL",
+          "params": [
+            "endpoint",
+            "dayStart",
+            "dayEnd"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "GetEnergyImportForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "GetEnergyExportForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "GetProductionForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "GetConsumptionForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "GetBatteryDataForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(charged float64, discharged float64, soc int, err error)",
+          "exported": true,
+          "lineCount": 46
+        },
+        {
+          "name": "QueryCost",
+          "params": [
+            "queryMode",
+            "hasBattery"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "GetMetricsFromCloud",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(*LocalMetrics, bool, error)",
+          "exported": true,
+          "lineCount": 114
+        },
+        {
+          "name": "maybeShowNoCacheFallbackWarning",
+          "params": [
+            "reason"
+          ],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "budgetExhausted",
+          "params": [],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "cacheMaxAge",
+          "params": [
+            "targetDate",
+            "queryMode"
+          ],
+          "returnType": "time.Duration",
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "cacheServable",
+          "params": [
+            "cached",
+            "maxAge"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "serveRecentEndpointCache",
+          "params": [
+            "url",
+            "maxAge"
+          ],
+          "returnType": "(*http.Response, bool)",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "tryLoadPastDateCache",
+          "params": [
+            "url",
+            "targetDate"
+          ],
+          "returnType": "(*cache.CachedResponse, bool)",
+          "exported": false,
+          "lineCount": 38
+        },
+        {
+          "name": "makeCachedAPIRequest",
+          "params": [
+            "ctx",
+            "url",
+            "targetDate",
+            "queryMode"
+          ],
+          "returnType": "(*http.Response, bool, error)",
+          "exported": false,
+          "lineCount": 221
+        },
+        {
+          "name": "getEnergyLifetime",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": false,
+          "lineCount": 31
+        },
+        {
+          "name": "getConsumptionLifetime",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": false,
+          "lineCount": 27
+        },
+        {
+          "name": "getEnergyImportLifetime",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": false,
+          "lineCount": 27
+        },
+        {
+          "name": "getEnergyExportLifetime",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": false,
+          "lineCount": 27
+        }
+      ],
+      "classes": [
+        {
+          "name": "EnlightenCloudClient",
+          "methods": [
+            "WithSystemName",
+            "lifetimeEndDate",
+            "fetchTelemetryData",
+            "buildTelemetryURL",
+            "GetEnergyImportForDate",
+            "GetEnergyExportForDate",
+            "GetProductionForDate",
+            "GetConsumptionForDate",
+            "GetBatteryDataForDate",
+            "GetMetricsFromCloud",
+            "cacheMaxAge",
+            "tryLoadPastDateCache",
+            "makeCachedAPIRequest",
+            "getEnergyLifetime",
+            "getConsumptionLifetime",
+            "getEnergyImportLifetime",
+            "getEnergyExportLifetime"
+          ],
+          "properties": [
+            "baseURL",
+            "systemID",
+            "systemName",
+            "apiKey",
+            "accessToken",
+            "timezone",
+            "httpClient",
+            "cacheUsed"
+          ],
+          "exported": true,
+          "lineCount": 10
+        }
+      ],
+      "imports": [
+        {
+          "source": "bytes",
+          "specifiers": [
+            "bytes"
+          ]
+        },
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "encoding/json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "io",
+          "specifiers": [
+            "io"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/url",
+          "specifiers": [
+            "neturl"
+          ]
+        },
+        {
+          "source": "strconv",
+          "specifiers": [
+            "strconv"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/parser",
+          "specifiers": [
+            "parser"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/timezone",
+          "specifiers": [
+            "timezone"
+          ]
+        }
+      ],
+      "exports": [
+        "EnlightenCloudClient",
+        "WithSystemName",
+        "NewEnlightenCloudClient",
+        "NewEnlightenCloudClientWithBaseURL",
+        "GetEnergyImportForDate",
+        "GetEnergyExportForDate",
+        "GetProductionForDate",
+        "GetConsumptionForDate",
+        "GetBatteryDataForDate",
+        "QueryCost",
+        "GetMetricsFromCloud"
+      ],
+      "totalLines": 1078,
+      "hasStructuralAnalysis": true
+    },
+    "internal/api/client_functional_test.go": {
+      "filePath": "internal/api/client_functional_test.go",
+      "contentHash": "04bffd4002d196f6abc89f7028aef37cbf739704206fb0a42e7f05eedbb0dab7",
+      "functions": [
+        {
+          "name": "mustLoadLocation",
+          "params": [
+            "t",
+            "name"
+          ],
+          "returnType": "*time.Location",
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "TestGetEnergyImportForDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 37
+        },
+        {
+          "name": "TestGetEnergyExportForDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 37
+        },
+        {
+          "name": "TestGetConsumptionForDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 35
+        },
+        {
+          "name": "TestGetBatteryDataForDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 65
+        },
+        {
+          "name": "TestGetBatteryDataForDate_NoSOC",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 46
+        },
+        {
+          "name": "TestGetMetricsFromCloud",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 85
+        },
+        {
+          "name": "TestGetMetricsFromCloud_PartialFailure",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 59
+        },
+        {
+          "name": "TestGetMetricsFromCloud_ProductionFailure",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 34
+        },
+        {
+          "name": "TestGetMetricsFromCloud_ContextCancellation",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 28
+        },
+        {
+          "name": "TestGetProductionForDate_EmptyIntervals",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "TestGetEnergyImportForDate_EmptyIntervals",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "TestGetProductionForDate_InvalidJSON",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "TestGetBatteryDataForDate_InvalidJSON",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "TestGetMetricsFromCloud_ConsumptionFallback",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 58
+        },
+        {
+          "name": "TestBuildTelemetryURL",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 24
+        },
+        {
+          "name": "TestNewEnlightenCloudClient",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 32
+        },
+        {
+          "name": "TestNewEnlightenCloudClientWithBaseURL",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "TestCacheUsedTracking",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 39
+        },
+        {
+          "name": "contains",
+          "params": [
+            "s",
+            "substr"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "findSubstring",
+          "params": [
+            "s",
+            "substr"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 8
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/http/httptest",
+          "specifiers": [
+            "httptest"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "TestGetEnergyImportForDate",
+        "TestGetEnergyExportForDate",
+        "TestGetConsumptionForDate",
+        "TestGetBatteryDataForDate",
+        "TestGetBatteryDataForDate_NoSOC",
+        "TestGetMetricsFromCloud",
+        "TestGetMetricsFromCloud_PartialFailure",
+        "TestGetMetricsFromCloud_ProductionFailure",
+        "TestGetMetricsFromCloud_ContextCancellation",
+        "TestGetProductionForDate_EmptyIntervals",
+        "TestGetEnergyImportForDate_EmptyIntervals",
+        "TestGetProductionForDate_InvalidJSON",
+        "TestGetBatteryDataForDate_InvalidJSON",
+        "TestGetMetricsFromCloud_ConsumptionFallback",
+        "TestBuildTelemetryURL",
+        "TestNewEnlightenCloudClient",
+        "TestNewEnlightenCloudClientWithBaseURL",
+        "TestCacheUsedTracking"
+      ],
+      "totalLines": 756,
+      "hasStructuralAnalysis": true
+    },
+    "internal/api/client_lifetime_test.go": {
+      "filePath": "internal/api/client_lifetime_test.go",
+      "contentHash": "1856677082ad8793e342d319cba06d54921477874e887f11dcdb02e1ee933f48",
+      "functions": [
+        {
+          "name": "pastMonth",
+          "params": [
+            "tz"
+          ],
+          "returnType": "time.Time",
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "TestGetEnergyImportForDate_Month",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 31
+        },
+        {
+          "name": "TestGetEnergyExportForDate_Month",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 31
+        },
+        {
+          "name": "TestGetProductionForDate_Month",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 31
+        },
+        {
+          "name": "TestGetConsumptionForDate_Month",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 31
+        },
+        {
+          "name": "TestGetEnergyImportForDate_Year",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 31
+        },
+        {
+          "name": "TestLifetimeEndpoint_APIError",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "TestGetEnergyImportForDate_PastDateCacheHit",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 40
+        },
+        {
+          "name": "TestGetEnergyImportForDate_RateLimited",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 31
+        },
+        {
+          "name": "TestMaybeShowNoCacheFallbackWarning",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/http/httptest",
+          "specifiers": [
+            "httptest"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "TestGetEnergyImportForDate_Month",
+        "TestGetEnergyExportForDate_Month",
+        "TestGetProductionForDate_Month",
+        "TestGetConsumptionForDate_Month",
+        "TestGetEnergyImportForDate_Year",
+        "TestLifetimeEndpoint_APIError",
+        "TestGetEnergyImportForDate_PastDateCacheHit",
+        "TestGetEnergyImportForDate_RateLimited",
+        "TestMaybeShowNoCacheFallbackWarning"
+      ],
+      "totalLines": 306,
+      "hasStructuralAnalysis": true
+    },
+    "internal/api/client_test.go": {
+      "filePath": "internal/api/client_test.go",
+      "contentHash": "7ed9c5f064003372c1a8124ed3bbe6ea11358021da148d546288067026059d9a",
+      "functions": [
+        {
+          "name": "TestEnlightenCloudClient_GetProductionForDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 52
+        },
+        {
+          "name": "TestEnlightenCloudClient_RateLimitHandling",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 36
+        },
+        {
+          "name": "TestEnlightenCloudClient_CacheUsedFlag",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "TestTryLoadPastDateCache_InvalidURL",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "TestTryLoadPastDateCache_NoMatch",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 15
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/http/httptest",
+          "specifiers": [
+            "httptest"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "TestEnlightenCloudClient_GetProductionForDate",
+        "TestEnlightenCloudClient_RateLimitHandling",
+        "TestEnlightenCloudClient_CacheUsedFlag",
+        "TestTryLoadPastDateCache_InvalidURL",
+        "TestTryLoadPastDateCache_NoMatch"
+      ],
+      "totalLines": 203,
+      "hasStructuralAnalysis": true
+    },
+    "internal/api/interface.go": {
+      "filePath": "internal/api/interface.go",
+      "contentHash": "d23154f8f1f43ca86db929e3a81bfb12d13ba1dbc68de90b0c7ca94f48358b87",
+      "functions": [],
+      "classes": [
+        {
+          "name": "CloudClient",
+          "methods": [
+            "GetMetricsFromCloud",
+            "GetEnergyImportForDate",
+            "GetEnergyExportForDate",
+            "GetProductionForDate",
+            "GetConsumptionForDate",
+            "GetBatteryDataForDate"
+          ],
+          "properties": [],
+          "exported": true,
+          "lineCount": 77
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "CloudClient"
+      ],
+      "totalLines": 128,
+      "hasStructuralAnalysis": true
+    },
+    "internal/api/preflight_test.go": {
+      "filePath": "internal/api/preflight_test.go",
+      "contentHash": "16cd96d2990ff0d2b18d9c82c02670f53acf2a8265915bfc7fc4705b8643ea75",
+      "functions": [
+        {
+          "name": "uniqueSysID",
+          "params": [
+            "tag"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "exhaustBudget",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "intervalProductionServer",
+          "params": [
+            "t"
+          ],
+          "returnType": "(*httptest.Server, *atomic.Int32)",
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "lifetimeProductionServer",
+          "params": [
+            "t"
+          ],
+          "returnType": "(*httptest.Server, *atomic.Int32)",
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "captureStdout",
+          "params": [
+            "fn"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "TestBudgetExhausted_CurrentDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "TestBudgetExhausted_SpecificDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 33
+        },
+        {
+          "name": "TestBudgetExhausted_MonthToDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "TestBudgetExhausted_SpecificMonth",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "TestBudgetExhausted_YearToDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 28
+        },
+        {
+          "name": "TestBudgetExhausted_SpecificYear",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "TestBudgetExhausted_CurrentTrueUp",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "TestBudgetExhausted_PastTrueUp",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "TestBudgetExhausted_NoCache_ReturnsRateLimitError",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 25
+        },
+        {
+          "name": "TestPreflightWarning_CurrentPeriod",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 51
+        },
+        {
+          "name": "TestPreflightWarning_PastPeriod",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 47
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "bytes",
+          "specifiers": [
+            "bytes"
+          ]
+        },
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "io",
+          "specifiers": [
+            "io"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/http/httptest",
+          "specifiers": [
+            "httptest"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "sync/atomic",
+          "specifiers": [
+            "atomic"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "TestBudgetExhausted_CurrentDate",
+        "TestBudgetExhausted_SpecificDate",
+        "TestBudgetExhausted_MonthToDate",
+        "TestBudgetExhausted_SpecificMonth",
+        "TestBudgetExhausted_YearToDate",
+        "TestBudgetExhausted_SpecificYear",
+        "TestBudgetExhausted_CurrentTrueUp",
+        "TestBudgetExhausted_PastTrueUp",
+        "TestBudgetExhausted_NoCache_ReturnsRateLimitError",
+        "TestPreflightWarning_CurrentPeriod",
+        "TestPreflightWarning_PastPeriod"
+      ],
+      "totalLines": 557,
+      "hasStructuralAnalysis": true
+    },
+    "internal/api/query_cost_test.go": {
+      "filePath": "internal/api/query_cost_test.go",
+      "contentHash": "017d3ce4c701a984f5623e3c7137523859fc8d118a1e09a3a2db745657ceb9e0",
+      "functions": [
+        {
+          "name": "TestQueryCost",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 34
+        },
+        {
+          "name": "TestQueryCost_FitsWithinBudget",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "TestQueryCost_TwoSystemsFitBudget",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 7
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "TestQueryCost",
+        "TestQueryCost_FitsWithinBudget",
+        "TestQueryCost_TwoSystemsFitBudget"
+      ],
+      "totalLines": 67,
+      "hasStructuralAnalysis": true
     },
     "internal/api/testmain_test.go": {
       "filePath": "internal/api/testmain_test.go",
@@ -119,7 +2055,7 @@
     },
     "internal/api/types.go": {
       "filePath": "internal/api/types.go",
-      "contentHash": "f85b94718c0c93401760a00d99f4c62629ada2ea73e4c72b6dd87d1838d24ac0",
+      "contentHash": "eaa651465ae033849c9533930c3570a1b9daae1a3fa7d590af58d5d309c222b2",
       "functions": [],
       "classes": [
         {
@@ -150,7 +2086,909 @@
       "exports": [
         "LocalMetrics"
       ],
-      "totalLines": 31,
+      "totalLines": 34,
+      "hasStructuralAnalysis": true
+    },
+    "internal/app/cache_report.go": {
+      "filePath": "internal/app/cache_report.go",
+      "contentHash": "01166528dad30811ebabe628fbf851ec1331e93f1772bf6dcac020ca76c7c6fc",
+      "functions": [
+        {
+          "name": "RunCacheReport",
+          "params": [
+            "ctx",
+            "rc",
+            "trueUpStart"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 46
+        },
+        {
+          "name": "printCacheDiagnostic",
+          "params": [
+            "statuses",
+            "effectiveDate",
+            "effectiveQueryMode",
+            "trueUpStart",
+            "originalDate"
+          ],
+          "exported": false,
+          "lineCount": 31
+        },
+        {
+          "name": "describePeriod",
+          "params": [
+            "date",
+            "queryMode",
+            "trueUpStart"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "populateCommand",
+          "params": [
+            "trueUpStart",
+            "originalDate",
+            "queryMode"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "formatAge",
+          "params": [
+            "d"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 10
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/api",
+          "specifiers": [
+            "api"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/timezone",
+          "specifiers": [
+            "timezone"
+          ]
+        }
+      ],
+      "exports": [
+        "RunCacheReport"
+      ],
+      "totalLines": 149,
+      "hasStructuralAnalysis": true
+    },
+    "internal/app/runner.go": {
+      "filePath": "internal/app/runner.go",
+      "contentHash": "b6f0ad7ed59bc7e9eab4e67e038c6aa7ff8e95f454b7eb5e1b9cc9a4cab6118f",
+      "functions": [
+        {
+          "name": "RunOnce",
+          "params": [
+            "ctx",
+            "rc",
+            "validationMode"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "RunContinuous",
+          "params": [
+            "ctx",
+            "rc"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 27
+        },
+        {
+          "name": "fetchAndDisplay",
+          "params": [
+            "ctx",
+            "rc"
+          ],
+          "returnType": "error",
+          "exported": false,
+          "lineCount": 25
+        }
+      ],
+      "classes": [
+        {
+          "name": "RunConfig",
+          "methods": [],
+          "properties": [
+            "Agg",
+            "Disp",
+            "Cfg",
+            "TestDate",
+            "QueryMode",
+            "ReportTZ",
+            "Debug"
+          ],
+          "exported": true,
+          "lineCount": 9
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/config",
+          "specifiers": [
+            "config"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/display",
+          "specifiers": [
+            "display"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/validation",
+          "specifiers": [
+            "validation"
+          ]
+        }
+      ],
+      "exports": [
+        "RunConfig",
+        "RunOnce",
+        "RunContinuous"
+      ],
+      "totalLines": 120,
+      "hasStructuralAnalysis": true
+    },
+    "internal/app/runner_test.go": {
+      "filePath": "internal/app/runner_test.go",
+      "contentHash": "fc3bbab3a3d79989887c29517388cf1905029fc261017c279c43940fc45742e2",
+      "functions": [
+        {
+          "name": "GetMetricsFromCloud",
+          "params": [
+            "ctx",
+            "date",
+            "queryMode"
+          ],
+          "returnType": "(*api.LocalMetrics, bool, error)",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "GetEnergyImportForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "GetEnergyExportForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "GetProductionForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "GetConsumptionForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "GetBatteryDataForDate",
+          "params": [
+            "ctx",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(charged float64, discharged float64, soc int, err error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "makeRunConfig",
+          "params": [
+            "agg",
+            "disp",
+            "cfg",
+            "tz"
+          ],
+          "returnType": "RunConfig",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "createMockAggregator",
+          "params": [
+            "metrics",
+            "err"
+          ],
+          "returnType": "*aggregator.DataAggregator",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "TestRunOnce_Success",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 47
+        },
+        {
+          "name": "TestFetchAndDisplay_Success",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 46
+        },
+        {
+          "name": "TestFetchAndDisplay_ContextCancelled",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 36
+        },
+        {
+          "name": "TestFetchAndDisplay_Error",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 35
+        },
+        {
+          "name": "TestRunContinuous_ImmediateExecution",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 55
+        },
+        {
+          "name": "TestRunContinuous_GracefulShutdown",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 51
+        }
+      ],
+      "classes": [
+        {
+          "name": "mockCloudClient",
+          "methods": [
+            "GetMetricsFromCloud",
+            "GetEnergyImportForDate",
+            "GetEnergyExportForDate",
+            "GetProductionForDate",
+            "GetConsumptionForDate",
+            "GetBatteryDataForDate"
+          ],
+          "properties": [
+            "metrics",
+            "err"
+          ],
+          "exported": false,
+          "lineCount": 4
+        }
+      ],
+      "imports": [
+        {
+          "source": "bytes",
+          "specifiers": [
+            "bytes"
+          ]
+        },
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/api",
+          "specifiers": [
+            "api"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/config",
+          "specifiers": [
+            "config"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/display",
+          "specifiers": [
+            "display"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/types",
+          "specifiers": [
+            "types"
+          ]
+        }
+      ],
+      "exports": [
+        "GetMetricsFromCloud",
+        "GetEnergyImportForDate",
+        "GetEnergyExportForDate",
+        "GetProductionForDate",
+        "GetConsumptionForDate",
+        "GetBatteryDataForDate",
+        "TestRunOnce_Success",
+        "TestFetchAndDisplay_Success",
+        "TestFetchAndDisplay_ContextCancelled",
+        "TestFetchAndDisplay_Error",
+        "TestRunContinuous_ImmediateExecution",
+        "TestRunContinuous_GracefulShutdown"
+      ],
+      "totalLines": 348,
+      "hasStructuralAnalysis": true
+    },
+    "internal/app/setup.go": {
+      "filePath": "internal/app/setup.go",
+      "contentHash": "1a47274e63dbdafe856b6b01ef9a2979046fca765621bf9c61ebc3e5a3e31b71",
+      "functions": [
+        {
+          "name": "CreateOAuthAdapter",
+          "params": [],
+          "returnType": "aggregator.OAuthTokenGetter",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "SetupDisplay",
+          "params": [
+            "cfg",
+            "reportTZ"
+          ],
+          "returnType": "*display.Display",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "ConfigureModes",
+          "params": [
+            "validationMode",
+            "noCache",
+            "debug"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "ParseTestDate",
+          "params": [
+            "dateStr",
+            "reportTZ"
+          ],
+          "returnType": "(ParseDateInput, error)",
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "FormatDateForQueryMode",
+          "params": [
+            "date",
+            "queryMode"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "GetAggregatorTypes",
+          "params": [
+            "cfg"
+          ],
+          "returnType": "([]aggregator.SystemConfig, *aggregator.APIConfig)",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "ValidateValidationModeCache",
+          "params": [
+            "targetDate",
+            "reportTZ"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 28
+        }
+      ],
+      "classes": [
+        {
+          "name": "ParseDateInput",
+          "methods": [],
+          "properties": [
+            "Date",
+            "QueryMode"
+          ],
+          "exported": true,
+          "lineCount": 4
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/config",
+          "specifiers": [
+            "config"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/display",
+          "specifiers": [
+            "display"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/oauth",
+          "specifiers": [
+            "oauth"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/timezone",
+          "specifiers": [
+            "timezone"
+          ]
+        }
+      ],
+      "exports": [
+        "ParseDateInput",
+        "CreateOAuthAdapter",
+        "SetupDisplay",
+        "ConfigureModes",
+        "ParseTestDate",
+        "FormatDateForQueryMode",
+        "GetAggregatorTypes",
+        "ValidateValidationModeCache"
+      ],
+      "totalLines": 162,
+      "hasStructuralAnalysis": true
+    },
+    "internal/app/setup_test.go": {
+      "filePath": "internal/app/setup_test.go",
+      "contentHash": "8440374f0ddbd600674a25bff901048237480774843240f0d6f295fe6f97da84",
+      "functions": [
+        {
+          "name": "TestFormatDateForQueryMode",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "TestCreateOAuthAdapter",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "TestSetupDisplay",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "TestSetupDisplay_WithCustomColors",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 27
+        },
+        {
+          "name": "TestParseTestDate_EmptyString",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "TestParseTestDate_ValidDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 24
+        },
+        {
+          "name": "TestParseTestDate_InvalidFormat",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "TestParseTestDate_InvalidDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "TestGetAggregatorTypes",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 25
+        },
+        {
+          "name": "TestGetAggregatorTypes_EmptySystems",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "TestRunOnce_ContextCancelled",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 34
+        },
+        {
+          "name": "TestConfigureModes",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 58
+        },
+        {
+          "name": "TestValidateValidationModeCache",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 78
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/config",
+          "specifiers": [
+            "config"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/types",
+          "specifiers": [
+            "types"
+          ]
+        }
+      ],
+      "exports": [
+        "TestFormatDateForQueryMode",
+        "TestCreateOAuthAdapter",
+        "TestSetupDisplay",
+        "TestSetupDisplay_WithCustomColors",
+        "TestParseTestDate_EmptyString",
+        "TestParseTestDate_ValidDate",
+        "TestParseTestDate_InvalidFormat",
+        "TestParseTestDate_InvalidDate",
+        "TestGetAggregatorTypes",
+        "TestGetAggregatorTypes_EmptySystems",
+        "TestRunOnce_ContextCancelled",
+        "TestConfigureModes",
+        "TestValidateValidationModeCache"
+      ],
+      "totalLines": 573,
+      "hasStructuralAnalysis": true
+    },
+    "internal/app/trueup.go": {
+      "filePath": "internal/app/trueup.go",
+      "contentHash": "f453cf1f75eba6601d7dffa0d3ccbed37aa477eaeb54b0691926533f96b27842",
+      "functions": [
+        {
+          "name": "RunTrueUp",
+          "params": [
+            "ctx",
+            "rc",
+            "trueUpStartStr"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "trueUpWindowEnd",
+          "params": [
+            "trueUpStart",
+            "now"
+          ],
+          "returnType": "time.Time",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "buildTrueUpReport",
+          "params": [
+            "m",
+            "startDate",
+            "endDate"
+          ],
+          "returnType": "*aggregator.TrueUpReport",
+          "exported": false,
+          "lineCount": 25
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/timezone",
+          "specifiers": [
+            "timezone"
+          ]
+        }
+      ],
+      "exports": [
+        "RunTrueUp"
+      ],
+      "totalLines": 87,
       "hasStructuralAnalysis": true
     },
     "internal/app/trueup_test.go": {
@@ -274,7 +3112,7 @@
     },
     "internal/cache/cache.go": {
       "filePath": "internal/cache/cache.go",
-      "contentHash": "827113642037d34d5d8ce7c697f87352446b1b20ba108df292c65db3b30d7358",
+      "contentHash": "c1613bbc6784b02577f150aab3c3e85b03708f675d9b1918659e4464c85d2dce",
       "functions": [
         {
           "name": "getCacheDir",
@@ -293,14 +3131,14 @@
           "lineCount": 12
         },
         {
-          "name": "TestMode",
+          "name": "ValidationMode",
           "params": [],
           "returnType": "bool",
           "exported": true,
           "lineCount": 3
         },
         {
-          "name": "SetTestMode",
+          "name": "SetValidationMode",
           "params": [
             "enabled"
           ],
@@ -353,14 +3191,14 @@
           "lineCount": 13
         },
         {
-          "name": "RateLimitWarningShown",
+          "name": "BudgetWarningShown",
           "params": [],
           "returnType": "bool",
           "exported": true,
           "lineCount": 3
         },
         {
-          "name": "SetRateLimitWarningShown",
+          "name": "SetBudgetWarningShown",
           "params": [
             "shown"
           ],
@@ -631,16 +3469,16 @@
       ],
       "exports": [
         "RedactURLKey",
-        "TestMode",
-        "SetTestMode",
+        "ValidationMode",
+        "SetValidationMode",
         "CacheDisabled",
         "SetCacheDisabled",
         "DebugMode",
         "SetDebugMode",
         "Debugf",
         "LastAPICallTime",
-        "RateLimitWarningShown",
-        "SetRateLimitWarningShown",
+        "BudgetWarningShown",
+        "SetBudgetWarningShown",
         "ResetState",
         "ClearAPICalls",
         "CachedResponse",
@@ -662,7 +3500,7 @@
     },
     "internal/cache/cache_functions_test.go": {
       "filePath": "internal/cache/cache_functions_test.go",
-      "contentHash": "389964e5ff1f9dddd1e5218ae1dcf4882e9ab620f564dde5b9fa2312e3011df2",
+      "contentHash": "c2b600cddf49e6333d1592d632da08a3c0b550eb054cf6ee5a850f8318c89d5c",
       "functions": [
         {
           "name": "TestRedactURLKey",
@@ -837,7 +3675,7 @@
     },
     "internal/cache/cache_test.go": {
       "filePath": "internal/cache/cache_test.go",
-      "contentHash": "ce21a828c132489c341cdd52a222ed2555972b14971d08353c2a14f1f81444d7",
+      "contentHash": "c4869d8c151aa1b86db7f0b741f7f8cc5a25d4b39360dda0826ceaeda21dce57",
       "functions": [
         {
           "name": "TestResetState",
@@ -848,7 +3686,7 @@
           "lineCount": 34
         },
         {
-          "name": "TestTestModeGetterSetter",
+          "name": "TestValidationModeGetterSetter",
           "params": [
             "t"
           ],
@@ -864,7 +3702,7 @@
           "lineCount": 20
         },
         {
-          "name": "TestRateLimitWarningShownGetterSetter",
+          "name": "TestBudgetWarningShownGetterSetter",
           "params": [
             "t"
           ],
@@ -883,9 +3721,9 @@
       ],
       "exports": [
         "TestResetState",
-        "TestTestModeGetterSetter",
+        "TestValidationModeGetterSetter",
         "TestCacheDisabledGetterSetter",
-        "TestRateLimitWarningShownGetterSetter"
+        "TestBudgetWarningShownGetterSetter"
       ],
       "totalLines": 211,
       "hasStructuralAnalysis": true
@@ -1377,7 +4215,7 @@
     },
     "internal/cli/flags.go": {
       "filePath": "internal/cli/flags.go",
-      "contentHash": "0772bad43c7bfb7498a077fde2378418bf60e4343dc72c1a2baae924cd3b122f",
+      "contentHash": "f913883f2f481c23a80fbb9a12dd66e7dcb74b143d2d34a147a12b6261f4aba9",
       "functions": [
         {
           "name": "ParseFlags",
@@ -1399,7 +4237,7 @@
             "ClearAllCache",
             "TestDate",
             "TrueUp",
-            "TestMode",
+            "Validation",
             "NoCache",
             "CachedMode",
             "Debug"
@@ -1425,7 +4263,7 @@
     },
     "internal/cli/flags_test.go": {
       "filePath": "internal/cli/flags_test.go",
-      "contentHash": "dc6fb2eb2ebde719db0fc0781d3510bb838ce577f736525df7d8bd6b688af9de",
+      "contentHash": "175f155654869732f75b98d7c953e8bb9c5511895e55791843e61e4794c08a2a",
       "functions": [
         {
           "name": "resetFlags",
@@ -1460,7 +4298,7 @@
           "lineCount": 12
         },
         {
-          "name": "TestParseFlags_TestMode",
+          "name": "TestParseFlags_Validation",
           "params": [
             "t"
           ],
@@ -1565,7 +4403,7 @@
         "TestParseFlags_Defaults",
         "TestParseFlags_ConfigFile",
         "TestParseFlags_Continuous",
-        "TestParseFlags_TestMode",
+        "TestParseFlags_Validation",
         "TestParseFlags_TestDate",
         "TestParseFlags_MultipleFlags",
         "TestParseFlags_OAuthSetup",
@@ -1581,7 +4419,7 @@
     },
     "internal/config/config.go": {
       "filePath": "internal/config/config.go",
-      "contentHash": "5c61157a1c92b621df0e8fe43356e705610c879b6ce321e555dfd02fa81ebb94",
+      "contentHash": "ed14183f42c43a4d1428c89c099de1cfd3b5e95f47f93359233f310ffa2a33d9",
       "functions": [
         {
           "name": "MergeWithDefaults",
@@ -1589,13 +4427,13 @@
             "defaults"
           ],
           "exported": true,
-          "lineCount": 25
+          "lineCount": 27
         },
         {
           "name": "convertHexFields",
           "params": [],
           "exported": false,
-          "lineCount": 21
+          "lineCount": 27
         },
         {
           "name": "LoadConfig",
@@ -1613,7 +4451,34 @@
           ],
           "returnType": "string",
           "exported": false,
-          "lineCount": 15
+          "lineCount": 12
+        },
+        {
+          "name": "convertIfHexBackground",
+          "params": [
+            "hex"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "hexToANSIBackground",
+          "params": [
+            "hex"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "parseHexRGB",
+          "params": [
+            "hex"
+          ],
+          "returnType": "(r, g, b int64, ok bool)",
+          "exported": false,
+          "lineCount": 31
         },
         {
           "name": "hexToANSI",
@@ -1622,7 +4487,7 @@
           ],
           "returnType": "string",
           "exported": false,
-          "lineCount": 58
+          "lineCount": 25
         }
       ],
       "classes": [
@@ -1637,8 +4502,10 @@
             "Discharge",
             "Import",
             "Export",
-            "NetFlow",
+            "NetImport",
             "NetExport",
+            "NetImportBackground",
+            "NetExportBackground",
             "Headers",
             "Charge",
             "TotalConsumed",
@@ -1647,7 +4514,7 @@
             "Error"
           ],
           "exported": true,
-          "lineCount": 14
+          "lineCount": 16
         },
         {
           "name": "Config",
@@ -1719,12 +4586,12 @@
         "Config",
         "LoadConfig"
       ],
-      "totalLines": 286,
+      "totalLines": 330,
       "hasStructuralAnalysis": true
     },
     "internal/config/config_test.go": {
       "filePath": "internal/config/config_test.go",
-      "contentHash": "cf24d3544db6e9145764e4ea3219aae08046e5bbb5db01d9430a16860565705a",
+      "contentHash": "ec32866d131a7e3a481b04c2ee75a55e6701c1a416c349957585dd7ad105b9c6",
       "functions": [
         {
           "name": "TestLoadConfig",
@@ -1822,6 +4689,645 @@
         "TestConvertHexFields"
       ],
       "totalLines": 462,
+      "hasStructuralAnalysis": true
+    },
+    "internal/constants/constants.go": {
+      "filePath": "internal/constants/constants.go",
+      "contentHash": "31d60644a85c112ca19f749a6dd789a0c4e765a5c63e17227e95e8fd2abdf4e1",
+      "functions": [
+        {
+          "name": "String",
+          "params": [],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "IsRateLimitError",
+          "params": [
+            "err"
+          ],
+          "returnType": "bool",
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        }
+      ],
+      "exports": [
+        "String",
+        "IsRateLimitError"
+      ],
+      "totalLines": 216,
+      "hasStructuralAnalysis": true
+    },
+    "internal/constants/constants_test.go": {
+      "filePath": "internal/constants/constants_test.go",
+      "contentHash": "dab73124652bf57e5da609c0c992aa90094752658f74f87cfa08b3bec4ebb407",
+      "functions": [
+        {
+          "name": "Error",
+          "params": [],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "TestQueryModeString",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "TestIsRateLimitError",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 42
+        },
+        {
+          "name": "TestConstants",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 72
+        }
+      ],
+      "classes": [
+        {
+          "name": "testError",
+          "methods": [
+            "Error"
+          ],
+          "properties": [
+            "msg"
+          ],
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "imports": [
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        }
+      ],
+      "exports": [
+        "Error",
+        "TestQueryModeString",
+        "TestIsRateLimitError",
+        "TestConstants"
+      ],
+      "totalLines": 201,
+      "hasStructuralAnalysis": true
+    },
+    "internal/display/display.go": {
+      "filePath": "internal/display/display.go",
+      "contentHash": "5753a55ed59cfd029b2f5fe771506a100effd76a78d0403302b71ca008945967",
+      "functions": [
+        {
+          "name": "GetDefaultColors",
+          "params": [],
+          "returnType": "config.ColorConfig",
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "NewDisplayWithColorsAndTimezone",
+          "params": [
+            "colors",
+            "tz"
+          ],
+          "returnType": "*Display",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "NewDisplayWithWriter",
+          "params": [
+            "colors",
+            "tz",
+            "w"
+          ],
+          "returnType": "*Display",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "ShowMetrics",
+          "params": [
+            "metrics"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "printHeader",
+          "params": [
+            "timestamp",
+            "cacheUsed",
+            "queryDate",
+            "queryMode"
+          ],
+          "exported": false,
+          "lineCount": 30
+        },
+        {
+          "name": "printTodayEnergy",
+          "params": [
+            "metrics"
+          ],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "printIndividualSystems",
+          "params": [
+            "metrics"
+          ],
+          "exported": false,
+          "lineCount": 40
+        },
+        {
+          "name": "printSeparator",
+          "params": [],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "printMetric",
+          "params": [
+            "label",
+            "value",
+            "valueColor",
+            "indent",
+            "labelWidth",
+            "rightAlign"
+          ],
+          "exported": false,
+          "lineCount": 19
+        },
+        {
+          "name": "printNetFlow",
+          "params": [
+            "label",
+            "netValue",
+            "indent",
+            "labelWidth",
+            "rightAlign",
+            "netImportBg",
+            "netExportBg"
+          ],
+          "exported": false,
+          "lineCount": 48
+        },
+        {
+          "name": "ShowTrueUpReport",
+          "params": [
+            "report"
+          ],
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "printTrueUpHeader",
+          "params": [
+            "report"
+          ],
+          "exported": false,
+          "lineCount": 31
+        },
+        {
+          "name": "printTrueUpCombined",
+          "params": [
+            "report"
+          ],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "printTrueUpSystems",
+          "params": [
+            "report"
+          ],
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "ShowError",
+          "params": [
+            "err"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "ShowInfo",
+          "params": [
+            "message"
+          ],
+          "exported": true,
+          "lineCount": 3
+        }
+      ],
+      "classes": [
+        {
+          "name": "Display",
+          "methods": [
+            "ShowMetrics",
+            "printHeader",
+            "printTodayEnergy",
+            "printIndividualSystems",
+            "printSeparator",
+            "printMetric",
+            "printNetFlow",
+            "ShowTrueUpReport",
+            "printTrueUpHeader",
+            "printTrueUpCombined",
+            "printTrueUpSystems",
+            "ShowError",
+            "ShowInfo"
+          ],
+          "properties": [
+            "colors",
+            "timezone",
+            "separatorLine",
+            "subSeparator",
+            "writer"
+          ],
+          "exported": true,
+          "lineCount": 7
+        }
+      ],
+      "imports": [
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "io",
+          "specifiers": [
+            "io"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/config",
+          "specifiers": [
+            "config"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/timezone",
+          "specifiers": [
+            "timezone"
+          ]
+        }
+      ],
+      "exports": [
+        "GetDefaultColors",
+        "Display",
+        "NewDisplayWithColorsAndTimezone",
+        "NewDisplayWithWriter",
+        "ShowMetrics",
+        "ShowTrueUpReport",
+        "ShowError",
+        "ShowInfo"
+      ],
+      "totalLines": 320,
+      "hasStructuralAnalysis": true
+    },
+    "internal/display/display_test.go": {
+      "filePath": "internal/display/display_test.go",
+      "contentHash": "307f3e3229985e1d63e6b3303de839ac194436d5d0d8e36c838e9ebdaf0619a5",
+      "functions": [
+        {
+          "name": "mustLoadLocation",
+          "params": [
+            "t",
+            "name"
+          ],
+          "returnType": "*time.Location",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "TestNewDisplayWithWriter",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "TestNewDisplayWithColorsAndTimezone",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "TestShowMetrics_ContainsHeader",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 24
+        },
+        {
+          "name": "TestShowMetrics_ContainsMetricValues",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 24
+        },
+        {
+          "name": "TestShowMetrics_CombinedSectionLabels",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 31
+        },
+        {
+          "name": "TestShowMetrics_CacheIndicator",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 31
+        },
+        {
+          "name": "TestShowMetrics_NetFlow",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 32
+        },
+        {
+          "name": "TestShowMetrics_IndividualSystems",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "TestShowMetrics_SingleSystem",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "TestShowError",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "TestShowInfo",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "TestShowMetrics_Battery_DayQuery",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "TestShowMetrics_Battery_MonthQuery",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "TestShowMetrics_Battery_YearQuery",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "makeTrueUpReport",
+          "params": [
+            "tz"
+          ],
+          "returnType": "*aggregator.TrueUpReport",
+          "exported": false,
+          "lineCount": 19
+        },
+        {
+          "name": "TestShowTrueUpReport_ContainsHeader",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "TestShowTrueUpReport_StartDateInHeader",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "TestShowTrueUpReport_CombinedSection",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "TestShowTrueUpReport_NetFlowDirection",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "TestShowTrueUpReport_IndividualSystemsShownForMultiple",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "TestShowTrueUpReport_IndividualSystemsHiddenForSingle",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "TestShowTrueUpReport_PerSystemMetrics",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "Error",
+          "params": [],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        }
+      ],
+      "classes": [
+        {
+          "name": "testError",
+          "methods": [
+            "Error"
+          ],
+          "properties": [
+            "msg"
+          ],
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "imports": [
+        {
+          "source": "bytes",
+          "specifiers": [
+            "bytes"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/config",
+          "specifiers": [
+            "config"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "TestNewDisplayWithWriter",
+        "TestNewDisplayWithColorsAndTimezone",
+        "TestShowMetrics_ContainsHeader",
+        "TestShowMetrics_ContainsMetricValues",
+        "TestShowMetrics_CombinedSectionLabels",
+        "TestShowMetrics_CacheIndicator",
+        "TestShowMetrics_NetFlow",
+        "TestShowMetrics_IndividualSystems",
+        "TestShowMetrics_SingleSystem",
+        "TestShowError",
+        "TestShowInfo",
+        "TestShowMetrics_Battery_DayQuery",
+        "TestShowMetrics_Battery_MonthQuery",
+        "TestShowMetrics_Battery_YearQuery",
+        "TestShowTrueUpReport_ContainsHeader",
+        "TestShowTrueUpReport_StartDateInHeader",
+        "TestShowTrueUpReport_CombinedSection",
+        "TestShowTrueUpReport_NetFlowDirection",
+        "TestShowTrueUpReport_IndividualSystemsShownForMultiple",
+        "TestShowTrueUpReport_IndividualSystemsHiddenForSingle",
+        "TestShowTrueUpReport_PerSystemMetrics",
+        "Error"
+      ],
+      "totalLines": 643,
       "hasStructuralAnalysis": true
     },
     "internal/oauth/oauth.go": {
@@ -2224,7 +5730,7 @@
     },
     "internal/oauth/oauth_functional_test.go": {
       "filePath": "internal/oauth/oauth_functional_test.go",
-      "contentHash": "6025975d4fa51af3b94ca32232c81b711ed7a8a53dfcbe8948fdce006a31ab2e",
+      "contentHash": "115eb784a8beba258a1b8905ae930ee18004a9d64e531ed27d9cc28cf6af8658",
       "functions": [
         {
           "name": "TestExchangeAuthorizationCode_Success",
@@ -2556,7 +6062,7 @@
     },
     "internal/parser/parser.go": {
       "filePath": "internal/parser/parser.go",
-      "contentHash": "354cd397c7eefe3416e3a0859293e581f709aeff146e96b25fc79a1f6e070ec4",
+      "contentHash": "ec298e0d2f3d5bb65ab830e196ce717eb2a6c5330f15307fdefa85a9c170bb1f",
       "functions": [
         {
           "name": "ParseNestedTelemetryResponse",
@@ -2822,7 +6328,7 @@
     },
     "internal/parser/parser_test.go": {
       "filePath": "internal/parser/parser_test.go",
-      "contentHash": "f46f1ed755e524b146571a75205ed251f80597212a3126170df32c65c7766f49",
+      "contentHash": "075f0c031ed7d8ca7f6610795438a58de70c83e0d77e785da530cbd8c44991c4",
       "functions": [
         {
           "name": "TestParseTelemetryResponse",
@@ -2909,6 +6415,290 @@
         "TestSumIntervalValues"
       ],
       "totalLines": 456,
+      "hasStructuralAnalysis": true
+    },
+    "internal/timezone/timezone.go": {
+      "filePath": "internal/timezone/timezone.go",
+      "contentHash": "2f74b417f08fcb6ef17c6c554213d936fea98250a2690788ed528d8dfd0c6d30",
+      "functions": [
+        {
+          "name": "LoadTimezone",
+          "params": [
+            "timezoneStr"
+          ],
+          "returnType": "(*time.Location, error)",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "GetDayBoundaries",
+          "params": [
+            "targetDate",
+            "tz"
+          ],
+          "returnType": "(dayStart, dayEnd time.Time)",
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "IsPastDate",
+          "params": [
+            "targetDate",
+            "tz"
+          ],
+          "returnType": "bool",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "ParseDateInTimezone",
+          "params": [
+            "dateStr",
+            "tz"
+          ],
+          "returnType": "(time.Time, error)",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "ParseDateString",
+          "params": [
+            "dateStr",
+            "tz"
+          ],
+          "returnType": "(ParseResult, error)",
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "GetMonthBoundaries",
+          "params": [
+            "targetDate",
+            "tz"
+          ],
+          "returnType": "(start, end time.Time)",
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "GetYearBoundaries",
+          "params": [
+            "targetDate",
+            "tz"
+          ],
+          "returnType": "(start, end time.Time)",
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "GetTrueUpBoundaries",
+          "params": [
+            "trueUpStartDate",
+            "tz"
+          ],
+          "returnType": "(start, end time.Time)",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "GetBoundaries",
+          "params": [
+            "targetDate",
+            "queryMode",
+            "tz"
+          ],
+          "returnType": "(start, end time.Time)",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "IsPastPeriod",
+          "params": [
+            "targetDate",
+            "queryMode",
+            "tz"
+          ],
+          "returnType": "bool",
+          "exported": true,
+          "lineCount": 26
+        }
+      ],
+      "classes": [
+        {
+          "name": "ParseResult",
+          "methods": [],
+          "properties": [
+            "Date",
+            "QueryMode"
+          ],
+          "exported": true,
+          "lineCount": 4
+        }
+      ],
+      "imports": [
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "ParseResult",
+        "LoadTimezone",
+        "GetDayBoundaries",
+        "IsPastDate",
+        "ParseDateInTimezone",
+        "ParseDateString",
+        "GetMonthBoundaries",
+        "GetYearBoundaries",
+        "GetTrueUpBoundaries",
+        "GetBoundaries",
+        "IsPastPeriod"
+      ],
+      "totalLines": 244,
+      "hasStructuralAnalysis": true
+    },
+    "internal/timezone/timezone_test.go": {
+      "filePath": "internal/timezone/timezone_test.go",
+      "contentHash": "a0e8eeadb94df4630e8716c55a88457c1bce9f21d6c01893e10ce301f1cb4f03",
+      "functions": [
+        {
+          "name": "TestLoadTimezone",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 69
+        },
+        {
+          "name": "TestGetDayBoundaries",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 53
+        },
+        {
+          "name": "TestIsPastDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 51
+        },
+        {
+          "name": "TestParseDateString",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 84
+        },
+        {
+          "name": "TestGetMonthBoundaries",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 33
+        },
+        {
+          "name": "TestGetYearBoundaries",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "TestGetBoundaries",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 35
+        },
+        {
+          "name": "TestIsPastPeriod",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 88
+        },
+        {
+          "name": "TestGetTrueUpBoundaries",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 27
+        },
+        {
+          "name": "TestGetBoundaries_TrueUp",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "TestParseDateInTimezone",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 68
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "TestLoadTimezone",
+        "TestGetDayBoundaries",
+        "TestIsPastDate",
+        "TestParseDateString",
+        "TestGetMonthBoundaries",
+        "TestGetYearBoundaries",
+        "TestGetBoundaries",
+        "TestIsPastPeriod",
+        "TestGetTrueUpBoundaries",
+        "TestGetBoundaries_TrueUp",
+        "TestParseDateInTimezone"
+      ],
+      "totalLines": 636,
       "hasStructuralAnalysis": true
     },
     "internal/types/types.go": {
@@ -3068,7 +6858,7 @@
     },
     "internal/validation/validation.go": {
       "filePath": "internal/validation/validation.go",
-      "contentHash": "7f6a17719641f34c1691ad2b96fbc081771948fb4fab8e94adbe29efc3e6e2da",
+      "contentHash": "3c2de92226becb4ec4956e5b018a8fc4a5e39b95a44ffe40d28c55fbfb70cd9c",
       "functions": [
         {
           "name": "ValidateMetrics",
@@ -3330,7 +7120,7 @@
     },
     "internal/validation/validation_test.go": {
       "filePath": "internal/validation/validation_test.go",
-      "contentHash": "912edb5c3a33a540fd1faddaff9cd7ed9ee3d5fec9f648e982fe9d67f72ee935",
+      "contentHash": "97ff127721dbd2d8a534b760ec31334cdfd8673e43306b8f8f130fe30124d5be",
       "functions": [
         {
           "name": "TestValidateMetric_ExactMatch",
@@ -3502,6 +7292,123 @@
         "TestValidateMetrics_SystemIDMismatch"
       ],
       "totalLines": 696,
+      "hasStructuralAnalysis": true
+    },
+    "main.go": {
+      "filePath": "main.go",
+      "contentHash": "52e32431a0eebf1807812948f12530fbcdbb03f39b644649a8d90e008b084f69",
+      "functions": [
+        {
+          "name": "main",
+          "params": [],
+          "exported": false,
+          "lineCount": 166
+        },
+        {
+          "name": "printDebugStartup",
+          "params": [
+            "debug",
+            "reportTZ"
+          ],
+          "exported": false,
+          "lineCount": 27
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "os/signal",
+          "specifiers": [
+            "signal"
+          ]
+        },
+        {
+          "source": "syscall",
+          "specifiers": [
+            "syscall"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/app",
+          "specifiers": [
+            "app"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cli",
+          "specifiers": [
+            "cli"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/config",
+          "specifiers": [
+            "config"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/oauth",
+          "specifiers": [
+            "oauth"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/timezone",
+          "specifiers": [
+            "timezone"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 308,
       "hasStructuralAnalysis": true
     },
     "test-data/expected_values_2025-12.json": {
