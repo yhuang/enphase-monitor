@@ -80,11 +80,11 @@ enphase-monitor/
 │   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
-│   │   ├── cache_test.go                  # Cache state management tests
-│   │   ├── cache_functions_test.go        # Cache functionality tests
-│   │   ├── api_budget_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
+│   │   ├── cache_test.go                  # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
+│   │   ├── cache_functions_test.go        # Core caching tests (URL normalization, save/load, HasCacheForDate)
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
+│   │   # Note: RecordAPICall / RemainingBudget / window pruning are exercised by internal/api/preflight_test.go.
 │   ├── cli/                               # Command-line interface
 │   │   ├── flags.go                       # CLI flag parsing
 │   │   ├── flags_test.go                  # Flag parsing tests
@@ -127,7 +127,10 @@ enphase-monitor/
 │   ├── GO_BEST_PRACTICES.md               # Go best practices guide
 │   ├── GO_CONCEPTS.md                     # Go concepts reference
 │   ├── OAUTH_SETUP.md                     # OAuth setup guide
-│   └── TESTING.md                         # Testing patterns and guidelines
+│   ├── TESTING.md                         # Testing patterns and guidelines
+│   └── adr/                               # Architecture Decision Records
+│       └── 0001-true-up-window-end-date.md # ADR for the True-Up Window end-date rule
+├── CONTEXT.md                             # Domain glossary (Site, System, Query Mode, Net Flow, API Budget, ...)
 ├── test-data/                             # Test validation data (expected values)
 ├── config.yaml                            # User configuration (not in git)
 ├── config.yaml.example                    # Configuration template
@@ -433,8 +436,8 @@ Callers can use `errors.Is()` or `errors.As()` to inspect wrapped errors.
 This codebase uses a simplified approach to optional configuration:
 
 ```go
-// display.go lines 55-57 - Constructor delegates to NewDisplayWithWriter
-// colors.MergeWithDefaults is called inside NewDisplayWithWriter (lines 61-72)
+// display.go lines 55-59 - Constructor delegates to NewDisplayWithWriter
+// colors.MergeWithDefaults is called inside NewDisplayWithWriter (lines 61-74)
 func NewDisplayWithColorsAndTimezone(colors config.ColorConfig, tz *time.Location) *Display {
     return NewDisplayWithWriter(colors, tz, os.Stdout)
 }
@@ -611,14 +614,14 @@ var tokenCache *TokenCache  // Shared token cache (singleton)
 
 // internal/cache/cache.go - Package-level state (set at startup, read-only during execution)
 var (
-    testMode              bool
-    cacheDisabled         bool
-    debugMode             bool
-    rateLimitWarningShown bool
+    validationMode     bool
+    cacheDisabled      bool
+    debugMode          bool
+    budgetWarningShown bool
 )
 
-func TestMode() bool {
-    return testMode
+func ValidationMode() bool {
+    return validationMode
 }
 ```
 
@@ -747,7 +750,9 @@ See [README.md#lint-and-ci](README.md#lint-and-ci) for details.
 
 ### Related Documentation
 
+- **[CONTEXT.md](../CONTEXT.md)** - Domain glossary: the authoritative source for terminology used in code, docs, and conversation
+- **[adr/](adr/)** - Architecture Decision Records for non-obvious design choices (e.g. True-Up Window end-date)
 - **[GO_BEST_PRACTICES.md](GO_BEST_PRACTICES.md)** - Go concepts and patterns
 - **[GO_CONCEPTS.md](GO_CONCEPTS.md)** - Go concepts including channels and signals
 - **[OAUTH_SETUP.md](OAUTH_SETUP.md)** - OAuth authentication explained
-- **[README.md](README.md)** - User documentation and usage guide
+- **[README.md](../README.md)** - User documentation and usage guide

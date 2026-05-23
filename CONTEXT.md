@@ -126,8 +126,8 @@ The battery charge level of a System, expressed as a percentage (0–100). Only 
 _Avoid_: Battery percentage, battery level, charge percentage
 
 **Net Flow**:
-Grid Import minus Grid Export for a System or Site (positive = net import from grid, negative = net export to grid). Code identifiers: `NetFlowToday` (per-day), `NetFlow` (period totals). Config key: `net_flow`. Validation JSON key: `net_flow`.
-_Avoid_: Net Import, Net Imported, Net Energy
+Grid Import minus Grid Export for a System or Site (positive = net import from grid, negative = net export to grid). Code identifiers: `NetFlowToday` (per-day), `NetFlow` (period totals). Config color keys are directional — `net_import` / `net_export` set the foreground color, and `import_background` / `export_background` set the row-highlight truecolor background. Validation JSON key: `net_flow`.
+_Avoid_: Net Import, Net Imported, Net Energy (as a substitute for Net Flow itself — the directional *color* keys `net_import` / `net_export` / `import_background` / `export_background` are the one exception, since they name the visual treatment, not the metric)
 
 ## Example Dialogue
 

@@ -21,18 +21,20 @@ import (
 // GetDefaultColors returns the default color configuration.
 func GetDefaultColors() config.ColorConfig {
 	return config.ColorConfig{
-		Production:    "\033[38;5;208m",
-		Discharge:     "\033[38;5;34m",
-		Import:        "\033[38;5;39m",
-		Export:        "\033[38;5;220m",
-		NetFlow:       "\033[38;5;39m",
-		NetExport:     "\033[38;5;220m",
-		Headers:       "\033[38;5;51m",
-		Charge:        "\033[38;5;205m",
-		TotalConsumed: "\033[38;5;39m",
-		SecondaryText: "\033[38;5;245m",
-		PrimaryText:   "\033[38;5;255m",
-		Error:         "\033[38;5;196m",
+		Production:       "\033[38;5;208m",
+		Discharge:        "\033[38;5;34m",
+		Import:           "\033[38;5;39m",
+		Export:           "\033[38;5;220m",
+		NetImport:        "\033[38;5;39m",
+		NetExport:        "\033[38;5;220m",
+		ImportBackground: "\033[48;2;1;4;105m",   // #010469 — net-flow line background when in import direction
+		ExportBackground: "\033[48;2;125;0;105m", // #7D0069 — net-flow line background when in export direction
+		Headers:          "\033[38;5;51m",
+		Charge:           "\033[38;5;205m",
+		TotalConsumed:    "\033[38;5;39m",
+		SecondaryText:    "\033[38;5;245m",
+		PrimaryText:      "\033[38;5;255m",
+		Error:            "\033[38;5;196m",
 	}
 }
 
@@ -114,7 +116,7 @@ func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
 	fmt.Fprintf(d.writer, "\n   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Energy Flow", metrics.NetFlowToday, "  ", 24, false, "\033[48;2;1;3;100m", "\033[48;2;114;0;102m")
+	d.printNetFlow("  Net Energy Flow", metrics.NetFlowToday, "  ", 24, false, d.colors.ImportBackground, d.colors.ExportBackground)
 	d.printMetric("Energy Produced", metrics.ProductionToday, d.colors.Production, "    ", 22, false)
 	d.printMetric("Energy Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 22, false)
 	d.printMetric("Energy Imported", metrics.GridImportToday, d.colors.Import, "    ", 22, false)
@@ -188,7 +190,7 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 
 func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int, rightAlign bool, importBg, exportBg string) {
 	// Default to import (positive), override for export (negative)
-	color := d.colors.NetFlow
+	color := d.colors.NetImport
 	direction := "import"
 	displayValue := netValue
 
@@ -281,7 +283,7 @@ func (d *Display) printTrueUpCombined(report *aggregator.TrueUpReport) {
 	fmt.Fprintf(d.writer, "\n   %s%sTRUE-UP ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Energy Flow", report.NetFlow, "  ", 24, false, "\033[48;2;1;3;100m", "\033[48;2;114;0;102m")
+	d.printNetFlow("  Net Energy Flow", report.NetFlow, "  ", 24, false, d.colors.ImportBackground, d.colors.ExportBackground)
 	d.printMetric("Energy Produced", report.Production, d.colors.Production, "    ", 22, false)
 	d.printMetric("Energy Consumed", report.Consumption, d.colors.TotalConsumed, "    ", 22, false)
 	d.printMetric("Energy Imported", report.GridImport, d.colors.Import, "    ", 22, false)

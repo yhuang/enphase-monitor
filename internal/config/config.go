@@ -80,18 +80,20 @@ type APIConfig = types.APIConfig
 // ColorConfig represents color customization settings.
 // Note: Reset and Bold are defined as constants in constants.go and cannot be customized.
 type ColorConfig struct {
-	Production    string `yaml:"production,omitempty"`     // Solar Production
-	Discharge     string `yaml:"discharge,omitempty"`      // Battery Discharge
-	Import        string `yaml:"import,omitempty"`         // Grid Import
-	Export        string `yaml:"export,omitempty"`         // Grid Export
-	NetFlow       string `yaml:"net_flow,omitempty"`       // Net Energy Flow
-	NetExport     string `yaml:"net_export,omitempty"`     // Net Energy Flow (Export)
-	Headers       string `yaml:"headers,omitempty"`        // Report Headers
-	Charge        string `yaml:"charge,omitempty"`         // Battery Charge
-	TotalConsumed string `yaml:"total_consumed,omitempty"` // Total Consumed
-	SecondaryText string `yaml:"secondary_text,omitempty"` // Secondary Text
-	PrimaryText   string `yaml:"primary_text,omitempty"`   // Primary Text
-	Error         string `yaml:"error,omitempty"`          // Error Text
+	Production       string `yaml:"production,omitempty"`        // Solar Production
+	Discharge        string `yaml:"discharge,omitempty"`         // Battery Discharge
+	Import           string `yaml:"import,omitempty"`            // Grid Import
+	Export           string `yaml:"export,omitempty"`            // Grid Export
+	NetImport        string `yaml:"net_import,omitempty"`        // Foreground color used when Net Flow is in the import direction (positive value)
+	NetExport        string `yaml:"net_export,omitempty"`        // Foreground color used when Net Flow is in the export direction (negative value)
+	ImportBackground string `yaml:"import_background,omitempty"` // Truecolor background highlight for the Net Flow line in the import direction. Hex values are rendered as 24-bit truecolor (\033[48;2;R;G;Bm) rather than 256-color cube to preserve fidelity for backgrounds.
+	ExportBackground string `yaml:"export_background,omitempty"` // Truecolor background highlight for the Net Flow line in the export direction. Hex values rendered as 24-bit truecolor.
+	Headers          string `yaml:"headers,omitempty"`           // Report Headers
+	Charge           string `yaml:"charge,omitempty"`            // Battery Charge
+	TotalConsumed    string `yaml:"total_consumed,omitempty"`    // Total Consumed
+	SecondaryText    string `yaml:"secondary_text,omitempty"`    // Secondary Text
+	PrimaryText      string `yaml:"primary_text,omitempty"`      // Primary Text
+	Error            string `yaml:"error,omitempty"`             // Error Text
 }
 
 // MergeWithDefaults fills in empty color fields with default values.
@@ -105,8 +107,10 @@ func (c *ColorConfig) MergeWithDefaults(defaults ColorConfig) {
 		{&c.Discharge, &defaults.Discharge},
 		{&c.Import, &defaults.Import},
 		{&c.Export, &defaults.Export},
-		{&c.NetFlow, &defaults.NetFlow},
+		{&c.NetImport, &defaults.NetImport},
 		{&c.NetExport, &defaults.NetExport},
+		{&c.ImportBackground, &defaults.ImportBackground},
+		{&c.ExportBackground, &defaults.ExportBackground},
 		{&c.Headers, &defaults.Headers},
 		{&c.Charge, &defaults.Charge},
 		{&c.TotalConsumed, &defaults.TotalConsumed},
@@ -123,15 +127,18 @@ func (c *ColorConfig) MergeWithDefaults(defaults ColorConfig) {
 }
 
 // convertHexFields converts hex color codes to ANSI escape codes.
-// Performance: Loop-based conversion reduces 12 field assignments to a single iteration.
+// Foreground fields use the ANSI 256-color cube (compact, terminal-friendly).
+// Background fields use 24-bit truecolor (\033[48;2;R;G;Bm) because the
+// 6×6×6 cube quantizes coarsely (only 216 colors) — fine for foreground text
+// where the eye tolerates approximation, but visibly wrong for solid
+// background fills the user is trying to match by hex code.
 func (c *ColorConfig) convertHexFields() {
-	// Define pointers to all color fields
-	fields := []*string{
+	foregroundFields := []*string{
 		&c.Production,
 		&c.Discharge,
 		&c.Import,
 		&c.Export,
-		&c.NetFlow,
+		&c.NetImport,
 		&c.NetExport,
 		&c.Headers,
 		&c.Charge,
@@ -140,9 +147,16 @@ func (c *ColorConfig) convertHexFields() {
 		&c.PrimaryText,
 		&c.Error,
 	}
-
-	for _, field := range fields {
+	for _, field := range foregroundFields {
 		*field = convertIfHex(*field)
+	}
+
+	backgroundFields := []*string{
+		&c.ImportBackground,
+		&c.ExportBackground,
+	}
+	for _, field := range backgroundFields {
+		*field = convertIfHexBackground(*field)
 	}
 }
 
@@ -204,64 +218,94 @@ func LoadConfig(filename string) (*Config, error) {
 	return &config, nil
 }
 
-// convertIfHex converts a hex color code to ANSI escape code if needed
-// If a value is already an ANSI code (starts with \033), it is left unchanged
-// If a value is a hex code (starts with #), it is converted to ANSI 256-color code
+// convertIfHex converts a hex color code to ANSI escape code if needed.
+// If a value is already an ANSI code (starts with \033), it is left unchanged.
+// If a value is a hex code (starts with #), it is converted to a 256-color
+// foreground code via the 6×6×6 cube.
 func convertIfHex(hex string) string {
 	if hex == "" {
 		return hex
 	}
-	// If it is already an ANSI code, return as-is
 	if strings.HasPrefix(hex, "\033") {
 		return hex
 	}
-	// If it is a hex code, convert it
 	if strings.HasPrefix(hex, "#") {
 		return hexToANSI(hex)
 	}
-	// Otherwise return as-is (might be a named color or other format)
 	return hex
+}
+
+// convertIfHexBackground is the background counterpart of convertIfHex.
+// Hex values are rendered as 24-bit truecolor backgrounds
+// (\033[48;2;R;G;Bm) rather than the 256-color cube, because backgrounds
+// fill solid areas where quantization is visually obvious.
+func convertIfHexBackground(hex string) string {
+	if hex == "" {
+		return hex
+	}
+	if strings.HasPrefix(hex, "\033") {
+		return hex
+	}
+	if strings.HasPrefix(hex, "#") {
+		return hexToANSIBackground(hex)
+	}
+	return hex
+}
+
+// hexToANSIBackground converts a hex color code to a 24-bit truecolor ANSI
+// background escape (\033[48;2;R;G;Bm). Returns "" on malformed input —
+// MergeWithDefaults will then refill the field from the package defaults.
+func hexToANSIBackground(hex string) string {
+	r, g, b, ok := parseHexRGB(hex)
+	if !ok {
+		return ""
+	}
+	return "\033[48;2;" +
+		strconv.FormatInt(r, 10) + ";" +
+		strconv.FormatInt(g, 10) + ";" +
+		strconv.FormatInt(b, 10) + "m"
+}
+
+// parseHexRGB parses a "#RRGGBB" or "#RGB" string into 0–255 RGB components.
+// Returns ok=false if the input has the wrong length or non-hex digits.
+func parseHexRGB(hex string) (r, g, b int64, ok bool) {
+	hex = strings.TrimPrefix(hex, "#")
+	hex = strings.ToUpper(hex)
+	if len(hex) != 6 && len(hex) != 3 {
+		return 0, 0, 0, false
+	}
+	if len(hex) == 6 {
+		var err error
+		r, err = strconv.ParseInt(hex[0:2], constants.HexBase, 64)
+		if err != nil {
+			return 0, 0, 0, false
+		}
+		g, err = strconv.ParseInt(hex[2:4], constants.HexBase, 64)
+		if err != nil {
+			return 0, 0, 0, false
+		}
+		b, err = strconv.ParseInt(hex[4:6], constants.HexBase, 64)
+		if err != nil {
+			return 0, 0, 0, false
+		}
+		return r, g, b, true
+	}
+	// len(hex) == 3 — short form #RGB
+	rVal, err1 := strconv.ParseInt(string(hex[0]), constants.HexBase, 64)
+	gVal, err2 := strconv.ParseInt(string(hex[1]), constants.HexBase, 64)
+	bVal, err3 := strconv.ParseInt(string(hex[2]), constants.HexBase, 64)
+	if err1 != nil || err2 != nil || err3 != nil {
+		return 0, 0, 0, false
+	}
+	return rVal*16 + rVal, gVal*16 + gVal, bVal*16 + bVal, true
 }
 
 // hexToANSI converts a hex color code (e.g., "#FF5733") to ANSI 256-color escape code
 // Uses the 6x6x6 color cube (216 colors) from the ANSI 256-color palette
 func hexToANSI(hex string) string {
-	// Remove # if present
-	hex = strings.TrimPrefix(hex, "#")
-	hex = strings.ToUpper(hex)
-
-	// Parse RGB values
-	var r, g, b int64
-	var err error
-
-	if len(hex) != 6 && len(hex) != 3 {
+	r, g, b, ok := parseHexRGB(hex)
+	if !ok {
 		return ""
-	}
-	if len(hex) == 6 {
-		r, err = strconv.ParseInt(hex[0:2], constants.HexBase, 64)
-		if err != nil {
-			return ""
-		}
-		g, err = strconv.ParseInt(hex[2:4], constants.HexBase, 64)
-		if err != nil {
-			return ""
-		}
-		b, err = strconv.ParseInt(hex[4:6], constants.HexBase, 64)
-		if err != nil {
-			return ""
-		}
-	}
-	if len(hex) == 3 {
-		// Short hex: #RGB -> #RRGGBB
-		rVal, err1 := strconv.ParseInt(string(hex[0]), constants.HexBase, 64)
-		gVal, err2 := strconv.ParseInt(string(hex[1]), constants.HexBase, 64)
-		bVal, err3 := strconv.ParseInt(string(hex[2]), constants.HexBase, 64)
-		if err1 != nil || err2 != nil || err3 != nil {
-			return ""
-		}
-		r = rVal*16 + rVal
-		g = gVal*16 + gVal
-		b = bVal*16 + bVal
 	}
 
 	// Convert RGB (0-255) to ANSI 256-color code (16-231 for 6x6x6 cube)

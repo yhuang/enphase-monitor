@@ -48,9 +48,9 @@
 // WHY SEPARATE FILE
 // -----------------
 // This package has 3 test files (1:many pattern):
-// - cache_test.go: State management tests (210 lines)
-// - cache_functions_test.go (this file): Functionality tests (469 lines)
-// - cli_test.go: CLI utilities tests (603 lines)
+// - cache_test.go: State management tests
+// - cache_functions_test.go (this file): Functionality tests
+// - cli_test.go: CLI utilities tests
 //
 // PATTERN USED
 // ------------

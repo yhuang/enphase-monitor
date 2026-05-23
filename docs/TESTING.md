@@ -24,20 +24,20 @@ The project follows a pragmatic approach to testing:
 |---------|----------|--------|
 | urlbuilder | 100.0% | ✅ Full coverage - URL construction |
 | constants | 100.0% | ✅ Full coverage - pure constants |
-| display | 95.2% | ✅ Near-full - output formatting |
+| display | 99.2% | ✅ Near-full - output formatting |
 | validation | 95.5% | ✅ Near-full - metrics validation |
-| parser | 94.5% | ✅ Near-full - JSON parsing |
+| parser | 94.8% | ✅ Near-full - JSON parsing |
 | config | 92.8% | ✅ Near-full - YAML parsing |
-| timezone | 91.4% | ✅ High - timezone handling |
-| cli | 87.7% | ✅ High - CLI interface |
-| aggregator | 86.8% | ✅ High - data aggregation |
-| app | 84.3% | ✅ High - application setup |
-| api | 83.0% | ✅ High - HTTP client |
-| cache | 82.5% | ✅ High - file caching |
+| timezone | 92.0% | ✅ High - timezone handling |
+| cli | 90.5% | ✅ High - CLI interface |
+| aggregator | 78.3% | ✅ Adequate - data aggregation |
+| api | 71.8% | ✅ Adequate - HTTP client |
 | oauth | 69.2% | ✅ Adequate - OAuth flows |
+| cache | 58.8% | ⚠️ Moderate - file caching (orchestration tested via api) |
+| app | 45.0% | ⚠️ Moderate - application glue (exercised end-to-end via api/preflight) |
 | main.go | 0.0% | ✅ **Acceptable** - entry point |
 
-**Overall**: 80.1% coverage (exceeds typical Go project standards of 50-60%)
+**Overall**: 68.1% coverage (exceeds typical Go project standards of 50-60%; `app` and `cache` orchestration paths are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests)
 
 ### Why main.go Has 0% Coverage
 
@@ -80,12 +80,13 @@ Most packages follow the simple convention where each source file has one corres
 
 For packages with extensive functionality or different test concerns, tests are split by category:
 
-**Cache Package** (4 test files):
-- `cache.go` → 4 test files:
-  - `cache_test.go` - State management tests (flags, ResetState)
-  - `cache_functions_test.go` - Core functionality tests (save, load, normalize, HasCacheForDate)
-  - `api_budget_test.go` - Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning, LastAPICallTime)
-  - `cli_test.go` - CLI utilities tests (ListCacheEntries, ClearTodayCache)
+**Cache Package** (3 test files):
+- `cache.go` → 3 test files:
+  - `cache_test.go` - State management tests (ValidationMode/CacheDisabled/BudgetWarningShown getters/setters, ResetState)
+  - `cache_functions_test.go` - Core functionality tests (RedactURLKey, normalize, save/load, HasCacheForDate)
+  - `cli_test.go` - CLI utilities tests (ListCacheEntries, ClearTodayCache, parseCacheResponse)
+
+The sliding-window budget surface (`RecordAPICall`, `RemainingBudget`, `LastAPICallTime`, pruning) is exercised end-to-end through [`internal/api/preflight_test.go`](#integration-test-files), which primes the cache, drains the budget, and verifies the fallback path.
 
 **OAuth Package** (3 test files):
 - `oauth.go` → 3 test files:
@@ -420,16 +421,16 @@ func BenchmarkParseTelemetryResponse(b *testing.B) {
 
 **Example** (`cache_test.go`):
 ```go
-func TestCacheState_SetAndGet(t *testing.T) {
+func TestValidationModeGetterSetter(t *testing.T) {
     // Reset to known state
     ResetState()
-    
+
     // Run test
-    SetTestMode(true)
-    if !TestMode() {
-        t.Error("TestMode should be true")
+    SetValidationMode(true)
+    if !ValidationMode() {
+        t.Error("ValidationMode should be true after SetValidationMode(true)")
     }
-    
+
     // Clean up (or use defer)
     defer ResetState()
 }
@@ -677,9 +678,8 @@ These files test component interactions:
 | `client_functional_test.go` | API client tests | HTTP interactions with mock server |
 | `client_lifetime_test.go` | Lifetime Data endpoint tests | Month/year queries via `_lifetime` API endpoints |
 | `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
-| `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 report types; preflight warning on/off |
+| `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 report types; preflight warning on/off; exercises `RecordAPICall`/`RemainingBudget` along the way |
 | `query_cost_test.go` | 3 test functions | `QueryCost` output for all query mode × hasBattery combinations; 2-system budget constraint |
-| `api_budget_test.go` | 8 test functions | `RecordAPICall`, `RemainingBudget`, old-entry pruning, `ClearAPICalls`, `LastAPICallTime` |
 | `testmain_test.go` | (no test functions) | `TestMain`: package-level setup redirecting all cache I/O to a temp dir so api tests never touch the production cache |
 
 ### OAuth Test Files
@@ -740,7 +740,7 @@ make test
 go test -v ./internal/cache/
 
 # Run a specific test
-go test -v ./internal/app/ -run TestValidateTestModeCache
+go test -v ./internal/app/ -run TestValidateValidationModeCache
 ```
 
 ### Integration Testing with --test Flag
@@ -801,7 +801,7 @@ The Validation Mode behavior is tested in:
 | Test File | Test Functions | Purpose |
 |-----------|----------------|---------|
 | `cache_functions_test.go` | `TestHasCacheForDate` | Cache existence check |
-| `setup_test.go` | `TestValidateTestModeCache` | Early validation with helpful errors |
+| `setup_test.go` | `TestValidateValidationModeCache` | Early validation with helpful errors |
 | `validation_test.go` | `TestValidateMetrics_MissingFile_HelpfulError` | Improved error messages |
 
 #### Testing Refactor Helpers

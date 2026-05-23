@@ -428,8 +428,10 @@ var (
 
 // internal/cache/cache.go - configuration flags
 var (
-    testMode      bool  // When true, only use cached responses (no live API calls)
-    cacheDisabled bool  // When true, always make live API calls
+    validationMode     bool  // When true, only use cached responses (no live API calls)
+    cacheDisabled      bool  // When true, always make live API calls
+    debugMode          bool  // When true, emit per-request cache/live trace via cache.Debugf
+    budgetWarningShown bool  // Latch so the budget-warning is shown at most once per run
 )
 ```
 
@@ -862,7 +864,7 @@ Functions that take a context should accept it as the **first parameter**:
 
 ```go
 // Good: ctx is first
-func RunOnce(ctx context.Context, rc RunConfig, testMode bool) error { ... }
+func RunOnce(ctx context.Context, rc RunConfig, validationMode bool) error { ... }
 func GetAccessToken(ctx context.Context, apiConfig *APIConfig) (string, error) { ... }
 ```
 
@@ -878,7 +880,7 @@ Use `context.Background()` only for code that is not tied to a request or operat
 // Good: main creates signal context for run loop
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
-app.RunOnce(ctx, rc, testMode)
+app.RunOnce(ctx, rc, validationMode)
 
 // Good: OAuth setup receives ctx so Ctrl+C cancels token exchange
 oauth.Setup(ctx, cfg)
@@ -991,7 +993,7 @@ For packages with many functions or complex logic, tests are split by **test cat
 
 **Cache Package** (`cache.go`):
 1. **`cache_test.go`** - State management tests
-   - Tests state flags (testMode, cacheDisabled, rateLimitWarning)
+   - Tests state flags (validationMode, cacheDisabled, budgetWarningShown)
    - Tests ResetState() for test isolation
 
 2. **`cache_functions_test.go`** - Core functionality tests
@@ -1031,7 +1033,7 @@ For packages with many functions or complex logic, tests are split by **test cat
 ✅ **History** - Shows evolution (original → functional → edge cases)
 ✅ **Focus** - Can run specific test categories independently
 
-**Bottom line:** The 1:many pattern emerged naturally during refactoring to keep test files organized and maintainable as coverage improved from 29.8% → 80.1%. It's a pragmatic choice, not a strict rule.
+**Bottom line:** The 1:many pattern emerged naturally during refactoring to keep test files organized and maintainable as coverage grew from 29.8% to the current ~68%. It's a pragmatic choice, not a strict rule.
 
 ---
 

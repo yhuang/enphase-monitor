@@ -110,8 +110,10 @@ go build -o enphase-monitor
      discharge: "#7acf38"          # Battery Discharge
      import: "#f63cb1"             # Grid Import
      export: "#06b6de"             # Grid Export
-     net_flow: "#f63cb1"           # Net Energy Flow
-     net_export: "#06b6de"         # Net Energy Flow (Export)
+     import_background: "#010469"  # Net Flow line background highlight (import direction) — rendered as 24-bit truecolor
+     export_background: "#7D0069"  # Net Flow line background highlight (export direction) — rendered as 24-bit truecolor
+     net_import: "#f63cb1"         # Net Energy Flow (foreground color when net is import)
+     net_export: "#06b6de"         # Net Energy Flow (foreground color when net is export)
      headers: "#f37320"            # Report Headers
      charge: "#7acf38"             # Battery Charge
      total_consumed: "#f37320"     # Total Consumed
@@ -475,8 +477,10 @@ colors:
   discharge: "#7acf38"          # Battery Discharge
   import: "#f63cb1"             # Grid Import
   export: "#06b6de"             # Grid Export
-  net_flow: "#f63cb1"           # Net Energy Flow (net import color)
-  net_export: "#06b6de"         # Net Energy Flow (net export color)
+  import_background: "#010469"  # Net Flow line background highlight (import direction) — 24-bit truecolor
+  export_background: "#7D0069"  # Net Flow line background highlight (export direction) — 24-bit truecolor
+  net_import: "#f63cb1"         # Net Energy Flow (foreground color when net is import)
+  net_export: "#06b6de"         # Net Energy Flow (foreground color when net is export)
   headers: "#f37320"            # Report Headers
   charge: "#7acf38"             # Battery Charge
   total_consumed: "#f37320"     # Total Consumed
@@ -486,8 +490,10 @@ colors:
 ```
 
 **Color Format Options:**
-- **Hex codes** (e.g., `#FF5733`): Automatically converted to ANSI color codes
-- **ANSI escape codes** (e.g., `\033[38;5;208m`): Used directly as-is
+- **Hex codes** (e.g., `#FF5733`): Automatically converted to ANSI color codes.
+  - **Foreground colors** (every key except `import_background` / `export_background`) render through the ANSI 256-color cube (`\033[38;5;Nm`). 216 cells total — the eye tolerates this for text.
+  - **Background colors** (`import_background`, `export_background`) render as 24-bit truecolor (`\033[48;2;R;G;Bm`) so a solid fill matches the requested hex exactly. Quantizing backgrounds to the 6×6×6 cube is visibly off.
+- **ANSI escape codes** (e.g., `\033[38;5;208m` for foreground, `\033[48;2;R;G;Bm` for background): Used directly as-is. Use this form if you need a specific 24-bit foreground color (no quantization).
 
 **Note:** `Reset` and `Bold` are constants defined in `constants.go` and cannot be customized.
 
@@ -675,7 +681,9 @@ This project includes comprehensive documentation for different learning paths:
 - **[OAUTH_SETUP.md](docs/OAUTH_SETUP.md)** - Complete OAuth 2.0 setup guide with detailed explanations
 
 ### For Understanding the Codebase
+- **[CONTEXT.md](CONTEXT.md)** - Domain glossary: the authoritative source of terminology (Site, System, Query Mode, True-Up Window, Net Flow, API Budget, etc.). Read this before contributing — it pins down what to call things and what to *avoid* calling them.
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture, execution flow, and design patterns
+- **[docs/adr/](docs/adr/)** - Architecture Decision Records capturing significant design choices (e.g. the True-Up Window end-date rule)
 - **[GO_BEST_PRACTICES.md](docs/GO_BEST_PRACTICES.md)** - Go concepts and patterns used in this codebase
 - **[GO_CONCEPTS.md](docs/GO_CONCEPTS.md)** - Quick reference for Go concepts used in the code, including channels and signals
 
@@ -719,11 +727,11 @@ enphase-monitor/
 │   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
-│   │   ├── cache_test.go                  # Cache state management tests
-│   │   ├── cache_functions_test.go        # Cache functionality tests
-│   │   ├── api_budget_test.go             # Sliding-window budget tests (RecordAPICall, RemainingBudget, pruning)
+│   │   ├── cache_test.go                  # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
+│   │   ├── cache_functions_test.go        # Core caching tests (URL normalization, key generation, save/load, HasCacheForDate)
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
+│   │   # Note: sliding-window budget (RecordAPICall, RemainingBudget) is exercised via internal/api/preflight_test.go.
 │   ├── cli/                               # Command-line interface
 │   │   ├── flags.go                       # CLI flag parsing
 │   │   ├── flags_test.go                  # Flag parsing tests
@@ -765,7 +773,9 @@ enphase-monitor/
 │   ├── GO_BEST_PRACTICES.md               # Go best practices guide
 │   ├── GO_CONCEPTS.md                     # Go concepts reference (channels, signals, and more)
 │   ├── OAUTH_SETUP.md                     # OAuth setup documentation (detailed)
-│   └── TESTING.md                         # Testing patterns and guidelines
+│   ├── TESTING.md                         # Testing patterns and guidelines
+│   └── adr/                               # Architecture Decision Records
+│       └── 0001-true-up-window-end-date.md # ADR for the True-Up Window end-date rule
 ├── test-data/                             # Test validation data
 │   └── expected_values_*.json             # Expected values for validation
 ├── config.yaml.example                    # Example configuration with all options
@@ -774,15 +784,17 @@ enphase-monitor/
 ├── go.mod                                 # Go module definition
 ├── go.sum                                 # Go module checksums
 ├── scripts/                               # Utility scripts
-│   └── run-tests.sh                       # Test runner script
+│   ├── run-tests.sh                       # Test runner script
+│   └── history.py                         # Git history inspection helper
 ├── Makefile                               # Build automation
+├── CONTEXT.md                             # Domain glossary (project terminology, "avoid" terms)
 ├── README.md                              # This file
 └── QUICKSTART.md                          # Quick start guide
 ```
 
 ## Testing
 
-The project includes a comprehensive test suite with **80.1% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
+The project includes a comprehensive test suite with **68.1% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
 
 ### Test Coverage by Package
 
@@ -790,19 +802,19 @@ The project includes a comprehensive test suite with **80.1% code coverage** acr
 |---------|----------|--------|
 | urlbuilder | 100.0% | ✅ |
 | constants | 100.0% | ✅ |
-| display | 95.2% | ✅ |
+| display | 99.2% | ✅ |
 | validation | 95.5% | ✅ |
+| parser | 94.8% | ✅ |
 | config | 92.8% | ✅ |
-| timezone | 91.4% | ✅ |
-| parser | 94.5% | ✅ |
-| cli | 87.7% | ✅ |
-| aggregator | 86.8% | ✅ |
-| app | 84.3% | ✅ |
-| api | 83.0% | ✅ |
-| cache | 82.5% | ✅ |
+| timezone | 92.0% | ✅ |
+| cli | 90.5% | ✅ |
+| aggregator | 78.3% | ✅ |
+| api | 71.8% | ✅ |
 | oauth | 69.2% | ✅ |
+| cache | 58.8% | ⚠️ |
+| app | 45.0% | ⚠️ |
 
-**Total: 80.1% coverage** (exceeds typical Go project standards of 50-60%)
+**Total: 68.1% coverage** (exceeds typical Go project standards of 50-60%; `app` and `cache` cover orchestration glue that is exercised more thoroughly via the api-package integration tests)
 
 ### Running Tests
 
@@ -965,8 +977,8 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 
 This project follows Go best practices and coding standards:
 
-- **Test Coverage**: 80.1% overall, 100% for urlbuilder and constants, 95%+ for display, validation, parser, and config
-- **Test Suite**: 29 test files across 14 packages with comprehensive unit, integration, and edge case tests
+- **Test Coverage**: 68.1% overall, 100% for urlbuilder and constants, 99% for display, 95%+ for validation, parser, config, timezone, and cli
+- **Test Suite**: 28 test files across 13 tested packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -975,10 +987,10 @@ This project follows Go best practices and coding standards:
 - **Performance**: Benchmarks included for hot paths
 
 **Code Metrics:**
-- Total Lines: ~5,700 (excluding tests)
-- Test Lines: ~10,800 (comprehensive test suite)
-- Packages: 14 internal packages
-- Test Files: 29 (unit, integration, functional, edge case, and benchmark tests)
+- Total Lines: ~5,500 (excluding tests)
+- Test Lines: ~10,600 (comprehensive test suite)
+- Packages: 14 internal packages (13 with tests; `types` is a pure type-definition package)
+- Test Files: 28 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)
 
 ## License
