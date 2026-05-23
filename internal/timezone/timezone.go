@@ -100,7 +100,7 @@ func ParseDateInTimezone(dateStr string, tz *time.Location) (time.Time, error) {
 	return parsed, nil
 }
 
-// ParseDateString parses a date string and determines its format (day/month/year).
+// ParseDateString parses a date string and selects the corresponding Query Mode (Day / Month / Year).
 // Supported formats:
 //   - YYYY-MM-DD (day)
 //   - YYYY-MM (month)
@@ -188,7 +188,7 @@ func GetYearBoundaries(targetDate time.Time, tz *time.Location) (start, end time
 	return start, end
 }
 
-// GetTrueUpBoundaries returns the start and end times for a true-up year query.
+// GetTrueUpBoundaries returns the start and end times for a True-Up Mode query.
 // Start is midnight on trueUpStartDate (callers normalize this to the first of the month).
 // End is 23:59:59 of yesterday (the most recent complete day).
 func GetTrueUpBoundaries(trueUpStartDate time.Time, tz *time.Location) (start, end time.Time) {
@@ -214,7 +214,7 @@ func GetBoundaries(targetDate time.Time, queryMode constants.QueryMode, tz *time
 	}
 }
 
-// IsPastPeriod checks if the given date's period (day/month/year) is in the past.
+// IsPastPeriod checks if the given date's period (Day / Month / Year) is a Past Period.
 func IsPastPeriod(targetDate time.Time, queryMode constants.QueryMode, tz *time.Location) bool {
 	if targetDate.IsZero() {
 		return false

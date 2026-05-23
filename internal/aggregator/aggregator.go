@@ -1,5 +1,5 @@
 // Package aggregator implements core aggregation logic for combining metrics
-// from multiple Enphase systems into a single report.
+// from multiple Systems at a Site into a single report.
 //
 // DataAggregator uses dependency injection (OAuth token getter, cloud client
 // factory) for testability. Types such as AggregatedMetrics and SystemMetrics
@@ -75,7 +75,7 @@ func NewDataAggregatorWithFactory(getAccessToken OAuthTokenGetter, factory Cloud
 
 // GetAggregatedMetrics retrieves and combines data from all systems
 // If testDate is provided, uses that date instead of today
-// queryMode specifies the Query Mode (day/month/year)
+// queryMode specifies the Query Mode (Day, Month, Year, or True-Up)
 // reportTimezone is the timezone to use for all systems' data queries (from config, system, or US/Pacific fallback)
 func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []SystemConfig, apiConfig *APIConfig, testDate time.Time, queryMode constants.QueryMode, reportTimezone *time.Location) (*AggregatedMetrics, error) {
 	metrics := &AggregatedMetrics{

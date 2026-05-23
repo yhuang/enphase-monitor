@@ -131,7 +131,7 @@ Press `Ctrl+C` to stop.
 Once it is working:
 
 - Query a Past Period: `./enphase-monitor --date 2026-01-15`
-- View your utility true-up year balance: `./enphase-monitor --true-up 2025-01-15` (use your utility's true-up start date)
+- View your True-Up Period balance: `./enphase-monitor --true-up 2025-01-15` (use the True-Up Start Date from your utility account)
 - Run on startup: Add to cron or systemd
 - Build a dashboard: Parse the output or extend the code
 - Set up alerts: Monitor grid dependence and trigger notifications

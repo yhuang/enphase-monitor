@@ -51,8 +51,8 @@ func SetupDisplay(cfg *config.Config, reportTZ *time.Location) *display.Display 
 		colors.Export = cfg.Colors.Export
 		colors.NetImport = cfg.Colors.NetImport
 		colors.NetExport = cfg.Colors.NetExport
-		colors.ImportBackground = cfg.Colors.ImportBackground
-		colors.ExportBackground = cfg.Colors.ExportBackground
+		colors.NetImportBackground = cfg.Colors.NetImportBackground
+		colors.NetExportBackground = cfg.Colors.NetExportBackground
 		colors.Headers = cfg.Colors.Headers
 		colors.Charge = cfg.Colors.Charge
 		colors.TotalConsumed = cfg.Colors.TotalConsumed
@@ -82,7 +82,7 @@ func ConfigureModes(validationMode, noCache, debug bool) {
 
 // ParseTestDate parses the test date string and returns the date and query mode.
 // Supports YYYY-MM-DD (day), YYYY-MM (month), and YYYY (year) formats.
-// Returns zero values if date string is empty (meaning use today as a day query).
+// Returns a zero time and QueryModeDay if the input is empty (meaning: query today in Day Mode).
 func ParseTestDate(dateStr string, reportTZ *time.Location) (ParseDateInput, error) {
 	if dateStr == "" {
 		return ParseDateInput{

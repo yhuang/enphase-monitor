@@ -2,9 +2,9 @@
 //
 // OVERVIEW
 // --------
-// This application monitors energy metrics from one or more Enphase solar systems
-// via the Enphase Enlighten Cloud API v4. It aggregates data from multiple systems
-// and displays a comprehensive energy report in a formatted terminal output.
+// This application monitors energy metrics from one or more Enphase solar Systems
+// at a Site via the Enphase Enlighten Cloud API v4. It aggregates per-System data
+// into Site-level totals and displays a formatted report in the terminal.
 //
 // DOCUMENTATION
 // -------------
@@ -36,7 +36,7 @@
 //	Application Layer (internal/app):
 //	- setup.go: Application initialization, OAuth adapter, display setup, mode configuration
 //	- runner.go: Execution modes (once/continuous), metric fetching and display
-//	- trueup.go: True-up year report via single-batch lifetime query and report conversion
+//	- trueup.go: True-Up Mode report via single-batch Lifetime Data query and report conversion
 //
 //	CLI Layer (internal/cli):
 //	- flags.go: Command-line flag parsing and definitions
@@ -238,7 +238,7 @@ func main() {
 	printDebugStartup(flags.Debug, reportTZ)
 
 	// Default is run-once; --continuous enables periodic refresh.
-	// Month/year queries and past-date queries always run once regardless of --continuous.
+	// Month, Year, and Past Period queries always run once regardless of --continuous.
 	runContinuous := flags.Continuous
 	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear {
 		runContinuous = false

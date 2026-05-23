@@ -333,7 +333,7 @@ const MaxCurrentDayCacheAge = 1 * time.Hour
 // totals are large cumulative numbers where a one-day delay in the refresh
 // is acceptable but a multi-day delay would be misleading.
 //
-// Past periods (already-ended day / month / year / true-up year) never
+// Past Periods (already-ended Day / Month / Year / True-Up) never
 // expire and are served regardless of age — see client.cacheMaxAge.
 const MaxCurrentPeriodCacheAge = 24 * time.Hour
 

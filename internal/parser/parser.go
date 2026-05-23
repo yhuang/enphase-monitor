@@ -31,7 +31,7 @@ import (
 // TelemetryResponse represents the response from telemetry endpoints.
 // Note: production_meter, consumption_meter, battery return a single array.
 type TelemetryResponse struct {
-	LastReportedAggregateSOC string              `json:"last_reported_aggregate_soc,omitempty"` // Battery state of charge percentage as string (e.g., "97%")
+	LastReportedAggregateSOC string              `json:"last_reported_aggregate_soc,omitempty"` // Battery State of Charge (SOC) as a percentage string (e.g., "97%")
 	Intervals                []TelemetryInterval `json:"intervals"`
 }
 
@@ -44,16 +44,16 @@ type TelemetryResponseNested struct {
 // TelemetryInterval represents a single 15-minute interval.
 type TelemetryInterval struct {
 	EndAt      int64   `json:"end_at"`      // Unix timestamp
-	WhDel      float64 `json:"wh_del"`      // Energy delivered (for production_meter)
-	WhRcv      float64 `json:"wh_rcv"`      // Energy received (legacy - not used in current endpoints)
-	WhImported float64 `json:"wh_imported"` // Energy imported (for energy_import_telemetry)
-	WhExported float64 `json:"wh_exported"` // Energy exported (for energy_export_telemetry)
-	Enwh       float64 `json:"enwh"`        // Energy in Wh (for production_meter, consumption_meter)
+	WhDel      float64 `json:"wh_del"`      // Production (Wh) — from production_meter endpoint
+	WhRcv      float64 `json:"wh_rcv"`      // Legacy field, not used by current endpoints (Wh)
+	WhImported float64 `json:"wh_imported"` // Grid Import (Wh) — from energy_import_telemetry endpoint
+	WhExported float64 `json:"wh_exported"` // Grid Export (Wh) — from energy_export_telemetry endpoint
+	Enwh       float64 `json:"enwh"`        // Energy (Wh) — used by production_meter and consumption_meter endpoints
 	Charge     struct {
-		Enwh float64 `json:"enwh"` // Energy charged in Wh
+		Enwh float64 `json:"enwh"` // Battery Charge for this interval (Wh)
 	} `json:"charge"`
 	Discharge struct {
-		Enwh float64 `json:"enwh"` // Energy discharged in Wh
+		Enwh float64 `json:"enwh"` // Battery Discharge for this interval (Wh)
 	} `json:"discharge"`
 }
 

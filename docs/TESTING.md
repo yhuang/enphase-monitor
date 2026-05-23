@@ -74,7 +74,7 @@ Most packages follow the simple convention where each source file has one corres
 | `constants.go` | `constants_test.go` | Constants validation |
 | `display.go` | `display_test.go` | Display formatting tests (includes `ShowTrueUpReport` tests) |
 | `timezone.go` | `timezone_test.go` | Timezone handling tests |
-| `trueup.go` | `trueup_test.go` | True-up Window end-date logic (`trueUpWindowEnd`): Current Period vs Past True-Up Period; `buildTrueUpReport` field mapping, net flow, per-system entries |
+| `trueup.go` | `trueup_test.go` | True-Up Window end-date logic (`trueUpWindowEnd`): Current Period vs Past True-Up Period; `buildTrueUpReport` field mapping, Net Flow, per-System entries |
 
 #### Pattern 2: Complex 1:Many Mapping
 
@@ -676,10 +676,10 @@ These files test component interactions:
 |-----------|-------|---------|
 | `validation_integration_test.go` | 7 test functions | End-to-end validation with real cached data and expected values files |
 | `client_functional_test.go` | API client tests | HTTP interactions with mock server |
-| `client_lifetime_test.go` | Lifetime Data endpoint tests | Month/year queries via `_lifetime` API endpoints |
+| `client_lifetime_test.go` | Lifetime Data tests | Month, Year, and True-Up Mode queries via `_lifetime` API endpoints |
 | `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
-| `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 report types; preflight warning on/off; exercises `RecordAPICall`/`RemainingBudget` along the way |
-| `query_cost_test.go` | 3 test functions | `QueryCost` output for all query mode × hasBattery combinations; 2-system budget constraint |
+| `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 Query Mode × Period combinations; preflight warning on/off; exercises `RecordAPICall`/`RemainingBudget` along the way |
+| `query_cost_test.go` | 3 test functions | `QueryCost` output for all Query Mode × hasBattery combinations; 2-System budget constraint |
 | `testmain_test.go` | (no test functions) | `TestMain`: package-level setup redirecting all cache I/O to a temp dir so api tests never touch the production cache |
 
 ### OAuth Test Files

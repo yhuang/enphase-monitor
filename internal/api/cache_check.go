@@ -87,8 +87,8 @@ func CheckCacheForSystem(systemID, systemName, apiKey string, testDate time.Time
 			build("energy_lifetime", true),
 			build("consumption_lifetime", true),
 			// battery_lifetime is NOT used: battery data is only fetched for today's
-			// live day query via the Interval Data endpoint; month/year/true-up queries
-			// skip battery entirely.
+			// live Day Mode query via the Interval Data endpoint; Month, Year, and
+			// True-Up Mode queries skip battery entirely.
 		}
 	}
 

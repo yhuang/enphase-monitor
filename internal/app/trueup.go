@@ -1,5 +1,5 @@
 // trueup.go implements True-Up Mode (--true-up flag), which fetches energy metrics
-// for a full true-up year period in a single API batch using Lifetime Data endpoints.
+// for a full True-Up Period in a single API batch using Lifetime Data endpoints.
 package app
 
 import (
@@ -12,10 +12,10 @@ import (
 	"enphase-monitor/internal/timezone"
 )
 
-// RunTrueUp calculates and displays energy metrics for a true-up year period.
-// trueUpStartStr must be YYYY-MM-DD — the utility-defined start date of the true-up year.
+// RunTrueUp calculates and displays energy metrics for a True-Up Period.
+// trueUpStartStr must be YYYY-MM-DD — the utility-defined True-Up Start Date.
 // Full calendar months are used; the query covers the first day of the start month
-// through the True-Up Window end in a single API batch (4 metrics per system, battery excluded).
+// through the True-Up Window end in a single API batch (4 metrics per System, battery excluded).
 func RunTrueUp(ctx context.Context, rc RunConfig, trueUpStartStr string) error {
 	startDate, err := timezone.ParseDateInTimezone(trueUpStartStr, rc.ReportTZ)
 	if err != nil {

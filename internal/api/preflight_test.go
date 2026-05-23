@@ -1,19 +1,19 @@
 // Package api - preflight_test.go
 //
-// Tests for budget-exhaustion cache-fallback behaviour across all 8 report
-// types, and for the preflight budget-insufficient warning emitted by
-// GetMetricsFromCloud.
+// Tests for budget-exhaustion cache-fallback behaviour across all 8
+// Query Mode × Period combinations, and for the preflight budget-
+// insufficient warning emitted by GetMetricsFromCloud.
 //
-// REPORT TYPES COVERED
-// --------------------
-//  1. Current date     (today, zero testDate, QueryModeDay)
-//  2. Specific date    (past day,             QueryModeDay)
-//  3. Month-to-date    (current month,        QueryModeMonth)
-//  4. Specific month   (past month,           QueryModeMonth)
-//  5. Year-to-date     (current year,         QueryModeYear)
-//  6. Specific year    (past year,            QueryModeYear)
-//  7. Current true-up  (Current Period,        QueryModeTrueUp)
-//  8. Past true-up     (Past Period,           QueryModeTrueUp)
+// QUERY SCENARIOS COVERED
+// -----------------------
+//  1. Current Period Day      (today, zero testDate, QueryModeDay)
+//  2. Past Period Day         (past day,             QueryModeDay)
+//  3. Current Period Month    (month-to-date,        QueryModeMonth)
+//  4. Past Period Month       (past month,           QueryModeMonth)
+//  5. Current Period Year     (year-to-date,         QueryModeYear)
+//  6. Past Period Year        (past year,            QueryModeYear)
+//  7. Current Period True-Up  (Current Period,       QueryModeTrueUp)
+//  8. Past Period True-Up     (Past Period,          QueryModeTrueUp)
 //
 // TESTING PATTERN
 // ---------------
@@ -23,7 +23,7 @@
 //  3. Probe call  — budget zero → client must serve from cache.
 //  4. Assert      — server received exactly 1 hit (the prime), not 2.
 //
-// For past periods (types 2, 4, 6, 8) the probe call never reaches the budget
+// For Past Periods (types 2, 4, 6, 8) the probe call never reaches the budget
 // check at all: makeCachedAPIRequest short-circuits to cache the moment it sees
 // isPast==true and a valid cache entry. This makes them a useful control group
 // that confirms immutable-cache behaviour is budget-free.
@@ -180,7 +180,7 @@ func TestBudgetExhausted_SpecificDate(t *testing.T) {
 
 	exhaustBudget()
 
-	// Probe: past period + cache exists → short-circuits to immutable cache,
+	// Probe: Past Period + cache exists → short-circuits to immutable cache,
 	// never reaches the budget check.
 	_, err = client.GetProductionForDate(ctx, pastDay, constants.QueryModeDay)
 	if err != nil {
@@ -374,13 +374,13 @@ func TestBudgetExhausted_CurrentTrueUp(t *testing.T) {
 }
 
 // =============================================================================
-// 8. Past true-up — QueryModeTrueUp, Past Period
+// 8. Past Period True-Up — QueryModeTrueUp, Past Period
 // =============================================================================
 
-// TestBudgetExhausted_PastTrueUp verifies that a completed true-up year is
+// TestBudgetExhausted_PastTrueUp verifies that a closed True-Up Period is
 // served from immutable cache even with zero budget. cacheMaxAge detects a
-// past true-up when trueUpStart + 1 year is before now and sets maxAge = 0
-// (never-expires sentinel).
+// Past Period True-Up when trueUpStart + 1 year is before now and sets
+// maxAge = 0 (never-expires sentinel).
 func TestBudgetExhausted_PastTrueUp(t *testing.T) {
 	cache.ResetState()
 	defer cache.ResetState()
@@ -446,12 +446,12 @@ func TestBudgetExhausted_NoCache_ReturnsRateLimitError(t *testing.T) {
 }
 
 // =============================================================================
-// 10. Preflight warning — emitted for current periods, suppressed for past
+// 10. Preflight warning — emitted for Current Periods, suppressed for past
 // =============================================================================
 
 // TestPreflightWarning_CurrentPeriod verifies that GetMetricsFromCloud prints
 // a budget-insufficient warning to stdout when the remaining budget is less
-// than the query cost for a current period.
+// than the query cost for a Current Period.
 func TestPreflightWarning_CurrentPeriod(t *testing.T) {
 	cache.ResetState()
 	defer cache.ResetState()
@@ -505,7 +505,7 @@ func TestPreflightWarning_CurrentPeriod(t *testing.T) {
 }
 
 // TestPreflightWarning_PastPeriod verifies that no preflight warning is emitted
-// for past periods — their data is always served from immutable cache and never
+// for Past Periods — their data is always served from immutable cache and never
 // consumes budget.
 func TestPreflightWarning_PastPeriod(t *testing.T) {
 	cache.ResetState()
@@ -545,12 +545,12 @@ func TestPreflightWarning_PastPeriod(t *testing.T) {
 	// Exhaust budget completely.
 	exhaustBudget()
 
-	// Probe: past period → no preflight warning expected.
+	// Probe: Past Period → no preflight warning expected.
 	output := captureStdout(func() {
 		_, _, _ = client.GetMetricsFromCloud(ctx, pastDay, constants.QueryModeDay)
 	})
 
 	if strings.Contains(output, "Insufficient API budget") {
-		t.Errorf("unexpected preflight warning for past period: %q", output)
+		t.Errorf("unexpected preflight warning for Past Period: %q", output)
 	}
 }

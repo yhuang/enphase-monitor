@@ -23,7 +23,7 @@
 //     - Refresh token (obtained from --oauth-setup)
 //
 //  2. Systems Configuration (systems:)
-//     - List of Enphase systems to monitor
+//     - List of Systems to monitor
 //     - Each system requires: name and ID (system ID from Enlighten)
 //
 //  3. Application Settings
@@ -80,20 +80,20 @@ type APIConfig = types.APIConfig
 // ColorConfig represents color customization settings.
 // Note: Reset and Bold are defined as constants in constants.go and cannot be customized.
 type ColorConfig struct {
-	Production       string `yaml:"production,omitempty"`        // Solar Production
-	Discharge        string `yaml:"discharge,omitempty"`         // Battery Discharge
-	Import           string `yaml:"import,omitempty"`            // Grid Import
-	Export           string `yaml:"export,omitempty"`            // Grid Export
-	NetImport        string `yaml:"net_import,omitempty"`        // Foreground color used when Net Flow is in the import direction (positive value)
-	NetExport        string `yaml:"net_export,omitempty"`        // Foreground color used when Net Flow is in the export direction (negative value)
-	ImportBackground string `yaml:"import_background,omitempty"` // Truecolor background highlight for the Net Flow line in the import direction. Hex values are rendered as 24-bit truecolor (\033[48;2;R;G;Bm) rather than 256-color cube to preserve fidelity for backgrounds.
-	ExportBackground string `yaml:"export_background,omitempty"` // Truecolor background highlight for the Net Flow line in the export direction. Hex values rendered as 24-bit truecolor.
-	Headers          string `yaml:"headers,omitempty"`           // Report Headers
-	Charge           string `yaml:"charge,omitempty"`            // Battery Charge
-	TotalConsumed    string `yaml:"total_consumed,omitempty"`    // Total Consumed
-	SecondaryText    string `yaml:"secondary_text,omitempty"`    // Secondary Text
-	PrimaryText      string `yaml:"primary_text,omitempty"`      // Primary Text
-	Error            string `yaml:"error,omitempty"`             // Error Text
+	Production          string `yaml:"production,omitempty"`            // Solar Production
+	Discharge           string `yaml:"discharge,omitempty"`             // Battery Discharge
+	Import              string `yaml:"import,omitempty"`                // Grid Import
+	Export              string `yaml:"export,omitempty"`                // Grid Export
+	NetImport           string `yaml:"net_import,omitempty"`            // Foreground color used when Net Flow is in the import direction (positive value)
+	NetExport           string `yaml:"net_export,omitempty"`            // Foreground color used when Net Flow is in the export direction (negative value)
+	NetImportBackground string `yaml:"net_import_background,omitempty"` // Truecolor background highlight for the Net Flow line in the import direction. Hex values are rendered as 24-bit truecolor (\033[48;2;R;G;Bm) rather than 256-color cube to preserve fidelity for backgrounds.
+	NetExportBackground string `yaml:"net_export_background,omitempty"` // Truecolor background highlight for the Net Flow line in the export direction. Hex values rendered as 24-bit truecolor.
+	Headers             string `yaml:"headers,omitempty"`               // Report Headers
+	Charge              string `yaml:"charge,omitempty"`                // Battery Charge
+	TotalConsumed       string `yaml:"total_consumed,omitempty"`        // Total Consumed
+	SecondaryText       string `yaml:"secondary_text,omitempty"`        // Secondary Text
+	PrimaryText         string `yaml:"primary_text,omitempty"`          // Primary Text
+	Error               string `yaml:"error,omitempty"`                 // Error Text
 }
 
 // MergeWithDefaults fills in empty color fields with default values.
@@ -109,8 +109,8 @@ func (c *ColorConfig) MergeWithDefaults(defaults ColorConfig) {
 		{&c.Export, &defaults.Export},
 		{&c.NetImport, &defaults.NetImport},
 		{&c.NetExport, &defaults.NetExport},
-		{&c.ImportBackground, &defaults.ImportBackground},
-		{&c.ExportBackground, &defaults.ExportBackground},
+		{&c.NetImportBackground, &defaults.NetImportBackground},
+		{&c.NetExportBackground, &defaults.NetExportBackground},
 		{&c.Headers, &defaults.Headers},
 		{&c.Charge, &defaults.Charge},
 		{&c.TotalConsumed, &defaults.TotalConsumed},
@@ -152,8 +152,8 @@ func (c *ColorConfig) convertHexFields() {
 	}
 
 	backgroundFields := []*string{
-		&c.ImportBackground,
-		&c.ExportBackground,
+		&c.NetImportBackground,
+		&c.NetExportBackground,
 	}
 	for _, field := range backgroundFields {
 		*field = convertIfHexBackground(*field)
