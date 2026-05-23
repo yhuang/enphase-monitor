@@ -370,8 +370,8 @@ func TestShowMetrics_Battery_DayQuery(t *testing.T) {
 	if !strings.Contains(output, "Battery Discharge") {
 		t.Error("Output should contain 'Battery Discharge' for Day Mode query")
 	}
-	if !strings.Contains(output, "Battery State of Charge (SOC)") {
-		t.Error("Output should contain 'Battery State of Charge (SOC)' for day query")
+	if !strings.Contains(output, "Battery State of Charge") {
+		t.Error("Output should contain 'Battery State of Charge' for day query")
 	}
 }
 
@@ -402,8 +402,8 @@ func TestShowMetrics_Battery_MonthQuery(t *testing.T) {
 	if strings.Contains(output, "Battery Discharge") {
 		t.Error("Output should NOT contain 'Battery Discharge' for Month Mode query")
 	}
-	if strings.Contains(output, "Battery State of Charge (SOC)") {
-		t.Error("Output should NOT contain 'Battery State of Charge (SOC)' for month query")
+	if strings.Contains(output, "Battery State of Charge") {
+		t.Error("Output should NOT contain 'Battery State of Charge' for month query")
 	}
 }
 
@@ -434,8 +434,8 @@ func TestShowMetrics_Battery_YearQuery(t *testing.T) {
 	if strings.Contains(output, "Battery Discharge") {
 		t.Error("Output should NOT contain 'Battery Discharge' for Year Mode query")
 	}
-	if strings.Contains(output, "Battery State of Charge (SOC)") {
-		t.Error("Output should NOT contain 'Battery State of Charge (SOC)' for year query")
+	if strings.Contains(output, "Battery State of Charge") {
+		t.Error("Output should NOT contain 'Battery State of Charge' for year query")
 	}
 }
 
@@ -624,7 +624,7 @@ func TestShowTrueUpReport_PerSystemMetrics(t *testing.T) {
 	}
 
 	// Battery metrics must be absent
-	batteryLabels := []string{"Battery", "Charged", "Discharged", "Battery State of Charge (SOC)"}
+	batteryLabels := []string{"Battery", "Charged", "Discharged", "Battery State of Charge"}
 	for _, label := range batteryLabels {
 		if strings.Contains(output, label) {
 			t.Errorf("output should NOT contain battery label %q in true-up report", label)

@@ -441,8 +441,10 @@ func QueryCost(queryMode constants.QueryMode, hasBattery bool) int {
 // GetMetricsFromCloud fetches all metrics from the Cloud API for the specified period.
 // If testDate is provided, uses that date instead of today.
 // queryMode selects Day, Month, Year, or True-Up Mode.
-// Battery data (charged, discharged, SOC) is only fetched for QueryModeDay; all other
-// query modes leave those fields as zero and skip the battery API call entirely.
+// Battery data (charged, discharged, SOC) is only fetched for today's live Day Mode
+// query (QueryModeDay with testDate.IsZero()); Past Period Day Mode queries and all
+// Month, Year, and True-Up Mode queries leave those fields as zero and skip the
+// battery API call entirely.
 // Returns metrics and a boolean indicating if any cache was used.
 func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (*LocalMetrics, bool, error) {
 	metrics := &LocalMetrics{

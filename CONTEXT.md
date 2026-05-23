@@ -54,7 +54,7 @@ The default behavior — execute one query, display the report, and exit. Works 
 _Avoid_: Single run, one-shot mode
 
 **Continuous Mode**:
-A run mode activated by `--continuous` that re-fetches and re-displays today's Day report on every Refresh Interval. Restricted to today's Day query — Month, Year, and past-date queries are silently downgraded to Run-Once Mode. Intended for use with Auto Cache Mode: when the API Budget is temporarily exhausted at a refresh tick, the program gracefully serves the most recent cached data rather than terminating. Using `--no-cache` with Continuous Mode is not recommended — it bypasses the pre-call budget short-circuit, so exhaustion triggers live calls that are likely to 429; on a 429 the program falls back to cache if available (with a warning), or exits with an error if no cache exists.
+A run mode activated by `--continuous` that re-fetches and re-displays today's Day report on every Refresh Interval. Restricted to today's Day query — Month, Year, Past Period, and True-Up Mode queries are silently downgraded to Run-Once Mode (Month / Year / Past Period via the run-mode gate in `main`; True-Up Mode via its dedicated early-return branch). Intended for use with Auto Cache Mode: when the API Budget is temporarily exhausted at a refresh tick, the program gracefully serves the most recent cached data rather than terminating. Using `--no-cache` with Continuous Mode is not recommended — it bypasses the pre-call budget short-circuit, so exhaustion triggers live calls that are likely to 429; on a 429 the program falls back to cache if available (with a warning), or exits with an error if no cache exists.
 _Avoid_: Loop mode, polling mode, watch mode
 
 **Refresh Interval**:
