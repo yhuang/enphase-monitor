@@ -16,7 +16,7 @@
 //   - Test query range formatting (date/time display)
 //   - Test combined energy report section
 //   - Test individual systems section
-//   - Test net import/export formatting (positive vs negative)
+//   - Test Net Flow direction formatting (positive = import, negative = export)
 //
 // 3. Color Application Tests (Optional)
 //   - Verify ANSI color codes are present in output
@@ -173,11 +173,11 @@ func TestShowMetrics_CombinedSectionLabels(t *testing.T) {
 	output := buf.String()
 
 	for _, want := range []string{
-		"Energy Produced",
-		"Energy Consumed",
-		"Energy Imported",
-		"Energy Exported",
-		"Net Energy Flow",
+		"Production",
+		"Consumption",
+		"Grid Import",
+		"Grid Export",
+		"Net Flow",
 	} {
 		if !strings.Contains(output, want) {
 			t.Errorf("combined section missing %q", want)
@@ -364,11 +364,11 @@ func TestShowMetrics_Battery_DayQuery(t *testing.T) {
 	output := buf.String()
 
 	// All three battery fields should appear for day queries
-	if !strings.Contains(output, "Charged to Battery") {
-		t.Error("Output should contain 'Charged to Battery' for day query")
+	if !strings.Contains(output, "Battery Charge") {
+		t.Error("Output should contain 'Battery Charge' for Day Mode query")
 	}
-	if !strings.Contains(output, "Discharged from Battery") {
-		t.Error("Output should contain 'Discharged from Battery' for day query")
+	if !strings.Contains(output, "Battery Discharge") {
+		t.Error("Output should contain 'Battery Discharge' for Day Mode query")
 	}
 	if !strings.Contains(output, "Battery State of Charge (SOC)") {
 		t.Error("Output should contain 'Battery State of Charge (SOC)' for day query")
@@ -396,11 +396,11 @@ func TestShowMetrics_Battery_MonthQuery(t *testing.T) {
 	output := buf.String()
 
 	// No battery fields should appear for month queries
-	if strings.Contains(output, "Charged to Battery") {
-		t.Error("Output should NOT contain 'Charged to Battery' for month query")
+	if strings.Contains(output, "Battery Charge") {
+		t.Error("Output should NOT contain 'Battery Charge' for Month Mode query")
 	}
-	if strings.Contains(output, "Discharged from Battery") {
-		t.Error("Output should NOT contain 'Discharged from Battery' for month query")
+	if strings.Contains(output, "Battery Discharge") {
+		t.Error("Output should NOT contain 'Battery Discharge' for Month Mode query")
 	}
 	if strings.Contains(output, "Battery State of Charge (SOC)") {
 		t.Error("Output should NOT contain 'Battery State of Charge (SOC)' for month query")
@@ -428,11 +428,11 @@ func TestShowMetrics_Battery_YearQuery(t *testing.T) {
 	output := buf.String()
 
 	// No battery fields should appear for year queries
-	if strings.Contains(output, "Charged to Battery") {
-		t.Error("Output should NOT contain 'Charged to Battery' for year query")
+	if strings.Contains(output, "Battery Charge") {
+		t.Error("Output should NOT contain 'Battery Charge' for Year Mode query")
 	}
-	if strings.Contains(output, "Discharged from Battery") {
-		t.Error("Output should NOT contain 'Discharged from Battery' for year query")
+	if strings.Contains(output, "Battery Discharge") {
+		t.Error("Output should NOT contain 'Battery Discharge' for Year Mode query")
 	}
 	if strings.Contains(output, "Battery State of Charge (SOC)") {
 		t.Error("Output should NOT contain 'Battery State of Charge (SOC)' for year query")
@@ -516,11 +516,11 @@ func TestShowTrueUpReport_CombinedSection(t *testing.T) {
 
 	checks := []string{
 		"TRUE-UP ENERGY REPORT",
-		"Energy Produced",
-		"Energy Consumed",
-		"Energy Imported",
-		"Energy Exported",
-		"Net Energy Flow",
+		"Production",
+		"Consumption",
+		"Grid Import",
+		"Grid Export",
+		"Net Flow",
 	}
 	for _, want := range checks {
 		if !strings.Contains(output, want) {
@@ -611,11 +611,11 @@ func TestShowTrueUpReport_PerSystemMetrics(t *testing.T) {
 	output := buf.String()
 
 	wantLabels := []string{
-		"Net Energy Flow",
-		"Energy Produced",
-		"Energy Consumed",
-		"Energy Imported",
-		"Energy Exported",
+		"Net Flow",
+		"Production",
+		"Consumption",
+		"Grid Import",
+		"Grid Export",
 	}
 	for _, label := range wantLabels {
 		if !strings.Contains(output, label) {

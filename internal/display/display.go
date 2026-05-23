@@ -21,20 +21,20 @@ import (
 // GetDefaultColors returns the default color configuration.
 func GetDefaultColors() config.ColorConfig {
 	return config.ColorConfig{
-		Production:       "\033[38;5;208m",
-		Discharge:        "\033[38;5;34m",
-		Import:           "\033[38;5;39m",
-		Export:           "\033[38;5;220m",
-		NetImport:        "\033[38;5;39m",
-		NetExport:        "\033[38;5;220m",
-		ImportBackground: "\033[48;2;1;4;105m",   // #010469 — net-flow line background when in import direction
-		ExportBackground: "\033[48;2;125;0;105m", // #7D0069 — net-flow line background when in export direction
-		Headers:          "\033[38;5;51m",
-		Charge:           "\033[38;5;205m",
-		TotalConsumed:    "\033[38;5;39m",
-		SecondaryText:    "\033[38;5;245m",
-		PrimaryText:      "\033[38;5;255m",
-		Error:            "\033[38;5;196m",
+		Production:          "\033[38;5;208m",
+		Discharge:           "\033[38;5;34m",
+		Import:              "\033[38;5;39m",
+		Export:              "\033[38;5;220m",
+		NetImport:           "\033[38;5;39m",
+		NetExport:           "\033[38;5;220m",
+		NetImportBackground: "\033[48;2;1;4;105m",   // #010469 — Net Flow line background when in import direction
+		NetExportBackground: "\033[48;2;125;0;105m", // #7D0069 — Net Flow line background when in export direction
+		Headers:             "\033[38;5;51m",
+		Charge:              "\033[38;5;205m",
+		TotalConsumed:       "\033[38;5;39m",
+		SecondaryText:       "\033[38;5;245m",
+		PrimaryText:         "\033[38;5;255m",
+		Error:               "\033[38;5;196m",
 	}
 }
 
@@ -86,7 +86,7 @@ func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate tim
 	fmt.Fprintf(d.writer, "    %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
 
-	// Calculate date range based on query mode (day/month/year).
+	// Calculate date range based on Query Mode (Day / Month / Year / True-Up).
 	// For ongoing month/year periods, cap the display end to yesterday (last complete day)
 	// to match Lifetime Data coverage — today's partial day is not included.
 	periodStart, periodEnd := timezone.GetBoundaries(queryDate, queryMode, d.timezone)
@@ -116,11 +116,11 @@ func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
 	fmt.Fprintf(d.writer, "\n   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Energy Flow", metrics.NetFlowToday, "  ", 24, false, d.colors.ImportBackground, d.colors.ExportBackground)
-	d.printMetric("Energy Produced", metrics.ProductionToday, d.colors.Production, "    ", 22, false)
-	d.printMetric("Energy Consumed", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 22, false)
-	d.printMetric("Energy Imported", metrics.GridImportToday, d.colors.Import, "    ", 22, false)
-	d.printMetric("Energy Exported", metrics.GridExportToday, d.colors.Export, "    ", 22, false)
+	d.printNetFlow("  Net Flow", metrics.NetFlowToday, "  ", 24, false, d.colors.NetImportBackground, d.colors.NetExportBackground)
+	d.printMetric("Production", metrics.ProductionToday, d.colors.Production, "    ", 22, false)
+	d.printMetric("Consumption", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 22, false)
+	d.printMetric("Grid Import", metrics.GridImportToday, d.colors.Import, "    ", 22, false)
+	d.printMetric("Grid Export", metrics.GridExportToday, d.colors.Export, "    ", 22, false)
 }
 
 func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) {
@@ -142,22 +142,22 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 			prefix, d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, displayName, constants.Reset,
 			d.colors.SecondaryText, identifier, constants.Reset)
-		// labelWidth anchors on the longest visible label + 7-space gap:
-		// today's report shows "Discharged from Battery:" (24 chars) → 33
-		// all other reports show "Energy Exported:" (16 chars) → 23
+		// labelWidth anchors on the longest visible label (plus gap):
+		// today's report includes "Battery Discharge:" (18 chars) → lw 27
+		// all other reports top out at "Grid Import:" / "Grid Export:" (12 chars) → lw 19
 		showBattery := metrics.QueryMode == constants.QueryModeDay && metrics.QueryDate.IsZero()
-		lw := 23
+		lw := 19
 		if showBattery {
-			lw = 33
+			lw = 27
 		}
-		d.printNetFlow("Net Energy Flow", sys.NetFlowToday, "        ", lw, true, "", "")
-		d.printMetric("Energy Produced", sys.ProductionToday, d.colors.Production, "        ", lw, true)
-		d.printMetric("Energy Consumed", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", lw, true)
-		d.printMetric("Energy Imported", sys.GridImportToday, d.colors.Import, "        ", lw, true)
-		d.printMetric("Energy Exported", sys.GridExportToday, d.colors.Export, "        ", lw, true)
+		d.printNetFlow("Net Flow", sys.NetFlowToday, "        ", lw, true, "", "")
+		d.printMetric("Production", sys.ProductionToday, d.colors.Production, "        ", lw, true)
+		d.printMetric("Consumption", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", lw, true)
+		d.printMetric("Grid Import", sys.GridImportToday, d.colors.Import, "        ", lw, true)
+		d.printMetric("Grid Export", sys.GridExportToday, d.colors.Export, "        ", lw, true)
 		if showBattery {
-			d.printMetric("Charged to Battery", sys.BatteryChargedToday, d.colors.Charge, "        ", lw, true)
-			d.printMetric("Discharged from Battery", sys.BatteryDischargedToday, d.colors.Discharge, "        ", lw, true)
+			d.printMetric("Battery Charge", sys.BatteryChargedToday, d.colors.Charge, "        ", lw, true)
+			d.printMetric("Battery Discharge", sys.BatteryDischargedToday, d.colors.Discharge, "        ", lw, true)
 			fmt.Fprintf(d.writer, "        %sBattery State of Charge (SOC):%s   %s%d%%%s\n",
 				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		}
@@ -188,18 +188,18 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 		padding, valueColor, displayValue, unit, constants.Reset)
 }
 
-func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int, rightAlign bool, importBg, exportBg string) {
-	// Default to import (positive), override for export (negative)
+func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int, rightAlign bool, netImportBg, netExportBg string) {
+	// Default to import direction (positive Net Flow), override for export direction (negative)
 	color := d.colors.NetImport
 	direction := "import"
 	displayValue := netValue
 
-	highlightBg := importBg
+	highlightBg := netImportBg
 	if netValue < 0 {
 		color = d.colors.NetExport
 		direction = "export"
 		displayValue = -netValue
-		highlightBg = exportBg
+		highlightBg = netExportBg
 	}
 
 	labelWithColon := label + ":"
@@ -237,7 +237,7 @@ func (d *Display) printNetFlow(label string, netValue float64, indent string, la
 	}
 }
 
-// ShowTrueUpReport displays the true-up year energy report.
+// ShowTrueUpReport displays the True-Up Mode energy report.
 func (d *Display) ShowTrueUpReport(report *aggregator.TrueUpReport) {
 	d.printTrueUpHeader(report)
 	d.printTrueUpCombined(report)
@@ -283,11 +283,11 @@ func (d *Display) printTrueUpCombined(report *aggregator.TrueUpReport) {
 	fmt.Fprintf(d.writer, "\n   %s%sTRUE-UP ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Energy Flow", report.NetFlow, "  ", 24, false, d.colors.ImportBackground, d.colors.ExportBackground)
-	d.printMetric("Energy Produced", report.Production, d.colors.Production, "    ", 22, false)
-	d.printMetric("Energy Consumed", report.Consumption, d.colors.TotalConsumed, "    ", 22, false)
-	d.printMetric("Energy Imported", report.GridImport, d.colors.Import, "    ", 22, false)
-	d.printMetric("Energy Exported", report.GridExport, d.colors.Export, "    ", 22, false)
+	d.printNetFlow("  Net Flow", report.NetFlow, "  ", 24, false, d.colors.NetImportBackground, d.colors.NetExportBackground)
+	d.printMetric("Production", report.Production, d.colors.Production, "    ", 22, false)
+	d.printMetric("Consumption", report.Consumption, d.colors.TotalConsumed, "    ", 22, false)
+	d.printMetric("Grid Import", report.GridImport, d.colors.Import, "    ", 22, false)
+	d.printMetric("Grid Export", report.GridExport, d.colors.Export, "    ", 22, false)
 }
 
 func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
@@ -299,11 +299,11 @@ func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, sys.Name, constants.Reset,
 			d.colors.SecondaryText, sys.ID, constants.Reset)
-		d.printNetFlow("Net Energy Flow", sys.NetFlow, "      ", 21, true, "", "")
-		d.printMetric("Energy Produced", sys.Production, d.colors.Production, "      ", 21, true)
-		d.printMetric("Energy Consumed", sys.Consumption, d.colors.TotalConsumed, "      ", 21, true)
-		d.printMetric("Energy Imported", sys.GridImport, d.colors.Import, "      ", 21, true)
-		d.printMetric("Energy Exported", sys.GridExport, d.colors.Export, "      ", 21, true)
+		d.printNetFlow("Net Flow", sys.NetFlow, "      ", 21, true, "", "")
+		d.printMetric("Production", sys.Production, d.colors.Production, "      ", 21, true)
+		d.printMetric("Consumption", sys.Consumption, d.colors.TotalConsumed, "      ", 21, true)
+		d.printMetric("Grid Import", sys.GridImport, d.colors.Import, "      ", 21, true)
+		d.printMetric("Grid Export", sys.GridExport, d.colors.Export, "      ", 21, true)
 	}
 }
 

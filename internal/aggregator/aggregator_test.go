@@ -10,7 +10,7 @@
 // 1. Aggregation Logic Tests
 //   - Test single-system aggregation
 //   - Test multi-system aggregation (summing values)
-//   - Test net import calculation (import - export)
+//   - Test Net Flow calculation (Grid Import − Grid Export)
 //
 // 2. Error Handling Tests
 //   - Test API errors are propagated correctly

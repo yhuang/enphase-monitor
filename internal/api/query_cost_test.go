@@ -29,7 +29,7 @@ func TestQueryCost(t *testing.T) {
 		{"year with battery", constants.QueryModeYear, true, 4},
 		{"year without battery", constants.QueryModeYear, false, 4},
 
-		// True-up queries: same as month/year.
+		// True-Up Mode queries: same as Month and Year.
 		{"true-up with battery", constants.QueryModeTrueUp, true, 4},
 		{"true-up without battery", constants.QueryModeTrueUp, false, 4},
 	}

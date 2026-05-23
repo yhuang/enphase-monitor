@@ -25,15 +25,15 @@ designed to help new engineers learn Go development patterns and best practices.
 
 ## Project Overview
 
-The **enphase-monitor** is a CLI application that monitors energy metrics from one or more Enphase solar systems via the Enphase Enlighten Cloud API v4.
+The **enphase-monitor** is a CLI application that monitors energy metrics from one or more Enphase solar Systems at a Site via the Enphase Enlighten Cloud API v4.
 
 ### Core Capabilities
 
-- **Multi-System Monitoring**: Query and aggregate data from multiple independent Enphase systems
+- **Multi-System Monitoring**: Query and aggregate data from multiple independent Systems at a Site
 - **Cloud API Integration**: Uses Enphase Enlighten Cloud API v4 exclusively (no local network access required)
 - **Intelligent Caching**: Disk-based response caching to stay within the API Budget (10 calls/minute)
 - **Past Period Queries**: Query any past date with `--date` flag (auto-runs once since Past Period data is immutable)
-- **True-Up Year Report**: Query energy metrics across a full utility true-up year with `--true-up`
+- **True-Up Report**: Energy metrics across a full utility True-Up Period with `--true-up`
 - **Real-time Monitoring**: Continuous mode with configurable refresh interval (default: 1 hour)
 - **Color Customization**: Customize terminal output colors via YAML configuration
 - **Validation Mode**: Test against expected values without making API calls
@@ -66,8 +66,8 @@ enphase-monitor/
 │   │   ├── cache_check.go                 # Per-system/endpoint cache availability check (--cache mode)
 │   │   ├── client_test.go                 # API client unit tests
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
-│   │   ├── client_lifetime_test.go        # Lifetime Data endpoint tests (month/year/true-up queries)
-│   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 report types)
+│   │   ├── client_lifetime_test.go        # Lifetime Data tests (Month, Year, True-Up Mode queries)
+│   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 Query Mode × Period combinations)
 │   │   ├── query_cost_test.go             # QueryCost unit tests (all QueryMode × hasBattery combos)
 │   │   └── testmain_test.go               # TestMain: redirects cache I/O to temp dir for all api tests
 │   ├── app/                               # Application execution logic
@@ -75,7 +75,7 @@ enphase-monitor/
 │   │   ├── setup_test.go                  # Setup tests
 │   │   ├── runner.go                      # Execution modes (once/continuous)
 │   │   ├── runner_test.go                 # Runner tests
-│   │   ├── trueup.go                      # True-up year: single-batch lifetime query, True-Up Window end-date logic, report conversion
+│   │   ├── trueup.go                      # True-Up Mode: single-batch Lifetime Data query, True-Up Window end-date logic, report conversion
 │   │   ├── trueup_test.go                 # True-up Window end-date logic (trueUpWindowEnd) and report conversion tests
 │   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── cache/                             # Disk-based response caching
@@ -202,7 +202,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │  4. AGGREGATION (internal/aggregator)                              │
 │     └─► GetAggregatedMetrics() loops through systems               │
 │         └─► Uses internal/api for HTTP requests                    │
-│             └─► Fetches production, consumption, grid import/export│
+│             └─► Fetches Production, Consumption, Grid Import/Export│
 │                 battery fetched only for today's Day query          │
 └────────────────────────────────────────────────────────────────────┘
                                     │
@@ -215,7 +215,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │         │   cache is fallback only when budget exhausted           │
 │         ├─► Budget exhausted: exact-URL cache → cross-endpoint     │
 │         │   same-system cache (any age) → RateLimitError           │
-│         ├─► Make HTTP request if current period and budget > 0     │
+│         ├─► Make HTTP request if Current Period and budget > 0     │
 │         └─► Save response to cache + append timestamp to api_calls │
 └────────────────────────────────────────────────────────────────────┘
                                     │
@@ -263,14 +263,14 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │              internal/api/EnlightenCloudClient                     │
 │  - OAuth authentication (internal/oauth)                           │
 │  - Interval Data endpoints (15-min data, single-day queries)       │
-│  - Lifetime Data endpoints (daily totals, month/year/true-up)      │
+│  - Lifetime Data endpoints (daily totals; Month, Year, True-Up)    │
 └────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
 ┌────────────────────────────────────────────────────────────────────┐
 │                  internal/cache/Cache Layer                        │
 │  - Sliding-window API Budget counter (api_calls, 10/60s)           │
-│  - Past periods: always from cache; current periods: live-first    │
+│  - Past Periods: always from cache; Current Periods: live-first    │
 │  - Disk-based storage tagged with endpoint + system ID             │
 └────────────────────────────┬───────────────────────────────────────┘
                              │
@@ -278,7 +278,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ┌────────────────────────────────────────────────────────────────────┐
 │              internal/aggregator/AggregatedMetrics                 │
 │   - Sums production, consumption across systems                    │
-│   - Battery tracked per system only (today's live day); zero otherwise │
+│   - Battery tracked per System only (today's live Day Mode query); zero otherwise │
 │   - Tracks cache usage flags (CacheUsed, AllFromCache)             │
 │   - TrueUpReport built from a single lifetime-endpoint batch       │
 └──────────────────────────┬─────────────────────────────────────────┘
@@ -299,16 +299,16 @@ The Enphase Cloud API enforces a budget of **10 requests per 60-second sliding w
 
 ### Layer 1: `QueryCost` — call-count estimator
 
-`QueryCost(queryMode, hasBattery)` in [internal/api/client.go](../internal/api/client.go) returns the number of live API calls that `GetMetricsFromCloud` will make for a **single system**:
+`QueryCost(queryMode, hasBattery)` in [internal/api/client.go](../internal/api/client.go) returns the number of live API calls that `GetMetricsFromCloud` will make for a **single System**:
 
 | Query mode | hasBattery=false | hasBattery=true |
 |------------|-----------------|-----------------|
 | Day        | 4               | 5               |
 | Month      | 4               | 4               |
 | Year       | 4               | 4               |
-| True-up    | 4               | 4               |
+| True-Up    | 4               | 4               |
 
-The base of 4 covers: grid import, grid export, production, and consumption. Battery telemetry adds a 5th call **only for today's Day query** (`testDate.IsZero() && QueryModeDay`) — all other cases skip it because:
+The base of 4 covers: Grid Import, Grid Export, Production, and Consumption. Battery telemetry adds a 5th call **only for today's Day query** (`testDate.IsZero() && QueryModeDay`) — all other cases skip it because:
 1. The battery telemetry endpoint returns per-15-minute intervals; fetching it for Past Period or multi-day queries would require one call per day, far exceeding the budget.
 2. Battery SOC is a point-in-time reading that is not meaningful as a Past Period or multi-day aggregate, so the call is omitted for any non-today query.
 
@@ -330,7 +330,7 @@ if cache.DebugMode() && !timezone.IsPastPeriod(testDate, queryMode, c.timezone) 
 ```
 
 Key design decisions:
-- **Past periods are skipped entirely.** A past day/month/year always comes from immutable cache and never consumes any budget, so a preflight check would be misleading noise.
+- **Past Periods are skipped entirely.** A Past Period Day / Month / Year / True-Up always comes from immutable Cache and never consumes any budget, so a preflight check would be misleading noise.
 - **Day queries use `hasBattery=true` (5 calls) as the conservative count.** At this point the client does not know whether the hardware has a battery, so it assumes the worst case. This ensures the warning fires early enough to be useful.
 - **The preflight only warns — it does not abort.** Each individual call will still try cache before giving up, so partial data is still possible even when the budget is tight.
 - **The warning is debug-only.** When `--debug` is off the check is skipped entirely so that normal report output is not cluttered with diagnostic noise.
@@ -340,10 +340,10 @@ Key design decisions:
 The actual enforcement happens inside `makeCachedAPIRequest` for every URL. The decision tree (simplified):
 
 ```
-Is this a past period with a valid cache entry?
+Is this a Past Period with a valid cache entry?
   YES → serve immutable cache, no budget consumed, done
   NO  ↓
-Is the cache entry within maxAge (1 h for today, 24 h for MTD/YTD/current true-up year)?
+Is the cache entry within maxAge (1 h for today's Day Mode query, 24 h for MTD / YTD / Current Period True-Up)?
   YES → serve cache, no live call
   NO  ↓
 Is budget exhausted (RemainingBudget() <= 0)?
@@ -362,7 +362,7 @@ The preflight (Layer 2) fires once per `GetMetricsFromCloud` call and is a forwa
 
 - If budget is full when the run starts and is exhausted mid-run (e.g. the first 4 calls succeed but the 5th lands after the window), Layer 3 handles it gracefully with a cache fallback.
 - If budget is already low before the run, Layer 2 warns the user up front (debug mode only) so they understand why the output may show stale numbers.
-- If budget is zero and no cache exists for the endpoint, `RateLimitError` is returned and the metric is shown as 0 in the output (non-fatal for optional metrics like grid import/export; fatal for production which is required).
+- If budget is zero and no cache exists for the endpoint, `RateLimitError` is returned and the metric is shown as 0 in the output (non-fatal for optional metrics like Grid Import/Export; fatal for Production which is required).
 
 ### Observability: `--debug` mode
 
@@ -379,10 +379,10 @@ Debug mode also suppresses the terminal-clearing escape sequence in `fetchAndDis
 
 | Test File | What it covers |
 |-----------|---------------|
-| [internal/api/query_cost_test.go](../internal/api/query_cost_test.go) | All 8 `QueryCost` combinations; asserts 2-system day+battery = exactly 10 |
-| [internal/api/preflight_test.go](../internal/api/preflight_test.go) | Budget-exhaustion cache fallback for all 8 report types; preflight warning emitted/suppressed correctly |
+| [internal/api/query_cost_test.go](../internal/api/query_cost_test.go) | All 8 `QueryCost` combinations; asserts 2 Systems × Day Mode with battery = exactly 10 calls |
+| [internal/api/preflight_test.go](../internal/api/preflight_test.go) | Budget-exhaustion cache fallback for all 8 Query Mode × Period combinations; preflight warning emitted/suppressed correctly |
 
-`preflight_test.go` follows the same **prime → exhaust → probe** pattern for every report type: a first live call populates the cache, the budget is manually drained to zero via `cache.RecordAPICall()`, and the probe call must serve from cache with zero additional server hits. Past-period probes (types 2, 4, 6, 8) never even reach the budget check — they short-circuit at the `isPast` branch — making them a useful control group that confirms immutable-cache behaviour is budget-free.
+`preflight_test.go` follows the same **prime → exhaust → probe** pattern for every Query Mode × Period combination: a first live call populates the cache, the budget is manually drained to zero via `cache.RecordAPICall()`, and the probe call must serve from cache with zero additional server hits. Past Period probes (scenarios 2, 4, 6, 8) never even reach the budget check — they short-circuit at the `isPast` branch — making them a useful control group that confirms immutable-cache behaviour is budget-free.
 
 ---
 
@@ -407,7 +407,7 @@ type EnlightenCloudClient struct {
 func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (*LocalMetrics, bool, error) {
     // 'c' is the receiver - access struct fields via c.systemID, etc.
     // ctx is used for request cancellation and timeout handling
-    // queryMode specifies the Query Mode (day/month/year/true-up)
+    // queryMode specifies the Query Mode (Day, Month, Year, or True-Up)
 }
 ```
 
@@ -649,7 +649,7 @@ when possible to improve testability.
 |---------------------------------------------------|---------------------------------------------------|
 | [internal/app/setup.go](../internal/app/setup.go)         | Application initialization & configuration        |
 | [internal/app/runner.go](../internal/app/runner.go)       | Execution modes (once/continuous)                 |
-| [internal/app/trueup.go](../internal/app/trueup.go)       | True-up year: single-batch lifetime query (QueryModeTrueUp) and report conversion            |
+| [internal/app/trueup.go](../internal/app/trueup.go)       | True-Up Mode: single-batch Lifetime Data query (QueryModeTrueUp) and report conversion        |
 | [internal/app/cache_report.go](../internal/app/cache_report.go) | --cache mode: per-system endpoint check, diagnostic output, and cached run  |
 
 ### Internal Packages - CLI Layer

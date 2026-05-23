@@ -51,7 +51,7 @@ type CloudClient interface {
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryMode: Query Mode (day/month/year)
+	//   - queryMode: Query Mode (Day, Month, Year, or True-Up)
 	//
 	// Returns:
 	//   - *LocalMetrics: All energy metrics for the period
@@ -59,65 +59,65 @@ type CloudClient interface {
 	//   - error: Any error encountered during fetching
 	GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (*LocalMetrics, bool, error)
 
-	// GetEnergyImportForDate gets total energy imported from the grid for a specific date/period.
+	// GetEnergyImportForDate gets the total Grid Import for a specific date/period.
 	//
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryMode: Query Mode (day/month/year)
+	//   - queryMode: Query Mode (Day, Month, Year, or True-Up)
 	//
 	// Returns:
-	//   - float64: Energy imported in kWh
+	//   - float64: Grid Import in kWh
 	//   - error: Any error encountered
 	GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error)
 
-	// GetEnergyExportForDate gets total energy exported to the grid for a specific date/period.
+	// GetEnergyExportForDate gets the total Grid Export for a specific date/period.
 	//
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryMode: Query Mode (day/month/year)
+	//   - queryMode: Query Mode (Day, Month, Year, or True-Up)
 	//
 	// Returns:
-	//   - float64: Energy exported in kWh
+	//   - float64: Grid Export in kWh
 	//   - error: Any error encountered
 	GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error)
 
-	// GetProductionForDate gets total solar energy production for a specific date/period.
+	// GetProductionForDate gets the total Production for a specific date/period.
 	//
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryMode: Query Mode (day/month/year)
+	//   - queryMode: Query Mode (Day, Month, Year, or True-Up)
 	//
 	// Returns:
-	//   - float64: Energy produced in kWh
+	//   - float64: Production in kWh
 	//   - error: Any error encountered
 	GetProductionForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error)
 
-	// GetConsumptionForDate gets total energy consumption for a specific date/period.
+	// GetConsumptionForDate gets the total Consumption for a specific date/period.
 	//
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryMode: Query Mode (day/month/year)
+	//   - queryMode: Query Mode (Day, Month, Year, or True-Up)
 	//
 	// Returns:
-	//   - float64: Energy consumed in kWh
+	//   - float64: Consumption in kWh
 	//   - error: Any error encountered
 	GetConsumptionForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error)
 
-	// GetBatteryDataForDate gets battery charge, discharge, and state of charge for a specific date/period.
+	// GetBatteryDataForDate gets Battery Charge, Battery Discharge, and State of Charge (SOC) for a specific date/period.
 	//
 	// Parameters:
 	//   - ctx: Context for request cancellation/timeout
 	//   - testDate: Date to query (zero value = today)
-	//   - queryMode: Query Mode (day/month/year)
+	//   - queryMode: Query Mode (Day, Month, Year, or True-Up)
 	//
 	// Returns:
-	//   - charged: Energy charged to battery in kWh
-	//   - discharged: Energy discharged from battery in kWh
-	//   - soc: State of charge percentage (0-100)
+	//   - charged: Battery Charge in kWh
+	//   - discharged: Battery Discharge in kWh
+	//   - soc: Battery State of Charge (SOC), 0–100 (percent)
 	//   - error: Any error encountered
 	GetBatteryDataForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (charged float64, discharged float64, soc int, err error)
 }

@@ -9,7 +9,7 @@ api:
   client_secret: "YOUR_CLIENT_SECRET"  # OAuth Client Secret
   authorization_url: "https://api.enphaseenergy.com/oauth/token"  # OAuth token endpoint
   redirect_uri: "http://localhost:8080/callback"  # Redirect URI (must match your app settings in developer portal)
-  refresh_token: "YOUR_REFRESH_TOKEN"  # Obtained from one-time OAuth setup (run: ./enphase-monitor --setup-oauth)
+  refresh_token: "YOUR_REFRESH_TOKEN"  # Obtained from one-time OAuth setup (run: ./enphase-monitor --oauth-setup)
 
 # Your Enphase Systems
 # Each system requires a system ID from Enlighten (get from Enlighten URL)
@@ -23,7 +23,7 @@ systems:
     id: "YOUR_OTHER_SYSTEM_ID"  # Different system ID, same API credentials
 
 # Refresh interval in seconds (how often to query the API)
-refresh_interval: 3600  # 1 hour (recommended to respect API rate limits)
+refresh_interval: 3600  # 1 hour (recommended to stay within the API Budget)
 
 # Timezone for reporting/display (optional)
 # Examples: "US/Pacific", "America/New_York", "Europe/London"
@@ -34,17 +34,17 @@ refresh_interval: 3600  # 1 hour (recommended to respect API rate limits)
 # Hex codes will be automatically converted to ANSI codes. Leave empty or omit to use defaults.
 # Note: reset and bold are constants defined in constants.go and cannot be customized
 #colors:
-#  production: "#FF8800"        # Solar production - hex code
-#  discharge: "#00AA00"         # Battery discharge, positive metrics - hex code
-#  import: "#0088FF"            # Consumption, grid import - hex code
-#  export: "#FFCC00"            # Grid export - hex code
-#  net_import: "#0088FF"        # Net Energy Flow foreground (net import direction) - hex code
-#  net_export: "#FFCC00"        # Net Energy Flow foreground (net export direction) - hex code
-#  import_background: "#010469" # Net Flow line background highlight (import direction). Rendered as 24-bit truecolor (\033[48;2;R;G;Bm) so the hex value is preserved exactly.
-#  export_background: "#7D0069" # Net Flow line background highlight (export direction). Rendered as 24-bit truecolor.
-#  headers: "#00FFFF"           # Headers, separators - hex code
-#  charge: "#FF00FF"            # Battery charge - hex code
-#  total_consumed: "#808080"    # Total consumed - hex code
-#  secondary_text: "#808080"    # Secondary info - hex code
-#  primary_text: "#FFFFFF"      # Primary text - hex code
-#  error: "#FF0000"             # Error messages - hex code
+#  production: "#f0b57c"            # Production - hex code
+#  discharge: "#7acf38"             # Battery Discharge - hex code
+#  import: "#f63cb1"                # Grid Import - hex code
+#  export: "#06b6de"                # Grid Export - hex code
+#  net_import_background: "#010469" # Net Flow line background highlight (import direction) 
+#  net_export_background: "#7D0069" # Net Flow line background highlight (export direction)
+#  net_import: "#f63cb1"            # Net Flow foreground (net import direction) - hex code
+#  net_export: "#06b6de"            # Net Flow foreground (net export direction) - hex code
+#  headers: "#f37320"               # Report headers, separators - hex code
+#  charge: "#008600"                # Battery Charge - hex code
+#  total_consumed: "#808080"        # Total Consumption - hex code
+#  secondary_text: "#808080"        # Secondary info - hex code
+#  primary_text: "#FFFFFF"          # Primary text - hex code
+#  error: "#ff0000"                 # Error messages - hex code

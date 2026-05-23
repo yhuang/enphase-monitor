@@ -167,7 +167,7 @@ func (c *ColorConfig) convertHexFields() {
 
     // Background fields → 24-bit truecolor via convertIfHexBackground
     backgroundFields := []*string{
-        &c.ImportBackground, &c.ExportBackground,
+        &c.NetImportBackground, &c.NetExportBackground,
     }
     for _, field := range backgroundFields {
         *field = convertIfHexBackground(*field)
@@ -191,7 +191,7 @@ type TokenCache struct {
 
 ### Struct Design Principles
 
-**Location**: `internal/api/types.go:21-30`
+**Location**: `internal/api/types.go:24-33`
 
 This struct follows Go best practices:
 1. Grouped related fields together (energy metrics, battery status)
@@ -201,7 +201,7 @@ This struct follows Go best practices:
 
 ### Field Types
 
-**Location**: `internal/api/types.go:22-29`
+**Location**: `internal/api/types.go:25-32`
 
 - `time.Time`: Go's standard time type (always has a value, cannot be nil)
 - `float64`: 64-bit floating point (precise enough for energy values)
@@ -1050,9 +1050,9 @@ internal/
 ├── app/                         # Application setup and execution
 │   ├── setup.go                 # Configuration and initialization
 │   ├── runner.go                # Execution modes (once/continuous)
-│   ├── trueup.go                # True-up year report
+│   ├── trueup.go                # True-Up Mode report
 │   ├── cache_report.go          # --cache mode: completeness check and cached run
-│   └── *_test.go                # Setup, runner, and true-up tests
+│   └── *_test.go                # Setup, runner, and True-Up Mode tests
 ├── cache/                       # Disk-based API response caching
 │   ├── cache.go                 # Core caching logic
 │   ├── cli.go                   # Cache inspection utilities

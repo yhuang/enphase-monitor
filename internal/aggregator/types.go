@@ -6,30 +6,32 @@ import (
 	"enphase-monitor/internal/constants"
 )
 
-// AggregatedMetrics represents combined data from all Enphase systems.
+// AggregatedMetrics represents combined data from all Systems for a single query.
 type AggregatedMetrics struct {
 	Timestamp time.Time
-	QueryDate time.Time             // The date being queried (zero value means today)
-	QueryMode constants.QueryMode   // The Query Mode (day/month/year/true-up)
+	QueryDate time.Time           // The date being queried (zero value means today)
+	QueryMode constants.QueryMode // The Query Mode (Day, Month, Year, or True-Up)
 
-	// Today's Energy (kWh)
+	// Energy totals for the queried period (kWh)
+	// Field names retain the `Today` suffix for backwards compatibility; the
+	// values reflect whatever Query Mode produced them.
 	ProductionToday  float64
 	ConsumptionToday float64
 	GridImportToday  float64
 	GridExportToday  float64
-	NetFlowToday     float64 // Grid Import - Grid Export (positive = net import, negative = net export)
+	NetFlowToday     float64 // Net Flow = Grid Import − Grid Export (positive = net import direction, negative = net export direction)
 
-	// Individual System Data
+	// Per-System breakdown
 	Systems []SystemMetrics
 
 	// Cache status
-	CacheUsed    bool // Indicates if any cached data was used
-	AllFromCache bool // True only when every system was served entirely from cache
+	CacheUsed    bool // True if any cached data was used
+	AllFromCache bool // True only when every System was served entirely from Cache
 }
 
-// TrueUpReport holds energy metrics for a true-up year period.
+// TrueUpReport holds energy metrics for a True-Up Period.
 type TrueUpReport struct {
-	StartDate   time.Time // user-provided true-up start date (display only; data starts from the 1st of this month)
+	StartDate   time.Time // user-provided True-Up Start Date (display only; data starts from the 1st of this month)
 	EndDate     time.Time // last day with complete data (yesterday)
 	Timestamp   time.Time // when the data was fetched
 	CacheUsed   bool      // true if any cached data was used
@@ -37,11 +39,11 @@ type TrueUpReport struct {
 	GridExport  float64
 	Production  float64
 	Consumption float64
-	NetFlow     float64 // GridImport - GridExport (positive = net import, negative = net export)
+	NetFlow     float64 // Net Flow = Grid Import − Grid Export (positive = net import direction, negative = net export direction)
 	Systems     []TrueUpSystemReport
 }
 
-// TrueUpSystemReport holds per-system metrics for the true-up period.
+// TrueUpSystemReport holds per-System metrics for a True-Up Period.
 type TrueUpSystemReport struct {
 	Name        string
 	ID          string
@@ -52,15 +54,17 @@ type TrueUpSystemReport struct {
 	NetFlow     float64
 }
 
-// SystemMetrics represents metrics for a single system.
+// SystemMetrics represents metrics for a single System.
 type SystemMetrics struct {
 	Name             string
-	ID               string // System ID (for Cloud API)
+	ID               string // System ID (Enphase system ID in Enlighten)
 	ProductionToday  float64
 	ConsumptionToday float64
-	BatterySOC       int
+	BatterySOC       int // Battery State of Charge (SOC), 0–100 (percent)
 
-	// Today's energy values for this system
+	// Per-period energy values for this System (field names retain the
+	// `Today` suffix for backwards compatibility; values reflect the active
+	// Query Mode).
 	GridImportToday        float64
 	GridExportToday        float64
 	BatteryChargedToday    float64

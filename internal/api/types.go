@@ -4,27 +4,30 @@ package api
 
 import "time"
 
-// LocalMetrics contains processed metrics from the Cloud API for a single system.
+// LocalMetrics contains processed metrics from the Cloud API for a single System.
 //
 // This struct standardizes the format of metrics returned from GetMetricsFromCloud.
-// All energy values are in kilowatt-hours (kWh). Battery SOC is a percentage (0-100).
+// All energy values are in kilowatt-hours (kWh). BatterySOC is 0–100 (percent).
 //
 // Fields:
 //   - Timestamp: When these metrics were collected (time.Now())
-//   - ProductionToday: Solar energy produced today (kWh)
-//   - ConsumptionToday: Energy consumed today (kWh)
-//   - GridImportToday: Energy imported from grid today (kWh)
-//   - GridExportToday: Energy exported to grid today (kWh)
-//   - BatteryChargedToday: Energy charged to battery today (kWh)
-//   - BatteryDischargedToday: Energy discharged from battery today (kWh)
-//   - BatterySOC: State of charge percentage (0-100)
+//   - ProductionToday: Production for the queried period (kWh)
+//   - ConsumptionToday: Consumption for the queried period (kWh)
+//   - GridImportToday: Grid Import for the queried period (kWh)
+//   - GridExportToday: Grid Export for the queried period (kWh)
+//   - BatteryChargedToday: Battery Charge for the queried period (kWh)
+//   - BatteryDischargedToday: Battery Discharge for the queried period (kWh)
+//   - BatterySOC: Battery State of Charge (SOC), 0–100 (percent)
+//
+// Field names retain the `Today` suffix from when the API was Day-Mode only;
+// the values now reflect whatever Query Mode produced them (Day / Month / Year / True-Up).
 type LocalMetrics struct {
 	Timestamp              time.Time // When these metrics were collected
-	ProductionToday        float64   // kWh - Solar energy produced today
-	ConsumptionToday       float64   // kWh - Energy consumed today
-	GridImportToday        float64   // kWh - Energy imported from grid today
-	GridExportToday        float64   // kWh - Energy exported to grid today
-	BatteryChargedToday    float64   // kWh - Energy charged to battery today
-	BatteryDischargedToday float64   // kWh - Energy discharged from battery today
-	BatterySOC             int       // State of charge percentage (0-100)
+	ProductionToday        float64   // kWh - Production for the queried period
+	ConsumptionToday       float64   // kWh - Consumption for the queried period
+	GridImportToday        float64   // kWh - Grid Import for the queried period
+	GridExportToday        float64   // kWh - Grid Export for the queried period
+	BatteryChargedToday    float64   // kWh - Battery Charge for the queried period
+	BatteryDischargedToday float64   // kWh - Battery Discharge for the queried period
+	BatterySOC             int       // Battery State of Charge (SOC), 0–100 (percent)
 }

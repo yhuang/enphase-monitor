@@ -77,9 +77,9 @@ const (
 	QueryModeMonth
 	// QueryModeYear represents a query for a specific year (YYYY)
 	QueryModeYear
-	// QueryModeTrueUp represents a single-batch query spanning a full true-up year period.
-	// The start date is the first day of the utility true-up start month; data covers
-	// all complete days through yesterday using Lifetime Data endpoints.
+	// QueryModeTrueUp represents a single-batch query spanning a full True-Up Period.
+	// The start date is the first day of the utility True-Up Start Date's month; data
+	// covers all complete days through yesterday using Lifetime Data endpoints.
 	QueryModeTrueUp
 )
 
