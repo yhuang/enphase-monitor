@@ -144,7 +144,7 @@ httpClient: &http.Client{
 
 ### Pointer Receiver Method
 
-**Location**: `internal/config/config.go:127`
+**Location**: `internal/config/config.go:135`
 
 `(c *ColorConfig)` means this is a method on `ColorConfig` with a pointer receiver. We use a pointer receiver because:
 1. We modify the struct (set ANSI codes in place)
@@ -155,13 +155,22 @@ If we used `(c ColorConfig)` (value receiver), modifications would only affect t
 
 ```go
 func (c *ColorConfig) convertHexFields() {
-    // Collect pointers to all 12 color fields, then convert in one loop
-    fields := []*string{
+    // Foreground fields → 256-color cube via convertIfHex
+    foregroundFields := []*string{
         &c.Production, &c.Discharge, &c.Import, &c.Export,
-        // ...all 12 fields...
+        &c.NetImport, &c.NetExport,
+        // ...remaining foreground fields...
     }
-    for _, field := range fields {
+    for _, field := range foregroundFields {
         *field = convertIfHex(*field)
+    }
+
+    // Background fields → 24-bit truecolor via convertIfHexBackground
+    backgroundFields := []*string{
+        &c.ImportBackground, &c.ExportBackground,
+    }
+    for _, field := range backgroundFields {
+        *field = convertIfHexBackground(*field)
     }
 }
 ```
@@ -320,7 +329,7 @@ if err != nil && constants.IsRateLimitError(err) {
 
 ### Zero Value Pattern
 
-**Location**: `internal/app/setup.go:84-90`
+**Location**: `internal/app/setup.go:86-92`
 
 Using `time.Time` (not `*time.Time`) with `.IsZero()` is the idiomatic Go approach. Zero value (`time.Time{}`) means "not set" (use today). Non-zero value means "use this specific date".
 

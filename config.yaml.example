@@ -38,8 +38,10 @@ refresh_interval: 3600  # 1 hour (recommended to respect API rate limits)
 #  discharge: "#00AA00"         # Battery discharge, positive metrics - hex code
 #  import: "#0088FF"            # Consumption, grid import - hex code
 #  export: "#FFCC00"            # Grid export - hex code
-#  net_flow: "#0088FF"          # Net Energy Flow (net import color) - hex code
-#  net_export: "#FFCC00"        # Net Energy Flow (Export) - hex code
+#  net_import: "#0088FF"        # Net Energy Flow foreground (net import direction) - hex code
+#  net_export: "#FFCC00"        # Net Energy Flow foreground (net export direction) - hex code
+#  import_background: "#010469" # Net Flow line background highlight (import direction). Rendered as 24-bit truecolor (\033[48;2;R;G;Bm) so the hex value is preserved exactly.
+#  export_background: "#7D0069" # Net Flow line background highlight (export direction). Rendered as 24-bit truecolor.
 #  headers: "#00FFFF"           # Headers, separators - hex code
 #  charge: "#FF00FF"            # Battery charge - hex code
 #  total_consumed: "#808080"    # Total consumed - hex code

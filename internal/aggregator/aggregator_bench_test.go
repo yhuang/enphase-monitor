@@ -77,14 +77,14 @@
 // -------------------
 //
 //	go test -bench=.                    # Run all benchmarks
-//	go test -bench=BenchmarkNetImport   # Run specific benchmark
+//	go test -bench=BenchmarkNetFlow     # Run specific benchmark
 //	go test -bench=. -benchmem          # Also show memory allocations
 //	go test -bench=. -count=5           # Run 5 times for consistency
 //
 // INTERPRETING OUTPUT:
 // --------------------
 //
-//	BenchmarkNetImportCalculation-8   1000000000   0.3150 ns/op
+//	BenchmarkNetFlowCalculation-8   1000000000   0.3150 ns/op
 //	│                            │   │            │
 //	│                            │   │            └─ Time per operation
 //	│                            │   └─ Number of iterations
