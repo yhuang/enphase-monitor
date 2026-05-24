@@ -2,8 +2,9 @@
 //
 // PURPOSE
 // -------
-// This package provides utility functions for constructing Enphase API URLs.
-// Centralizes URL building logic to ensure consistent formatting and parameter handling.
+// Centralizes URL building so that every caller produces identically formatted
+// URLs — consistent parameter ordering, Unix-timestamp date ranges, and injected
+// API keys — which in turn ensures cache hits are not missed due to URL variance.
 //
 // KEY FEATURES
 // ------------

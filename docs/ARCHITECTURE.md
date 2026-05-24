@@ -82,9 +82,9 @@ enphase-monitor/
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                  # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
 │   │   ├── cache_functions_test.go        # Core caching tests (URL normalization, save/load, HasCacheForDate)
+│   │   ├── api_budget_test.go             # Sliding-window API Budget counter tests (RecordAPICall, RemainingBudget, pruning)
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
-│   │   # Note: RecordAPICall / RemainingBudget / window pruning are exercised by internal/api/preflight_test.go.
 │   ├── cli/                               # Command-line interface
 │   │   ├── flags.go                       # CLI flag parsing
 │   │   ├── flags_test.go                  # Flag parsing tests
@@ -192,32 +192,32 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │  ├─► Normalize to month-1    │  │     └─► RunContinuous: synchronous for/select (ticker.C, ctx.Done) │
 │  ├─► GetAggregatedMetrics    │  │         (no goroutines spawned)                                    │
 │  │   (QueryModeTrueUp,       │  │     └─► fetchAndDisplay(ctx, ...) calls aggregator                 │
-│  │   4 metrics/system,        │  └────────────────────────────────────────────────────────────────────┘
+│  │   4 metrics/system,       │  └────────────────────────────────────────────────────────────────────┘
 │  ├─► buildTrueUpReport()     │
 │  └─► ShowTrueUpReport()      │
 └──────────────────────────────┘
                                     │
                                     ▼
-┌────────────────────────────────────────────────────────────────────┐
-│  4. AGGREGATION (internal/aggregator)                              │
-│     └─► GetAggregatedMetrics() loops through systems               │
-│         └─► Uses internal/api for HTTP requests                    │
-│             └─► Fetches Production, Consumption, Grid Import/Export│
+┌─────────────────────────────────────────────────────────────────────┐
+│  4. AGGREGATION (internal/aggregator)                               │
+│     └─► GetAggregatedMetrics() loops through systems                │
+│         └─► Uses internal/api for HTTP requests                     │
+│             └─► Fetches Production, Consumption, Grid Import/Export │
 │                 battery fetched only for today's Day query          │
-└────────────────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-┌────────────────────────────────────────────────────────────────────┐
-│  5. API CALLS (internal/api)                                       │
-│     └─► Each call goes through caching layer (internal/cache)      │
-│         ├─► Past periods: always served from cache (data immutable)│
-│         ├─► Current periods: live call when budget allows;         │
-│         │   cache is fallback only when budget exhausted           │
-│         ├─► Budget exhausted: exact-URL cache → cross-endpoint     │
-│         │   same-system cache (any age) → RateLimitError           │
-│         ├─► Make HTTP request if Current Period and budget > 0     │
-│         └─► Save response to cache + append timestamp to api_calls │
-└────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  5. API CALLS (internal/api)                                        │
+│     └─► Each call goes through caching layer (internal/cache)       │
+│         ├─► Past periods: always served from cache (data immutable) │
+│         ├─► Current periods: live call when budget allows;          │
+│         │   cache is fallback only when budget exhausted            │
+│         ├─► Budget exhausted: exact-URL cache → cross-endpoint      │
+│         │   same-system cache (any age) → RateLimitError            │
+│         ├─► Make HTTP request if Current Period and budget > 0      │
+│         └─► Save response to cache + append timestamp to api_calls  │
+└─────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌────────────────────────────────────────────────────────────────────┐
@@ -275,13 +275,13 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 └────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
-┌────────────────────────────────────────────────────────────────────┐
-│              internal/aggregator/AggregatedMetrics                 │
-│   - Sums production, consumption across systems                    │
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│              internal/aggregator/AggregatedMetrics                                │
+│   - Sums production, consumption across systems                                   │
 │   - Battery tracked per System only (today's live Day Mode query); zero otherwise │
-│   - Tracks cache usage flags (CacheUsed, AllFromCache)             │
-│   - TrueUpReport built from a single lifetime-endpoint batch       │
-└──────────────────────────┬─────────────────────────────────────────┘
+│   - Tracks cache usage flags (CacheUsed, AllFromCache)                            │
+│   - TrueUpReport built from a single lifetime-endpoint batch                      │
+└──────────────────────────┬────────────────────────────────────────────────────────┘
                            │
                            ▼
 ┌────────────────────────────────────────────────────────────────────┐
@@ -302,11 +302,11 @@ The Enphase Cloud API enforces a budget of **10 requests per 60-second sliding w
 `QueryCost(queryMode, hasBattery)` in [internal/api/client.go](../internal/api/client.go) returns the number of live API calls that `GetMetricsFromCloud` will make for a **single System**:
 
 | Query mode | hasBattery=false | hasBattery=true |
-|------------|-----------------|-----------------|
-| Day        | 4               | 5               |
-| Month      | 4               | 4               |
-| Year       | 4               | 4               |
-| True-Up    | 4               | 4               |
+|------------|------------------|-----------------|
+| Day | 4 | 5 |
+| Month | 4 | 4 |
+| Year | 4 | 4 |
+| True-Up | 4 | 4 |
 
 The base of 4 covers: Grid Import, Grid Export, Production, and Consumption. Battery telemetry adds a 5th call **only for today's Day query** (`testDate.IsZero() && QueryModeDay`) — all other cases skip it because:
 1. The battery telemetry endpoint returns per-15-minute intervals; fetching it for Past Period or multi-day queries would require one call per day, far exceeding the budget.
@@ -342,16 +342,14 @@ The actual enforcement happens inside `makeCachedAPIRequest` for every URL. The 
 ```
 Is this a Past Period with a valid cache entry?
   YES → serve immutable cache, no budget consumed, done
-  NO  ↓
-Is the cache entry within maxAge (1 h for today's Day Mode query, 24 h for MTD / YTD / Current Period True-Up)?
-  YES → serve cache, no live call
-  NO  ↓
+  NO  ↓  (Current Period: live-first — data changes throughout the day)
 Is budget exhausted (RemainingBudget() <= 0)?
   YES → try exact-URL cache (any age)
       → try cross-endpoint same-system cache (any age)
       → return RateLimitError
   NO  ↓
 Make live API call → record timestamp → save to cache → return
+  → on 429/503: serve any-age cache if available, else RateLimitError
 ```
 
 The cross-endpoint fallback (step 3, middle branch) lets the client surface *some* recent data for the same endpoint+system even when the URL differs (e.g. a new `--date` value), rather than failing outright.
@@ -371,7 +369,7 @@ When run with `--debug`, the application emits structured logs to stderr that ex
 - **Startup banner** (`printDebugStartup` in [main.go](../main.go)) shows the current time, the most recent recorded API call (`cache.LastAPICallTime()`), how long until the 60-second window resets, and the remaining budget. This is the single best diagnostic for "why am I getting 429s?" because it answers "is the window still active?" before any work begins.
 - **Preflight warning** (Layer 2, in `GetMetricsFromCloud`) prints `WARNING: … Insufficient API budget …` to stdout when the remaining budget is smaller than the query cost for a current-period run. Only emitted in debug mode to avoid cluttering normal report output.
 - **Cached mode banner** (`RunCacheReport`) prints `CACHE MODE: Serving report from cache, no live API calls` when `--cache` finds a complete cache. Only emitted in debug mode for the same reason.
-- **Per-request trace** (`cache.Debugf` from `makeCachedAPIRequest` in [internal/api/client.go](../internal/api/client.go)) emits one line per URL describing the decision taken: serving past-period cache, serving within-maxAge cache, falling back due to budget exhaustion, making a live call, or hitting the 429 fallback paths. Each line includes the redacted URL and the cache age so traces are reproducible without leaking the API key.
+- **Per-request trace** (`cache.Debugf` from `makeCachedAPIRequest` in [internal/api/client.go](../internal/api/client.go)) emits one line per URL describing the decision taken: serving Past Period immutable cache, falling back due to budget exhaustion, making a live call, or hitting the 429/503 fallback paths. Each line includes the redacted URL and the cache age so traces are reproducible without leaking the API key.
 
 Debug mode also suppresses the terminal-clearing escape sequence in `fetchAndDisplay` so the trace remains visible after the report is printed. The `cache.Debugf` helper is a no-op when debug mode is off — callers do not need to guard the call sites.
 
@@ -639,55 +637,55 @@ when possible to improve testability.
 
 ### Main Package
 
-| File                    | Responsibility                                         |
-|-------------------------|--------------------------------------------------------|
-| [main.go](main.go)      | Application entry point (pure orchestration)           |
+| File | Responsibility |
+|------|----------------|
+| [main.go](main.go) | Application entry point (pure orchestration) |
 
 ### Internal Packages - Application Layer
 
-| Package/File                                      | Responsibility                                    |
-|---------------------------------------------------|---------------------------------------------------|
-| [internal/app/setup.go](../internal/app/setup.go)         | Application initialization & configuration        |
-| [internal/app/runner.go](../internal/app/runner.go)       | Execution modes (once/continuous)                 |
-| [internal/app/trueup.go](../internal/app/trueup.go)       | True-Up Mode: single-batch Lifetime Data query (QueryModeTrueUp) and report conversion        |
-| [internal/app/cache_report.go](../internal/app/cache_report.go) | --cache mode: per-system endpoint check, diagnostic output, and cached run  |
+| Package/File | Responsibility |
+|--------------|----------------|
+| [internal/app/setup.go](../internal/app/setup.go) | Application initialization & configuration |
+| [internal/app/runner.go](../internal/app/runner.go) | Execution modes (once/continuous) |
+| [internal/app/trueup.go](../internal/app/trueup.go) | True-Up Mode: single-batch Lifetime Data query (QueryModeTrueUp) and report conversion | 
+| [internal/app/cache_report.go](../internal/app/cache_report.go) | --cache mode: per-system endpoint check, diagnostic output, and cached run |
 
 ### Internal Packages - CLI Layer
 
-| Package/File                                      | Responsibility                                    |
-|---------------------------------------------------|---------------------------------------------------|
-| [internal/cli/flags.go](../internal/cli/flags.go)         | CLI flag parsing and definitions                  |
-| [internal/cli/cache_commands.go](../internal/cli/cache_commands.go) | Cache management command handlers     |
+| Package/File | Responsibility |
+|--------------|----------------|
+| [internal/cli/flags.go](../internal/cli/flags.go) | CLI flag parsing and definitions |
+| [internal/cli/cache_commands.go](../internal/cli/cache_commands.go) | Cache management command handlers |
 
 ### Internal Packages - Authentication
 
-| Package/File                                      | Responsibility                                    |
-|---------------------------------------------------|---------------------------------------------------|
-| [internal/oauth/oauth.go](../internal/oauth/oauth.go)     | OAuth token management & refresh                  |
-| [internal/oauth/setup.go](../internal/oauth/setup.go)     | Interactive OAuth setup wizard                    |
-| [internal/oauth/oauth_test.go](../internal/oauth/oauth_test.go) | OAuth tests                               |
+| Package/File | Responsibility |
+|--------------|----------------|
+| [internal/oauth/oauth.go](../internal/oauth/oauth.go) | OAuth token management & refresh |
+| [internal/oauth/setup.go](../internal/oauth/setup.go) | Interactive OAuth setup wizard |
+| [internal/oauth/oauth_test.go](../internal/oauth/oauth_test.go) | OAuth tests |
 
 ### Internal Packages - Business Logic
 
-| Package/File                                      | Responsibility                                    |
-|---------------------------------------------------|---------------------------------------------------|
-| [internal/aggregator/types.go](../internal/aggregator/types.go)         | Metric data structures                            |
-| [internal/aggregator/aggregator.go](../internal/aggregator/aggregator.go) | Multi-system aggregation with DI                  |
-| [internal/display/display.go](../internal/display/display.go)           | Terminal output formatting with colors            |
-| [internal/api/client.go](../internal/api/client.go)              | HTTP client for Enphase Cloud API v4              |
-| [internal/api/cache_check.go](../internal/api/cache_check.go)    | Per-system/endpoint cache availability probe (used by --cache mode) |
-| [internal/cache/*](../internal/cache/)               | Disk-based response caching                       |
-| [internal/parser/*](../internal/parser/)             | JSON telemetry response parsing                   |
-| [internal/config/*](../internal/config/)             | Configuration types and utilities                 |
-| [internal/timezone/*](../internal/timezone/)         | Timezone handling and date boundaries             |
-| [internal/validation/*](../internal/validation/)     | Validation Mode with tolerance-based checks       |
-| [internal/constants/*](../internal/constants/)       | Centralized constants                             |
+| Package/File | Responsibility |
+|--------------|----------------|
+| [internal/aggregator/types.go](../internal/aggregator/types.go) | Metric data structures |
+| [internal/aggregator/aggregator.go](../internal/aggregator/aggregator.go) | Multi-system aggregation with DI |
+| [internal/display/display.go](../internal/display/display.go) | Terminal output formatting with colors |
+| [internal/api/client.go](../internal/api/client.go) | HTTP client for Enphase Cloud API v4 |
+| [internal/api/cache_check.go](../internal/api/cache_check.go) | Per-system/endpoint cache availability probe (used by --cache mode) |
+| [internal/cache/*](../internal/cache/) | Disk-based response caching |
+| [internal/parser/*](../internal/parser/) | JSON telemetry response parsing |
+| [internal/config/*](../internal/config/) | Configuration types and utilities |
+| [internal/timezone/*](../internal/timezone/) | Timezone handling and date boundaries |
+| [internal/validation/*](../internal/validation/) | Validation Mode with tolerance-based checks |
+| [internal/constants/*](../internal/constants/) | Centralized constants |
 
 ### Internal Packages - Shared Types
 
-| Package/File                                      | Responsibility                                    |
-|---------------------------------------------------|---------------------------------------------------|
-| [internal/types/types.go](../internal/types/types.go)     | Shared type definitions (SystemConfig, APIConfig) |
+| Package/File | Responsibility |
+|--------------|----------------|
+| [internal/types/types.go](../internal/types/types.go) | Shared type definitions (SystemConfig, APIConfig) |
 
 ---
 
@@ -719,15 +717,15 @@ when possible to improve testability.
 
 ### Key Files for Learning Go Patterns
 
-| Pattern                | Files to Study                                      | What to Look For                                                      |
-|------------------------|-----------------------------------------------------|-----------------------------------------------------------------------|
-| **Error Handling**     | `internal/oauth/oauth.go`, `internal/api/client.go` | `%w` error wrapping, error propagation                                |
-| **Channels & Select**  | `main.go`, `internal/app/runner.go`                 | `select` statement, signal handling, graceful shutdown                |
-| **Concurrency**        | `main.go`, `internal/app/runner.go`                 | Channels, select statement, signal handling (single-threaded execution) |
-| **Struct Methods**     | All files                                           | Pointer vs value receivers, method design                             |
-| **JSON Parsing**       | `internal/parser/parser.go`                           | Struct tags, JSON marshaling/unmarshaling                             |
-| **Defer Usage**        | Throughout                                          | Resource cleanup, guaranteed execution                                |
-| **Interfaces**         | Throughout                                          | Implicit satisfaction, dependency injection                           |
+| Pattern | Files to Study | What to Look For |
+|---------|----------------|------------------|
+| **Error Handling** | `internal/oauth/oauth.go`, `internal/api/client.go` | `%w` error wrapping, error propagation |
+| **Channels & Select** | `main.go`, `internal/app/runner.go` | `select` statement, signal handling, graceful shutdown |            
+| **Concurrency** | `main.go`, `internal/app/runner.go`  | Channels, select statement, signal handling (single-threaded execution) | 
+| **Struct Methods** | All files | Pointer vs value receivers, method design |
+| **JSON Parsing** | `internal/parser/parser.go` | Struct tags, JSON marshaling/unmarshaling |
+| **Defer Usage** | Throughout | Resource cleanup, guaranteed execution |
+| **Interfaces** | Throughout | Implicit satisfaction, dependency injection |
 
 ### Code Reading Strategy
 

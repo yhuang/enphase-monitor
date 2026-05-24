@@ -31,5 +31,3 @@ func HandleClearAllCache() error {
 	fmt.Println("All cache cleared successfully")
 	return nil
 }
-
-

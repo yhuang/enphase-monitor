@@ -5,20 +5,7 @@ package api
 import "time"
 
 // LocalMetrics contains processed metrics from the Cloud API for a single System.
-//
-// This struct standardizes the format of metrics returned from GetMetricsFromCloud.
 // All energy values are in kilowatt-hours (kWh). BatterySOC is 0–100 (percent).
-//
-// Fields:
-//   - Timestamp: When these metrics were collected (time.Now())
-//   - ProductionToday: Production for the queried period (kWh)
-//   - ConsumptionToday: Consumption for the queried period (kWh)
-//   - GridImportToday: Grid Import for the queried period (kWh)
-//   - GridExportToday: Grid Export for the queried period (kWh)
-//   - BatteryChargedToday: Battery Charge for the queried period (kWh)
-//   - BatteryDischargedToday: Battery Discharge for the queried period (kWh)
-//   - BatterySOC: Battery State of Charge (SOC), 0–100 (percent)
-//
 // Field names retain the `Today` suffix from when the API was Day-Mode only;
 // the values now reflect whatever Query Mode produced them (Day / Month / Year / True-Up).
 type LocalMetrics struct {

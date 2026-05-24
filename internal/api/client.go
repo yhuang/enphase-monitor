@@ -102,7 +102,7 @@
 //	GET /api/v4/systems/{system_id}/energy_export_lifetime
 //	Returns: {"export": [18205, 20777, ...]} - array of daily Wh values
 //
-// NOTE: battery_lifetime endpoint is NOT used. Battery data is fetched only via
+// NOTE: Lifetime Data endpoint (battery_lifetime) is NOT used. Battery data is fetched only via
 // the Interval Data endpoint (telemetry/battery) and only for today's live Day Mode query.
 // Month, Year, and True-Up Mode queries skip battery entirely.
 //
@@ -130,20 +130,20 @@
 // cache.MaxRequestsPerWindow requests per cache.MinRequestInterval (10 / 60s).
 // This client relies on internal/cache for caching responses and on a
 // sliding-window counter to stay under the limit:
-//  1. Per-query-mode cache expiry (see EnlightenCloudClient.cacheMaxAge):
-//     - Past Period Day / Month / Year / True-Up: never expires
-//     - today's Day Mode query:                    1 hour
-//     - MTD / YTD / Current Period True-Up:        24 hours
-//     If a cache entry for the exact URL exists and is within its age bound,
-//     it is returned without an API call. Past periods (immutable totals)
-//     are served regardless of age.
+//  1. Past Period serving: Past Period responses are always served from cache
+//     without consuming any API Budget — the data is immutable so a live call
+//     would return identical results. Detected via cacheMaxAge returning 0.
+//     Current Period queries (today / MTD / YTD / Current Period True-Up) are
+//     live-first: a real API call is made whenever budget allows, because data
+//     changes throughout the day. Cache is the fallback only when budget is
+//     exhausted.
 //  2. Sliding-window counter: every live response appends a timestamp to
 //     cache/api_calls. cache.RemainingBudget() reports how many requests
 //     are still available in the current window. When budget is exhausted
-//     the client tries a cross-endpoint match (same endpoint + system, any
-//     date, gated by the same maxAge) instead of a live call. If no match
-//     passes, the request short-circuits to constants.RateLimitError so
-//     the user sees the 429 wait message instead of us burning a
+//     the client tries an exact-URL cache (any age) then a cross-endpoint
+//     match (same endpoint + system, any date) instead of a live call.
+//     If no match exists, the request short-circuits to constants.RateLimitError
+//     so the user sees the 429 wait message instead of us burning a
 //     guaranteed-failed live call.
 //  3. 429/503 fallback: when the API responds with a rate-limit or
 //     service-unavailable status, cached responses are served as a best-
@@ -416,7 +416,6 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	return chargeWh / constants.WhToKWh, dischargeWh / constants.WhToKWh, socPercent, nil // Convert Wh to kWh
 }
 
-
 // QueryCost returns the number of live API calls GetMetricsFromCloud will make
 // for a single system with the given query mode. Callers can compare this value
 // against cache.RemainingBudget() before starting a fetch to decide whether a
@@ -606,18 +605,6 @@ func (c *EnlightenCloudClient) cacheMaxAge(targetDate time.Time, queryMode const
 	return cache.MaxCurrentPeriodCacheAge
 }
 
-// cacheServable reports whether the cached response is within the acceptable
-// age window for this query mode. maxAge of 0 means "no upper bound".
-func cacheServable(cached *cache.CachedResponse, maxAge time.Duration) bool {
-	if cached == nil {
-		return false
-	}
-	if maxAge == 0 {
-		return true
-	}
-	return time.Since(cached.CachedAt) <= maxAge
-}
-
 // serveRecentEndpointCache returns the most recent cache entry for the same
 // endpoint+systemID as url, filtered by maxAge (0 = no upper bound). Returns
 // nil and false when the URL can't be parsed or no eligible entry exists.
@@ -663,7 +650,7 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 		return nil, false
 	}
 	targetDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, c.timezone)
-	dateStr := targetDay.Format("2006-01-02")
+	dateStr := targetDay.Format(constants.DateFormat)
 	allEntries, err := cache.ListCacheEntries()
 	if err != nil {
 		return nil, false
@@ -693,7 +680,7 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 // │         ▼                                                               │
 // │  ┌─────────────┐                                                        │
 // │  │ Validation  │──YES──► Return cache only (fail if no cache)           │
-// │  │    Mode?    │
+// │  │    Mode?    │                                                        |
 // │  └──────┬──────┘                                                        │
 // │         │ NO                                                            │
 // │         ▼                                                               │
@@ -702,24 +689,22 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 // │  └──────┬────────┘                                                      │
 // │         │ NO                                                            │
 // │         ▼                                                               │
-// │  ┌──────────────────────┐                                               │
-// │  │ Cache within maxAge? │──YES──► Return cache (no API call)            │
-// │  │ Past Period:    ∞    │                                                │
-// │  │ Today's Day:    1h   │                                                │
-// │  │ MTD/YTD/cur TU: 24h  │                                                │
-// │  └──────┬───────────────┘                                                │
-// │         │ NO (missing or expired)                                        │
-// │         ▼                                                                │
-// │  ┌────────────────────┐                                                  │
-// │  │ Budget exhausted?  │──YES──► Cross-endpoint match (same maxAge);     │
-// │  │ (>=10 calls in 60s)│         else short-circuit to RateLimitError    │
-// │  └──────┬─────────────┘                                                  │
-// │         │ NO (budget available)                                          │
-// │         ▼                                                                │
-// │  ┌─────────────┐                                                         │
-// │  │ Make API    │──429──► Serve any-age cache if available                │
+// │  ┌─────────────────────────────────┐                                    │
+// │  │ Past Period with valid cache?   │──YES──► Return immutable cache     │
+// │  │ (cacheMaxAge == 0)              │         (no API call, no budget)   │
+// │  └──────┬──────────────────────────┘                                    │
+// │         │ NO (Current Period)                                           │
+// │         ▼                                                               │
+// │  ┌────────────────────┐                                                 │
+// │  │ Budget exhausted?  │──YES──► Exact-URL cache (any age);              │
+// │  │ (>=10 calls in 60s)│         cross-endpoint cache; RateLimitError    │
+// │  └──────┬─────────────┘                                                 │
+// │         │ NO (budget available)                                         │
+// │         ▼                                                               │
+// │  ┌─────────────┐                                                        │
+// │  │ Make API    │──429──► Serve any-age cache if available               │
 // │  │   Request   │──OK───► RecordAPICall, save to cache, return data      │
-// │  └─────────────┘                                                         │
+// │  └─────────────┘                                                        │
 // └─────────────────────────────────────────────────────────────────────────┘
 //
 // Parameters:
@@ -795,11 +780,11 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 			return cached.ToHTTPResponse(), true, nil
 		}
 
-		if resp.StatusCode == 429 && cacheErr != nil {
+		if resp.StatusCode == http.StatusTooManyRequests && cacheErr != nil {
 			resp.Body.Close()
 			return nil, false, fmt.Errorf(constants.RateLimitError)
 		}
-		if resp.StatusCode == 429 {
+		if resp.StatusCode == http.StatusTooManyRequests {
 			resp.Body.Close()
 			maybeShowNoCacheFallbackWarning("Rate limited (429)")
 			return cached.ToHTTPResponse(), true, nil
@@ -842,7 +827,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		return cached.ToHTTPResponse(), true, nil
 	}
 
-	// Current periods (today / current month / current year / active true-up):
+	// Current periods (today / current month / current year / current true-up year):
 	// prefer a live API call when budget allows — data changes throughout the day.
 	// Cache is the fallback when budget is exhausted, not the default.
 	if budgetExhausted() {
@@ -877,7 +862,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	}
 
 	// Handle rate limit (429)
-	if resp.StatusCode == 429 {
+	if resp.StatusCode == http.StatusTooManyRequests {
 		resp.Body.Close()
 		cache.Debugf("server returned 429: %s", cache.RedactURLKey(url))
 		if cacheErr == nil {

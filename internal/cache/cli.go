@@ -35,12 +35,9 @@ import (
 	"enphase-monitor/internal/constants"
 )
 
-// ClearTodayCache clears only cache files for today's date
-// It identifies today's cache by checking:
-// 1. The CachedAt timestamp (must be today)
-// 2. The file modification time (must be today)
-// This ensures we only delete cache files that were created/modified today,
-// preserving cache files from yesterday or earlier
+// ClearTodayCache clears only cache files for today's date.
+// It identifies today's cache by checking the CachedAt timestamp and file
+// modification time, preserving cache files from yesterday or earlier.
 func ClearTodayCache() error {
 	today := time.Now()
 	todayStr := today.Format(constants.DateFormat)
@@ -127,7 +124,7 @@ func ClearTodayCache() error {
 	return nil
 }
 
-// ClearAllCache clears all cached API responses
+// ClearAllCache clears all cached API responses.
 func ClearAllCache() error {
 	return os.RemoveAll(getCacheDir())
 }
@@ -147,7 +144,7 @@ type CacheEntry struct {
 	Summary  string // Summary of data (array lengths, values, etc.)
 }
 
-// ListCacheEntries returns all cached API responses with their metadata
+// ListCacheEntries returns all cached API responses with their metadata.
 func ListCacheEntries() ([]CacheEntry, error) {
 	if _, err := os.Stat(getCacheDir()); os.IsNotExist(err) {
 		return []CacheEntry{}, nil
@@ -165,7 +162,7 @@ func ListCacheEntries() ([]CacheEntry, error) {
 		}
 
 		// Skip metadata files like last_request.json and the sliding-window
-		// API-call log used by the rate-limit counter.
+		// API-call log used by the API Budget counter.
 		if entry.Name() == "last_request.json" || entry.Name() == "last_request" || entry.Name() == apiCallsFilename {
 			continue
 		}
@@ -222,7 +219,7 @@ func ListCacheEntries() ([]CacheEntry, error) {
 	return cacheEntries, nil
 }
 
-// LoadCachedResponseByPath loads a cached response from a specific file path
+// LoadCachedResponseByPath loads a cached response from a specific file path.
 func LoadCachedResponseByPath(cachePath string) (*CachedResponse, error) {
 	data, err := os.ReadFile(cachePath)
 	if err != nil {
@@ -260,8 +257,12 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 
 	// Extract date from first interval's timestamp
 	firstTime := time.Unix(telemetryResp.Intervals[0].EndAt, 0)
-	defaultTZ, _ := time.LoadLocation("US/Pacific")
-	date = firstTime.In(defaultTZ).Format(constants.DateFormat)
+	defaultTZ, err := time.LoadLocation("US/Pacific")
+	if err != nil {
+		Debugf("failed to load US/Pacific timezone; cache entry will show no date in --cache output: %v", err)
+	} else {
+		date = firstTime.In(defaultTZ).Format(constants.DateFormat)
+	}
 
 	// Determine endpoint type from which fields are populated (go-style-core: flat with early return)
 	hasCharge, hasWhDel, hasWhRcv, hasEnwh := false, false, false, false

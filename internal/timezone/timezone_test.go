@@ -507,7 +507,7 @@ func TestIsPastPeriod(t *testing.T) {
 			got := IsPastPeriod(tt.targetDate, tt.queryMode, tz)
 			if got != tt.want {
 				t.Errorf("IsPastPeriod(%v, %v) = %v, want %v",
-					tt.targetDate.Format("2006-01-02"), tt.queryMode, got, tt.want)
+					tt.targetDate.Format(constants.DateFormat), tt.queryMode, got, tt.want)
 			}
 		})
 	}
@@ -536,7 +536,7 @@ func TestGetTrueUpBoundaries(t *testing.T) {
 	// End must be 23:59:59 of yesterday.
 	yesterday := time.Now().In(tz).AddDate(0, 0, -1)
 	if end.Year() != yesterday.Year() || end.Month() != yesterday.Month() || end.Day() != yesterday.Day() {
-		t.Errorf("end date = %v, want yesterday (%v)", end.Format("2006-01-02"), yesterday.Format("2006-01-02"))
+		t.Errorf("end date = %v, want yesterday (%v)", end.Format(constants.DateFormat), yesterday.Format(constants.DateFormat))
 	}
 	if end.Hour() != 23 || end.Minute() != 59 || end.Second() != 59 {
 		t.Errorf("end time = %02d:%02d:%02d, want 23:59:59", end.Hour(), end.Minute(), end.Second())
@@ -560,7 +560,7 @@ func TestGetBoundaries_TrueUp(t *testing.T) {
 	yesterday := time.Now().In(tz).AddDate(0, 0, -1)
 	if end.Year() != yesterday.Year() || end.Month() != yesterday.Month() || end.Day() != yesterday.Day() {
 		t.Errorf("GetBoundaries(true-up) end date = %v, want yesterday (%v)",
-			end.Format("2006-01-02"), yesterday.Format("2006-01-02"))
+			end.Format(constants.DateFormat), yesterday.Format(constants.DateFormat))
 	}
 }
 

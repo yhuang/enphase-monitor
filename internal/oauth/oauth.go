@@ -158,7 +158,7 @@ func ExchangeAuthorizationCode(ctx context.Context, apiConfig *types.APIConfig, 
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != constants.HTTPStatusOK {
+	if resp.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("token request failed with status %d: failed to read body: %w", resp.StatusCode, err)
@@ -231,7 +231,7 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != constants.HTTPStatusOK {
+	if resp.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return "", fmt.Errorf("token request failed with status %d: failed to read body: %w", resp.StatusCode, err)
@@ -239,13 +239,13 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 		errorMsg := string(body)
 
 		// Provide helpful error message for common OAuth errors (go-style-core: early return, max 2 levels)
-		if resp.StatusCode == constants.HTTPStatusUnauthorized && apiConfig.RefreshToken != "" {
+		if resp.StatusCode == http.StatusUnauthorized && apiConfig.RefreshToken != "" {
 			return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
 				"Your refresh token appears to be invalid or expired. Please regenerate it by running:\n"+
 				"  ./enphase-monitor --oauth-setup\n\n"+
 				"Then update the refresh_token in your config.yaml file.", resp.StatusCode, errorMsg)
 		}
-		if resp.StatusCode == constants.HTTPStatusUnauthorized {
+		if resp.StatusCode == http.StatusUnauthorized {
 			return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
 				"Authentication failed. Please check your credentials in config.yaml.", resp.StatusCode, errorMsg)
 		}

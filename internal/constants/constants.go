@@ -12,7 +12,7 @@
 //   - ANSI font style constants (Reset, Bold)
 //   - Display formatting (SeparatorWidth)
 //   - Date and time formats (DateFormat, TimestampFormat)
-//   - HTTP client configuration (APIRequestTimeout, status codes, API Budget)
+//   - HTTP client configuration (APIRequestTimeout, API Budget)
 //   - Error messages (RateLimitError, API config errors)
 //   - Energy conversion (WhToKWh)
 //   - Telemetry field names (API JSON field constants)
@@ -108,14 +108,6 @@ const (
 	// APIMaxDateRangeDays is the maximum date range per API request (7 days)
 	// The Enphase API returns 422 errors for ranges exceeding this limit
 	APIMaxDateRangeDays = 7
-	// HTTPStatusOK is the standard HTTP success status code
-	HTTPStatusOK = 200
-	// HTTPStatusUnauthorized is the unauthorized HTTP status code
-	HTTPStatusUnauthorized = 401
-	// HTTPStatusTooManyRequests is the rate limit HTTP status code
-	HTTPStatusTooManyRequests = 429
-	// HTTPStatusUnprocessableEntity is returned when request parameters are invalid
-	HTTPStatusUnprocessableEntity = 422
 )
 
 // Error Message Constants
@@ -179,6 +171,8 @@ const (
 	ANSIColorCubeBase = 16
 	// ANSIColorCubeLevels is the number of levels per RGB channel (6x6x6 cube)
 	ANSIColorCubeLevels = 6
+	// ANSIColorCubeRedMultiplier is the stride for the red channel (levels^2 = 36)
+	ANSIColorCubeRedMultiplier = ANSIColorCubeLevels * ANSIColorCubeLevels
 	// HexBase is the base for hexadecimal parsing
 	HexBase = 16
 	// RGBMaxValue is the maximum RGB value (0-255)

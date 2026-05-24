@@ -309,7 +309,7 @@ func hexToANSI(hex string) string {
 	}
 
 	// Convert RGB (0-255) to ANSI 256-color code (16-231 for 6x6x6 cube)
-	// ANSI 256-color palette: 16 + 36*r + 6*g + b
+	// ANSI 256-color palette: base + redMultiplier*r + levels*g + b
 	// Where r, g, b are in range 0-5 (6 levels each)
 	// Map 0-255 to 0-5: use value * 5 / 255 for better accuracy
 	r6 := int(math.Round((float64(r) * float64(constants.ANSIColorCubeLevels-1)) / float64(constants.RGBMaxValue)))
@@ -322,7 +322,7 @@ func hexToANSI(hex string) string {
 	b6 = max(0, min(constants.ANSIColorCubeLevels-1, b6))
 
 	// Calculate ANSI color code (16-231 for color cube)
-	ansiCode := constants.ANSIColorCubeBase + 36*r6 + constants.ANSIColorCubeLevels*g6 + b6
+	ansiCode := constants.ANSIColorCubeBase + constants.ANSIColorCubeRedMultiplier*r6 + constants.ANSIColorCubeLevels*g6 + b6
 
 	// Return ANSI escape code (strconv.Itoa is faster than fmt.Sprintf for single int)
 	return "\033[38;5;" + strconv.Itoa(ansiCode) + "m"

@@ -80,13 +80,13 @@
 //     a. If --cache: call app.RunCacheReport (cache-only run; lists missing endpoints if incomplete) and exit.
 //     b. Else if --true-up: call app.RunTrueUp (single-batch lifetime query, no battery) and exit.
 //     c. Otherwise, run the standard execution mode:
-//        - For each system in config:
-//          i.   Get OAuth access token via internal/oauth (cached or refreshed)
-//          ii.  Create API client via internal/api for the system
-//          iii. Fetch metrics via Cloud API (with caching from internal/cache)
-//        - Aggregate metrics via internal/aggregator
-//        - Validate if in Validation Mode via internal/validation
-//        - Display formatted report via internal/display
+//     - For each system in config:
+//     i.   Get OAuth access token via internal/oauth (cached or refreshed)
+//     ii.  Create API client via internal/api for the system
+//     iii. Fetch metrics via Cloud API (with caching from internal/cache)
+//     - Aggregate metrics via internal/aggregator
+//     - Validate if in Validation Mode via internal/validation
+//     - Display formatted report via internal/display
 //
 // For continuous mode, step 8c repeats at the configured refresh interval. Continuous mode
 // is restricted to today's Day Mode query — Month, Year, Past Period, and True-Up Mode

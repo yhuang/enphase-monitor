@@ -262,32 +262,32 @@ func TestParseLifetimeResponse(t *testing.T) {
 		wantFirst float64
 	}{
 		{
-			name: "production field",
-			json: `{"system_id":12345,"start_date":"2026-01-01","production":[1000.0,2000.0,1500.0]}`,
+			name:      "production field",
+			json:      `{"system_id":12345,"start_date":"2026-01-01","production":[1000.0,2000.0,1500.0]}`,
 			wantCount: 3,
 			wantFirst: 1000.0,
 		},
 		{
-			name: "consumption field",
-			json: `{"system_id":12345,"start_date":"2026-01-01","consumption":[500.0,600.0]}`,
+			name:      "consumption field",
+			json:      `{"system_id":12345,"start_date":"2026-01-01","consumption":[500.0,600.0]}`,
 			wantCount: 2,
 			wantFirst: 500.0,
 		},
 		{
-			name: "import field",
-			json: `{"system_id":12345,"start_date":"2026-01-01","import":[100.0,200.0]}`,
+			name:      "import field",
+			json:      `{"system_id":12345,"start_date":"2026-01-01","import":[100.0,200.0]}`,
 			wantCount: 2,
 			wantFirst: 100.0,
 		},
 		{
-			name: "export field",
-			json: `{"system_id":12345,"start_date":"2026-01-01","export":[50.0,75.0]}`,
+			name:      "export field",
+			json:      `{"system_id":12345,"start_date":"2026-01-01","export":[50.0,75.0]}`,
 			wantCount: 2,
 			wantFirst: 50.0,
 		},
 		{
-			name: "intervals fallback field",
-			json: `{"system_id":12345,"start_date":"2026-01-01","intervals":[300.0,400.0]}`,
+			name:      "intervals fallback field",
+			json:      `{"system_id":12345,"start_date":"2026-01-01","intervals":[300.0,400.0]}`,
 			wantCount: 2,
 			wantFirst: 300.0,
 		},

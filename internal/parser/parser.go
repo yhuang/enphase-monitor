@@ -1,4 +1,4 @@
-// Package parser provides utilities for parsing Enphase Cloud API v4 telemetry responses.
+// Package parser provides utilities for parsing Enphase Cloud API v4 Interval Data responses.
 //
 // PURPOSE
 // -------

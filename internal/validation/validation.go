@@ -182,8 +182,7 @@ func runMetricTests(w io.Writer, tests []metricTestCase) (total, passed int, any
 		p := validateMetric(w, test.name, test.expected, test.actual)
 		if p {
 			passed++
-		}
-		if !p {
+		} else {
 			anyFailed = true
 		}
 	}

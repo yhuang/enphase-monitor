@@ -344,4 +344,3 @@ func TestRunContinuous_GracefulShutdown(t *testing.T) {
 		t.Error("RunContinuous() should display graceful shutdown message")
 	}
 }
-

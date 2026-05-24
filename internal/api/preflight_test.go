@@ -377,7 +377,7 @@ func TestBudgetExhausted_CurrentTrueUp(t *testing.T) {
 // 8. Past Period True-Up — QueryModeTrueUp, Past Period
 // =============================================================================
 
-// TestBudgetExhausted_PastTrueUp verifies that a closed True-Up Period is
+// TestBudgetExhausted_PastTrueUp verifies that a Past True-Up Period is
 // served from immutable cache even with zero budget. cacheMaxAge detects a
 // Past Period True-Up when trueUpStart + 1 year is before now and sets
 // maxAge = 0 (never-expires sentinel).

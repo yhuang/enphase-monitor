@@ -358,7 +358,7 @@ func TestValidateMetrics_MissingFile(t *testing.T) {
 				ConsumptionToday: 8.0,
 				GridImportToday:  5.0,
 				GridExportToday:  2.0,
-				NetFlowToday: 3.0,
+				NetFlowToday:     3.0,
 			},
 		},
 	}

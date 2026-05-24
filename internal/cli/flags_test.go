@@ -23,7 +23,7 @@
 //   - Test --clear-cache sets ClearCache to true
 //   - Test --clear-all-cache sets ClearAllCache to true
 //
-//TESTING APPROACH
+// TESTING APPROACH
 // ----------------
 // - Reset flag.CommandLine before each test (isolation)
 // - Mock os.Args to simulate command-line arguments

@@ -112,7 +112,7 @@ func TestShowMetrics_ContainsHeader(t *testing.T) {
 		ConsumptionToday: 8.2,
 		GridImportToday:  2.0,
 		GridExportToday:  4.3,
-		NetFlowToday:   -2.3, // Net export
+		NetFlowToday:     -2.3, // Net export
 	}
 
 	d.ShowMetrics(metrics)
@@ -165,7 +165,7 @@ func TestShowMetrics_CombinedSectionLabels(t *testing.T) {
 		ConsumptionToday: 8.2,
 		GridImportToday:  2.0,
 		GridExportToday:  4.3,
-		NetFlowToday:   -2.3,
+		NetFlowToday:     -2.3,
 	}
 
 	d.ShowMetrics(metrics)
@@ -223,9 +223,9 @@ func TestShowMetrics_NetFlow(t *testing.T) {
 	tz := mustLoadLocation(t, "US/Pacific")
 
 	tests := []struct {
-		name           string
+		name         string
 		netFlowToday float64
-		expected       string
+		expected     string
 	}{
 		{"net export", -5.0, "(export)"},
 		{"net import", 5.0, "(import)"},
@@ -238,7 +238,7 @@ func TestShowMetrics_NetFlow(t *testing.T) {
 			d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
 
 			metrics := &aggregator.AggregatedMetrics{
-				Timestamp:      time.Now(),
+				Timestamp:    time.Now(),
 				NetFlowToday: tt.netFlowToday,
 			}
 
@@ -534,10 +534,10 @@ func TestShowTrueUpReport_NetFlowDirection(t *testing.T) {
 	tz := mustLoadLocation(t, "US/Pacific")
 
 	tests := []struct {
-		name     string
-		netFlow  float64
-		wantDir  string
-		noDir    string
+		name    string
+		netFlow float64
+		wantDir string
+		noDir   string
 	}{
 		{"net export", -500.0, "(export)", "(import)"},
 		{"net import", 500.0, "(import)", "(export)"},

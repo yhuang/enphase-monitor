@@ -115,7 +115,7 @@ func describePeriod(date time.Time, queryMode constants.QueryMode, trueUpStart s
 	case constants.QueryModeMonth:
 		return date.Format("2006-01")
 	default:
-		return date.Format("2006-01-02")
+		return date.Format(constants.DateFormat)
 	}
 }
 
@@ -132,7 +132,7 @@ func populateCommand(trueUpStart string, originalDate time.Time, queryMode const
 	case constants.QueryModeMonth:
 		return "./enphase-monitor --date " + originalDate.Format("2006-01")
 	default:
-		return "./enphase-monitor --date " + originalDate.Format("2006-01-02")
+		return "./enphase-monitor --date " + originalDate.Format(constants.DateFormat)
 	}
 }
 

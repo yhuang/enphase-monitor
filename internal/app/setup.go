@@ -133,9 +133,9 @@ func GetAggregatorTypes(cfg *config.Config) ([]aggregator.SystemConfig, *aggrega
 // This prevents confusing errors when running --test without populated cache.
 func ValidateValidationModeCache(targetDate time.Time, reportTZ *time.Location) error {
 	// Determine the date string to check: default to specified date, override for today if none
-	dateStr := targetDate.Format("2006-01-02")
+	dateStr := targetDate.Format(constants.DateFormat)
 	if targetDate.IsZero() {
-		dateStr = time.Now().In(reportTZ).Format("2006-01-02")
+		dateStr = time.Now().In(reportTZ).Format(constants.DateFormat)
 	}
 
 	// Check if cache exists for this date

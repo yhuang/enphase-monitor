@@ -728,9 +728,9 @@ enphase-monitor/
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                  # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
 │   │   ├── cache_functions_test.go        # Core caching tests (URL normalization, key generation, save/load, HasCacheForDate)
+│   │   ├── api_budget_test.go             # Sliding-window API Budget counter tests (RecordAPICall, RemainingBudget, pruning)
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
-│   │   # Note: sliding-window budget (RecordAPICall, RemainingBudget) is exercised via internal/api/preflight_test.go.
 │   ├── cli/                               # Command-line interface
 │   │   ├── flags.go                       # CLI flag parsing
 │   │   ├── flags_test.go                  # Flag parsing tests
@@ -793,7 +793,7 @@ enphase-monitor/
 
 ## Testing
 
-The project includes a comprehensive test suite with **68.1% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
+The project includes a comprehensive test suite with **70.1% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
 
 ### Test Coverage by Package
 
@@ -804,16 +804,16 @@ The project includes a comprehensive test suite with **68.1% code coverage** acr
 | display | 99.2% | ✅ |
 | validation | 95.5% | ✅ |
 | parser | 94.8% | ✅ |
-| config | 92.8% | ✅ |
+| config | 83.1% | ✅ |
 | timezone | 92.0% | ✅ |
 | cli | 90.5% | ✅ |
 | aggregator | 78.3% | ✅ |
 | api | 71.8% | ✅ |
 | oauth | 69.2% | ✅ |
-| cache | 58.8% | ⚠️ |
+| cache | 69.7% | ✅ |
 | app | 45.0% | ⚠️ |
 
-**Total: 68.1% coverage** (exceeds typical Go project standards of 50-60%; `app` and `cache` cover orchestration glue that is exercised more thoroughly via the api-package integration tests)
+**Total: 70.1% coverage** (exceeds typical Go project standards of 50-60%; `app` covers orchestration glue that is exercised more thoroughly via the api-package integration tests)
 
 ### Running Tests
 
@@ -976,8 +976,8 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 
 This project follows Go best practices and coding standards:
 
-- **Test Coverage**: 68.1% overall, 100% for urlbuilder and constants, 99% for display, 95%+ for validation, parser, config, timezone, and cli
-- **Test Suite**: 28 test files across 13 tested packages with comprehensive unit, integration, and edge case tests
+- **Test Coverage**: 70.1% overall, 100% for urlbuilder and constants, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and config
+- **Test Suite**: 29 test files across 13 tested packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -989,7 +989,7 @@ This project follows Go best practices and coding standards:
 - Total Lines: ~5,500 (excluding tests)
 - Test Lines: ~10,600 (comprehensive test suite)
 - Packages: 14 internal packages (13 with tests; `types` is a pure type-definition package)
-- Test Files: 28 (unit, integration, functional, edge case, and benchmark tests)
+- Test Files: 29 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)
 
 ## License

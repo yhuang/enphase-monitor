@@ -116,11 +116,11 @@ func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
 	fmt.Fprintf(d.writer, "\n   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Flow", metrics.NetFlowToday, "  ", 24, false, d.colors.NetImportBackground, d.colors.NetExportBackground)
-	d.printMetric("Production", metrics.ProductionToday, d.colors.Production, "    ", 22, false)
-	d.printMetric("Consumption", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 22, false)
-	d.printMetric("Grid Import", metrics.GridImportToday, d.colors.Import, "    ", 22, false)
-	d.printMetric("Grid Export", metrics.GridExportToday, d.colors.Export, "    ", 22, false)
+	d.printNetFlow("  Net Flow", metrics.NetFlowToday, "  ", 24, d.colors.NetImportBackground, d.colors.NetExportBackground)
+	d.printMetric("Production", metrics.ProductionToday, d.colors.Production, "    ", 22)
+	d.printMetric("Consumption", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 22)
+	d.printMetric("Grid Import", metrics.GridImportToday, d.colors.Import, "    ", 22)
+	d.printMetric("Grid Export", metrics.GridExportToday, d.colors.Export, "    ", 22)
 }
 
 func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) {
@@ -150,14 +150,14 @@ func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) 
 		if showBattery {
 			lw = 27
 		}
-		d.printNetFlow("Net Flow", sys.NetFlowToday, "        ", lw, true, "", "")
-		d.printMetric("Production", sys.ProductionToday, d.colors.Production, "        ", lw, true)
-		d.printMetric("Consumption", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", lw, true)
-		d.printMetric("Grid Import", sys.GridImportToday, d.colors.Import, "        ", lw, true)
-		d.printMetric("Grid Export", sys.GridExportToday, d.colors.Export, "        ", lw, true)
+		d.printNetFlow("Net Flow", sys.NetFlowToday, "        ", lw, "", "")
+		d.printMetric("Production", sys.ProductionToday, d.colors.Production, "        ", lw)
+		d.printMetric("Consumption", sys.ConsumptionToday, d.colors.TotalConsumed, "        ", lw)
+		d.printMetric("Grid Import", sys.GridImportToday, d.colors.Import, "        ", lw)
+		d.printMetric("Grid Export", sys.GridExportToday, d.colors.Export, "        ", lw)
 		if showBattery {
-			d.printMetric("Battery Charge", sys.BatteryChargedToday, d.colors.Charge, "        ", lw, true)
-			d.printMetric("Battery Discharge", sys.BatteryDischargedToday, d.colors.Discharge, "        ", lw, true)
+			d.printMetric("Battery Charge", sys.BatteryChargedToday, d.colors.Charge, "        ", lw)
+			d.printMetric("Battery Discharge", sys.BatteryDischargedToday, d.colors.Discharge, "        ", lw)
 			fmt.Fprintf(d.writer, "        %sBattery State of Charge:%s   %s%d%%%s\n",
 				d.colors.SecondaryText, constants.Reset, d.colors.Charge, sys.BatterySOC, constants.Reset)
 		}
@@ -168,7 +168,7 @@ func (d *Display) printSeparator() {
 	fmt.Fprintln(d.writer, "\n  "+d.colors.Headers+d.separatorLine+constants.Reset+"\n")
 }
 
-func (d *Display) printMetric(label string, value float64, valueColor string, indent string, labelWidth int, rightAlign bool) {
+func (d *Display) printMetric(label string, value float64, valueColor string, indent string, labelWidth int) {
 	labelWithColon := label + ":"
 	padding := ""
 	if labelWidth > 0 && len(labelWithColon) < labelWidth {
@@ -188,7 +188,7 @@ func (d *Display) printMetric(label string, value float64, valueColor string, in
 		padding, valueColor, displayValue, unit, constants.Reset)
 }
 
-func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int, rightAlign bool, netImportBg, netExportBg string) {
+func (d *Display) printNetFlow(label string, netValue float64, indent string, labelWidth int, netImportBg, netExportBg string) {
 	// Default to import direction (positive Net Flow), override for export direction (negative)
 	color := d.colors.NetImport
 	direction := "import"
@@ -283,11 +283,11 @@ func (d *Display) printTrueUpCombined(report *aggregator.TrueUpReport) {
 	fmt.Fprintf(d.writer, "\n   %s%sTRUE-UP ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Flow", report.NetFlow, "  ", 24, false, d.colors.NetImportBackground, d.colors.NetExportBackground)
-	d.printMetric("Production", report.Production, d.colors.Production, "    ", 22, false)
-	d.printMetric("Consumption", report.Consumption, d.colors.TotalConsumed, "    ", 22, false)
-	d.printMetric("Grid Import", report.GridImport, d.colors.Import, "    ", 22, false)
-	d.printMetric("Grid Export", report.GridExport, d.colors.Export, "    ", 22, false)
+	d.printNetFlow("  Net Flow", report.NetFlow, "  ", 24, d.colors.NetImportBackground, d.colors.NetExportBackground)
+	d.printMetric("Production", report.Production, d.colors.Production, "    ", 22)
+	d.printMetric("Consumption", report.Consumption, d.colors.TotalConsumed, "    ", 22)
+	d.printMetric("Grid Import", report.GridImport, d.colors.Import, "    ", 22)
+	d.printMetric("Grid Export", report.GridExport, d.colors.Export, "    ", 22)
 }
 
 func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
@@ -299,11 +299,11 @@ func (d *Display) printTrueUpSystems(report *aggregator.TrueUpReport) {
 			d.colors.Headers, i+1, constants.Reset,
 			constants.Bold, sys.Name, constants.Reset,
 			d.colors.SecondaryText, sys.ID, constants.Reset)
-		d.printNetFlow("Net Flow", sys.NetFlow, "        ", 21, true, "", "")
-		d.printMetric("Production", sys.Production, d.colors.Production, "        ", 21, true)
-		d.printMetric("Consumption", sys.Consumption, d.colors.TotalConsumed, "        ", 21, true)
-		d.printMetric("Grid Import", sys.GridImport, d.colors.Import, "        ", 21, true)
-		d.printMetric("Grid Export", sys.GridExport, d.colors.Export, "        ", 21, true)
+		d.printNetFlow("Net Flow", sys.NetFlow, "        ", 21, "", "")
+		d.printMetric("Production", sys.Production, d.colors.Production, "        ", 21)
+		d.printMetric("Consumption", sys.Consumption, d.colors.TotalConsumed, "        ", 21)
+		d.printMetric("Grid Import", sys.GridImport, d.colors.Import, "        ", 21)
+		d.printMetric("Grid Export", sys.GridExport, d.colors.Export, "        ", 21)
 	}
 }
 

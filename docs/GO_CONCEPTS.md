@@ -70,7 +70,7 @@ We check the error type to determine how to handle it. For rate limit errors, we
 
 ```go
 if err != nil && constants.IsRateLimitError(err) {
-    rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
+    rateLimitErrors = append(rateLimitErrors, sys.Name)
     allFromCache = false
     continue
 }
@@ -252,7 +252,7 @@ allIntervals = append(allIntervals, intervalArray...)
 `append()` adds elements to a slice, automatically growing if needed. Since we pre-allocated capacity, this should be efficient.
 
 ```go
-rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
+rateLimitErrors = append(rateLimitErrors, sys.Name)
 ```
 
 ### Array to Slice Conversion
@@ -321,7 +321,7 @@ case constants.FieldWhExported:
 
 ```go
 if err != nil && constants.IsRateLimitError(err) {
-    rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
+    rateLimitErrors = append(rateLimitErrors, sys.Name)
     allFromCache = false
     continue
 }
@@ -1171,7 +1171,7 @@ Why have `internal/types/types.go` when we already have package-specific `types.
 |---------|----------|---------|---------------|
 | **Package-specific types** | `internal/api/types.go` | Types used ONLY within that package | `LocalMetrics` |
 | **Package-specific types** | `internal/aggregator/types.go` | Types used ONLY within that package | `AggregatedMetrics`, `SystemMetrics` |
-| **Shared types package** | `internal/types/types.go` | Types used by MULTIPLE packages | `SystemConfig`, `APIConfig` |
+| **Shared types package**   | `internal/types/types.go` | Types used by MULTIPLE packages | `SystemConfig`, `APIConfig` |
 
 **Why Package-Specific Types Stay in Their Package:**
 

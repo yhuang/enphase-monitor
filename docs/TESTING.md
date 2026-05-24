@@ -33,11 +33,11 @@ The project follows a pragmatic approach to testing:
 | aggregator | 78.3% | ✅ Adequate - data aggregation |
 | api | 71.8% | ✅ Adequate - HTTP client |
 | oauth | 69.2% | ✅ Adequate - OAuth flows |
-| cache | 58.8% | ⚠️ Moderate - file caching (orchestration tested via api) |
+| cache | 69.7% | ✅ Adequate - file caching (budget counter also tested directly in api_budget_test.go) |
 | app | 45.0% | ⚠️ Moderate - application glue (exercised end-to-end via api/preflight) |
 | main.go | 0.0% | ✅ **Acceptable** - entry point |
 
-**Overall**: 68.1% coverage (exceeds typical Go project standards of 50-60%; `app` and `cache` orchestration paths are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests)
+**Overall**: 70.1% coverage (exceeds typical Go project standards of 50-60%; `app` orchestration paths are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests)
 
 ### Why main.go Has 0% Coverage
 
@@ -80,13 +80,14 @@ Most packages follow the simple convention where each source file has one corres
 
 For packages with extensive functionality or different test concerns, tests are split by category:
 
-**Cache Package** (3 test files):
-- `cache.go` → 3 test files:
+**Cache Package** (4 test files):
+- `cache.go` → 4 test files:
   - `cache_test.go` - State management tests (ValidationMode/CacheDisabled/BudgetWarningShown getters/setters, ResetState)
   - `cache_functions_test.go` - Core functionality tests (RedactURLKey, normalize, save/load, HasCacheForDate)
+  - `api_budget_test.go` - Sliding-window API Budget counter unit tests (RecordAPICall, RemainingBudget, LastAPICallTime, pruning)
   - `cli_test.go` - CLI utilities tests (ListCacheEntries, ClearTodayCache, parseCacheResponse)
 
-The sliding-window budget surface (`RecordAPICall`, `RemainingBudget`, `LastAPICallTime`, pruning) is exercised end-to-end through [`internal/api/preflight_test.go`](#integration-test-files), which primes the cache, drains the budget, and verifies the fallback path.
+The sliding-window budget surface is unit-tested directly in `api_budget_test.go`. It is also exercised end-to-end through [`internal/api/preflight_test.go`](#integration-test-files), which primes the cache, drains the budget, and verifies the fallback path.
 
 **OAuth Package** (3 test files):
 - `oauth.go` → 3 test files:

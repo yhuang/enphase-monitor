@@ -5,7 +5,7 @@
 // Implements disk-based caching to reduce API calls and enable offline testing.
 // Cache files are stored in cache/ with SHA256 hashed filenames.
 //
-// For details on the caching strategy and rate limiting, see:
+// For details on the caching strategy and API Budget, see:
 //   - docs/ARCHITECTURE.md: "API Budget Checks" section
 //   - README.md: "Caching and API Budget" section
 //
@@ -21,7 +21,7 @@
 //     find the most recent cache for a given endpoint when budget is exhausted
 //   - Maintains a sliding-window counter of recent live API calls in
 //     cache/api_calls so the client can serve cache instead of issuing a call
-//     that would exceed the per-API-key rate limit (MaxRequestsPerWindow per
+//     that would exceed the API Budget (MaxRequestsPerWindow per
 //     MinRequestInterval)
 package cache
 
@@ -96,9 +96,9 @@ const MinRequestInterval = 1 * time.Minute
 // These flags are set once at startup before any concurrent operations begin,
 // so no mutex protection is needed.
 var (
-	validationMode    bool
-	cacheDisabled     bool
-	debugMode         bool
+	validationMode     bool
+	cacheDisabled      bool
+	debugMode          bool
 	budgetWarningShown bool
 )
 

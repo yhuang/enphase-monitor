@@ -33,7 +33,7 @@ func TestGetEnergyImportForDate_Month(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		startDate := target.Format("2006-01-02")
+		startDate := target.Format(constants.DateFormat)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(fmt.Sprintf(
 			`{"system_id":12345,"start_date":%q,"import":[1000.0,2000.0,1500.0]}`,
@@ -66,7 +66,7 @@ func TestGetEnergyExportForDate_Month(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		startDate := target.Format("2006-01-02")
+		startDate := target.Format(constants.DateFormat)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(fmt.Sprintf(
 			`{"system_id":12345,"start_date":%q,"export":[500.0,750.0,250.0]}`,
@@ -99,7 +99,7 @@ func TestGetProductionForDate_Month(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		startDate := target.Format("2006-01-02")
+		startDate := target.Format(constants.DateFormat)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(fmt.Sprintf(
 			`{"system_id":12345,"start_date":%q,"production":[3000.0,4000.0,2000.0]}`,
@@ -132,7 +132,7 @@ func TestGetConsumptionForDate_Month(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		startDate := target.Format("2006-01-02")
+		startDate := target.Format(constants.DateFormat)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(fmt.Sprintf(
 			`{"system_id":12345,"start_date":%q,"consumption":[2000.0,3000.0,1000.0]}`,
@@ -152,7 +152,6 @@ func TestGetConsumptionForDate_Month(t *testing.T) {
 	}
 }
 
-
 // TestGetEnergyImportForDate_Year tests year-level lifetime queries.
 func TestGetEnergyImportForDate_Year(t *testing.T) {
 	cache.SetCacheDisabled(true)
@@ -170,7 +169,7 @@ func TestGetEnergyImportForDate_Year(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(fmt.Sprintf(
 			`{"system_id":12345,"start_date":%q,"import":[1000.0,2000.0]}`,
-			target.Format("2006-01-02"),
+			target.Format(constants.DateFormat),
 		)))
 	}))
 	defer server.Close()

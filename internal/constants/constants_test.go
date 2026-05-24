@@ -149,16 +149,6 @@ func TestConstants(t *testing.T) {
 	if APIRequestTimeout.String() != "30s" {
 		t.Errorf("APIRequestTimeout = %v, want 30s", APIRequestTimeout)
 	}
-	if HTTPStatusOK != 200 {
-		t.Errorf("HTTPStatusOK = %d, want 200", HTTPStatusOK)
-	}
-	if HTTPStatusUnauthorized != 401 {
-		t.Errorf("HTTPStatusUnauthorized = %d, want 401", HTTPStatusUnauthorized)
-	}
-	if HTTPStatusTooManyRequests != 429 {
-		t.Errorf("HTTPStatusTooManyRequests = %d, want 429", HTTPStatusTooManyRequests)
-	}
-
 	// Error messages
 	if RateLimitError != "rate limit exceeded (429)" {
 		t.Errorf("RateLimitError = %q, want %q", RateLimitError, "rate limit exceeded (429)")

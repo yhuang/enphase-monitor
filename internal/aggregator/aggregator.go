@@ -10,6 +10,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"enphase-monitor/internal/api"
@@ -73,20 +75,20 @@ func NewDataAggregatorWithFactory(getAccessToken OAuthTokenGetter, factory Cloud
 	}
 }
 
-// GetAggregatedMetrics retrieves and combines data from all systems
-// If testDate is provided, uses that date instead of today
-// queryMode specifies the Query Mode (Day, Month, Year, or True-Up)
-// reportTimezone is the timezone to use for all systems' data queries (from config, system, or US/Pacific fallback)
+// GetAggregatedMetrics retrieves and combines data from all systems.
+// If testDate is provided, uses that date instead of today.
+// queryMode specifies the Query Mode (Day, Month, Year, or True-Up).
+// reportTimezone is the timezone to use for all systems' data queries (from config, system, or US/Pacific fallback).
 func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []SystemConfig, apiConfig *APIConfig, testDate time.Time, queryMode constants.QueryMode, reportTimezone *time.Location) (*AggregatedMetrics, error) {
 	metrics := &AggregatedMetrics{
 		Timestamp: time.Now(),
-		QueryDate: testDate,    // time.Time zero value means "today"
-		QueryMode: queryMode,   // Query Mode
+		QueryDate: testDate,  // time.Time zero value means "today"
+		QueryMode: queryMode, // Query Mode
 		Systems:   make([]SystemMetrics, 0, len(systems)),
 	}
 	anyCacheUsed := false
 	allFromCache := len(systems) > 0 // optimistic; flipped false if any live call is made
-	var rateLimitErrors []string      // Collect 429 errors to report at the end
+	var rateLimitErrors []string     // system names that hit the rate limit
 
 	for _, sys := range systems {
 		// Use Cloud API
@@ -111,10 +113,9 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 		// Create Cloud API client with API key, access token, and report timezone
 		cloudClient := a.createCloudClient(sys.ID, sys.Name, apiConfig.Key, accessToken, reportTimezone)
 
-		var cacheUsed bool
 		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryMode)
 		if err != nil && constants.IsRateLimitError(err) {
-			rateLimitErrors = append(rateLimitErrors, fmt.Sprintf("System %s: %v", sys.Name, err))
+			rateLimitErrors = append(rateLimitErrors, sys.Name)
 			allFromCache = false
 			continue
 		}
@@ -171,7 +172,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 
 	// If we collected any 429 errors that could not be resolved with cache, return error
 	if len(rateLimitErrors) > 0 {
-		return nil, fmt.Errorf("API rate limit exceeded (429): %d system(s) affected", len(rateLimitErrors))
+		return nil, fmt.Errorf("API rate limit exceeded (%d): affected systems: %s", http.StatusTooManyRequests, strings.Join(rateLimitErrors, ", "))
 	}
 
 	return metrics, nil
