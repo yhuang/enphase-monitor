@@ -81,8 +81,6 @@ func RunContinuous(ctx context.Context, rc RunConfig) error {
 			}
 
 		case <-ctx.Done():
-			// Context is cancelled when SIGINT (Ctrl+C) or SIGTERM is received.
-			// In-flight HTTP requests are also cancelled via the shared context.
 			rc.Disp.ShowInfo("Shutting down gracefully...")
 			return nil
 		}
@@ -111,7 +109,7 @@ func fetchAndDisplay(ctx context.Context, rc RunConfig) error {
 
 	// Clear screen for cleaner output (skipped in debug mode to preserve debug output)
 	if !rc.Debug {
-		fmt.Print("\033[H\033[2J")
+		rc.Disp.ClearScreen()
 	}
 
 	rc.Disp.ShowMetrics(metrics)

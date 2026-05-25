@@ -1,40 +1,3 @@
-// Package aggregator - aggregator_test.go
-//
-// TEST SETUP
-// ----------
-// This test suite validates multi-system data aggregation logic using mock API clients.
-// Dependency injection allows testing without making real API calls.
-//
-// TEST PLAN
-// ---------
-// 1. Aggregation Logic Tests
-//   - Test single-system aggregation
-//   - Test multi-system aggregation (summing values)
-//   - Test Net Flow calculation (Grid Import − Grid Export)
-//
-// 2. Error Handling Tests
-//   - Test API errors are propagated correctly
-//   - Test rate limit errors (429) are collected
-//   - Test context cancellation
-//
-// 3. Cache Tracking Tests
-//   - Test cache flag is set when any system uses cache
-//   - Test cache flag is false when all systems use live data
-//
-// TESTING APPROACH
-// ----------------
-// - Mock CloudClient implementation for controlled testing
-// - Factory function allows injecting mock client
-// - Test both success and error paths
-// - Verify calculations match expected formulas
-//
-// PATTERN USED
-// ------------
-// - Pattern 2: Mock Objects (MockCloudClient)
-// - Pattern 6: Test Fixtures (makeTestMetrics helper)
-// - Pattern 12: Context Cancellation Testing
-//
-// See docs/TESTING.md for detailed pattern explanations.
 package aggregator
 
 import (
@@ -66,6 +29,9 @@ type MockCloudClient struct {
 
 // GetMetricsFromCloud returns the mock metrics or error.
 func (m *MockCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (*api.LocalMetrics, bool, error) {
+	if ctx.Err() != nil {
+		return nil, false, ctx.Err()
+	}
 	if m.Err != nil {
 		return nil, false, m.Err
 	}

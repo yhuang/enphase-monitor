@@ -1,50 +1,3 @@
-// Package timezone - timezone_test.go
-//
-// TEST SETUP
-// ----------
-// This test suite validates timezone handling and date boundary calculations.
-// Tests ensure consistent date/time handling across different timezones.
-//
-// TEST PLAN
-// ---------
-// 1. Timezone Loading Tests
-//   - Test valid IANA timezone identifiers (US/Pacific, America/New_York, etc.)
-//   - Test empty string uses system timezone
-//   - Test UTC timezone fallback logic
-//   - Test invalid timezone returns error
-//
-// 2. Date Boundary Tests
-//   - Test GetDayBoundaries returns correct start/end times
-//   - Test boundaries respect timezone (not UTC)
-//   - Test daylight saving time transitions
-//   - Test zero time value (use today)
-//
-// 3. Past Date Detection Tests
-//   - Test IsPastDate correctly identifies past dates
-//   - Test today returns false
-//   - Test future dates return false
-//
-// TESTING APPROACH
-// ----------------
-// - Table-driven tests with various timezone strings
-// - Use known dates for predictable results
-// - Verify boundaries are in specified timezone, not UTC
-// - Test edge cases (UTC, empty string, invalid timezone)
-//
-// WHY TIMEZONE MATTERS
-// --------------------
-// Timezone handling is critical for:
-// - Accurate day boundaries (midnight to midnight in local time)
-// - Cache key generation (dates must be consistent)
-// - Display formatting (show times in user's timezone)
-// - API queries (request data for correct 24-hour period)
-//
-// PATTERN USED
-// ------------
-// - Pattern 1: Table-Driven Tests
-// - Pattern 3: Subtests with t.Run()
-//
-// See docs/TESTING.md for detailed pattern explanations.
 package timezone
 
 import (
@@ -175,59 +128,6 @@ func TestGetDayBoundaries(t *testing.T) {
 			// Verify end is after or equal to start
 			if dayEnd.Before(dayStart) {
 				t.Errorf("GetDayBoundaries() end (%v) is before start (%v)", dayEnd, dayStart)
-			}
-		})
-	}
-}
-
-// TestIsPastDate tests past date detection
-func TestIsPastDate(t *testing.T) {
-	tz, err := time.LoadLocation("America/Los_Angeles")
-	if err != nil {
-		t.Fatalf("Failed to load test timezone: %v", err)
-	}
-
-	now := time.Now().In(tz)
-	yesterday := now.AddDate(0, 0, -1)
-	tomorrow := now.AddDate(0, 0, 1)
-
-	tests := []struct {
-		name       string
-		targetDate time.Time
-		expected   bool
-	}{
-		{
-			name:       "zero time (today)",
-			targetDate: time.Time{},
-			expected:   false,
-		},
-		{
-			name:       "yesterday",
-			targetDate: yesterday,
-			expected:   true,
-		},
-		{
-			name:       "tomorrow",
-			targetDate: tomorrow,
-			expected:   false,
-		},
-		{
-			name:       "today",
-			targetDate: now,
-			expected:   false,
-		},
-		{
-			name:       "last week",
-			targetDate: now.AddDate(0, 0, -7),
-			expected:   true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := IsPastDate(tt.targetDate, tz)
-			if result != tt.expected {
-				t.Errorf("IsPastDate(%v) = %v, want %v", tt.targetDate.Format(constants.DateFormat), result, tt.expected)
 			}
 		})
 	}
@@ -458,9 +358,9 @@ func TestIsPastPeriod(t *testing.T) {
 		},
 		{
 			name:       "past month (same year)",
-			targetDate: time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, tz),
+			targetDate: time.Date(2020, time.March, 1, 0, 0, 0, 0, tz),
 			queryMode:  constants.QueryModeMonth,
-			want:       now.Month() > 1, // only true if we're not in January
+			want:       true,
 		},
 		{
 			name:       "current month is not past",

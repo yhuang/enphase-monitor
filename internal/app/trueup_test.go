@@ -1,14 +1,3 @@
-// Package app - trueup_test.go
-//
-// TEST PLAN
-// ---------
-// 1. buildTrueUpReport Tests
-//   - All combined fields are mapped correctly from AggregatedMetrics
-//   - NetFlow = GridImport - GridExport for combined totals
-//   - NetFlow = GridImport - GridExport for each per-system entry
-//   - Start/End dates are passed through unchanged
-//   - Each system in AggregatedMetrics produces a TrueUpSystemReport entry
-//   - Net export scenario: NetFlow is negative when export > import
 package app
 
 import (

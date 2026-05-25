@@ -1,54 +1,9 @@
-// Package config - config_test.go
-//
-// TEST SETUP
-// ----------
-// This test suite validates YAML configuration loading and validation.
-// Tests create temporary YAML files to avoid polluting the workspace.
-//
-// TEST PLAN
-// ---------
-// 1. Valid Configuration Tests
-//   - Test complete config with all fields
-//   - Test minimal config with required fields only
-//   - Test default values (refresh_interval, timezone)
-//
-// 2. Validation Tests
-//   - Test missing required fields (API key, client_id, systems)
-//   - Test empty system ID (should fail)
-//   - Test invalid YAML syntax
-//
-// 3. Color Conversion Tests
-//   - Test hex color codes (e.g., #FF5733) are converted to ANSI
-//   - Test ANSI codes are preserved as-is
-//   - Test default colors are applied when not specified
-//
-// 4. Whitespace Handling Tests
-//   - Test leading/trailing whitespace is trimmed
-//   - Test refresh_token whitespace is cleaned
-//
-// TESTING APPROACH
-// ----------------
-// - Table-driven tests with inline YAML strings
-// - Create temporary files with os.WriteFile()
-// - Clean up temp files with defer os.Remove()
-// - Use validation functions to verify loaded config
-//
-// YAML PARSING
-// ------------
-// Uses gopkg.in/yaml.v3 for YAML parsing.
-// Struct tags map YAML field names to Go struct fields.
-//
-// PATTERN USED
-// ------------
-// - Pattern 1: Table-Driven Tests
-// - Pattern 3: Subtests with t.Run()
-//
-// See docs/TESTING.md for detailed pattern explanations.
 package config
 
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"enphase-monitor/internal/constants"
@@ -250,7 +205,7 @@ systems:
 					t.Errorf("LoadConfig() error = nil, want error containing %q", tt.errContains)
 					return
 				}
-				if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("LoadConfig() error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
@@ -372,12 +327,6 @@ func TestHexToANSI(t *testing.T) {
 	}
 }
 
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && stringContains(s, substr)))
-}
-
 // TestMergeWithDefaults tests that empty fields are filled from defaults.
 func TestMergeWithDefaults(t *testing.T) {
 	defaults := ColorConfig{
@@ -448,13 +397,4 @@ func TestConvertHexFields(t *testing.T) {
 	if c.Export != "not-hex" {
 		t.Errorf("convertHexFields() Export = %q, want %q", c.Export, "not-hex")
 	}
-}
-
-func stringContains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

@@ -170,13 +170,10 @@ func TestParseCacheResponse_TelemetryBattery(t *testing.T) {
 		]
 	}`
 
-	endpoint, systemID, date, summary := parseCacheResponse([]byte(batteryJSON))
+	endpoint, summary := parseCacheResponse([]byte(batteryJSON))
 
 	if endpoint == "" {
 		t.Error("Expected non-empty endpoint for battery telemetry")
-	}
-	if date == "" {
-		t.Error("Expected non-empty date from battery telemetry")
 	}
 	if !strings.Contains(strings.ToLower(endpoint), "battery") {
 		t.Errorf("Expected battery endpoint, got: %s", endpoint)
@@ -184,7 +181,6 @@ func TestParseCacheResponse_TelemetryBattery(t *testing.T) {
 	if summary != "" && !strings.Contains(strings.ToLower(summary), "interval") {
 		t.Logf("Summary: %s", summary)
 	}
-	_ = systemID
 }
 
 func TestParseCacheResponse_ProductionMeter(t *testing.T) {
@@ -197,31 +193,24 @@ func TestParseCacheResponse_ProductionMeter(t *testing.T) {
 		]
 	}`
 
-	endpoint, _, date, summary := parseCacheResponse([]byte(productionJSON))
+	endpoint, summary := parseCacheResponse([]byte(productionJSON))
 
 	if endpoint == "" {
 		t.Error("Expected non-empty endpoint for production meter")
 	}
-	if date == "" {
-		t.Error("Expected non-empty date from production meter")
-	}
-	t.Logf("Parsed production: endpoint=%s, date=%s, summary=%s", endpoint, date, summary)
+	t.Logf("Parsed production: endpoint=%s, summary=%s", endpoint, summary)
 }
 
 func TestParseCacheResponse_InvalidJSON(t *testing.T) {
-	endpoint, systemID, date, summary := parseCacheResponse([]byte(`not valid json {{{`))
+	endpoint, summary := parseCacheResponse([]byte(`not valid json {{{`))
 	_ = endpoint
-	_ = systemID
-	_ = date
 	_ = summary
 	t.Log("Invalid JSON handled gracefully (no panic)")
 }
 
 func TestParseCacheResponse_EmptyResponse(t *testing.T) {
-	endpoint, systemID, date, summary := parseCacheResponse([]byte("{}"))
+	endpoint, summary := parseCacheResponse([]byte("{}"))
 	_ = endpoint
-	_ = systemID
-	_ = date
 	_ = summary
 	t.Log("Empty response handled gracefully")
 }
@@ -236,16 +225,12 @@ func TestParseCacheResponse_ConsumptionMeter(t *testing.T) {
 		]
 	}`
 
-	endpoint, _, date, summary := parseCacheResponse([]byte(consumptionJSON))
-
-	if date == "" {
-		t.Error("Expected non-empty date from consumption meter")
-	}
-	t.Logf("Parsed consumption: endpoint=%s, date=%s, summary=%s", endpoint, date, summary)
+	endpoint, summary := parseCacheResponse([]byte(consumptionJSON))
+	t.Logf("Parsed consumption: endpoint=%s, summary=%s", endpoint, summary)
 }
 
-func TestCacheEntry_Structure(t *testing.T) {
-	entry := CacheEntry{
+func TestEntry_Structure(t *testing.T) {
+	entry := Entry{
 		Key:      "test_hash",
 		Path:     "/path/to/cache.json",
 		CachedAt: time.Now(),
@@ -308,9 +293,8 @@ func TestParseCacheResponse_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			endpoint, systemID, date, summary := parseCacheResponse([]byte(tt.json))
-			t.Logf("%s: endpoint=%s, systemID=%s, date=%s, summary=%s",
-				tt.desc, endpoint, systemID, date, summary)
+			endpoint, summary := parseCacheResponse([]byte(tt.json))
+			t.Logf("%s: endpoint=%s, summary=%s", tt.desc, endpoint, summary)
 		})
 	}
 }
@@ -338,7 +322,7 @@ func TestListCacheEntries_WithRealFile(t *testing.T) {
 		t.Fatalf("ListCacheEntries() error = %v", err)
 	}
 
-	var found *CacheEntry
+	var found *Entry
 	for i := range entries {
 		if entries[i].Path == cachePath {
 			found = &entries[i]

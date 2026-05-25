@@ -1,62 +1,3 @@
-// Package oauth - oauth_edge_cases_test.go
-//
-// TEST SETUP
-// ----------
-// This test suite validates edge cases and error paths in OAuth authentication.
-// Focuses on error handling, validation, and unusual scenarios.
-//
-// TEST PLAN
-// ---------
-// 1. Validation Error Tests
-//   - Test nil config
-//   - Test missing/empty required fields
-//   - Test invalid URLs
-//
-// 2. Network Error Tests
-//   - Test connection failures
-//   - Test timeouts
-//   - Test connection reset (simulated with hijacking)
-//
-// 3. Response Error Tests
-//   - Test malformed JSON
-//   - Test missing required response fields
-//   - Test invalid token format
-//
-// 4. HTTP Status Code Tests
-//   - Test 400 Bad Request
-//   - Test 401 Unauthorized
-//   - Test 403 Forbidden
-//   - Test 500 Internal Server Error
-//
-// TESTING APPROACH
-// ----------------
-// - Mock HTTP servers that deliberately fail
-// - Simulate network issues (connection reset, timeout)
-// - Verify error messages provide useful context
-// - Test cleanup happens even on error (defer statements)
-//
-// WHY TEST ERROR PATHS
-// --------------------
-// Error path testing ensures:
-// - Graceful degradation (no panics or crashes)
-// - Useful error messages for debugging
-// - Proper resource cleanup (defer executed)
-// - Error wrapping preserves context
-//
-// TEST ORGANIZATION
-// -----------------
-// This package has 3 test files (1:many pattern):
-// - oauth_test.go: Basic unit tests (316 lines)
-// - oauth_functional_test.go: Integration tests (652 lines)
-// - oauth_edge_cases_test.go (this file): Edge cases (560 lines)
-//
-// PATTERN USED
-// ------------
-// - Pattern 7: Error Path Testing
-// - Pattern 4: Mock HTTP Servers (for failure scenarios)
-// - Pattern 1: Table-Driven Tests
-//
-// See docs/TESTING.md for detailed pattern explanations.
 package oauth
 
 import (
@@ -516,7 +457,7 @@ func TestSetup_NilAPI(t *testing.T) {
 
 // TestSetup_EmptyClientID tests that Setup returns an error when ClientID is empty.
 func TestSetup_EmptyClientID(t *testing.T) {
-	cfg := &config.Config{API: &config.APIConfig{ClientID: ""}}
+	cfg := &config.Config{API: &types.APIConfig{ClientID: ""}}
 	err := Setup(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("Setup() with empty ClientID: want error, got nil")
@@ -544,7 +485,7 @@ func TestSetup_AuthorizationError(t *testing.T) {
 	w.Close()
 
 	cfg := &config.Config{
-		API: &config.APIConfig{
+		API: &types.APIConfig{
 			ClientID:    "test_client_id",
 			RedirectURI: "http://localhost:8080/callback",
 		},

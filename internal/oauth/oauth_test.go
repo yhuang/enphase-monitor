@@ -1,48 +1,3 @@
-// Package oauth - oauth_test.go
-//
-// TEST SETUP
-// ----------
-// This test suite validates OAuth 2.0 authentication logic:
-// - Authorization URL generation
-// - Token refresh mechanics
-// - Configuration validation
-//
-// These are UNIT tests (no HTTP calls). For integration tests with mock HTTP servers,
-// see oauth_functional_test.go. For edge cases and error paths, see oauth_edge_cases_test.go.
-//
-// TEST PLAN
-// ---------
-// 1. Authorization URL Tests
-//   - Test URL contains required parameters (client_id, redirect_uri, scope)
-//   - Test URL encoding is correct
-//   - Test validation of missing/empty config fields
-//
-// 2. Token Refresh Tests
-//   - Test token expiration detection
-//   - Test cache hit/miss logic
-//   - Test token data structure
-//
-// TESTING APPROACH
-// ----------------
-// - Table-driven tests for multiple scenarios
-// - URL validation by checking required substrings
-// - Config validation tests for missing fields
-// - No external HTTP calls (pure unit tests)
-//
-// TEST ORGANIZATION
-// -----------------
-// This package has 3 test files (1:many pattern):
-// - oauth_test.go (this file): Basic unit tests (316 lines)
-// - oauth_functional_test.go: Integration tests with mock HTTP (652 lines)
-// - oauth_edge_cases_test.go: Edge cases and error paths (560 lines)
-//
-// PATTERN USED
-// ------------
-// - Pattern 1: Table-Driven Tests
-// - Pattern 3: Subtests with t.Run()
-// - Pattern 9: State Reset (token cache)
-//
-// See docs/TESTING.md for detailed pattern explanations.
 package oauth
 
 import (
@@ -51,20 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"enphase-monitor/internal/config"
+	"enphase-monitor/internal/types"
 )
 
 // TestGetAuthorizationURL tests OAuth authorization URL generation
 func TestGetAuthorizationURL(t *testing.T) {
 	tests := []struct {
 		name     string
-		config   *config.APIConfig
+		config   *types.APIConfig
 		wantErr  bool
 		checkURL func(string) bool
 	}{
 		{
 			name: "valid_config",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				ClientID:    "test-client-id",
 				RedirectURI: "http://localhost:8080/callback",
 			},
@@ -84,7 +39,7 @@ func TestGetAuthorizationURL(t *testing.T) {
 		},
 		{
 			name: "missing_client_id",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				ClientID:    "",
 				RedirectURI: "http://localhost:8080/callback",
 			},
@@ -93,7 +48,7 @@ func TestGetAuthorizationURL(t *testing.T) {
 		},
 		{
 			name: "missing_redirect_uri",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				ClientID:    "test-client-id",
 				RedirectURI: "",
 			},
@@ -131,7 +86,7 @@ func TestExchangeAuthorizationCode_Errors(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		config  *config.APIConfig
+		config  *types.APIConfig
 		code    string
 		wantErr bool
 	}{
@@ -143,7 +98,7 @@ func TestExchangeAuthorizationCode_Errors(t *testing.T) {
 		},
 		{
 			name: "missing_authorization_url",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				ClientID:     "test-id",
 				ClientSecret: "test-secret",
 				RedirectURI:  "http://localhost:8080/callback",
@@ -153,7 +108,7 @@ func TestExchangeAuthorizationCode_Errors(t *testing.T) {
 		},
 		{
 			name: "missing_client_id",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				AuthorizationURL: "https://api.example.com/oauth/token",
 				ClientSecret:     "test-secret",
 				RedirectURI:      "http://localhost:8080/callback",
@@ -163,7 +118,7 @@ func TestExchangeAuthorizationCode_Errors(t *testing.T) {
 		},
 		{
 			name: "missing_client_secret",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				AuthorizationURL: "https://api.example.com/oauth/token",
 				ClientID:         "test-id",
 				RedirectURI:      "http://localhost:8080/callback",
@@ -173,7 +128,7 @@ func TestExchangeAuthorizationCode_Errors(t *testing.T) {
 		},
 		{
 			name: "missing_redirect_uri",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				AuthorizationURL: "https://api.example.com/oauth/token",
 				ClientID:         "test-id",
 				ClientSecret:     "test-secret",
@@ -183,7 +138,7 @@ func TestExchangeAuthorizationCode_Errors(t *testing.T) {
 		},
 		{
 			name: "empty_code",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				AuthorizationURL: "https://api.example.com/oauth/token",
 				ClientID:         "test-id",
 				ClientSecret:     "test-secret",
@@ -221,7 +176,7 @@ func TestGetAccessToken_Errors(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		config  *config.APIConfig
+		config  *types.APIConfig
 		wantErr bool
 	}{
 		{
@@ -231,7 +186,7 @@ func TestGetAccessToken_Errors(t *testing.T) {
 		},
 		{
 			name: "missing_authorization_url",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				ClientID:     "test-id",
 				ClientSecret: "test-secret",
 			},
@@ -239,7 +194,7 @@ func TestGetAccessToken_Errors(t *testing.T) {
 		},
 		{
 			name: "missing_client_id",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				AuthorizationURL: "https://api.example.com/oauth/token",
 				ClientSecret:     "test-secret",
 			},
@@ -247,7 +202,7 @@ func TestGetAccessToken_Errors(t *testing.T) {
 		},
 		{
 			name: "missing_client_secret",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				AuthorizationURL: "https://api.example.com/oauth/token",
 				ClientID:         "test-id",
 			},
@@ -255,7 +210,7 @@ func TestGetAccessToken_Errors(t *testing.T) {
 		},
 		{
 			name: "no_valid_authentication_method",
-			config: &config.APIConfig{
+			config: &types.APIConfig{
 				AuthorizationURL: "https://api.example.com/oauth/token",
 				ClientID:         "test-id",
 				ClientSecret:     "test-secret",

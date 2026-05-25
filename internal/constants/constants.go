@@ -59,8 +59,6 @@ const (
 	MonthFormat = "2006-01"
 	// YearFormat is the format for year-level queries (YYYY)
 	YearFormat = "2006"
-	// AltDateFormat is an alternative date format (YYYY/MM/DD)
-	AltDateFormat = "2006/01/02"
 	// TimestampFormat includes time and timezone
 	TimestampFormat = "2006-01-02 15:04:05 MST"
 	// JSONExtension is the file extension for JSON cache files

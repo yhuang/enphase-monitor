@@ -1,32 +1,3 @@
-// Package api - preflight_test.go
-//
-// Tests for budget-exhaustion cache-fallback behaviour across all 8
-// Query Mode × Period combinations, and for the preflight budget-
-// insufficient warning emitted by GetMetricsFromCloud.
-//
-// QUERY SCENARIOS COVERED
-// -----------------------
-//  1. Current Period Day      (today, zero testDate, QueryModeDay)
-//  2. Past Period Day         (past day,             QueryModeDay)
-//  3. Current Period Month    (month-to-date,        QueryModeMonth)
-//  4. Past Period Month       (past month,           QueryModeMonth)
-//  5. Current Period Year     (year-to-date,         QueryModeYear)
-//  6. Past Period Year        (past year,            QueryModeYear)
-//  7. Current Period True-Up  (Current Period,       QueryModeTrueUp)
-//  8. Past Period True-Up     (Past Period,          QueryModeTrueUp)
-//
-// TESTING PATTERN
-// ---------------
-// Each test follows the same two-call pattern:
-//  1. Prime call  — budget available → live API call, response saved to cache.
-//  2. Exhaust     — RecordAPICall() until RemainingBudget() == 0.
-//  3. Probe call  — budget zero → client must serve from cache.
-//  4. Assert      — server received exactly 1 hit (the prime), not 2.
-//
-// For Past Periods (types 2, 4, 6, 8) the probe call never reaches the budget
-// check at all: makeCachedAPIRequest short-circuits to cache the moment it sees
-// isPast==true and a valid cache entry. This makes them a useful control group
-// that confirms immutable-cache behaviour is budget-free.
 package api
 
 import (
@@ -112,10 +83,6 @@ func captureStdout(fn func()) string {
 	return buf.String()
 }
 
-// =============================================================================
-// 1. Current date — QueryModeDay, today (zero testDate)
-// =============================================================================
-
 // TestBudgetExhausted_CurrentDate verifies that when the budget is fully
 // consumed, a current-day query serves production data from cache and makes no
 // additional live API call.
@@ -149,10 +116,6 @@ func TestBudgetExhausted_CurrentDate(t *testing.T) {
 		t.Errorf("probe: expected 1 total server hit (cache used), got %d", hits.Load())
 	}
 }
-
-// =============================================================================
-// 2. Specific date — QueryModeDay, past day
-// =============================================================================
 
 // TestBudgetExhausted_SpecificDate verifies that a past-day result is always
 // served from immutable cache — even when the budget was already zero before
@@ -191,10 +154,6 @@ func TestBudgetExhausted_SpecificDate(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// 3. Month-to-date — QueryModeMonth, current month
-// =============================================================================
-
 // TestBudgetExhausted_MonthToDate verifies that a current-month query falls
 // back to the lifetime-endpoint cache when the budget is exhausted.
 func TestBudgetExhausted_MonthToDate(t *testing.T) {
@@ -226,10 +185,6 @@ func TestBudgetExhausted_MonthToDate(t *testing.T) {
 		t.Errorf("probe: expected 1 total server hit (cache used), got %d", hits.Load())
 	}
 }
-
-// =============================================================================
-// 4. Specific month — QueryModeMonth, past month
-// =============================================================================
 
 // TestBudgetExhausted_SpecificMonth verifies that a completed past-month result
 // is served from immutable cache even with zero budget.
@@ -263,10 +218,6 @@ func TestBudgetExhausted_SpecificMonth(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// 5. Year-to-date — QueryModeYear, current year
-// =============================================================================
-
 // TestBudgetExhausted_YearToDate verifies that a current-year query falls back
 // to the lifetime-endpoint cache when the budget is exhausted.
 func TestBudgetExhausted_YearToDate(t *testing.T) {
@@ -297,10 +248,6 @@ func TestBudgetExhausted_YearToDate(t *testing.T) {
 		t.Errorf("probe: expected 1 total server hit (cache used), got %d", hits.Load())
 	}
 }
-
-// =============================================================================
-// 6. Specific year — QueryModeYear, past year
-// =============================================================================
 
 // TestBudgetExhausted_SpecificYear verifies that a completed past-year result
 // is served from immutable cache even with zero budget.
@@ -333,10 +280,6 @@ func TestBudgetExhausted_SpecificYear(t *testing.T) {
 		t.Errorf("probe: expected 1 total server hit (immutable cache), got %d", hits.Load())
 	}
 }
-
-// =============================================================================
-// 7. Current true-up — QueryModeTrueUp, Current Period
-// =============================================================================
 
 // TestBudgetExhausted_CurrentTrueUp verifies that a Current Period True-Up Mode query
 // falls back to the lifetime-endpoint cache when the budget is exhausted.
@@ -373,10 +316,6 @@ func TestBudgetExhausted_CurrentTrueUp(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// 8. Past Period True-Up — QueryModeTrueUp, Past Period
-// =============================================================================
-
 // TestBudgetExhausted_PastTrueUp verifies that a Past True-Up Period is
 // served from immutable cache even with zero budget. cacheMaxAge detects a
 // Past Period True-Up when trueUpStart + 1 year is before now and sets
@@ -412,10 +351,6 @@ func TestBudgetExhausted_PastTrueUp(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// 9. No-cache + exhausted budget → RateLimitError
-// =============================================================================
-
 // TestBudgetExhausted_NoCache_ReturnsRateLimitError verifies that a current-
 // period query returns a RateLimitError (not a panic or misleading zero) when
 // the budget is zero and no cache entry exists for the endpoint.
@@ -444,10 +379,6 @@ func TestBudgetExhausted_NoCache_ReturnsRateLimitError(t *testing.T) {
 		t.Errorf("expected 0 server hits (budget exhausted), got %d", hits.Load())
 	}
 }
-
-// =============================================================================
-// 10. Preflight warning — emitted for Current Periods, suppressed for past
-// =============================================================================
 
 // TestPreflightWarning_CurrentPeriod verifies that GetMetricsFromCloud prints
 // a budget-insufficient warning to stdout when the remaining budget is less

@@ -10,7 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -41,17 +41,7 @@ func defaultCloudClientFactory(systemID, systemName, apiKey, accessToken string,
 }
 
 // DataAggregator handles combining data from multiple systems.
-//
-// GO PATTERN: Service Object with Dependency Injection
-// This struct uses dependency injection for:
-//   - getAccessToken: OAuth token retrieval (injected at construction)
-//   - createCloudClient: Cloud client creation (injectable for testing)
-//
-// Benefits:
-//   - Method grouping: organizes related functions under one namespace
-//   - Interface readiness: can implement interfaces for mocking/testing
-//   - Testability: dependencies can be mocked via factory functions
-//   - Future extensibility: fields can be added later without changing call sites
+// Dependencies are injected at construction to support testing.
 type DataAggregator struct {
 	getAccessToken    OAuthTokenGetter
 	createCloudClient CloudClientFactory
@@ -79,11 +69,18 @@ func NewDataAggregatorWithFactory(getAccessToken OAuthTokenGetter, factory Cloud
 // If testDate is provided, uses that date instead of today.
 // queryMode specifies the Query Mode (Day, Month, Year, or True-Up).
 // reportTimezone is the timezone to use for all systems' data queries (from config, system, or US/Pacific fallback).
-func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []SystemConfig, apiConfig *APIConfig, testDate time.Time, queryMode constants.QueryMode, reportTimezone *time.Location) (*AggregatedMetrics, error) {
+func (a *DataAggregator) GetAggregatedMetrics(
+	ctx context.Context,
+	systems []SystemConfig,
+	apiConfig *APIConfig,
+	testDate time.Time,
+	queryMode constants.QueryMode,
+	reportTimezone *time.Location,
+) (*AggregatedMetrics, error) {
 	metrics := &AggregatedMetrics{
 		Timestamp: time.Now(),
-		QueryDate: testDate,  // time.Time zero value means "today"
-		QueryMode: queryMode, // Query Mode
+		QueryDate: testDate,
+		QueryMode: queryMode,
 		Systems:   make([]SystemMetrics, 0, len(systems)),
 	}
 	anyCacheUsed := false
@@ -91,7 +88,6 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 	var rateLimitErrors []string     // system names that hit the rate limit
 
 	for _, sys := range systems {
-		// Use Cloud API
 		if apiConfig == nil {
 			return nil, fmt.Errorf("%s for system %s", constants.ErrAPIConfigRequired, sys.Name)
 		}
@@ -99,7 +95,6 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 			return nil, fmt.Errorf("api.key required for system %s", sys.Name)
 		}
 
-		// Get OAuth access token using client credentials
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -109,8 +104,6 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 			return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, sys.Name, err)
 		}
 
-		// Use the report timezone for all systems (from config, system, or US/Pacific fallback)
-		// Create Cloud API client with API key, access token, and report timezone
 		cloudClient := a.createCloudClient(sys.ID, sys.Name, apiConfig.Key, accessToken, reportTimezone)
 
 		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryMode)
@@ -123,18 +116,16 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 			if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 				return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
 			}
-			fmt.Printf("WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
+			fmt.Fprintf(os.Stderr, "WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
 			allFromCache = false
 			continue
 		}
-		// Track cache status
 		if cacheUsed {
 			anyCacheUsed = true
 		} else {
 			allFromCache = false
 		}
 
-		// Calculate net flow today (positive = net import, negative = net export)
 		netFlowToday := localMetrics.GridImportToday - localMetrics.GridExportToday
 
 		systemMetrics := SystemMetrics{
@@ -151,20 +142,12 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 		}
 
 		metrics.Systems = append(metrics.Systems, systemMetrics)
-
-		// Aggregate totals
-		// Production: sum across systems (each system has its own solar panels)
 		metrics.ProductionToday += localMetrics.ProductionToday
-
-		// Consumption: sum across systems
 		metrics.ConsumptionToday += localMetrics.ConsumptionToday
-
-		// Grid import/export: sum across systems
 		metrics.GridImportToday += localMetrics.GridImportToday
 		metrics.GridExportToday += localMetrics.GridExportToday
 	}
 
-	// Calculate net flow (positive = net import, negative = net export)
 	metrics.NetFlowToday = metrics.GridImportToday - metrics.GridExportToday
 
 	metrics.CacheUsed = anyCacheUsed
@@ -172,7 +155,7 @@ func (a *DataAggregator) GetAggregatedMetrics(ctx context.Context, systems []Sys
 
 	// If we collected any 429 errors that could not be resolved with cache, return error
 	if len(rateLimitErrors) > 0 {
-		return nil, fmt.Errorf("API rate limit exceeded (%d): affected systems: %s", http.StatusTooManyRequests, strings.Join(rateLimitErrors, ", "))
+		return nil, fmt.Errorf("%s: affected systems: %s", constants.RateLimitError, strings.Join(rateLimitErrors, ", "))
 	}
 
 	return metrics, nil

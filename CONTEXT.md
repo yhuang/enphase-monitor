@@ -17,7 +17,7 @@ _Avoid_: Installation, sub-panel, unit
 These terms come from Enphase API documentation, not from the energy domain. They are not user-facing, but they shape the entire data-fetching and caching architecture.
 
 **Interval Data**:
-API responses from the `telemetry` and `energy_*_telemetry` endpoints. Returns exactly one calendar day of five-minute intervals (96 per day). Single-day only — multi-day ranges are rejected by the API. Used for Day Mode queries.
+API responses from the `telemetry` and `energy_*_telemetry` endpoints. Returns exactly one calendar day of 15-minute intervals (96 per day). Single-day only — multi-day ranges are rejected by the API. Used for Day Mode queries.
 _Avoid_: Interval endpoint, telemetry data
 
 **Lifetime Data**:
@@ -116,10 +116,10 @@ Energy pushed from a System into the utility grid. Code identifier: `GridExport`
 _Avoid_: Export, energy export, grid feed
 
 **Battery Charge**:
-Energy stored into a System's batteries. Code identifier: `BatteryCharged`.
+Energy stored into a System's batteries. Only fetched for today's live Day Mode query (`queryMode == QueryModeDay && testDate.IsZero()`); omitted for all other Query Modes and for past dates. Code identifier: `BatteryCharged`.
 
 **Battery Discharge**:
-Energy drawn from a System's batteries. Code identifier: `BatteryDischarged`.
+Energy drawn from a System's batteries. Only fetched for today's live Day Mode query (`queryMode == QueryModeDay && testDate.IsZero()`); omitted for all other Query Modes and for past dates. Code identifier: `BatteryDischarged`.
 
 **State of Charge (SOC)**:
 The battery charge level of a System, expressed as a percentage (0–100). Only available for today's live Day Mode query — the exact gate in `internal/api/client.go` is `queryMode == QueryModeDay && testDate.IsZero()`, so an explicit `--date <today>` does *not* fetch SOC (testDate is non-zero). Code identifier: `BatterySOC`.
