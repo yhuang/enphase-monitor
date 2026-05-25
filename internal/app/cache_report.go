@@ -67,7 +67,7 @@ func RunCacheReport(ctx context.Context, rc RunConfig, trueUpStart string) error
 	if trueUpStart != "" {
 		return RunTrueUp(ctx, rc, trueUpStart)
 	}
-	return RunOnce(ctx, rc, false)
+	return RunOnce(ctx, rc, false /* validationMode */)
 }
 
 func printCacheDiagnostic(statuses []api.SystemCacheStatus, effectiveDate time.Time, effectiveQueryMode constants.QueryMode, trueUpStart string, originalDate time.Time) {

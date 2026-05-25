@@ -1,73 +1,18 @@
-// Package validation - validation_test.go
-//
-// TEST FILE WALKTHROUGH
-// =====================
-// This file demonstrates several Go testing patterns. Each test function below
-// includes detailed comments explaining what the code does and why.
-//
-// PATTERNS DEMONSTRATED
-// ---------------------
-// - Pattern 1: Table-Driven Tests (multiple inputs, one test function)
-// - Pattern 3: Subtests with t.Run() (named, independently runnable tests)
-// - Pattern 5: Writer Injection (io.Writer/io.Discard for testable output)
-// - Pattern 7: Error Path Testing (deliberately cause errors to test handling)
-//
-// HOW TO RUN THESE TESTS
-// ----------------------
-//
-//	go test -v ./internal/validation/                    # Run all tests in package
-//	go test -v ./internal/validation/ -run ExactMatch    # Run tests matching "ExactMatch"
-//	go test -v ./internal/validation/ -run "WithinTolerance/small"  # Run specific subtest
-//
-// UNDERSTANDING TEST OUTPUT
-// -------------------------
-// When you run `go test -v`, you'll see:
-//
-//	=== RUN   TestValidateMetric_ExactMatch           <- Test function started
-//	=== RUN   TestValidateMetric_ExactMatch/zero_values  <- Subtest started
-//	--- PASS: TestValidateMetric_ExactMatch/zero_values  <- Subtest passed
-//	--- PASS: TestValidateMetric_ExactMatch (0.00s)      <- All subtests passed
-//
-// See docs/TESTING.md for detailed pattern explanations.
 package validation
 
 import (
 	"bytes"
 	"io"
 	"math"
+	"strings"
 	"testing"
 
 	"enphase-monitor/internal/aggregator"
 	"enphase-monitor/internal/constants"
 )
 
-// =============================================================================
-// PATTERN 1: TABLE-DRIVEN TESTS
-// =============================================================================
-//
-// Table-driven tests let you test the same logic with many different inputs.
-// Instead of writing 4 separate test functions, you define test cases in a
-// "table" (slice of structs) and loop through them.
-//
-// BENEFITS:
-// - Add new test cases by adding one line (no new functions needed)
-// - All cases use identical test logic (DRY - Don't Repeat Yourself)
-// - Easy to see all inputs/outputs at a glance
-// - Less code to maintain
-
 // TestValidateMetric_ExactMatch tests validation with exact matches.
-//
-// WALKTHROUGH:
-// This test verifies that validateMetric returns true when expected == actual.
-// It tests several edge cases: zero, positive, negative, and large values.
 func TestValidateMetric_ExactMatch(t *testing.T) {
-	// STEP 1: Define the test table
-	// Each struct in this slice represents one test case.
-	// The struct fields are:
-	//   - name: human-readable description (used in test output)
-	//   - expected: first input to validateMetric
-	//   - actual: second input to validateMetric
-	//   - want: what we expect validateMetric to return
 	tests := []struct {
 		name     string
 		expected float64
@@ -81,19 +26,10 @@ func TestValidateMetric_ExactMatch(t *testing.T) {
 		{"large value match", 1234.5, 1234.5, true},
 	}
 
-	// STEP 2: Loop through each test case
-	// The `tt` variable holds the current test case (convention: "tt" for "table test")
 	for _, tt := range tests {
-		// STEP 3: Create a subtest for each case using t.Run()
-		// This gives each case its own name in the output, and allows running
-		// individual cases with: go test -run "ExactMatch/zero_values"
 		t.Run(tt.name, func(t *testing.T) {
-			// STEP 4: Call the function we're testing
-			// validateMetric is defined in validation.go (same package, so we can call it)
 			got := validateMetric(io.Discard, "Test Metric", tt.expected, tt.actual)
 
-			// STEP 5: Compare the result with what we expected
-			// If they don't match, report an error with helpful context
 			if got != tt.want {
 				t.Errorf("validateMetric() = %v, want %v", got, tt.want)
 			}
@@ -101,19 +37,11 @@ func TestValidateMetric_ExactMatch(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// TABLE-DRIVEN TEST WITH RICHER ERROR MESSAGES
-// =============================================================================
 //
 // This test shows how to add extra fields to your test struct for better
 // debugging when tests fail.
 
 // TestValidateMetric_WithinTolerance tests validation within tolerance bounds.
-//
-// WALKTHROUGH:
-// This test verifies the tolerance logic: values within ±10% (or ±0.1 kWh minimum)
-// should pass validation. The test includes a "description" field that explains
-// WHY each case should pass, making failures easier to debug.
 func TestValidateMetric_WithinTolerance(t *testing.T) {
 	// Notice the extra "description" field - this helps when debugging failures
 	tests := []struct {
@@ -176,10 +104,6 @@ func TestValidateMetric_WithinTolerance(t *testing.T) {
 }
 
 // TestValidateMetric_OutsideTolerance tests validation outside tolerance bounds.
-//
-// WALKTHROUGH:
-// This test verifies that values OUTSIDE the tolerance correctly return false.
-// It's the "negative case" counterpart to TestValidateMetric_WithinTolerance.
 func TestValidateMetric_OutsideTolerance(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -231,9 +155,6 @@ func TestValidateMetric_OutsideTolerance(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// EDGE CASE TESTING
-// =============================================================================
 //
 // Edge cases are inputs at the boundaries of what a function handles:
 // - Zero values (division by zero concerns)
@@ -241,11 +162,6 @@ func TestValidateMetric_OutsideTolerance(t *testing.T) {
 // - Boundary conditions (exactly at tolerance limit)
 
 // TestValidateMetric_ZeroValues tests validation with zero expected values.
-//
-// WALKTHROUGH:
-// Zero is a special case because:
-// 1. 10% of zero is zero (not useful as a tolerance)
-// 2. We need the minimum tolerance (0.1 kWh) to kick in
 func TestValidateMetric_ZeroValues(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -285,9 +201,6 @@ func TestValidateMetric_ZeroValues(t *testing.T) {
 }
 
 // TestValidateMetric_NegativeValues tests validation with negative values.
-//
-// WALKTHROUGH:
-// Negative values test sign handling - the tolerance should use absolute values.
 func TestValidateMetric_NegativeValues(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -326,9 +239,6 @@ func TestValidateMetric_NegativeValues(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// PATTERN 7: ERROR PATH TESTING
-// =============================================================================
 //
 // Error path tests deliberately cause errors to verify the code handles them
 // correctly. This ensures:
@@ -341,14 +251,7 @@ func TestValidateMetric_NegativeValues(t *testing.T) {
 // ensures your code fails gracefully.
 
 // TestValidateMetrics_MissingFile tests handling of missing expected values file.
-//
-// WALKTHROUGH:
-// This test passes an impossible date ("9999-99-99") that will never have
-// an expected values file. We verify that ValidateMetrics returns an error
-// instead of crashing or returning nil.
 func TestValidateMetrics_MissingFile(t *testing.T) {
-	// STEP 1: Create valid input data
-	// The metrics struct is valid - only the date is impossible
 	metrics := &aggregator.AggregatedMetrics{
 		Systems: []aggregator.SystemMetrics{
 			{
@@ -363,20 +266,15 @@ func TestValidateMetrics_MissingFile(t *testing.T) {
 		},
 	}
 
-	// STEP 2: Call function with input that SHOULD cause an error
 	var buf bytes.Buffer
 	err := ValidateMetrics(&buf, metrics, "9999-99-99") // Non-existent date
 
-	// STEP 3: Verify we got an error (not nil)
 	if err == nil {
 		t.Error("Expected error for missing file, got nil")
 		// Note: We use t.Error (not t.Fatal) because there's no more code after this
 	}
 }
 
-// =============================================================================
-// TESTING ERROR MESSAGE QUALITY
-// =============================================================================
 //
 // It's not enough to just return an error - the error message should be
 // HELPFUL. It should tell the user:
@@ -385,10 +283,6 @@ func TestValidateMetrics_MissingFile(t *testing.T) {
 // - Any relevant context (file paths, dates, etc.)
 
 // TestValidateMetrics_MissingFile_HelpfulError tests that missing file error is helpful.
-//
-// WALKTHROUGH:
-// This test verifies that when the expected values file is missing, the error
-// message contains all the information a user needs to fix the problem.
 func TestValidateMetrics_MissingFile_HelpfulError(t *testing.T) {
 	metrics := &aggregator.AggregatedMetrics{
 		Systems: []aggregator.SystemMetrics{
@@ -400,84 +294,53 @@ func TestValidateMetrics_MissingFile_HelpfulError(t *testing.T) {
 	var buf bytes.Buffer
 	err := ValidateMetrics(&buf, metrics, testDate)
 
-	// STEP 1: First verify we got an error at all
 	if err == nil {
 		t.Fatal("Expected error for missing file, got nil")
 		// t.Fatal STOPS the test immediately - no point checking error message if there's no error
 	}
 
-	// STEP 2: Get the error message as a string for checking
 	errMsg := err.Error()
-
-	// STEP 3: Use subtests to check MULTIPLE aspects of the error message
-	// Each aspect is its own subtest, so you can see exactly which checks failed
 
 	t.Run("contains target date", func(t *testing.T) {
 		// The error should mention which date we were looking for
-		if !containsString(errMsg, testDate) {
+		if !strings.Contains(errMsg, testDate) {
 			t.Errorf("Error message should contain date %q", testDate)
 		}
 	})
 
 	t.Run("contains file path", func(t *testing.T) {
 		// The error should tell the user WHERE the file should be
-		if !containsString(errMsg, "test-data/expected_values_") {
+		if !strings.Contains(errMsg, "test-data/expected_values_") {
 			t.Error("Error message should contain expected file path")
 		}
 	})
 
 	t.Run("contains JSON format example", func(t *testing.T) {
 		// The error should show the user what format the file needs
-		if !containsString(errMsg, "\"date\":") {
+		if !strings.Contains(errMsg, "\"date\":") {
 			t.Error("Error message should contain JSON format example")
 		}
-		if !containsString(errMsg, "\"systems\":") {
+		if !strings.Contains(errMsg, "\"systems\":") {
 			t.Error("Error message should contain systems field in example")
 		}
-		if !containsString(errMsg, "\"expected\":") {
+		if !strings.Contains(errMsg, "\"expected\":") {
 			t.Error("Error message should contain expected field in example")
 		}
 	})
 
 	t.Run("contains skip validation hint", func(t *testing.T) {
 		// The error should tell the user how to skip validation if they don't want it
-		if !containsString(errMsg, "without validation") || !containsString(errMsg, "omit the --test flag") {
+		if !strings.Contains(errMsg, "without validation") || !strings.Contains(errMsg, "omit the --test flag") {
 			t.Error("Error message should contain hint about skipping validation")
 		}
 	})
 }
 
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-//
-// Helper functions keep test code DRY (Don't Repeat Yourself).
-// This helper is used by multiple tests above.
-
-// containsString is a helper for string containment check.
-// We could use strings.Contains, but this avoids adding an import.
-func containsString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-// =============================================================================
-// SKIPPING TESTS
-// =============================================================================
 //
 // Sometimes you want to write a test but can't run it yet (missing fixtures,
 // external dependencies, etc.). Use t.Skip() to mark it as skipped.
 
 // TestValidateMetrics_InvalidJSON tests handling of malformed JSON.
-//
-// WALKTHROUGH:
-// This test is SKIPPED because it would require creating a malformed JSON file
-// in the test-data/ directory. The test is here to document that this case
-// SHOULD be tested, and to make it easy to implement later.
 func TestValidateMetrics_InvalidJSON(t *testing.T) {
 	// t.Skip() marks this test as skipped (not failed)
 	// The message explains WHY it's skipped
@@ -487,22 +350,11 @@ func TestValidateMetrics_InvalidJSON(t *testing.T) {
 	// and implement the test logic here
 }
 
-// =============================================================================
-// TESTING INTERNAL CALCULATIONS
-// =============================================================================
 //
 // Sometimes you want to test a calculation directly, not through the function
 // that uses it. This makes tests more focused and failures easier to diagnose.
 
 // TestToleranceCalculation tests the tolerance calculation logic.
-//
-// WALKTHROUGH:
-// This test verifies the tolerance formula directly:
-//
-//	tolerance = max(expected * 10%, 0.1 kWh)
-//
-// By testing the formula separately, we can verify the math is correct
-// independent of the validateMetric function.
 func TestToleranceCalculation(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -556,9 +408,6 @@ func TestToleranceCalculation(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// TESTING REFACTOR HELPERS (findSystemByID, runMetricTests)
-// =============================================================================
 //
 // These helpers were introduced during go-style-core refactoring to keep
 // ValidateMetrics nesting at most 2 levels. Tests ensure they behave correctly.
@@ -644,19 +493,11 @@ func TestRunMetricTests(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// INTEGRATION-STYLE TESTS
-// =============================================================================
 //
 // These tests call the full ValidateMetrics function with realistic inputs.
 // They test how multiple components work together.
 
 // TestValidateMetrics_EmptyMetrics tests validation with empty metrics.
-//
-// WALKTHROUGH:
-// This test verifies that ValidateMetrics handles the edge case where no
-// systems are provided. The expected values file (if it exists) will have
-// systems, but our metrics don't - this mismatch should cause an error.
 func TestValidateMetrics_EmptyMetrics(t *testing.T) {
 	// Create metrics with an EMPTY systems slice
 	metrics := &aggregator.AggregatedMetrics{
@@ -672,10 +513,6 @@ func TestValidateMetrics_EmptyMetrics(t *testing.T) {
 }
 
 // TestValidateMetrics_SystemIDMismatch tests handling of system ID mismatches.
-//
-// WALKTHROUGH:
-// This test verifies that ValidateMetrics catches when the system IDs in
-// the metrics don't match the system IDs in the expected values file.
 func TestValidateMetrics_SystemIDMismatch(t *testing.T) {
 	metrics := &aggregator.AggregatedMetrics{
 		Systems: []aggregator.SystemMetrics{

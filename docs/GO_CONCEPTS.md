@@ -29,7 +29,7 @@ This document explains all the intermediate Go concepts that are used throughout
 
 ### Error Handling Pattern
 
-**Location**: `internal/aggregator/aggregator.go:105-108`
+**Location**: `internal/aggregator/aggregator.go:102-105`
 
 Standard Go pattern: function returns `(result, error)`. We check `err` immediately and return early if non-nil. This is idiomatic Go - errors are values, not exceptions.
 
@@ -54,7 +54,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Error Wrapping with %w
 
-**Location**: `internal/aggregator/aggregator.go:107`
+**Location**: `internal/aggregator/aggregator.go:104`
 
 `fmt.Errorf` with `%w` verb wraps the original error, preserving the error chain. This allows callers to use `errors.Is()` or `errors.Unwrap()` to inspect the chain. We add context ("failed to refresh token for system X") while preserving the original error for debugging.
 
@@ -64,7 +64,7 @@ return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, 
 
 ### Error Inspection
 
-**Location**: `internal/aggregator/aggregator.go:116-128`
+**Location**: `internal/aggregator/aggregator.go:110-122`
 
 We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit. For context cancellation errors (Ctrl+C or deadline exceeded), we return immediately to abort all systems. For other errors, we warn and continue.
 
@@ -78,7 +78,7 @@ if err != nil {
     if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
         return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
     }
-    fmt.Printf("WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
+    fmt.Fprintf(os.Stderr, "WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
     allFromCache = false
     continue
 }
@@ -90,7 +90,7 @@ if err != nil {
 
 ### Constructor Function Pattern
 
-**Location**: `internal/api/client.go:201-214`
+**Location**: `internal/api/client.go:204-215`
 
 Functions starting with "New" are constructors - they create and initialize structs. This is a Go naming convention, not a language feature. We return a pointer `(*EnlightenCloudClient)` because:
 1. the return type specifies a pointer type;
@@ -106,7 +106,7 @@ func NewEnlightenCloudClient(...) *EnlightenCloudClient {
 
 ### Struct Literal with Pointer
 
-**Location**: `internal/api/client.go:204-213`
+**Location**: `internal/api/client.go:205-214`
 
 `&EnlightenCloudClient{...}` creates a struct and returns a pointer to it. This is idiomatic Go - create struct, take address, return pointer.
 
@@ -119,7 +119,7 @@ return &EnlightenCloudClient{
 
 ### Struct Initialization with Pointer Return
 
-**Location**: `internal/aggregator/aggregator.go:81-86`
+**Location**: `internal/aggregator/aggregator.go:80-85`
 
 We use `&AggregatedMetrics{}` to create a pointer to a new struct. This is more efficient than returning by value (avoids copying large struct).
 
@@ -132,7 +132,7 @@ metrics := &AggregatedMetrics{
 
 ### Nested Struct Initialization
 
-**Location**: `internal/api/client.go:210-212`
+**Location**: `internal/api/client.go:211-213`
 
 We initialize `httpClient` field with a struct literal. `http.Client` is from standard library - we set Timeout for safety.
 
@@ -177,7 +177,7 @@ func (c *ColorConfig) convertHexFields() {
 
 ### Struct Definition
 
-**Location**: `internal/oauth/oauth.go:85-89`
+**Location**: `internal/oauth/oauth.go:83-87`
 
 Structs group related data together. This struct holds token information. Fields are exported (PascalCase) so they can be accessed from other packages.
 
@@ -191,7 +191,7 @@ type TokenCache struct {
 
 ### Struct Design Principles
 
-**Location**: `internal/api/types.go:24-33`
+**Location**: `internal/api/types.go:11-20`
 
 This struct follows Go best practices:
 1. Grouped related fields together (energy metrics, battery status)
@@ -201,7 +201,7 @@ This struct follows Go best practices:
 
 ### Field Types
 
-**Location**: `internal/api/types.go:25-32`
+**Location**: `internal/api/types.go:12-19`
 
 - `time.Time`: Go's standard time type (always has a value, cannot be nil)
 - `float64`: 64-bit floating point (precise enough for energy values)
@@ -223,7 +223,7 @@ allIntervals := make([]TelemetryInterval, 0, total)
 
 ### Slice Capacity Hint
 
-**Location**: `internal/aggregator/aggregator.go:85`
+**Location**: `internal/aggregator/aggregator.go:84`
 
 `make([]Type, length, capacity)` pre-allocates capacity to avoid reallocation. We know we will have `len(systems)` elements, so we pre-allocate that capacity. This is more efficient than letting the slice grow dynamically.
 
@@ -247,7 +247,7 @@ allIntervals = append(allIntervals, intervalArray...)
 
 ### Slice Append
 
-**Location**: `internal/aggregator/aggregator.go:117`
+**Location**: `internal/aggregator/aggregator.go:111`
 
 `append()` adds elements to a slice, automatically growing if needed. Since we pre-allocated capacity, this should be efficient.
 
@@ -315,7 +315,7 @@ case constants.FieldWhExported:
 
 ### Continue Statement
 
-**Location**: `internal/aggregator/aggregator.go:116-120`
+**Location**: `internal/aggregator/aggregator.go:110-114`
 
 `continue` skips to next iteration of the loop. We use it here to skip this system and try the next one when a rate limit error occurs.
 
@@ -525,7 +525,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Duration Literals
 
-**Location**: `internal/api/client.go:211`
+**Location**: `internal/api/client.go:211-213`
 
 `time.Second` is a typed constant (`time.Duration`). Multiplying an integer by `time.Second` — e.g. `30 * time.Second` — is idiomatic Go for expressing durations. In this codebase the value is extracted to `constants.APIRequestTimeout` for clarity.
 
@@ -968,7 +968,7 @@ defer ticker.Stop()
 
 ### Package-Level Variable
 
-**Location**: `internal/oauth/oauth.go:91`
+**Location**: `internal/oauth/oauth.go:89`
 
 Variables declared outside functions are package-level (shared across all functions). We use `*TokenCache` (pointer) so it can be `nil` (meaning "no cache yet"). This is a singleton pattern - one cache for the entire application.
 
@@ -1003,7 +1003,7 @@ return hex.EncodeToString(hash[:])
 
 ### Variable Declaration with Type
 
-**Location**: `internal/aggregator/aggregator.go:89`
+**Location**: `internal/aggregator/aggregator.go:88`
 
 `var name []Type` declares a variable with zero value (nil slice for slices). We could use `:= []string{}` but `var` is clearer when we are not initializing.
 
@@ -1017,7 +1017,7 @@ var rateLimitErrors []string
 
 ### Multiple Return Values
 
-**Location**: `internal/aggregator/aggregator.go:115`
+**Location**: `internal/aggregator/aggregator.go:109`
 
 Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for API Budget tracking).
 

@@ -1,27 +1,5 @@
-// Package cache - cli.go
-//
-// PURPOSE
-// -------
-// This file implements CLI commands for cache management and entry listing.
-//
-// CACHE COMMANDS
-// --------------
-//   - --clear-cache: Clear today's cache only (preserves historical)
-//   - --clear-all-cache: Clear all cached responses
-//
-// CACHE ENTRY STRUCTURE
-// ---------------------
-// Each cache file contains:
-//   - status_code: HTTP status code
-//   - headers: HTTP response headers
-//   - body: Raw API response (JSON)
-//   - cached_at: Timestamp when cached
-//   - queried_date: Date that was queried (YYYY-MM-DD)
-//
-// CACHE FILE NAMING
-// -----------------
-// Files are named by SHA256 hash of normalized URL (includes query params).
-// Format: {hash}.json where {hash} is 64-character hexadecimal string.
+// cli.go implements cache management commands (--clear-cache, --clear-all-cache) and
+// cache entry listing used by the --cache diagnostic path.
 package cache
 
 import (
@@ -129,10 +107,8 @@ func ClearAllCache() error {
 	return os.RemoveAll(getCacheDir())
 }
 
-// CacheEntry represents a cached API response with metadata.
-//
-//nolint:revive // exported name clarifies package (cache.CacheEntry)
-type CacheEntry struct {
+// Entry represents a cached API response with metadata.
+type Entry struct {
 	Key      string
 	Path     string
 	CachedAt time.Time
@@ -145,9 +121,9 @@ type CacheEntry struct {
 }
 
 // ListCacheEntries returns all cached API responses with their metadata.
-func ListCacheEntries() ([]CacheEntry, error) {
+func ListCacheEntries() ([]Entry, error) {
 	if _, err := os.Stat(getCacheDir()); os.IsNotExist(err) {
-		return []CacheEntry{}, nil
+		return []Entry{}, nil
 	}
 
 	entries, err := os.ReadDir(getCacheDir())
@@ -155,7 +131,7 @@ func ListCacheEntries() ([]CacheEntry, error) {
 		return nil, err
 	}
 
-	var cacheEntries []CacheEntry
+	var cacheEntries []Entry
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -180,7 +156,7 @@ func ListCacheEntries() ([]CacheEntry, error) {
 		cached, err := LoadCachedResponseByPath(cachePath)
 		if err != nil {
 			// If we cannot load it, still include it but with minimal info
-			cacheEntries = append(cacheEntries, CacheEntry{
+			cacheEntries = append(cacheEntries, Entry{
 				Key:      hash,
 				Path:     cachePath,
 				Size:     info.Size(),
@@ -190,18 +166,22 @@ func ListCacheEntries() ([]CacheEntry, error) {
 			continue
 		}
 
-		// Try to parse the response body to extract useful information
-		endpoint, systemID, _, summary := parseCacheResponse(cached.Body)
+		// Use authoritative metadata from the cached response; fall back to body-parsed
+		// endpoint for old cache entries that predate the Endpoint/SystemID fields.
+		parsedEndpoint, summary := parseCacheResponse(cached.Body)
+		endpoint := cached.Endpoint
+		if endpoint == "" {
+			endpoint = parsedEndpoint
+		}
+		systemID := cached.SystemID
 
-		// Use QueriedDate if available (the date we actually queried), otherwise fall back to API's start_date
+		// Use QueriedDate if available; fall back to CachedAt date for pre-metadata entries.
 		date := cached.QueriedDate
-		if date == "" {
-			// Fallback: try to extract from response body (API's start_date)
-			// Note: This is the system installation date, not the queried date
-			_, _, date, _ = parseCacheResponse(cached.Body)
+		if date == "" && !cached.CachedAt.IsZero() {
+			date = cached.CachedAt.Format(constants.DateFormat)
 		}
 
-		entry := CacheEntry{
+		entry := Entry{
 			Key:      hash,
 			Path:     cachePath,
 			CachedAt: cached.CachedAt,
@@ -234,16 +214,18 @@ func LoadCachedResponseByPath(cachePath string) (*CachedResponse, error) {
 	return &cached, nil
 }
 
-// parseCacheResponse attempts to parse the cached response body and extract useful information
-// Returns: endpoint type, system ID, date, and summary
-func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) {
+// parseCacheResponse attempts to parse the cached response body and extract a human-readable
+// summary. It also identifies the endpoint type as a fallback for old cache entries that
+// predate the Endpoint metadata field. Returns empty strings if the body cannot be parsed.
+func parseCacheResponse(body []byte) (endpoint, summary string) {
 	var telemetryResp struct {
 		Intervals []struct {
-			EndAt  int64   `json:"end_at"`
-			WhDel  float64 `json:"wh_del"`
-			WhRcv  float64 `json:"wh_rcv"`
-			Enwh   float64 `json:"enwh"`
-			Charge struct {
+			EndAt      int64   `json:"end_at"`
+			WhImported float64 `json:"wh_imported"`
+			WhExported float64 `json:"wh_exported"`
+			WhDel      float64 `json:"wh_del"`
+			Enwh       float64 `json:"enwh"`
+			Charge     struct {
 				Enwh float64 `json:"enwh"`
 			} `json:"charge"`
 			Discharge struct {
@@ -252,29 +234,22 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 		} `json:"intervals"`
 	}
 	if err := json.Unmarshal(body, &telemetryResp); err != nil || len(telemetryResp.Intervals) == 0 {
-		return "", "", "", ""
+		return "", ""
 	}
 
-	// Extract date from first interval's timestamp
-	firstTime := time.Unix(telemetryResp.Intervals[0].EndAt, 0)
-	defaultTZ, err := time.LoadLocation("US/Pacific")
-	if err != nil {
-		Debugf("failed to load US/Pacific timezone; cache entry will show no date in --cache output: %v", err)
-	} else {
-		date = firstTime.In(defaultTZ).Format(constants.DateFormat)
-	}
-
-	// Determine endpoint type from which fields are populated (go-style-core: flat with early return)
-	hasCharge, hasWhDel, hasWhRcv, hasEnwh := false, false, false, false
+	var hasCharge, hasWhImported, hasWhExported, hasWhDel, hasEnwh bool
 	for _, interval := range telemetryResp.Intervals {
 		if interval.Charge.Enwh > 0 || interval.Discharge.Enwh > 0 {
 			hasCharge = true
 		}
+		if interval.WhImported > 0 {
+			hasWhImported = true
+		}
+		if interval.WhExported > 0 {
+			hasWhExported = true
+		}
 		if interval.WhDel > 0 {
 			hasWhDel = true
-		}
-		if interval.WhRcv > 0 {
-			hasWhRcv = true
 		}
 		if interval.Enwh > 0 {
 			hasEnwh = true
@@ -287,36 +262,45 @@ func parseCacheResponse(body []byte) (endpoint, systemID, date, summary string) 
 			totalCharge += interval.Charge.Enwh
 			totalDischarge += interval.Discharge.Enwh
 		}
-		return "telemetry/battery", "", date,
+		return "telemetry/battery",
 			fmt.Sprintf("Battery: %d intervals, charge=%.2f, discharge=%.2f kWh",
 				len(telemetryResp.Intervals), totalCharge/constants.WhToKWh, totalDischarge/constants.WhToKWh)
 	}
-	if hasWhDel && !hasWhRcv {
-		var totalImport float64
+	if hasWhImported {
+		var total float64
 		for _, interval := range telemetryResp.Intervals {
-			totalImport += interval.WhDel
+			total += interval.WhImported
 		}
-		return "energy_import_telemetry", "", date,
+		return "energy_import_telemetry",
 			fmt.Sprintf("Import: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalImport/constants.WhToKWh)
+				len(telemetryResp.Intervals), total/constants.WhToKWh)
 	}
-	if hasWhRcv && !hasWhDel {
-		var totalExport float64
+	if hasWhExported {
+		var total float64
 		for _, interval := range telemetryResp.Intervals {
-			totalExport += interval.WhRcv
+			total += interval.WhExported
 		}
-		return "energy_export_telemetry", "", date,
+		return "energy_export_telemetry",
 			fmt.Sprintf("Export: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalExport/constants.WhToKWh)
+				len(telemetryResp.Intervals), total/constants.WhToKWh)
+	}
+	if hasWhDel {
+		var total float64
+		for _, interval := range telemetryResp.Intervals {
+			total += interval.WhDel
+		}
+		return "telemetry/production_meter",
+			fmt.Sprintf("Production: %d intervals, total=%.2f kWh",
+				len(telemetryResp.Intervals), total/constants.WhToKWh)
 	}
 	if hasEnwh {
-		var totalEnwh float64
+		var total float64
 		for _, interval := range telemetryResp.Intervals {
-			totalEnwh += interval.Enwh
+			total += interval.Enwh
 		}
-		return "telemetry/production_meter", "", date,
-			fmt.Sprintf("Production/Consumption: %d intervals, total=%.2f kWh",
-				len(telemetryResp.Intervals), totalEnwh/constants.WhToKWh)
+		return "telemetry/consumption_meter",
+			fmt.Sprintf("Consumption: %d intervals, total=%.2f kWh",
+				len(telemetryResp.Intervals), total/constants.WhToKWh)
 	}
-	return "", "", date, ""
+	return "", ""
 }

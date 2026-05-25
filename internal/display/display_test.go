@@ -1,48 +1,3 @@
-// Package display - display_test.go
-//
-// TEST SETUP
-// ----------
-// This test suite validates terminal output formatting using writer injection.
-// Tests capture output to bytes.Buffer instead of printing to stdout.
-//
-// TEST PLAN
-// ---------
-// 1. Constructor Tests
-//   - Test NewDisplayWithWriter (custom writer)
-//   - Test NewDisplayWithColorsAndTimezone (default writer)
-//
-// 2. Output Content Tests
-//   - Test header contains "ENPHASE MULTI-SYSTEM MONITOR"
-//   - Test query range formatting (date/time display)
-//   - Test combined energy report section
-//   - Test individual systems section
-//   - Test Net Flow direction formatting (positive = import, negative = export)
-//
-// 3. Color Application Tests (Optional)
-//   - Verify ANSI color codes are present in output
-//   - Test color customization via config
-//
-// TESTING APPROACH
-// ----------------
-// - Inject bytes.Buffer as io.Writer to capture output
-// - Generate output by calling ShowMetrics()
-// - Verify output contains expected text using strings.Contains()
-// - Test timezone formatting (US/Pacific for consistency)
-//
-// WHY WRITER INJECTION
-// --------------------
-// Writer injection (io.Writer interface) enables:
-// - Testing output without printing to terminal
-// - Fast in-memory testing (no I/O)
-// - Precise verification of formatting
-// - No manual visual inspection needed
-//
-// PATTERN USED
-// ------------
-// - Pattern 5: Writer Injection (bytes.Buffer)
-// - Pattern 6: Test Fixtures (helper functions for test data)
-//
-// See docs/TESTING.md for detailed pattern explanations.
 package display
 
 import (
@@ -438,10 +393,6 @@ func TestShowMetrics_Battery_YearQuery(t *testing.T) {
 		t.Error("Output should NOT contain 'Battery State of Charge' for year query")
 	}
 }
-
-// =============================================================================
-// ShowTrueUpReport Tests
-// =============================================================================
 
 // makeTrueUpReport is a test fixture that builds a TrueUpReport with two systems.
 func makeTrueUpReport(tz *time.Location) *aggregator.TrueUpReport {

@@ -1,83 +1,3 @@
-// Package app - setup_test.go
-//
-// TEST SETUP
-// ----------
-// This test suite validates application initialization and configuration logic.
-// Tests ensure proper setup of OAuth adapter, display, and mode configuration.
-//
-// TEST PLAN
-// ---------
-// 1. OAuth Adapter Tests
-//   - Test CreateOAuthAdapter returns non-nil function
-//   - Test adapter can be called (basic smoke test)
-//
-// 2. Display Setup Tests
-//   - Test SetupDisplay creates Display with correct colors
-//   - Test default colors are applied when config has no colors
-//   - Test custom colors override defaults
-//   - Test timezone is set correctly
-//
-// 3. Mode Configuration Tests
-//   - Test ConfigureModes sets Validation Mode flag
-//   - Test ConfigureModes sets cache disabled flag
-//   - Validation Mode flags are mutually independent
-//
-// 4. Date Parsing Tests
-//   - Test ParseTestDate with valid date string
-//   - Test ParseTestDate with empty string returns zero time
-//   - Test ParseTestDate with invalid format returns error
-//
-// 5. Validation Mode Cache Validation Tests
-//   - Test ValidateValidationModeCache returns error for missing cache
-//   - Test error message contains target date
-//   - Test error message contains helpful instructions
-//
-// TESTING APPROACH
-// ----------------
-// - Create minimal config structures for testing
-// - Verify returned objects are non-nil and properly configured
-// - Test error handling for invalid inputs
-// - Use time.Time zero value for "no date specified"
-//
-// WHY TEST APPLICATION SETUP
-// --------------------------
-// Setup functions orchestrate multiple components:
-// - OAuth token management
-// - Display with color configuration
-// - Operating modes (validation, cache)
-// - Date parsing for Past Period queries
-//
-// Testing ensures all components are initialized correctly before use.
-//
-// PATTERN USED
-// ------------
-// - Pattern 1: Table-Driven Tests
-// - Pattern 3: Subtests with t.Run()
-//
-// See docs/TESTING.md for detailed pattern explanations.
-//
-// =============================================================================
-// TESTING PATTERNS DEMONSTRATED IN THIS FILE
-// =============================================================================
-//
-// This file demonstrates several key testing patterns:
-//
-//  1. SMOKE TESTS - Quick tests that verify basic functionality
-//     (TestCreateOAuthAdapter, TestSetupDisplay)
-//
-//  2. CONFIGURATION VARIANTS - Testing the same function with different configs
-//     (TestSetupDisplay vs TestSetupDisplay_WithCustomColors)
-//
-//  3. BOUNDARY VALUE TESTING - Testing edge cases like empty strings, zero values
-//     (TestParseTestDate_EmptyString, TestParseTestDate_InvalidDate)
-//
-//  4. SUBTESTS WITH t.Run() - Grouping related assertions
-//     (TestValidateValidationModeCache uses t.Run for each scenario)
-//
-//  5. TABLE-DRIVEN TESTS - Testing multiple cases with same logic
-//     (TestConfigureModes uses a test table)
-//
-// =============================================================================
 package app
 
 import (
@@ -88,28 +8,11 @@ import (
 	"time"
 
 	"enphase-monitor/internal/aggregator"
+	"enphase-monitor/internal/cache"
 	"enphase-monitor/internal/config"
 	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/types"
 )
-
-// =============================================================================
-// SMOKE TESTS
-// =============================================================================
-//
-// WHAT IS A SMOKE TEST?
-// ---------------------
-// A smoke test is a quick sanity check that verifies basic functionality.
-// The name comes from electronics: if you power on a device and smoke comes
-// out, you know something is fundamentally wrong without further testing.
-//
-// CHARACTERISTICS OF SMOKE TESTS:
-// - Fast to run (milliseconds)
-// - Check that functions don't crash or return nil
-// - Don't verify detailed behavior
-// - Catch obvious regressions quickly
-//
-// =============================================================================
 
 // TestFormatDateForQueryMode tests date formatting for each query mode.
 func TestFormatDateForQueryMode(t *testing.T) {
@@ -167,25 +70,6 @@ func TestSetupDisplay(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// CONFIGURATION VARIANT TESTING
-// =============================================================================
-//
-// WHAT IS CONFIGURATION VARIANT TESTING?
-// --------------------------------------
-// When a function behaves differently based on configuration, test each
-// variant separately. This makes it clear WHICH configuration caused a failure.
-//
-// NAMING CONVENTION:
-// - TestFunctionName         (default/basic case)
-// - TestFunctionName_Variant (specific configuration)
-//
-// Examples:
-// - TestSetupDisplay             (default colors)
-// - TestSetupDisplay_WithCustomColors (custom colors)
-//
-// =============================================================================
-
 func TestSetupDisplay_WithCustomColors(t *testing.T) {
 	// VARIANT: Custom colors in configuration
 	// This tests the color override path vs the default color path
@@ -213,27 +97,6 @@ func TestSetupDisplay_WithCustomColors(t *testing.T) {
 		t.Error("SetupDisplay() returned nil")
 	}
 }
-
-// =============================================================================
-// BOUNDARY VALUE TESTING
-// =============================================================================
-//
-// WHAT IS BOUNDARY VALUE TESTING?
-// -------------------------------
-// Boundary values are inputs at the edges of valid ranges:
-// - Empty strings, zero values, nil pointers
-// - Maximum/minimum values
-// - Just inside/outside valid ranges
-//
-// These often expose bugs because programmers focus on "normal" cases.
-//
-// FOR STRING INPUTS, TEST:
-// - Empty string ""
-// - Valid format with valid data
-// - Valid format with invalid data (2026-13-45)
-// - Invalid format entirely (01-15-2026)
-//
-// =============================================================================
 
 func TestParseTestDate_EmptyString(t *testing.T) {
 	// BOUNDARY: Empty string input
@@ -381,96 +244,40 @@ func TestRunOnce_ContextCancelled(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// TABLE-DRIVEN TESTS WITH SUBTESTS
-// =============================================================================
-//
 // COMBINING PATTERNS:
 // -------------------
 // This test combines Pattern 1 (Table-Driven) with Pattern 3 (Subtests).
 // The table defines all test cases, and t.Run() creates a subtest for each.
 //
-// BENEFITS:
-// - Each case runs independently (one failure doesn't stop others)
-// - Output shows which specific case failed
-// - Easy to add new combinations
-//
-// BOOLEAN COMBINATION TESTING:
-// ----------------------------
-// With 2 boolean flags (validationMode, noCache), there are 4 possible states:
-// - false, false
-// - true, false
-// - false, true
-// - true, true
-//
-// Testing all combinations ensures flags are independent (setting one
-// doesn't accidentally affect the other).
-//
-// =============================================================================
-
-// TestConfigureModes tests the ConfigureModes function
+// TestConfigureModes tests that ConfigureModes correctly propagates flags to cache state.
 func TestConfigureModes(t *testing.T) {
-	// This struct is here to satisfy the compiler - in a real scenario,
-	// you'd verify the cache package state
-	cache := &struct {
-		validationMode bool
-		cacheDisabled  bool
-	}{}
-
-	// TABLE: Define all boolean combinations
-	// Each row is one test case with inputs and expected outputs
 	tests := []struct {
-		name           string // Descriptive name for test output
-		validationMode bool   // Input: --test flag
-		noCache        bool   // Input: --no-cache flag
-		wantValidation bool   // Expected: cache.ValidationMode() value
-		wantCache      bool   // Expected: cache.CacheDisabled() value
+		name           string
+		validationMode bool
+		noCache        bool
+		wantValidation bool
+		wantCache      bool
 	}{
-		{
-			name:           "both false",
-			validationMode: false,
-			noCache:        false,
-			wantValidation: false,
-			wantCache:      false,
-		},
-		{
-			name:           "validation mode enabled",
-			validationMode: true,
-			noCache:        false,
-			wantValidation: true,
-			wantCache:      false,
-		},
-		{
-			name:           "no cache enabled",
-			validationMode: false,
-			noCache:        true,
-			wantValidation: false,
-			wantCache:      true,
-		},
-		{
-			name:           "both enabled",
-			validationMode: true,
-			noCache:        true,
-			wantValidation: true,
-			wantCache:      true,
-		},
+		{name: "both false", validationMode: false, noCache: false, wantValidation: false, wantCache: false},
+		{name: "validation mode enabled", validationMode: true, noCache: false, wantValidation: true, wantCache: false},
+		{name: "no cache enabled", validationMode: false, noCache: true, wantValidation: false, wantCache: true},
+		{name: "both enabled", validationMode: true, noCache: true, wantValidation: true, wantCache: true},
 	}
 
-	// LOOP: Run each test case as a subtest
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Note: ConfigureModes calls cache.SetValidationMode and cache.SetCacheDisabled
-			// We can't easily test the actual state changes without mocking,
-			// but we can verify the function doesn't panic
+			t.Cleanup(cache.ResetState)
 			ConfigureModes(tt.validationMode, tt.noCache, false)
-			_ = cache // Use the mock struct to avoid unused variable
+			if got := cache.ValidationMode(); got != tt.wantValidation {
+				t.Errorf("cache.ValidationMode() = %v, want %v", got, tt.wantValidation)
+			}
+			if got := cache.CacheDisabled(); got != tt.wantCache {
+				t.Errorf("cache.CacheDisabled() = %v, want %v", got, tt.wantCache)
+			}
 		})
 	}
 }
 
-// =============================================================================
-// SUBTESTS WITH t.Run() - DETAILED WALKTHROUGH
-// =============================================================================
 //
 // WHAT ARE SUBTESTS?
 // ------------------

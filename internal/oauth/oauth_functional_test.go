@@ -1,57 +1,3 @@
-// Package oauth - oauth_functional_test.go
-//
-// TEST SETUP
-// ----------
-// This test suite validates OAuth 2.0 flows using mock HTTP servers.
-// Uses httptest.NewServer to simulate Enphase authorization server without real network calls.
-//
-// TEST PLAN
-// ---------
-// 1. Token Exchange Tests (Authorization Code Flow)
-//   - Test successful code exchange
-//   - Test HTTP method validation (must be POST)
-//   - Test request header validation (Content-Type, Authorization)
-//   - Test request body parsing
-//
-// 2. Token Refresh Tests
-//   - Test successful token refresh
-//   - Test expired token refresh
-//   - Test refresh token validation
-//
-// 3. HTTP Error Tests
-//   - Test 401 Unauthorized response
-//   - Test 500 Server Error response
-//   - Test malformed JSON response
-//
-// TESTING APPROACH
-// ----------------
-// - httptest.NewServer creates a mock OAuth server
-// - Server handler validates requests and returns mock responses
-// - Tests verify both request format and response parsing
-// - Mock server is closed after each test (defer server.Close())
-//
-// WHY MOCK HTTP SERVER
-// --------------------
-// Mock HTTP servers enable:
-// - Testing real HTTP interactions without external dependencies
-// - Control over response codes, headers, and body content
-// - Fast, deterministic tests (no network latency or failures)
-// - No API Budget constraints or quota consumption
-//
-// TEST ORGANIZATION
-// -----------------
-// This package has 3 test files (1:many pattern):
-// - oauth_test.go: Basic unit tests (316 lines)
-// - oauth_functional_test.go (this file): Integration tests (652 lines)
-// - oauth_edge_cases_test.go: Edge cases and error paths (560 lines)
-//
-// PATTERN USED
-// ------------
-// - Pattern 4: Mock HTTP Servers (httptest.NewServer)
-// - Pattern 1: Table-Driven Tests
-// - Pattern 7: Error Path Testing
-//
-// See docs/TESTING.md for detailed pattern explanations.
 package oauth
 
 import (
@@ -108,7 +54,7 @@ func TestExchangeAuthorizationCode_Success(t *testing.T) {
 		}
 
 		// Return mock token response
-		resp := OAuthTokenResponse{
+		resp := TokenResponse{
 			AccessToken:  "mock-access-token",
 			TokenType:    "Bearer",
 			RefreshToken: "mock-refresh-token",
@@ -258,7 +204,7 @@ func TestGetAccessToken_WithRefreshToken(t *testing.T) {
 		}
 
 		// Return mock token response
-		resp := OAuthTokenResponse{
+		resp := TokenResponse{
 			AccessToken: "new-access-token",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -331,7 +277,7 @@ func TestGetAccessToken_WithPasswordGrant(t *testing.T) {
 		}
 
 		// Return mock token response
-		resp := OAuthTokenResponse{
+		resp := TokenResponse{
 			AccessToken: "password-access-token",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -423,7 +369,7 @@ func TestGetAccessToken_CacheMiss_NearExpiry(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		serverCalled = true
 
-		resp := OAuthTokenResponse{
+		resp := TokenResponse{
 			AccessToken: "refreshed-token",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -467,7 +413,7 @@ func TestGetAccessToken_EmptyAccessToken(t *testing.T) {
 
 	// Mock server returns response without access_token
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := OAuthTokenResponse{
+		resp := TokenResponse{
 			TokenType: "Bearer",
 			ExpiresIn: 3600,
 			// No AccessToken field
@@ -569,7 +515,7 @@ func TestGetAccessToken_DefaultExpiresIn(t *testing.T) {
 
 	// Mock server returns response without expires_in
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := OAuthTokenResponse{
+		resp := TokenResponse{
 			AccessToken: "test-token",
 			TokenType:   "Bearer",
 			// ExpiresIn is 0 (not set)
@@ -620,7 +566,7 @@ func TestGetAccessToken_PreservesRefreshToken(t *testing.T) {
 
 	// Mock server returns new access token but NO refresh token
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := OAuthTokenResponse{
+		resp := TokenResponse{
 			AccessToken: "new-access-token",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,

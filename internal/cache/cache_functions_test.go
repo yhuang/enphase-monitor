@@ -408,37 +408,19 @@ func TestCachedResponse_EmptyHeaders(t *testing.T) {
 // TestHasCacheForDate tests the cache existence check for a specific date.
 // This function is used to validate that --test mode has data available before running.
 func TestHasCacheForDate(t *testing.T) {
-	// Create a temporary cache directory for testing
-	tempDir := t.TempDir()
-	originalGetCacheDir := getCacheDir
+	useTempCacheDir(t)
 
-	// Override getCacheDir to use temp directory
-	// We need to test with actual files, so create them in temp dir
-	testCacheDir := filepath.Join(tempDir, "cache")
-	if err := os.MkdirAll(testCacheDir, 0755); err != nil {
-		t.Fatalf("Failed to create test cache dir: %v", err)
-	}
-
-	t.Run("returns false when cache directory does not exist", func(t *testing.T) {
-		// Use a non-existent directory path
-		nonExistentDir := filepath.Join(tempDir, "nonexistent")
-
-		// Create a test file to check with the actual function
-		// Since we can't easily override getCacheDir, we test edge cases
+	t.Run("returns false when no cache exists for distant future date", func(t *testing.T) {
 		hasCache, err := HasCacheForDate("2099-12-31")
 		if err != nil {
 			t.Errorf("HasCacheForDate() returned error: %v", err)
 		}
-		// This date shouldn't exist in any real cache
 		if hasCache {
 			t.Error("HasCacheForDate() should return false for non-existent date")
 		}
-		_ = nonExistentDir // silence unused variable
-		_ = originalGetCacheDir
 	})
 
 	t.Run("returns false when no matching date in cache files", func(t *testing.T) {
-		// Test with a date that definitely doesn't exist
 		hasCache, err := HasCacheForDate("1999-01-01")
 		if err != nil {
 			t.Errorf("HasCacheForDate() returned error: %v", err)

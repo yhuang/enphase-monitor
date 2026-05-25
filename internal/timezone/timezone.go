@@ -78,19 +78,6 @@ func GetDayBoundaries(targetDate time.Time, tz *time.Location) (dayStart, dayEnd
 	return dayStart, dayEnd
 }
 
-// IsPastDate checks if the given date is before today in the specified timezone.
-func IsPastDate(targetDate time.Time, tz *time.Location) bool {
-	if targetDate.IsZero() {
-		return false
-	}
-
-	now := time.Now().In(tz)
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
-	targetDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, tz)
-
-	return targetDay.Before(today)
-}
-
 // ParseDateInTimezone parses a date string in YYYY-MM-DD format in the specified timezone.
 func ParseDateInTimezone(dateStr string, tz *time.Location) (time.Time, error) {
 	parsed, err := time.ParseInLocation(constants.DateFormat, dateStr, tz)

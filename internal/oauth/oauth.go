@@ -70,10 +70,8 @@ const (
 	oauthRequestTimeout = 30 * time.Second
 )
 
-// OAuthTokenResponse represents the OAuth token response.
-//
-//nolint:revive // exported name clarifies package (oauth.OAuthTokenResponse)
-type OAuthTokenResponse struct {
+// TokenResponse represents the OAuth token response.
+type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type"`
 	RefreshToken string `json:"refresh_token,omitempty"`
@@ -118,7 +116,7 @@ func GetAuthorizationURL(apiConfig *types.APIConfig) (string, error) {
 }
 
 // ExchangeAuthorizationCode exchanges an authorization code for access and refresh tokens.
-func ExchangeAuthorizationCode(ctx context.Context, apiConfig *types.APIConfig, code string) (*OAuthTokenResponse, error) {
+func ExchangeAuthorizationCode(ctx context.Context, apiConfig *types.APIConfig, code string) (*TokenResponse, error) {
 	if apiConfig == nil {
 		return nil, fmt.Errorf("API configuration is required")
 	}
@@ -166,7 +164,7 @@ func ExchangeAuthorizationCode(ctx context.Context, apiConfig *types.APIConfig, 
 		return nil, fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var tokenResp OAuthTokenResponse
+	var tokenResp TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		return nil, fmt.Errorf("failed to decode token response: %w", err)
 	}
@@ -252,7 +250,7 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 		return "", fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, errorMsg)
 	}
 
-	var tokenResp OAuthTokenResponse
+	var tokenResp TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		return "", fmt.Errorf("failed to decode token response: %w", err)
 	}

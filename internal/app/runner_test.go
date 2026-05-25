@@ -22,6 +22,9 @@ type mockCloudClient struct {
 }
 
 func (m *mockCloudClient) GetMetricsFromCloud(ctx context.Context, date time.Time, queryMode constants.QueryMode) (*api.LocalMetrics, bool, error) {
+	if ctx.Err() != nil {
+		return nil, false, ctx.Err()
+	}
 	if m.err != nil {
 		return nil, false, m.err
 	}

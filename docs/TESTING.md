@@ -33,7 +33,7 @@ The project follows a pragmatic approach to testing:
 | aggregator | 78.3% | ✅ Adequate - data aggregation |
 | api | 71.8% | ✅ Adequate - HTTP client |
 | oauth | 69.2% | ✅ Adequate - OAuth flows |
-| cache | 69.7% | ✅ Adequate - file caching (budget counter also tested directly in api_budget_test.go) |
+| cache | 66.9% | ✅ Adequate - file caching (budget counter also tested directly in api_budget_test.go) |
 | app | 45.0% | ⚠️ Moderate - application glue (exercised end-to-end via api/preflight) |
 | main.go | 0.0% | ✅ **Acceptable** - entry point |
 

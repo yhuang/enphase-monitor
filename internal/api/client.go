@@ -161,6 +161,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -260,8 +261,8 @@ func (c *EnlightenCloudClient) fetchTelemetryData(ctx context.Context, endpoint 
 	return parser.ReadResponseBody(resp.Body)
 }
 
-// buildTelemetryURL constructs a URL using the client's base URL and parameters
-// This method uses the injected baseURL for testability
+// buildTelemetryURL constructs a URL using the client's base URL and parameters.
+// This method uses the injected baseURL for testability.
 func (c *EnlightenCloudClient) buildTelemetryURL(endpoint string, dayStart, dayEnd time.Time) string {
 	baseURL := fmt.Sprintf("%s/%s/%s", c.baseURL, c.systemID, endpoint)
 	return baseURL + "?key=" + c.apiKey +
@@ -269,8 +270,6 @@ func (c *EnlightenCloudClient) buildTelemetryURL(endpoint string, dayStart, dayE
 		"&end_at=" + strconv.FormatInt(dayEnd.Unix(), 10)
 }
 
-// LocalMetrics is exported in types.go
-//
 // GetEnergyImportForDate gets the total Grid Import for a specific date/period.
 // If testDate is zero, uses today. queryMode selects Day, Month, Year, or True-Up Mode.
 // For Month, Year, and True-Up Mode queries, uses the Lifetime Data endpoint (daily aggregated).
@@ -288,9 +287,6 @@ func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testD
 	allIntervals, err := parser.ParseNestedTelemetryResponse(bodyBytes)
 	if err != nil {
 		return 0, err
-	}
-	if len(allIntervals) == 0 {
-		return 0, nil
 	}
 	importWh := parser.SumIntervalValues(allIntervals, constants.FieldWhImported)
 	return importWh / constants.WhToKWh, nil
@@ -743,7 +739,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
-	// SECTION 4: VALIDATION MODE HANDLING
+	// SECTION 3: VALIDATION MODE HANDLING
 	// In Validation Mode, ONLY use cache - never make live API calls.
 	// This allows validating behavior without hitting the real API.
 	// ─────────────────────────────────────────────────────────────────────────
@@ -759,7 +755,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
-	// SECTION 5: LIVE CACHE MODE HANDLING (--no-cache)
+	// SECTION 4: LIVE CACHE MODE HANDLING (--no-cache)
 	// When cache is disabled, skip cache lookup and always make live API calls.
 	// Note: We still fall back to cache on 429 errors as a safety measure.
 	// ─────────────────────────────────────────────────────────────────────────
@@ -782,7 +778,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 
 		if resp.StatusCode == http.StatusTooManyRequests && cacheErr != nil {
 			resp.Body.Close()
-			return nil, false, fmt.Errorf(constants.RateLimitError)
+			return nil, false, errors.New(constants.RateLimitError)
 		}
 		if resp.StatusCode == http.StatusTooManyRequests {
 			resp.Body.Close()
@@ -841,7 +837,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 			return recent, true, nil
 		}
 		cache.Debugf("budget exhausted, no cache available — returning RateLimitError")
-		return nil, false, fmt.Errorf(constants.RateLimitError)
+		return nil, false, errors.New(constants.RateLimitError)
 	}
 
 	// Make the API request
@@ -880,7 +876,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 			return recent, true, nil // Cache was used (429 cross-date fallback)
 		}
 		cache.Debugf("429 fallback: no cache available — returning RateLimitError")
-		return nil, false, fmt.Errorf(constants.RateLimitError)
+		return nil, false, errors.New(constants.RateLimitError)
 	}
 
 	// Handle 503 Service Unavailable - Enphase server temporarily down, use cache if available (even stale)

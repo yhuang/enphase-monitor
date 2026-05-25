@@ -63,8 +63,14 @@ type ExpectedMetrics struct {
 // ValidateMetrics validates actual metrics against expected values for the given date.
 // Output is written to w, allowing tests to capture and verify the output.
 func ValidateMetrics(w io.Writer, metrics *aggregator.AggregatedMetrics, dateStr string) error {
+	return validateMetricsFromRoot(w, metrics, dateStr, ".")
+}
+
+// validateMetricsFromRoot is like ValidateMetrics but looks for test-data/ under root.
+// Tests use this to pass an absolute project root, avoiding os.Chdir.
+func validateMetricsFromRoot(w io.Writer, metrics *aggregator.AggregatedMetrics, dateStr, root string) error {
 	// Load expected values
-	expectedPath := filepath.Join("test-data", fmt.Sprintf("expected_values_%s.json", dateStr))
+	expectedPath := filepath.Join(root, "test-data", fmt.Sprintf("expected_values_%s.json", dateStr))
 	expectedData, err := os.ReadFile(expectedPath)
 	if err != nil {
 		if os.IsNotExist(err) {

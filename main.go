@@ -172,7 +172,7 @@ func main() {
 	// --cache: serve report from cache only; diagnose missing endpoints if incomplete.
 	// Handles --cache alone, --cache --date, and --cache --true-up.
 	if flags.CachedMode {
-		app.ConfigureModes(false, false, flags.Debug)
+		app.ConfigureModes(false /* validationMode */, false /* noCache */, flags.Debug)
 		printDebugStartup(flags.Debug, reportTZ)
 		parsedInput, err := app.ParseTestDate(flags.TestDate, reportTZ)
 		if err != nil {

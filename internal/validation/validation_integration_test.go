@@ -1,63 +1,40 @@
 // Package validation - validation_integration_test.go
 //
-// TEST SETUP
-// ----------
-// This test suite performs integration testing of the validation logic using
-// real expected values JSON files from the test-data directory. Tests the
-// complete validation flow end-to-end.
-//
-// TEST PLAN
-// ---------
-// 1. Full Validation Flow Tests
-//   - Test complete validation with real expected values files
-//   - Test validation with all metrics matching
-//   - Test validation with some metrics outside tolerance
-//   - Test validation with multiple systems
-//
-// 2. JSON File Loading Tests
-//   - Test loading actual expected values files
-//   - Test date matching
-//   - Test system matching by ID
-//
-// 3. Error Reporting Tests
-//   - Test validation failure reporting
-//   - Test summary statistics (passed/failed counts)
-//
-// TESTING APPROACH
-// ----------------
-// - Uses real expected values files from test-data/
-// - Creates mock aggregated metrics structures
-// - Tests complete validation flow from metrics to result
-// - Validates error messages and summary output
-//
-// PATTERN USED
-// ------------
-// - Pattern 3: Subtests with t.Run()
-// - Pattern 5: Writer Injection (bytes.Buffer for output capture and verification)
-// - Pattern 6: Test Fixtures (expected values JSON files)
-// - Pattern 7: Error Path Testing
-// - Pattern 11: Golden Data Validation (expected values files)
-//
-// See docs/TESTING.md for detailed pattern explanations.
+// Integration tests for validation logic using real expected-values JSON files
+// from the test-data directory.
 package validation
 
 import (
 	"bytes"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"enphase-monitor/internal/aggregator"
 )
 
+// testProjectRoot returns the absolute path to the repository root by resolving
+// two directories up from this source file. This avoids os.Chdir (process-global
+// state) while still allowing tests to locate the test-data directory.
+func testProjectRoot(t *testing.T) string {
+	t.Helper()
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller(0) failed")
+	}
+	// this file lives at internal/validation/; project root is two dirs up
+	return filepath.Join(filepath.Dir(filename), "../..")
+}
+
 // TestValidateMetrics_FullFlow_Success tests successful validation with matching metrics
 func TestValidateMetrics_FullFlow_Success(t *testing.T) {
-	// Check if expected values file exists
-	if _, err := os.Stat("../../test-data/expected_values_2026-01-20.json"); os.IsNotExist(err) {
+	root := testProjectRoot(t)
+	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
-	// Create metrics that exactly match expected values from the file
 	metrics := &aggregator.AggregatedMetrics{
 		Systems: []aggregator.SystemMetrics{
 			{
@@ -85,26 +62,10 @@ func TestValidateMetrics_FullFlow_Success(t *testing.T) {
 		},
 	}
 
-	// Change to project root for correct file path resolution
-	originalDir, getwdErr := os.Getwd()
-	if getwdErr != nil {
-		t.Fatal(getwdErr)
-	}
-	if err := os.Chdir("../.."); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Error("restore working directory:", err)
-		}
-	}()
-
 	var buf bytes.Buffer
-	err := ValidateMetrics(&buf, metrics, "2026-01-20")
-	if err != nil {
+	if err := validateMetricsFromRoot(&buf, metrics, "2026-01-20", root); err != nil {
 		t.Errorf("Validation failed with matching metrics: %v", err)
 	}
-	// Verify output contains success indicator
 	if !strings.Contains(buf.String(), "ALL VALIDATIONS PASSED") {
 		t.Error("Expected output to contain 'ALL VALIDATIONS PASSED'")
 	}
@@ -112,12 +73,11 @@ func TestValidateMetrics_FullFlow_Success(t *testing.T) {
 
 // TestValidateMetrics_FullFlow_WithinTolerance tests validation with metrics within tolerance
 func TestValidateMetrics_FullFlow_WithinTolerance(t *testing.T) {
-	// Check if expected values file exists
-	if _, err := os.Stat("../../test-data/expected_values_2026-01-20.json"); os.IsNotExist(err) {
+	root := testProjectRoot(t)
+	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
-	// Create metrics slightly different but within 10% tolerance
 	metrics := &aggregator.AggregatedMetrics{
 		Systems: []aggregator.SystemMetrics{
 			{
@@ -145,26 +105,10 @@ func TestValidateMetrics_FullFlow_WithinTolerance(t *testing.T) {
 		},
 	}
 
-	// Change to project root for correct file path resolution
-	originalDir, getwdErr := os.Getwd()
-	if getwdErr != nil {
-		t.Fatal(getwdErr)
-	}
-	if err := os.Chdir("../.."); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Error("restore working directory:", err)
-		}
-	}()
-
 	var buf bytes.Buffer
-	err := ValidateMetrics(&buf, metrics, "2026-01-20")
-	if err != nil {
+	if err := validateMetricsFromRoot(&buf, metrics, "2026-01-20", root); err != nil {
 		t.Errorf("Validation failed with metrics within tolerance: %v", err)
 	}
-	// Verify output contains success indicator
 	if !strings.Contains(buf.String(), "ALL VALIDATIONS PASSED") {
 		t.Error("Expected output to contain 'ALL VALIDATIONS PASSED'")
 	}
@@ -172,24 +116,23 @@ func TestValidateMetrics_FullFlow_WithinTolerance(t *testing.T) {
 
 // TestValidateMetrics_FullFlow_OutsideTolerance tests validation with metrics outside tolerance
 func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
-	// Check if expected values file exists
-	if _, err := os.Stat("../../test-data/expected_values_2026-01-20.json"); os.IsNotExist(err) {
+	root := testProjectRoot(t)
+	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
-	// Create metrics significantly different (outside 10% tolerance)
 	metrics := &aggregator.AggregatedMetrics{
 		Systems: []aggregator.SystemMetrics{
 			{
 				ID:                     "5525881",
 				Name:                   "Right Subpanel",
 				GridImportToday:        30.0, // Far from 23.4 (28% difference)
-				GridExportToday:        3.9,  // Match
-				ProductionToday:        14.6, // Match
-				BatteryDischargedToday: 6.8,  // Match
-				BatteryChargedToday:    8.6,  // Match
-				NetFlowToday:           19.6, // Match
-				ConsumptionToday:       32.3, // Match
+				GridExportToday:        3.9,
+				ProductionToday:        14.6,
+				BatteryDischargedToday: 6.8,
+				BatteryChargedToday:    8.6,
+				NetFlowToday:           19.6,
+				ConsumptionToday:       32.3,
 			},
 			{
 				ID:                     "5392556",
@@ -205,26 +148,11 @@ func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
 		},
 	}
 
-	// Change to project root for correct file path resolution
-	originalDir, getwdErr := os.Getwd()
-	if getwdErr != nil {
-		t.Fatal(getwdErr)
-	}
-	if err := os.Chdir("../.."); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Error("restore working directory:", err)
-		}
-	}()
-
 	var buf bytes.Buffer
-	err := ValidateMetrics(&buf, metrics, "2026-01-20")
+	err := validateMetricsFromRoot(&buf, metrics, "2026-01-20", root)
 	if err == nil {
 		t.Error("Expected validation to fail with metrics outside tolerance, but it passed")
 	}
-	// Verify output contains failure indicator for Grid Import
 	output := buf.String()
 	if !strings.Contains(output, "SOME VALIDATIONS FAILED") {
 		t.Error("Expected output to contain 'SOME VALIDATIONS FAILED'")
@@ -236,12 +164,11 @@ func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
 
 // TestValidateMetrics_MissingSystem tests validation when a system is missing
 func TestValidateMetrics_MissingSystem(t *testing.T) {
-	// Check if expected values file exists
-	if _, err := os.Stat("../../test-data/expected_values_2026-01-20.json"); os.IsNotExist(err) {
+	root := testProjectRoot(t)
+	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
-	// Create metrics with only one system (missing the second one)
 	metrics := &aggregator.AggregatedMetrics{
 		Systems: []aggregator.SystemMetrics{
 			{
@@ -259,38 +186,20 @@ func TestValidateMetrics_MissingSystem(t *testing.T) {
 		},
 	}
 
-	// Change to project root for correct file path resolution
-	originalDir, getwdErr := os.Getwd()
-	if getwdErr != nil {
-		t.Fatal(getwdErr)
-	}
-	if err := os.Chdir("../.."); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Error("restore working directory:", err)
-		}
-	}()
-
 	var buf bytes.Buffer
-	err := ValidateMetrics(&buf, metrics, "2026-01-20")
+	err := validateMetricsFromRoot(&buf, metrics, "2026-01-20", root)
 	if err == nil {
 		t.Error("Expected validation to fail with missing system, but it passed")
 	}
-	// Verify output indicates missing system
 	if !strings.Contains(buf.String(), "not found in actual metrics") {
 		t.Error("Expected output to indicate missing system")
 	}
 }
 
-// TestValidateMetrics_DateMismatch tests handling of date mismatch
+// TestValidateMetrics_DateMismatch tests handling of a date with no expected-values file
 func TestValidateMetrics_DateMismatch(t *testing.T) {
-	// This test verifies that date validation works
-	// The expected values file has date "2026-01-20" but we query with a different date
-
-	// Check if expected values file exists
-	if _, err := os.Stat("../../test-data/expected_values_2026-01-20.json"); os.IsNotExist(err) {
+	root := testProjectRoot(t)
+	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
@@ -303,23 +212,8 @@ func TestValidateMetrics_DateMismatch(t *testing.T) {
 		},
 	}
 
-	// Change to project root for correct file path resolution
-	originalDir, getwdErr := os.Getwd()
-	if getwdErr != nil {
-		t.Fatal(getwdErr)
-	}
-	if err := os.Chdir("../.."); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Error("restore working directory:", err)
-		}
-	}()
-
-	// Try to validate with a date that doesn't exist in test-data
 	var buf bytes.Buffer
-	err := ValidateMetrics(&buf, metrics, "2026-01-99")
+	err := validateMetricsFromRoot(&buf, metrics, "2026-01-99", root)
 	if err == nil {
 		t.Error("Expected error for non-existent date file, got nil")
 	}
@@ -327,6 +221,8 @@ func TestValidateMetrics_DateMismatch(t *testing.T) {
 
 // TestValidateMetrics_MultipleExpectedValuesFiles tests with different dates
 func TestValidateMetrics_MultipleExpectedValuesFiles(t *testing.T) {
+	root := testProjectRoot(t)
+
 	tests := []struct {
 		name string
 		date string
@@ -340,105 +236,64 @@ func TestValidateMetrics_MultipleExpectedValuesFiles(t *testing.T) {
 		{"2026-01-20", "2026-01-20"},
 	}
 
-	// Change to project root for correct file path resolution
-	originalDir, getwdErr := os.Getwd()
-	if getwdErr != nil {
-		t.Fatal(getwdErr)
-	}
-	if err := os.Chdir("../.."); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Error("restore working directory:", err)
-		}
-	}()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Check if expected values file exists
-			filename := "test-data/expected_values_" + tt.date + ".json"
+			filename := filepath.Join(root, "test-data", "expected_values_"+tt.date+".json")
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
 				t.Skipf("Expected values file %s not found - skipping", filename)
 			}
 
-			// Create empty metrics to test file loading
 			metrics := &aggregator.AggregatedMetrics{
 				Systems: []aggregator.SystemMetrics{},
 			}
 
-			// We expect this to fail because metrics are empty, but it should
-			// successfully load the expected values file first
 			var buf bytes.Buffer
-			err := ValidateMetrics(&buf, metrics, tt.date)
-
-			// We expect an error because metrics are empty, but not a file loading error
+			err := validateMetricsFromRoot(&buf, metrics, tt.date, root)
 			if err == nil {
 				t.Error("Expected error for empty metrics, got nil")
 			}
-			// Don't check the specific error - just verify the file was loadable
 		})
 	}
 }
 
 // TestValidateMetrics_RealWorldScenario tests a realistic validation scenario
 func TestValidateMetrics_RealWorldScenario(t *testing.T) {
-	// Check if expected values file exists
-	if _, err := os.Stat("../../test-data/expected_values_2026-01-20.json"); os.IsNotExist(err) {
+	root := testProjectRoot(t)
+	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
-	// Simulate real-world data with slight variations due to:
-	// - API response timing differences
-	// - Floating point precision
-	// - 15-minute interval boundary effects
 	metrics := &aggregator.AggregatedMetrics{
 		Systems: []aggregator.SystemMetrics{
 			{
 				ID:                     "5525881",
 				Name:                   "Right Subpanel",
-				GridImportToday:        23.38, // Slight variation
-				GridExportToday:        3.92,  // Slight variation
-				ProductionToday:        14.58, // Slight variation
-				BatteryDischargedToday: 6.79,  // Slight variation
-				BatteryChargedToday:    8.62,  // Slight variation
-				NetFlowToday:           19.46, // Calculated value may vary
-				ConsumptionToday:       32.28, // Calculated value may vary
+				GridImportToday:        23.38,
+				GridExportToday:        3.92,
+				ProductionToday:        14.58,
+				BatteryDischargedToday: 6.79,
+				BatteryChargedToday:    8.62,
+				NetFlowToday:           19.46,
+				ConsumptionToday:       32.28,
 			},
 			{
 				ID:                     "5392556",
 				Name:                   "Left Subpanel",
-				GridImportToday:        7.48,  // Slight variation
-				GridExportToday:        7.62,  // Slight variation
-				ProductionToday:        19.28, // Slight variation
-				BatteryDischargedToday: 5.52,  // Slight variation
-				BatteryChargedToday:    8.08,  // Slight variation
-				NetFlowToday:           -0.14, // Calculated value may vary
-				ConsumptionToday:       16.48, // Calculated value may vary
+				GridImportToday:        7.48,
+				GridExportToday:        7.62,
+				ProductionToday:        19.28,
+				BatteryDischargedToday: 5.52,
+				BatteryChargedToday:    8.08,
+				NetFlowToday:           -0.14,
+				ConsumptionToday:       16.48,
 			},
 		},
 	}
 
-	// Change to project root for correct file path resolution
-	originalDir, getwdErr := os.Getwd()
-	if getwdErr != nil {
-		t.Fatal(getwdErr)
-	}
-	if err := os.Chdir("../.."); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(originalDir); err != nil {
-			t.Error("restore working directory:", err)
-		}
-	}()
-
 	var buf bytes.Buffer
-	err := ValidateMetrics(&buf, metrics, "2026-01-20")
-	if err != nil {
+	if err := validateMetricsFromRoot(&buf, metrics, "2026-01-20", root); err != nil {
 		t.Errorf("Validation failed with realistic variations: %v", err)
 	}
-	// Verify output contains success indicator
 	if !strings.Contains(buf.String(), "ALL VALIDATIONS PASSED") {
 		t.Error("Expected output to contain 'ALL VALIDATIONS PASSED'")
 	}

@@ -457,8 +457,8 @@ The "True-Up Start" line shows the True-Up Start Date you provided. The "Query R
 - **Consumption**: Consumption for this System (kWh)
 - **Grid Import**: Grid Import for this System (kWh)
 - **Grid Export**: Grid Export for this System (kWh)
-- **Battery Charge**: Battery Charge for this System (kWh). Shown only for today's live Day Mode query (omitted for Past Period Day Mode queries and all Month, Year, and True-Up Mode queries).
-- **Battery Discharge**: Battery Discharge for this System (kWh). Shown only for today's live Day Mode query.
+- **Battery Charge**: Battery Charge for this System (kWh). Shown only for today's live Day Mode query (i.e., running without `--date`). Omitted for Past Period Day Mode queries and all Month, Year, and True-Up Mode queries.
+- **Battery Discharge**: Battery Discharge for this System (kWh). Shown only for today's live Day Mode query (i.e., running without `--date`). Omitted for Past Period Day Mode queries and all Month, Year, and True-Up Mode queries.
 - **State of Charge (SOC)**: Battery State of Charge for this System, 0–100 (percent). Shown per-System only (not aggregated) and **only for today's live Day Mode query** (i.e., running without `--date`). Past Period Day Mode queries and all Month, Year, and True-Up Mode queries omit battery metrics — SOC is a point-in-time reading that is not meaningful for past or multi-day periods.
 
 ### Individual System Metrics (True-Up Report)
@@ -810,7 +810,7 @@ The project includes a comprehensive test suite with **70.1% code coverage** acr
 | aggregator | 78.3% | ✅ |
 | api | 71.8% | ✅ |
 | oauth | 69.2% | ✅ |
-| cache | 69.7% | ✅ |
+| cache | 66.9% | ✅ |
 | app | 45.0% | ⚠️ |
 
 **Total: 70.1% coverage** (exceeds typical Go project standards of 50-60%; `app` covers orchestration glue that is exercised more thoroughly via the api-package integration tests)
@@ -987,7 +987,7 @@ This project follows Go best practices and coding standards:
 
 **Code Metrics:**
 - Total Lines: ~5,500 (excluding tests)
-- Test Lines: ~10,600 (comprehensive test suite)
+- Test Lines: ~9,300 (comprehensive test suite)
 - Packages: 14 internal packages (13 with tests; `types` is a pure type-definition package)
 - Test Files: 29 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)

@@ -73,6 +73,12 @@ func NewDisplayWithWriter(colors config.ColorConfig, tz *time.Location, w io.Wri
 	}
 }
 
+// ClearScreen clears the terminal screen by writing the ANSI clear-screen sequence
+// to the display writer.
+func (d *Display) ClearScreen() {
+	fmt.Fprint(d.writer, "\033[H\033[2J")
+}
+
 // ShowMetrics displays the aggregated metrics in a formatted output.
 func (d *Display) ShowMetrics(metrics *aggregator.AggregatedMetrics) {
 	d.printHeader(metrics.Timestamp, metrics.CacheUsed, metrics.QueryDate, metrics.QueryMode)
