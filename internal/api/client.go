@@ -718,9 +718,9 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// ─────────────────────────────────────────────────────────────────────────
 	// SECTION 1: INITIALIZATION
 	// Determine if we are querying a Past Period (affects caching strategy).
-	// Use IsPastPeriod (not IsPastDate) so that Month and Year Mode queries for the
-	// Current Period are NOT treated as past — e.g. a month query with
-	// testDate=2026-03-01 is the current month, not a Past Period, even
+	// IsPastPeriod is granularity-aware (not a naive "date before today" check) so that
+	// Month and Year Mode queries for the Current Period are NOT treated as past — e.g. a
+	// month query with testDate=2026-03-01 is the current month, not a Past Period, even
 	// though March 1 is before today.
 	// ─────────────────────────────────────────────────────────────────────────
 	isDateInPast := timezone.IsPastPeriod(targetDate, queryMode, c.timezone)
