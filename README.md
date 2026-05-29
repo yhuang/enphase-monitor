@@ -708,7 +708,6 @@ enphase-monitor/
 │   ├── api/                               # HTTP client for Cloud API v4
 │   │   ├── client.go                      # Enlighten Cloud API client
 │   │   ├── types.go                       # API request/response types
-│   │   ├── interface.go                   # CloudClient interface for testability
 │   │   ├── cache_check.go                 # Per-system/endpoint cache availability check (--cache mode)
 │   │   ├── client_test.go                 # API client unit tests
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers

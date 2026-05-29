@@ -663,22 +663,22 @@ This section summarizes interface usage, type assertions, embedding, and receive
 
 ### Implicit interface satisfaction
 
-Go has no `implements` keyword. A type satisfies an interface by implementing its methods. **In this codebase:** `*EnlightenCloudClient` implements `api.CloudClient` by defining all interface methods (e.g. `GetMetricsFromCloud`, `GetEnergyImportForDate`). Mocks (e.g. `MockCloudClient` in tests) implement the same interface for dependency injection.
+Go has no `implements` keyword. A type satisfies an interface by implementing its methods. **In this codebase:** `*api.EnlightenCloudClient` satisfies `aggregator.CloudClient` by defining its method (`GetMetricsFromCloud`). Mocks (e.g. `MockCloudClient` in tests) implement the same interface for dependency injection.
 
 ### Interface naming
 
-One-method interfaces use the method name plus **`-er`**: `Reader`, `Writer`, `Stringer`. Multi-method interfaces (e.g. `CloudClient`) use a descriptive name for the capability.
+One-method interfaces conventionally use the method name plus **`-er`**: `Reader`, `Writer`, `Stringer`. Multi-method interfaces use a descriptive name for the capability. **In this codebase:** the sole interface, `CloudClient`, is single-method (`GetMetricsFromCloud`) but keeps a descriptive role-based name rather than an `-er` name, since "the cloud client" reads more clearly here than a verb-`er` would.
 
 ### Compile-time interface check
 
 To ensure a type implements an interface at compile time, use a blank identifier assignment:
 
 ```go
-// api/interface.go - fails to build if *EnlightenCloudClient no longer implements CloudClient
-var _ CloudClient = (*EnlightenCloudClient)(nil)
+// aggregator.go - fails to build if *api.EnlightenCloudClient no longer satisfies CloudClient
+var _ CloudClient = (*api.EnlightenCloudClient)(nil)
 ```
 
-Use this when there is no other static conversion that would catch the error. **In this codebase:** this check lives in `internal/api/interface.go` next to the `CloudClient` interface.
+Use this when there is no other static conversion that would catch the error. **In this codebase:** this check lives in `internal/aggregator/aggregator.go` next to the `CloudClient` interface (the consumer side).
 
 ### Type assertions and type switches
 
@@ -801,7 +801,7 @@ This section summarizes defensive programming patterns from the go-defensive ski
 
 ### Interface compliance
 
-- **Compile-time checks** — Use `var _ Interface = (*Type)(nil)` so that if a type stops implementing an interface, the build fails. This codebase has this for `api.CloudClient` in `internal/api/interface.go`.
+- **Compile-time checks** — Use `var _ Interface = (*Type)(nil)` so that if a type stops implementing an interface, the build fails. This codebase has this for `CloudClient` in `internal/aggregator/aggregator.go`.
 
 ### Copy slices and maps at boundaries
 
@@ -819,7 +819,7 @@ This section summarizes defensive programming patterns from the go-defensive ski
 
 ### In this codebase
 
-- **Interface check** — `var _ CloudClient = (*EnlightenCloudClient)(nil)` in `internal/api/interface.go`.
+- **Interface check** — `var _ CloudClient = (*api.EnlightenCloudClient)(nil)` in `internal/aggregator/aggregator.go`.
 - **Slice at boundary** — `GetAggregatorTypes` copies `cfg.Systems` before return.
 - **Defer** — HTTP response bodies and the runner ticker use `defer` for cleanup.
 - **Time** — Config uses `RefreshIntervalSeconds`; runner uses `time.Duration(...) * time.Second` for the ticker.

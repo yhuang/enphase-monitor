@@ -29,7 +29,7 @@ This document explains all the intermediate Go concepts that are used throughout
 
 ### Error Handling Pattern
 
-**Location**: `internal/aggregator/aggregator.go:102-105`
+**Location**: `internal/aggregator/aggregator.go:113-116`
 
 Standard Go pattern: function returns `(result, error)`. We check `err` immediately and return early if non-nil. This is idiomatic Go - errors are values, not exceptions.
 
@@ -54,7 +54,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Error Wrapping with %w
 
-**Location**: `internal/aggregator/aggregator.go:104`
+**Location**: `internal/aggregator/aggregator.go:115`
 
 `fmt.Errorf` with `%w` verb wraps the original error, preserving the error chain. This allows callers to use `errors.Is()` or `errors.Unwrap()` to inspect the chain. We add context ("failed to refresh token for system X") while preserving the original error for debugging.
 
@@ -64,7 +64,7 @@ return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, 
 
 ### Error Inspection
 
-**Location**: `internal/aggregator/aggregator.go:110-122`
+**Location**: `internal/aggregator/aggregator.go:121-133`
 
 We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit. For context cancellation errors (Ctrl+C or deadline exceeded), we return immediately to abort all systems. For other errors, we warn and continue.
 
@@ -90,7 +90,7 @@ if err != nil {
 
 ### Constructor Function Pattern
 
-**Location**: `internal/api/client.go:204-215`
+**Location**: `internal/api/client.go:205-216`
 
 Functions starting with "New" are constructors - they create and initialize structs. This is a Go naming convention, not a language feature. We return a pointer `(*EnlightenCloudClient)` because:
 1. the return type specifies a pointer type;
@@ -106,7 +106,7 @@ func NewEnlightenCloudClient(...) *EnlightenCloudClient {
 
 ### Struct Literal with Pointer
 
-**Location**: `internal/api/client.go:205-214`
+**Location**: `internal/api/client.go:206-215`
 
 `&EnlightenCloudClient{...}` creates a struct and returns a pointer to it. This is idiomatic Go - create struct, take address, return pointer.
 
@@ -119,7 +119,7 @@ return &EnlightenCloudClient{
 
 ### Struct Initialization with Pointer Return
 
-**Location**: `internal/aggregator/aggregator.go:80-85`
+**Location**: `internal/aggregator/aggregator.go:91-96`
 
 We use `&AggregatedMetrics{}` to create a pointer to a new struct. This is more efficient than returning by value (avoids copying large struct).
 
@@ -132,7 +132,7 @@ metrics := &AggregatedMetrics{
 
 ### Nested Struct Initialization
 
-**Location**: `internal/api/client.go:211-213`
+**Location**: `internal/api/client.go:212-214`
 
 We initialize `httpClient` field with a struct literal. `http.Client` is from standard library - we set Timeout for safety.
 
@@ -223,7 +223,7 @@ allIntervals := make([]TelemetryInterval, 0, total)
 
 ### Slice Capacity Hint
 
-**Location**: `internal/aggregator/aggregator.go:84`
+**Location**: `internal/aggregator/aggregator.go:95`
 
 `make([]Type, length, capacity)` pre-allocates capacity to avoid reallocation. We know we will have `len(systems)` elements, so we pre-allocate that capacity. This is more efficient than letting the slice grow dynamically.
 
@@ -247,7 +247,7 @@ allIntervals = append(allIntervals, intervalArray...)
 
 ### Slice Append
 
-**Location**: `internal/aggregator/aggregator.go:111`
+**Location**: `internal/aggregator/aggregator.go:122`
 
 `append()` adds elements to a slice, automatically growing if needed. Since we pre-allocated capacity, this should be efficient.
 
@@ -315,7 +315,7 @@ case constants.FieldWhExported:
 
 ### Continue Statement
 
-**Location**: `internal/aggregator/aggregator.go:110-114`
+**Location**: `internal/aggregator/aggregator.go:121-125`
 
 `continue` skips to next iteration of the loop. We use it here to skip this system and try the next one when a rate limit error occurs.
 
@@ -525,7 +525,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Duration Literals
 
-**Location**: `internal/api/client.go:211-213`
+**Location**: `internal/api/client.go:212-214`
 
 `time.Second` is a typed constant (`time.Duration`). Multiplying an integer by `time.Second` — e.g. `30 * time.Second` — is idiomatic Go for expressing durations. In this codebase the value is extracted to `constants.APIRequestTimeout` for clarity.
 
@@ -1003,7 +1003,7 @@ return hex.EncodeToString(hash[:])
 
 ### Variable Declaration with Type
 
-**Location**: `internal/aggregator/aggregator.go:88`
+**Location**: `internal/aggregator/aggregator.go:99`
 
 `var name []Type` declares a variable with zero value (nil slice for slices). We could use `:= []string{}` but `var` is clearer when we are not initializing.
 
@@ -1017,7 +1017,7 @@ var rateLimitErrors []string
 
 ### Multiple Return Values
 
-**Location**: `internal/aggregator/aggregator.go:109`
+**Location**: `internal/aggregator/aggregator.go:120`
 
 Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for API Budget tracking).
 
@@ -1038,12 +1038,11 @@ Go projects use the `internal/` directory for packages that should not be import
 ```
 internal/
 ├── aggregator/                  # Multi-system data aggregation
-│   ├── aggregator.go            # Core aggregation logic
+│   ├── aggregator.go            # Core aggregation logic + CloudClient interface (consumer-side)
 │   ├── types.go                 # Data types (AggregatedMetrics, SystemMetrics)
 │   └── *_test.go                # Tests and benchmarks
 ├── api/                         # API client for Enphase Cloud API
 │   ├── client.go                # HTTP client implementation
-│   ├── interface.go             # CloudClient interface definition
 │   ├── types.go                 # LocalMetrics type
 │   ├── cache_check.go           # Per-system/endpoint cache availability check (--cache mode)
 │   └── *_test.go                # Unit and functional tests
@@ -1140,11 +1139,14 @@ func (c *Client) GetMetrics() (*LocalMetrics, error) {
     // ...
 }
 
-// interface.go - Contains interface definitions
-type CloudClient interface {
-    GetMetricsFromCloud(ctx context.Context, date time.Time, queryMode constants.QueryMode) (*LocalMetrics, bool, error)
+// cache_check.go - Contains the preflight cache-availability probe
+func CheckCacheForSystem(/* ... */) SystemCacheStatus {
+    // ...
 }
 ```
+
+(The consumer-side `CloudClient` interface that `*EnlightenCloudClient` satisfies lives
+in the `aggregator` package — see the cross-package interface example below.)
 
 **Cross-Package Type Sharing:**
 
@@ -1274,7 +1276,7 @@ Does package A also need something from package B?
 | Scenario | Solution | Example in Codebase |
 |----------|----------|---------------------|
 | B needs A's type, A doesn't need B | Direct import | `display` imports `aggregator.AggregatedMetrics` |
-| Mutual dependency, behavior needed | Define interface | `api.CloudClient` interface for mocking |
+| Mutual dependency, behavior needed | Define interface in the consumer | `aggregator.CloudClient` interface for mocking |
 | Mutual dependency, concrete type needed | Move to `internal/types/` | `SystemConfig`, `APIConfig` |
 
 **Current Type Locations:**
@@ -1354,7 +1356,7 @@ func FetchData(client CloudClient) {
 }
 ```
 
-That's why `SystemConfig` and `APIConfig` are in `internal/types/` (multiple packages need struct fields), while `CloudClient` is an interface in `internal/api/` (consumers only call methods).
+That's why `SystemConfig` and `APIConfig` are in `internal/types/` (multiple packages need struct fields), while `CloudClient` is an interface in `internal/aggregator/` — the consumer package — because the aggregator only calls methods (it never accesses the client's fields).
 
 ---
 
@@ -1400,9 +1402,9 @@ type SystemConfig = types.SystemConfig
 | Term | Description | Example |
 |------|-------------|---------|
 | **Package-per-feature** | Each package handles one domain concept | `cache/`, `oauth/`, `display/` |
-| **Type extraction** | Moving types to dedicated files | `types.go`, `interface.go` |
+| **Type extraction** | Moving types to dedicated files | `api/types.go`, `aggregator/types.go` |
 | **Shared types package** | Common types in separate package (named `types` by convention, not `shared`) | `internal/types/types.go` |
-| **Interface files** | Defining contracts separate from implementation | `api/interface.go` |
+| **Consumer-side interface** | Defining the behavior contract in the package that uses it | `aggregator.go`'s `CloudClient` |
 | **Internal packages** | Compiler-enforced encapsulation | `internal/*` |
 | **Type alias** | Re-exporting a type under a new name | `type Foo = pkg.Foo` |
 

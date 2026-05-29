@@ -20,7 +20,7 @@ func mustLoadLocation(t *testing.T, name string) *time.Location {
 	return loc
 }
 
-// MockCloudClient implements api.CloudClient for testing.
+// MockCloudClient implements CloudClient for testing.
 type MockCloudClient struct {
 	Metrics   *api.LocalMetrics
 	CacheUsed bool
@@ -117,7 +117,7 @@ func TestNewDataAggregatorWithFactory(t *testing.T) {
 	mockTokenGetter := func(ctx context.Context, apiConfig *APIConfig) (string, error) {
 		return "test-token", nil
 	}
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) api.CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
 		return &MockCloudClient{}
 	}
 
@@ -143,7 +143,7 @@ func TestGetAggregatedMetrics_SingleSystem(t *testing.T) {
 		CacheUsed: false,
 	}
 
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) api.CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
 		return mockClient
 	}
 
@@ -183,7 +183,7 @@ func TestGetAggregatedMetrics_SingleSystem(t *testing.T) {
 // TestGetAggregatedMetrics_MultipleSystems verifies aggregation for multiple systems.
 func TestGetAggregatedMetrics_MultipleSystems(t *testing.T) {
 	callCount := 0
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) api.CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
 		callCount++
 		// Return different metrics for each system
 		if systemID == "123" {
