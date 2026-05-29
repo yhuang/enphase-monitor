@@ -56,6 +56,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -184,7 +185,7 @@ func LoadConfig(filename string) (*Config, error) {
 
 	// Validate required fields
 	if len(config.Systems) == 0 {
-		return nil, fmt.Errorf("no systems configured")
+		return nil, errors.New("no systems configured")
 	}
 
 	for i, sys := range config.Systems {
