@@ -36,7 +36,8 @@
 // LoadConfig() performs comprehensive validation:
 //   - Ensures all required API fields are present
 //   - Validates each system has a name and ID
-//   - Checks refresh_interval is positive
+//   - Checks refresh_interval is positive and clamps values below the API Budget
+//     window (60s) up to that floor, since faster refreshes exhaust the budget
 //   - Trims whitespace from refresh_token (common copy/paste issue)
 //   - Sets default refresh_interval to 3600 (1 hour) if not specified
 //
@@ -55,6 +56,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -183,7 +185,7 @@ func LoadConfig(filename string) (*Config, error) {
 
 	// Validate required fields
 	if len(config.Systems) == 0 {
-		return nil, fmt.Errorf("no systems configured")
+		return nil, errors.New("no systems configured")
 	}
 
 	for i, sys := range config.Systems {
@@ -200,9 +202,16 @@ func LoadConfig(filename string) (*Config, error) {
 		}
 	}
 
-	// Default refresh interval to 1 hour if not specified or invalid
+	// Default refresh interval to 1 hour if not specified or invalid.
 	if config.RefreshIntervalSeconds <= 0 {
 		config.RefreshIntervalSeconds = 3600
+	} else if config.RefreshIntervalSeconds < constants.APIBudgetWindowSeconds {
+		// Enforce the documented floor: refreshing faster than one API Budget window
+		// would exhaust the budget on every Continuous Mode tick and trigger 429s.
+		// Clamp up to the window length and warn (to stderr, so reports stay clean).
+		fmt.Fprintf(os.Stderr, "WARNING: refresh_interval of %ds is below the %ds minimum (one API Budget window); using %ds instead\n",
+			config.RefreshIntervalSeconds, constants.APIBudgetWindowSeconds, constants.APIBudgetWindowSeconds)
+		config.RefreshIntervalSeconds = constants.APIBudgetWindowSeconds
 	}
 
 	// Trim whitespace from refresh token (common issue with copy/paste)

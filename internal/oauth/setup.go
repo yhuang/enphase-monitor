@@ -25,6 +25,7 @@ package oauth
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -57,11 +58,11 @@ func openBrowser(url string) error {
 // ctx is used for cancellation (e.g. Ctrl+C during token exchange).
 func Setup(ctx context.Context, cfg *config.Config) error {
 	if cfg.API == nil {
-		return fmt.Errorf("API configuration is required")
+		return errors.New("API configuration is required")
 	}
 
 	if cfg.API.ClientID == "" {
-		return fmt.Errorf("client_id is required in API configuration")
+		return errors.New("client_id is required in API configuration")
 	}
 
 	// Get redirect URI from config or prompt
@@ -136,7 +137,7 @@ func Setup(ctx context.Context, cfg *config.Config) error {
 	code = strings.TrimSpace(code)
 
 	if code == "" {
-		return fmt.Errorf("authorization code is required")
+		return errors.New("authorization code is required")
 	}
 
 	// Check if user pasted a URL with an error
@@ -149,7 +150,7 @@ func Setup(ctx context.Context, cfg *config.Config) error {
 		fmt.Println("1. The redirect_uri does not match your app settings in Developer Portal")
 		fmt.Println("2. You used the wrong authorization URL (should have 'read write' scope)")
 		fmt.Println()
-		return fmt.Errorf("authorization failed - please check the error in the URL and try again")
+		return errors.New("authorization failed - please check the error in the URL and try again")
 	}
 
 	// Extract code from URL if user pasted full URL
@@ -164,7 +165,7 @@ func Setup(ctx context.Context, cfg *config.Config) error {
 		fmt.Println()
 		fmt.Println("Could not find 'code=' or 'error=' in the URL you provided.")
 		fmt.Println("Please paste the complete URL from your browser address bar.")
-		return fmt.Errorf("invalid redirect URL - no authorization code found")
+		return errors.New("invalid redirect URL - no authorization code found")
 	}
 
 	// Exchange code for tokens
@@ -175,7 +176,7 @@ func Setup(ctx context.Context, cfg *config.Config) error {
 	}
 
 	if tokenResp.RefreshToken == "" {
-		return fmt.Errorf("no refresh token in response - authorization may have failed")
+		return errors.New("no refresh token in response - authorization may have failed")
 	}
 
 	fmt.Println("\n✓ Success! Tokens received:")

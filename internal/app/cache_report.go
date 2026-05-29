@@ -26,7 +26,7 @@ var ErrCacheIncomplete = errors.New("cached report unavailable: one or more endp
 func RunCacheReport(ctx context.Context, rc RunConfig, trueUpStart string) error {
 	systems, apiConfig := GetAggregatorTypes(rc.Cfg)
 	if apiConfig == nil || apiConfig.Key == "" {
-		return fmt.Errorf("api.key required to check cache")
+		return errors.New("api.key required to check cache")
 	}
 
 	// Determine the effective date and query mode for the cache pre-check.

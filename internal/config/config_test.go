@@ -121,6 +121,25 @@ refresh_interval: -1
 			},
 		},
 		{
+			name: "below-minimum refresh interval is clamped to the 60s floor",
+			yamlContent: `
+api:
+  key: test-key
+  client_id: test-client
+  client_secret: test-secret
+systems:
+  - name: System 1
+    id: "12345"
+refresh_interval: 30
+`,
+			wantErr: false,
+			validate: func(t *testing.T, cfg *Config) {
+				if cfg.RefreshIntervalSeconds != constants.APIBudgetWindowSeconds {
+					t.Errorf("RefreshIntervalSeconds = %d, want %d (clamped to floor)", cfg.RefreshIntervalSeconds, constants.APIBudgetWindowSeconds)
+				}
+			},
+		},
+		{
 			name: "refresh token with whitespace is trimmed",
 			yamlContent: `
 api:

@@ -166,6 +166,7 @@ import (
 	"io"
 	"net/http"
 	neturl "net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -268,26 +269,87 @@ func (c *EnlightenCloudClient) buildTelemetryURL(endpoint string, dayStart, dayE
 	return urlbuilder.BuildTelemetryURL(c.baseURL, c.systemID, endpoint, c.apiKey, dayStart, dayEnd)
 }
 
+// intervalMetric describes one energy metric: the Interval Data endpoint for Day Mode,
+// the Lifetime Data endpoint for Month/Year/True-Up Mode, the interval field to sum, and
+// how to parse the Day Mode response shape. Capturing the per-metric differences as data
+// lets the four Get*ForDate methods share a single fetch path.
+type intervalMetric struct {
+	dayEndpoint      string                                           // Interval Data endpoint (Day Mode)
+	lifetimeEndpoint string                                           // Lifetime Data endpoint (Month/Year/True-Up Mode)
+	field            string                                           // constants.Field* summed from each interval
+	parseDay         func([]byte) ([]parser.TelemetryInterval, error) // Day Mode response parser
+}
+
+var (
+	importMetric      = intervalMetric{"energy_import_telemetry", "energy_import_lifetime", constants.FieldWhImported, parser.ParseNestedTelemetryResponse}
+	exportMetric      = intervalMetric{"energy_export_telemetry", "energy_export_lifetime", constants.FieldWhExported, parser.ParseNestedTelemetryResponse}
+	productionMetric  = intervalMetric{"telemetry/production_meter", "energy_lifetime", constants.FieldWhDel, parseProductionIntervals}
+	consumptionMetric = intervalMetric{"telemetry/consumption_meter", "consumption_lifetime", constants.FieldEnwh, parser.ParseTelemetryResponse}
+)
+
+// parseProductionIntervals parses the production_meter response, which has appeared in
+// both the nested and the flat interval shapes; it tries nested first and falls back to
+// flat. (Import/export are always nested; consumption is always flat.)
+func parseProductionIntervals(body []byte) ([]parser.TelemetryInterval, error) {
+	intervals, err := parser.ParseNestedTelemetryResponse(body)
+	if err != nil {
+		return parser.ParseTelemetryResponse(body)
+	}
+	return intervals, nil
+}
+
+// fetchMetric returns a metric total in kWh for the period. Month, Year, and True-Up Mode
+// use the Lifetime Data endpoint (daily aggregated, complete days only); Day Mode uses the
+// Interval Data endpoint (better granularity, 96 data points) and the metric's parser.
+func (c *EnlightenCloudClient) fetchMetric(ctx context.Context, m intervalMetric, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
+	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear || queryMode == constants.QueryModeTrueUp {
+		return c.fetchLifetimeMetric(ctx, m.lifetimeEndpoint, testDate, queryMode)
+	}
+
+	bodyBytes, err := c.fetchTelemetryData(ctx, m.dayEndpoint, testDate, queryMode)
+	if err != nil {
+		return 0, err
+	}
+	intervals, err := m.parseDay(bodyBytes)
+	if err != nil {
+		return 0, err
+	}
+	return parser.SumIntervalValues(intervals, m.field) / constants.WhToKWh, nil
+}
+
+// fetchLifetimeMetric fetches a daily-aggregated metric from a Lifetime Data endpoint and
+// sums the daily values within the period. The total covers complete days only (through
+// yesterday for ongoing periods; see lifetimeEndDate).
+func (c *EnlightenCloudClient) fetchLifetimeMetric(ctx context.Context, endpoint string, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
+	periodStart, _ := timezone.GetBoundaries(testDate, queryMode, c.timezone)
+	startDateStr := periodStart.Format(constants.DateFormat)
+	endDateStr := c.lifetimeEndDate(testDate, queryMode)
+
+	reqURL := urlbuilder.BuildLifetimeURL(c.baseURL, c.systemID, endpoint, c.apiKey, startDateStr)
+	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
+	c.cacheUsed = cacheUsed
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := parser.ReadResponseBody(resp.Body)
+	if err != nil {
+		return 0, err
+	}
+	dailyIntervals, err := parser.ParseLifetimeResponse(bodyBytes)
+	if err != nil {
+		return 0, err
+	}
+	return parser.SumDailyIntervals(dailyIntervals, startDateStr, endDateStr) / constants.WhToKWh, nil
+}
+
 // GetEnergyImportForDate gets the total Grid Import for a specific date/period.
 // If testDate is zero, uses today. queryMode selects Day, Month, Year, or True-Up Mode.
 // For Month, Year, and True-Up Mode queries, uses the Lifetime Data endpoint (daily aggregated).
 // The result always covers complete days only (through yesterday for ongoing periods).
 func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
-	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear || queryMode == constants.QueryModeTrueUp {
-		return c.getEnergyImportLifetime(ctx, testDate, queryMode)
-	}
-
-	// Single-day query: use Interval Data endpoint (better granularity, 96 data points)
-	bodyBytes, err := c.fetchTelemetryData(ctx, "energy_import_telemetry", testDate, queryMode)
-	if err != nil {
-		return 0, err
-	}
-	allIntervals, err := parser.ParseNestedTelemetryResponse(bodyBytes)
-	if err != nil {
-		return 0, err
-	}
-	importWh := parser.SumIntervalValues(allIntervals, constants.FieldWhImported)
-	return importWh / constants.WhToKWh, nil
+	return c.fetchMetric(ctx, importMetric, testDate, queryMode)
 }
 
 // GetEnergyExportForDate gets the total Grid Export for a specific date/period.
@@ -295,21 +357,7 @@ func (c *EnlightenCloudClient) GetEnergyImportForDate(ctx context.Context, testD
 // For Month, Year, and True-Up Mode queries, uses the Lifetime Data endpoint (daily aggregated).
 // The result always covers complete days only (through yesterday for ongoing periods).
 func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
-	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear || queryMode == constants.QueryModeTrueUp {
-		return c.getEnergyExportLifetime(ctx, testDate, queryMode)
-	}
-
-	// Single-day query: use Interval Data endpoint
-	bodyBytes, err := c.fetchTelemetryData(ctx, "energy_export_telemetry", testDate, queryMode)
-	if err != nil {
-		return 0, err
-	}
-	allIntervals, err := parser.ParseNestedTelemetryResponse(bodyBytes)
-	if err != nil {
-		return 0, err
-	}
-	exportWh := parser.SumIntervalValues(allIntervals, constants.FieldWhExported)
-	return exportWh / constants.WhToKWh, nil
+	return c.fetchMetric(ctx, exportMetric, testDate, queryMode)
 }
 
 // GetProductionForDate gets the total Production for a specific date/period.
@@ -318,24 +366,7 @@ func (c *EnlightenCloudClient) GetEnergyExportForDate(ctx context.Context, testD
 // The result always covers complete days only (through yesterday for ongoing periods).
 // Returns the aggregated sum of all wh_del values from the API response.
 func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
-	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear || queryMode == constants.QueryModeTrueUp {
-		return c.getEnergyLifetime(ctx, testDate, queryMode)
-	}
-
-	// Single-day query: use Interval Data endpoint
-	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/production_meter", testDate, queryMode)
-	if err != nil {
-		return 0, err
-	}
-	allIntervals, err := parser.ParseNestedTelemetryResponse(bodyBytes)
-	if err != nil {
-		allIntervals, err = parser.ParseTelemetryResponse(bodyBytes)
-		if err != nil {
-			return 0, err
-		}
-	}
-	productionWh := parser.SumIntervalValues(allIntervals, constants.FieldWhDel)
-	return productionWh / constants.WhToKWh, nil
+	return c.fetchMetric(ctx, productionMetric, testDate, queryMode)
 }
 
 // GetConsumptionForDate gets the total Consumption for a specific date/period.
@@ -343,21 +374,7 @@ func (c *EnlightenCloudClient) GetProductionForDate(ctx context.Context, testDat
 // For Month, Year, and True-Up Mode queries, uses the Lifetime Data endpoint (daily aggregated).
 // The result always covers complete days only (through yesterday for ongoing periods).
 func (c *EnlightenCloudClient) GetConsumptionForDate(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
-	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear || queryMode == constants.QueryModeTrueUp {
-		return c.getConsumptionLifetime(ctx, testDate, queryMode)
-	}
-
-	// Single-day query: use Interval Data endpoint
-	bodyBytes, err := c.fetchTelemetryData(ctx, "telemetry/consumption_meter", testDate, queryMode)
-	if err != nil {
-		return 0, err
-	}
-	intervals, err := parser.ParseTelemetryResponse(bodyBytes)
-	if err != nil {
-		return 0, err
-	}
-	consumptionWh := parser.SumIntervalValues(intervals, constants.FieldEnwh)
-	return consumptionWh / constants.WhToKWh, nil
+	return c.fetchMetric(ctx, consumptionMetric, testDate, queryMode)
 }
 
 // GetBatteryDataForDate gets battery charge, discharge, and State of Charge (SOC) for today.
@@ -469,7 +486,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 		needed := QueryCost(queryMode, queryMode == constants.QueryModeDay)
 		remaining := cache.RemainingBudget()
 		if remaining < needed {
-			fmt.Printf("WARNING: %sInsufficient API budget: need %d call(s), %d/%d remaining — results may use cached data\n",
+			fmt.Fprintf(os.Stderr, "WARNING: %sInsufficient API budget: need %d call(s), %d/%d remaining — results may use cached data\n",
 				sysPrefix, needed, remaining, cache.MaxRequestsPerWindow)
 		}
 	}
@@ -492,7 +509,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 		}
 		// Grid import may fail - continue with 0
 		if shouldLogError(err) {
-			fmt.Printf("WARNING: %sFailed to get grid import: %v\n", sysPrefix, err)
+			fmt.Fprintf(os.Stderr, "WARNING: %sFailed to get grid import: %v\n", sysPrefix, err)
 		}
 		metrics.GridImportToday = 0
 	}
@@ -505,7 +522,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 		}
 		// Grid export may fail - continue with 0
 		if shouldLogError(err) {
-			fmt.Printf("WARNING: %sFailed to get grid export: %v\n", sysPrefix, err)
+			fmt.Fprintf(os.Stderr, "WARNING: %sFailed to get grid export: %v\n", sysPrefix, err)
 		}
 		metrics.GridExportToday = 0
 	}
@@ -528,7 +545,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 			if err := checkCancelled(); err != nil {
 				return nil, false, err
 			}
-			fmt.Printf("WARNING: %sFailed to get battery data: %v\n", sysPrefix, err)
+			fmt.Fprintf(os.Stderr, "WARNING: %sFailed to get battery data: %v\n", sysPrefix, err)
 			metrics.BatteryChargedToday = 0
 			metrics.BatteryDischargedToday = 0
 			metrics.BatterySOC = 0
@@ -560,7 +577,7 @@ func maybeShowNoCacheFallbackWarning(reason string) {
 	if cache.BudgetWarningShown() {
 		return
 	}
-	fmt.Printf("WARNING: %s - returning cached data despite --no-cache flag\n", reason)
+	fmt.Fprintf(os.Stderr, "WARNING: %s - returning cached data despite --no-cache flag\n", reason)
 	cache.SetBudgetWarningShown(true)
 }
 
@@ -785,7 +802,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		}
 		if resp.StatusCode == http.StatusServiceUnavailable && cacheErr != nil {
 			resp.Body.Close()
-			return nil, false, fmt.Errorf("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
+			return nil, false, errors.New("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
 		}
 		if resp.StatusCode == http.StatusServiceUnavailable {
 			resp.Body.Close()
@@ -886,7 +903,7 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		if retryCached, retryErr := cache.LoadCachedResponse(url, c.timezone); retryErr == nil {
 			return retryCached.ToHTTPResponse(), true, nil // Cache was used (503 retry)
 		}
-		return nil, false, fmt.Errorf("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
+		return nil, false, errors.New("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
 	}
 	cache.RecordAPICall()
 	cache.Debugf("live API call succeeded (budget now %d/%d)", cache.RemainingBudget(), cache.MaxRequestsPerWindow)
@@ -932,125 +949,4 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		Header:     resp.Header,
 		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
 	}, false, nil // Cache was NOT used (fresh API call)
-}
-
-// getEnergyLifetime fetches production data using the Lifetime Data endpoint (energy_lifetime, daily aggregated).
-// This Lifetime Data endpoint has no 7-day limit and returns daily totals instead of 15-minute intervals.
-func (c *EnlightenCloudClient) getEnergyLifetime(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
-	periodStart, _ := timezone.GetBoundaries(testDate, queryMode, c.timezone)
-	startDateStr := periodStart.Format(constants.DateFormat)
-	// Cap to yesterday for ongoing periods so the total covers only complete days.
-	// For Past Periods, the period end is already a complete day so we use it directly.
-	endDateStr := c.lifetimeEndDate(testDate, queryMode)
-
-	// Build URL for Lifetime Data endpoint
-	reqURL := urlbuilder.BuildLifetimeURL(c.baseURL, c.systemID, "energy_lifetime", c.apiKey, startDateStr)
-
-	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
-	c.cacheUsed = cacheUsed
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := parser.ReadResponseBody(resp.Body)
-	if err != nil {
-		return 0, err
-	}
-
-	dailyIntervals, err := parser.ParseLifetimeResponse(bodyBytes)
-	if err != nil {
-		return 0, err
-	}
-
-	// Sum daily values within the period
-	totalWh := parser.SumDailyIntervals(dailyIntervals, startDateStr, endDateStr)
-	return totalWh / constants.WhToKWh, nil
-}
-
-// getConsumptionLifetime fetches consumption data using the Lifetime Data endpoint (consumption_lifetime).
-func (c *EnlightenCloudClient) getConsumptionLifetime(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
-	periodStart, _ := timezone.GetBoundaries(testDate, queryMode, c.timezone)
-	startDateStr := periodStart.Format(constants.DateFormat)
-	endDateStr := c.lifetimeEndDate(testDate, queryMode)
-
-	reqURL := urlbuilder.BuildLifetimeURL(c.baseURL, c.systemID, "consumption_lifetime", c.apiKey, startDateStr)
-
-	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
-	c.cacheUsed = cacheUsed
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := parser.ReadResponseBody(resp.Body)
-	if err != nil {
-		return 0, err
-	}
-
-	dailyIntervals, err := parser.ParseLifetimeResponse(bodyBytes)
-	if err != nil {
-		return 0, err
-	}
-
-	totalWh := parser.SumDailyIntervals(dailyIntervals, startDateStr, endDateStr)
-	return totalWh / constants.WhToKWh, nil
-}
-
-// getEnergyImportLifetime fetches grid import data using the Lifetime Data endpoint (energy_import_lifetime).
-func (c *EnlightenCloudClient) getEnergyImportLifetime(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
-	periodStart, _ := timezone.GetBoundaries(testDate, queryMode, c.timezone)
-	startDateStr := periodStart.Format(constants.DateFormat)
-	endDateStr := c.lifetimeEndDate(testDate, queryMode)
-
-	reqURL := urlbuilder.BuildLifetimeURL(c.baseURL, c.systemID, "energy_import_lifetime", c.apiKey, startDateStr)
-
-	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
-	c.cacheUsed = cacheUsed
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := parser.ReadResponseBody(resp.Body)
-	if err != nil {
-		return 0, err
-	}
-
-	dailyIntervals, err := parser.ParseLifetimeResponse(bodyBytes)
-	if err != nil {
-		return 0, err
-	}
-
-	totalWh := parser.SumDailyIntervals(dailyIntervals, startDateStr, endDateStr)
-	return totalWh / constants.WhToKWh, nil
-}
-
-// getEnergyExportLifetime fetches grid export data using the Lifetime Data endpoint (energy_export_lifetime).
-func (c *EnlightenCloudClient) getEnergyExportLifetime(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (float64, error) {
-	periodStart, _ := timezone.GetBoundaries(testDate, queryMode, c.timezone)
-	startDateStr := periodStart.Format(constants.DateFormat)
-	endDateStr := c.lifetimeEndDate(testDate, queryMode)
-
-	reqURL := urlbuilder.BuildLifetimeURL(c.baseURL, c.systemID, "energy_export_lifetime", c.apiKey, startDateStr)
-
-	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
-	c.cacheUsed = cacheUsed
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := parser.ReadResponseBody(resp.Body)
-	if err != nil {
-		return 0, err
-	}
-
-	dailyIntervals, err := parser.ParseLifetimeResponse(bodyBytes)
-	if err != nil {
-		return 0, err
-	}
-
-	totalWh := parser.SumDailyIntervals(dailyIntervals, startDateStr, endDateStr)
-	return totalWh / constants.WhToKWh, nil
 }
