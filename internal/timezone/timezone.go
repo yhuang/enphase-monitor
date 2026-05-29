@@ -19,6 +19,7 @@
 package timezone
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -121,7 +122,7 @@ func ParseDateString(dateStr string, tz *time.Location) (ParseResult, error) {
 		return ParseResult{Date: parsed, QueryMode: constants.QueryModeYear}, nil
 	}
 
-	return ParseResult{}, fmt.Errorf("invalid date format: use YYYY-MM-DD, YYYY-MM, or YYYY")
+	return ParseResult{}, errors.New("invalid date format: use YYYY-MM-DD, YYYY-MM, or YYYY")
 }
 
 // GetMonthBoundaries returns the start and end times for a given month.

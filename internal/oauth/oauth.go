@@ -52,6 +52,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -96,13 +97,13 @@ var oauthHTTPClient = &http.Client{
 // GetAuthorizationURL generates the authorization URL for the user to visit (one-time setup).
 func GetAuthorizationURL(apiConfig *types.APIConfig) (string, error) {
 	if apiConfig == nil {
-		return "", fmt.Errorf("API configuration is required")
+		return "", errors.New("API configuration is required")
 	}
 	if apiConfig.ClientID == "" {
-		return "", fmt.Errorf("client_id is required")
+		return "", errors.New("client_id is required")
 	}
 	if apiConfig.RedirectURI == "" {
-		return "", fmt.Errorf("redirect_uri is required in API configuration")
+		return "", errors.New("redirect_uri is required in API configuration")
 	}
 
 	authURL := constants.EnphaseOAuthAuthorizeURL
@@ -118,19 +119,19 @@ func GetAuthorizationURL(apiConfig *types.APIConfig) (string, error) {
 // ExchangeAuthorizationCode exchanges an authorization code for access and refresh tokens.
 func ExchangeAuthorizationCode(ctx context.Context, apiConfig *types.APIConfig, code string) (*TokenResponse, error) {
 	if apiConfig == nil {
-		return nil, fmt.Errorf("API configuration is required")
+		return nil, errors.New("API configuration is required")
 	}
 	if apiConfig.AuthorizationURL == "" {
-		return nil, fmt.Errorf("authorization_url is required in API configuration")
+		return nil, errors.New("authorization_url is required in API configuration")
 	}
 	if apiConfig.ClientID == "" || apiConfig.ClientSecret == "" {
-		return nil, fmt.Errorf("client_id and client_secret are required in API configuration")
+		return nil, errors.New("client_id and client_secret are required in API configuration")
 	}
 	if apiConfig.RedirectURI == "" {
-		return nil, fmt.Errorf("redirect_uri is required in API configuration")
+		return nil, errors.New("redirect_uri is required in API configuration")
 	}
 	if code == "" {
-		return nil, fmt.Errorf("authorization code is required")
+		return nil, errors.New("authorization code is required")
 	}
 
 	data := url.Values{}
@@ -180,15 +181,15 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 	}
 
 	if apiConfig == nil {
-		return "", fmt.Errorf("API configuration is required")
+		return "", errors.New("API configuration is required")
 	}
 
 	if apiConfig.AuthorizationURL == "" {
-		return "", fmt.Errorf("authorization_url is required in API configuration")
+		return "", errors.New("authorization_url is required in API configuration")
 	}
 
 	if apiConfig.ClientID == "" || apiConfig.ClientSecret == "" {
-		return "", fmt.Errorf("client_id and client_secret are required in API configuration")
+		return "", errors.New("client_id and client_secret are required in API configuration")
 	}
 
 	// Determine which grant type to use
@@ -208,7 +209,7 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 		formData.Set("password", apiConfig.Password)
 	}
 	if formData == nil {
-		return "", fmt.Errorf("no valid authentication method available: for developer plan run one-time authorization to get a refresh_token (see README)")
+		return "", errors.New("no valid authentication method available: for developer plan run one-time authorization to get a refresh_token (see README)")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", apiConfig.AuthorizationURL, bytes.NewBufferString(formData.Encode()))
@@ -256,7 +257,7 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 	}
 
 	if tokenResp.AccessToken == "" {
-		return "", fmt.Errorf("no access token in response")
+		return "", errors.New("no access token in response")
 	}
 
 	// Cache the token and refresh token

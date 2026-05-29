@@ -12,6 +12,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -49,7 +50,7 @@ func RunOnce(ctx context.Context, rc RunConfig, validationMode bool) error {
 	// If in Validation Mode and test date is provided, validate against expected values
 	if validationMode {
 		if rc.TestDate.IsZero() {
-			return fmt.Errorf("--test flag requires --date flag to specify which date to validate")
+			return errors.New("--test flag requires --date flag to specify which date to validate")
 		}
 		testDateStr := FormatDateForQueryMode(rc.TestDate, rc.QueryMode)
 		if err := validation.ValidateMetrics(os.Stdout, metrics, testDateStr); err != nil {

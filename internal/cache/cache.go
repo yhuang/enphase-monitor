@@ -30,6 +30,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -409,7 +410,7 @@ func writeAPICallStamps(stamps []time.Time) {
 // Pass 0 to accept entries of any age.
 func FindMostRecentByEndpoint(endpoint, systemID string, maxAge time.Duration) (*CachedResponse, error) {
 	if endpoint == "" || systemID == "" {
-		return nil, fmt.Errorf("endpoint and systemID required")
+		return nil, errors.New("endpoint and systemID required")
 	}
 	dir := getCacheDir()
 	entries, err := os.ReadDir(dir)
