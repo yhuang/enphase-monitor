@@ -69,15 +69,16 @@ func lifetimeProductionServer(t *testing.T) (*httptest.Server, *atomic.Int32) {
 	return srv, &hits
 }
 
-// captureStdout redirects os.Stdout for the duration of fn and returns everything
-// written to it. Restores the original Stdout before returning.
-func captureStdout(fn func()) string {
+// captureStderr redirects os.Stderr for the duration of fn and returns everything
+// written to it. Restores the original Stderr before returning. Operational warnings
+// (including the budget preflight warning) are emitted to stderr, not stdout.
+func captureStderr(fn func()) string {
 	r, w, _ := os.Pipe()
-	orig := os.Stdout
-	os.Stdout = w
+	orig := os.Stderr
+	os.Stderr = w
 	fn()
 	w.Close()
-	os.Stdout = orig
+	os.Stderr = orig
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)
 	return buf.String()
@@ -426,7 +427,7 @@ func TestPreflightWarning_CurrentPeriod(t *testing.T) {
 	}
 
 	// Probe: preflight should warn because remaining (1) < needed (5).
-	output := captureStdout(func() {
+	output := captureStderr(func() {
 		_, _, _ = client.GetMetricsFromCloud(ctx, time.Time{}, constants.QueryModeDay)
 	})
 
@@ -477,7 +478,7 @@ func TestPreflightWarning_PastPeriod(t *testing.T) {
 	exhaustBudget()
 
 	// Probe: Past Period → no preflight warning expected.
-	output := captureStdout(func() {
+	output := captureStderr(func() {
 		_, _, _ = client.GetMetricsFromCloud(ctx, pastDay, constants.QueryModeDay)
 	})
 

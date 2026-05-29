@@ -166,6 +166,7 @@ import (
 	"io"
 	"net/http"
 	neturl "net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -469,7 +470,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 		needed := QueryCost(queryMode, queryMode == constants.QueryModeDay)
 		remaining := cache.RemainingBudget()
 		if remaining < needed {
-			fmt.Printf("WARNING: %sInsufficient API budget: need %d call(s), %d/%d remaining — results may use cached data\n",
+			fmt.Fprintf(os.Stderr, "WARNING: %sInsufficient API budget: need %d call(s), %d/%d remaining — results may use cached data\n",
 				sysPrefix, needed, remaining, cache.MaxRequestsPerWindow)
 		}
 	}
@@ -492,7 +493,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 		}
 		// Grid import may fail - continue with 0
 		if shouldLogError(err) {
-			fmt.Printf("WARNING: %sFailed to get grid import: %v\n", sysPrefix, err)
+			fmt.Fprintf(os.Stderr, "WARNING: %sFailed to get grid import: %v\n", sysPrefix, err)
 		}
 		metrics.GridImportToday = 0
 	}
@@ -505,7 +506,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 		}
 		// Grid export may fail - continue with 0
 		if shouldLogError(err) {
-			fmt.Printf("WARNING: %sFailed to get grid export: %v\n", sysPrefix, err)
+			fmt.Fprintf(os.Stderr, "WARNING: %sFailed to get grid export: %v\n", sysPrefix, err)
 		}
 		metrics.GridExportToday = 0
 	}
@@ -528,7 +529,7 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 			if err := checkCancelled(); err != nil {
 				return nil, false, err
 			}
-			fmt.Printf("WARNING: %sFailed to get battery data: %v\n", sysPrefix, err)
+			fmt.Fprintf(os.Stderr, "WARNING: %sFailed to get battery data: %v\n", sysPrefix, err)
 			metrics.BatteryChargedToday = 0
 			metrics.BatteryDischargedToday = 0
 			metrics.BatterySOC = 0
@@ -560,7 +561,7 @@ func maybeShowNoCacheFallbackWarning(reason string) {
 	if cache.BudgetWarningShown() {
 		return
 	}
-	fmt.Printf("WARNING: %s - returning cached data despite --no-cache flag\n", reason)
+	fmt.Fprintf(os.Stderr, "WARNING: %s - returning cached data despite --no-cache flag\n", reason)
 	cache.SetBudgetWarningShown(true)
 }
 

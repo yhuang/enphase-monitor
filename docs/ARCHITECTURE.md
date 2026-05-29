@@ -366,7 +366,7 @@ The preflight (Layer 2) fires once per `GetMetricsFromCloud` call and is a forwa
 When run with `--debug`, the application emits structured logs to stderr that expose Layer 2 and Layer 3 decisions:
 
 - **Startup banner** (`printDebugStartup` in [main.go](../main.go)) shows the current time, the most recent recorded API call (`cache.LastAPICallTime()`), how long until the 60-second window resets, and the remaining budget. This is the single best diagnostic for "why am I getting 429s?" because it answers "is the window still active?" before any work begins.
-- **Preflight warning** (Layer 2, in `GetMetricsFromCloud`) prints `WARNING: … Insufficient API budget …` to stdout when the remaining budget is smaller than the query cost for a current-period run. Only emitted in debug mode to avoid cluttering normal report output.
+- **Preflight warning** (Layer 2, in `GetMetricsFromCloud`) prints `WARNING: … Insufficient API budget …` to stderr when the remaining budget is smaller than the query cost for a current-period run. Only emitted in debug mode to avoid cluttering normal report output.
 - **Cached mode banner** (`RunCacheReport`) prints `CACHE MODE: Serving report from cache, no live API calls` when `--cache` finds a complete cache. Only emitted in debug mode for the same reason.
 - **Per-request trace** (`cache.Debugf` from `makeCachedAPIRequest` in [internal/api/client.go](../internal/api/client.go)) emits one line per URL describing the decision taken: serving Past Period immutable cache, falling back due to budget exhaustion, making a live call, or hitting the 429/503 fallback paths. Each line includes the redacted URL and the cache age so traces are reproducible without leaking the API key.
 
