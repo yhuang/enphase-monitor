@@ -1,4 +1,4 @@
-// types.go defines types used by the CloudClient interface (e.g. LocalMetrics).
+// types.go defines the value types returned by the cloud client (e.g. LocalMetrics).
 // Package comment is in client.go.
 package api
 

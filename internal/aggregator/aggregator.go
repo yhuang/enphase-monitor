@@ -31,12 +31,23 @@ type APIConfig = types.APIConfig
 // This allows the aggregator to work with any OAuth implementation.
 type OAuthTokenGetter func(ctx context.Context, apiConfig *APIConfig) (string, error)
 
+// CloudClient is the subset of the cloud API that the aggregator depends on.
+// It is defined here, on the consumer side, so the aggregator owns the abstraction
+// it actually needs (only GetMetricsFromCloud); api.NewEnlightenCloudClient returns a
+// concrete *api.EnlightenCloudClient that satisfies it.
+type CloudClient interface {
+	GetMetricsFromCloud(ctx context.Context, testDate time.Time, queryMode constants.QueryMode) (*api.LocalMetrics, bool, error)
+}
+
+// Compile-time check that *api.EnlightenCloudClient satisfies CloudClient.
+var _ CloudClient = (*api.EnlightenCloudClient)(nil)
+
 // CloudClientFactory is a function type for creating cloud clients.
 // This allows dependency injection for testing purposes.
-type CloudClientFactory func(systemID, systemName, apiKey, accessToken string, timezone *time.Location) api.CloudClient
+type CloudClientFactory func(systemID, systemName, apiKey, accessToken string, timezone *time.Location) CloudClient
 
 // defaultCloudClientFactory creates the default production cloud client.
-func defaultCloudClientFactory(systemID, systemName, apiKey, accessToken string, tz *time.Location) api.CloudClient {
+func defaultCloudClientFactory(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
 	return api.NewEnlightenCloudClient(systemID, apiKey, accessToken, tz).WithSystemName(systemName)
 }
 

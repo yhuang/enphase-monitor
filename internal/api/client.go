@@ -174,6 +174,7 @@ import (
 	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/parser"
 	"enphase-monitor/internal/timezone"
+	"enphase-monitor/internal/urlbuilder"
 )
 
 // EnlightenCloudClient handles communication with Enphase Enlighten Cloud API v4.
@@ -264,10 +265,7 @@ func (c *EnlightenCloudClient) fetchTelemetryData(ctx context.Context, endpoint 
 // buildTelemetryURL constructs a URL using the client's base URL and parameters.
 // This method uses the injected baseURL for testability.
 func (c *EnlightenCloudClient) buildTelemetryURL(endpoint string, dayStart, dayEnd time.Time) string {
-	baseURL := fmt.Sprintf("%s/%s/%s", c.baseURL, c.systemID, endpoint)
-	return baseURL + "?key=" + c.apiKey +
-		"&start_at=" + strconv.FormatInt(dayStart.Unix(), 10) +
-		"&end_at=" + strconv.FormatInt(dayEnd.Unix(), 10)
+	return urlbuilder.BuildTelemetryURL(c.baseURL, c.systemID, endpoint, c.apiKey, dayStart, dayEnd)
 }
 
 // GetEnergyImportForDate gets the total Grid Import for a specific date/period.
@@ -946,7 +944,7 @@ func (c *EnlightenCloudClient) getEnergyLifetime(ctx context.Context, testDate t
 	endDateStr := c.lifetimeEndDate(testDate, queryMode)
 
 	// Build URL for Lifetime Data endpoint
-	reqURL := fmt.Sprintf("%s/%s/energy_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
+	reqURL := urlbuilder.BuildLifetimeURL(c.baseURL, c.systemID, "energy_lifetime", c.apiKey, startDateStr)
 
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
 	c.cacheUsed = cacheUsed
@@ -976,7 +974,7 @@ func (c *EnlightenCloudClient) getConsumptionLifetime(ctx context.Context, testD
 	startDateStr := periodStart.Format(constants.DateFormat)
 	endDateStr := c.lifetimeEndDate(testDate, queryMode)
 
-	reqURL := fmt.Sprintf("%s/%s/consumption_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
+	reqURL := urlbuilder.BuildLifetimeURL(c.baseURL, c.systemID, "consumption_lifetime", c.apiKey, startDateStr)
 
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
 	c.cacheUsed = cacheUsed
@@ -1005,7 +1003,7 @@ func (c *EnlightenCloudClient) getEnergyImportLifetime(ctx context.Context, test
 	startDateStr := periodStart.Format(constants.DateFormat)
 	endDateStr := c.lifetimeEndDate(testDate, queryMode)
 
-	reqURL := fmt.Sprintf("%s/%s/energy_import_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
+	reqURL := urlbuilder.BuildLifetimeURL(c.baseURL, c.systemID, "energy_import_lifetime", c.apiKey, startDateStr)
 
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
 	c.cacheUsed = cacheUsed
@@ -1034,7 +1032,7 @@ func (c *EnlightenCloudClient) getEnergyExportLifetime(ctx context.Context, test
 	startDateStr := periodStart.Format(constants.DateFormat)
 	endDateStr := c.lifetimeEndDate(testDate, queryMode)
 
-	reqURL := fmt.Sprintf("%s/%s/energy_export_lifetime?key=%s&start_date=%s", c.baseURL, c.systemID, c.apiKey, startDateStr)
+	reqURL := urlbuilder.BuildLifetimeURL(c.baseURL, c.systemID, "energy_export_lifetime", c.apiKey, startDateStr)
 
 	resp, cacheUsed, err := c.makeCachedAPIRequest(ctx, reqURL, testDate, queryMode)
 	c.cacheUsed = cacheUsed

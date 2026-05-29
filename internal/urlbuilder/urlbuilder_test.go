@@ -75,7 +75,7 @@ func TestBuildTelemetryURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := BuildTelemetryURL(tt.systemID, tt.endpoint, tt.apiKey, tt.dayStart, tt.dayEnd)
+			got := BuildTelemetryURL(constants.EnphaseAPIv4SystemsURL, tt.systemID, tt.endpoint, tt.apiKey, tt.dayStart, tt.dayEnd)
 
 			// Verify URL contains expected components
 			if tt.want.containsBaseURL && !strings.Contains(got, constants.EnphaseAPIv4SystemsURL) {
@@ -113,7 +113,7 @@ func TestBuildTelemetryURL_TimestampConversion(t *testing.T) {
 	dayStart := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
 	dayEnd := time.Date(2026, 1, 15, 23, 59, 59, 0, time.UTC)
 
-	url := BuildTelemetryURL(systemID, endpoint, apiKey, dayStart, dayEnd)
+	url := BuildTelemetryURL(constants.EnphaseAPIv4SystemsURL, systemID, endpoint, apiKey, dayStart, dayEnd)
 
 	// Verify Unix timestamps are included
 	expectedStartUnix := dayStart.Unix()
@@ -157,7 +157,7 @@ func TestBuildTelemetryURL_SpecialCharacters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			url := BuildTelemetryURL(tt.systemID, tt.endpoint, tt.apiKey, dayStart, dayEnd)
+			url := BuildTelemetryURL(constants.EnphaseAPIv4SystemsURL, tt.systemID, tt.endpoint, tt.apiKey, dayStart, dayEnd)
 
 			// Verify all components are present
 			if !strings.Contains(url, tt.systemID) {
@@ -170,5 +170,31 @@ func TestBuildTelemetryURL_SpecialCharacters(t *testing.T) {
 				t.Errorf("BuildTelemetryURL() missing API key: %v", tt.apiKey)
 			}
 		})
+	}
+}
+
+func TestBuildLifetimeURL(t *testing.T) {
+	got := BuildLifetimeURL(constants.EnphaseAPIv4SystemsURL, "12345", "energy_lifetime", "test-key", "2026-01-15")
+
+	expectedPrefix := constants.EnphaseAPIv4SystemsURL + "/12345/energy_lifetime"
+	if !strings.HasPrefix(got, expectedPrefix) {
+		t.Errorf("BuildLifetimeURL() wrong prefix, got = %v, want prefix = %v", got, expectedPrefix)
+	}
+	if !strings.Contains(got, "key=test-key") {
+		t.Errorf("BuildLifetimeURL() missing API key, got = %v", got)
+	}
+	if !strings.Contains(got, "start_date=2026-01-15") {
+		t.Errorf("BuildLifetimeURL() missing start_date parameter, got = %v", got)
+	}
+	// Lifetime URLs use start_date, never the interval start_at/end_at params.
+	if strings.Contains(got, "start_at=") || strings.Contains(got, "end_at=") {
+		t.Errorf("BuildLifetimeURL() should not contain interval params, got = %v", got)
+	}
+}
+
+func TestBuildLifetimeURL_CustomBase(t *testing.T) {
+	got := BuildLifetimeURL("http://test.local", "sys-1", "consumption_lifetime", "k", "2025-12-31")
+	if !strings.HasPrefix(got, "http://test.local/sys-1/consumption_lifetime") {
+		t.Errorf("BuildLifetimeURL() did not honor custom base, got = %v", got)
 	}
 }

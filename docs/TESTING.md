@@ -174,7 +174,7 @@ func TestParseTelemetryResponse(t *testing.T) {
 
 **Example** (`aggregator_test.go`):
 ```go
-// MockCloudClient implements api.CloudClient interface
+// MockCloudClient implements aggregator.CloudClient interface
 type MockCloudClient struct {
     Metrics   *api.LocalMetrics
     CacheUsed bool

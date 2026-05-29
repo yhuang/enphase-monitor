@@ -48,13 +48,14 @@
 //	- setup.go: Interactive OAuth setup wizard for first-time configuration
 //
 //	Data Aggregation (internal/aggregator):
-//	- aggregator.go: Multi-system data orchestration and metric aggregation
-//	- types.go: Metric data structures and interfaces
+//	- aggregator.go: Multi-system data orchestration, metric aggregation, and the
+//	  consumer-side CloudClient interface the aggregator depends on
+//	- types.go: Metric data structures (AggregatedMetrics, SystemMetrics)
 //
 //	API Communication (internal/api):
 //	- client.go: HTTP client for Enlighten Cloud API v4, handles all API requests
 //	- types.go: API request/response types
-//	- interface.go: API client interfaces
+//	- cache_check.go: Preflight per-system/endpoint cache-availability probe
 //
 //	Supporting Services:
 //	- internal/cache: Disk-based response caching with URL normalization and the sliding-window API Budget counter

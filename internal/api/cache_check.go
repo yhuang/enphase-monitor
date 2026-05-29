@@ -1,12 +1,12 @@
 package api
 
 import (
-	"fmt"
 	"time"
 
 	"enphase-monitor/internal/cache"
 	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/timezone"
+	"enphase-monitor/internal/urlbuilder"
 )
 
 // EndpointStatus reports the cache state for one API endpoint of one system.
@@ -59,7 +59,7 @@ func CheckCacheForSystem(systemID, systemName, apiKey string, testDate time.Time
 		build := func(name string, required bool) ep {
 			return ep{
 				name:     name,
-				url:      fmt.Sprintf("%s/%s/%s?key=%s&start_at=%d&end_at=%d", base, systemID, name, apiKey, periodStart.Unix(), periodEnd.Unix()),
+				url:      urlbuilder.BuildTelemetryURL(base, systemID, name, apiKey, periodStart, periodEnd),
 				required: required,
 			}
 		}
@@ -77,7 +77,7 @@ func CheckCacheForSystem(systemID, systemName, apiKey string, testDate time.Time
 		build := func(name string, required bool) ep {
 			return ep{
 				name:     name,
-				url:      fmt.Sprintf("%s/%s/%s?key=%s&start_date=%s", base, systemID, name, apiKey, startDate),
+				url:      urlbuilder.BuildLifetimeURL(base, systemID, name, apiKey, startDate),
 				required: required,
 			}
 		}
