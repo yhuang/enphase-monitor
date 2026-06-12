@@ -63,6 +63,12 @@ func RunOnce(ctx context.Context, rc RunConfig, validationMode bool) error {
 // RunContinuous executes continuous monitoring with periodic refresh.
 // It returns an error only on fatal failures (e.g. 429); normal shutdown returns nil.
 func RunContinuous(ctx context.Context, rc RunConfig) error {
+	// refresh_interval is only consumed here, so the API Budget floor warning is
+	// emitted here (to stderr, keeping reports clean) rather than on every run.
+	if rc.Cfg.RefreshIntervalClampedFromSeconds > 0 {
+		fmt.Fprintf(os.Stderr, "WARNING: refresh_interval of %ds is below the %ds minimum (one API Budget window); using %ds instead\n",
+			rc.Cfg.RefreshIntervalClampedFromSeconds, constants.APIBudgetWindowSeconds, rc.Cfg.RefreshIntervalSeconds)
+	}
 	rc.Disp.ShowInfo(fmt.Sprintf("Starting continuous monitoring (refresh every %d seconds)", rc.Cfg.RefreshIntervalSeconds))
 	rc.Disp.ShowInfo("Press Ctrl+C to stop")
 

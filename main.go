@@ -117,10 +117,35 @@ func main() {
 	// Parse command-line flags
 	flags := cli.ParseFlags()
 
+	// The cache-clearing commands are mutually exclusive; reject ambiguous
+	// combinations rather than silently running whichever is checked first.
+	clearCommands := 0
+	if flags.ClearCache {
+		clearCommands++
+	}
+	if flags.ClearCacheDate != "" {
+		clearCommands++
+	}
+	if flags.ClearAllCache {
+		clearCommands++
+	}
+	if clearCommands > 1 {
+		fmt.Fprintln(os.Stderr, "Error: --clear-cache, --clear-cache-date, and --clear-all-cache are mutually exclusive")
+		os.Exit(1)
+	}
+
 	// Handle cache management commands
 	if flags.ClearCache {
 		if err := cli.HandleClearCache(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to clear cache: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if flags.ClearCacheDate != "" {
+		if err := cli.HandleClearCacheForDate(flags.ClearCacheDate); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
 		}
 		return

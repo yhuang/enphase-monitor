@@ -58,7 +58,7 @@ A run mode activated by `--continuous` that re-fetches and re-displays today's D
 _Avoid_: Loop mode, polling mode, watch mode
 
 **Refresh Interval**:
-The user-configured number of seconds between re-fetches in Continuous Mode. Set via `refresh_interval` in `config.yaml`; defaults to 3600 (1 hour). Must be at least 60 seconds to avoid exhausting the API Budget on every tick.
+The user-configured number of seconds between re-fetches in Continuous Mode. Set via `refresh_interval` in `config.yaml`; defaults to 3600 (1 hour). Values below 60 seconds are clamped up to a 60-second floor (one API Budget window) to avoid exhausting the API Budget on every tick; the clamp is silent at load time and warns only when Continuous Mode actually starts (the only consumer of `refresh_interval`).
 _Avoid_: Polling interval, refresh rate, refresh period
 
 ## Query Modes
