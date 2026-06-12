@@ -47,6 +47,29 @@ func TestHandleClearAllCache_Success(t *testing.T) {
 	}
 }
 
+func TestHandleClearCacheForDate_ValidPastDate(t *testing.T) {
+	useTempCacheDir(t)
+	if err := HandleClearCacheForDate("2026-01-19"); err != nil {
+		t.Errorf("HandleClearCacheForDate() returned error: %v", err)
+	}
+}
+
+func TestHandleClearCacheForDate_InvalidFormat(t *testing.T) {
+	useTempCacheDir(t)
+	for _, bad := range []string{"2026-1-9", "01-19-2026", "not-a-date", ""} {
+		if err := HandleClearCacheForDate(bad); err == nil {
+			t.Errorf("HandleClearCacheForDate(%q) = nil, want error", bad)
+		}
+	}
+}
+
+func TestHandleClearCacheForDate_FutureDate(t *testing.T) {
+	useTempCacheDir(t)
+	if err := HandleClearCacheForDate("2099-12-31"); err == nil {
+		t.Error("HandleClearCacheForDate() for future date = nil, want error")
+	}
+}
+
 func TestHandleClearCache_Idempotent(t *testing.T) {
 	useTempCacheDir(t)
 	for i := 0; i < 3; i++ {

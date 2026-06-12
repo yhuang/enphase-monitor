@@ -31,13 +31,13 @@ The project follows a pragmatic approach to testing:
 | timezone | 92.0% | ✅ High - timezone handling |
 | cli | 90.5% | ✅ High - CLI interface |
 | aggregator | 78.3% | ✅ Adequate - data aggregation |
-| api | 71.8% | ✅ Adequate - HTTP client |
+| api | 77.1% | ✅ Adequate - HTTP client |
 | oauth | 69.2% | ✅ Adequate - OAuth flows |
-| cache | 66.9% | ✅ Adequate - file caching (budget counter also tested directly in api_budget_test.go) |
+| cache | 71.6% | ✅ Adequate - file caching (budget counter also tested directly in api_budget_test.go) |
 | app | 45.0% | ⚠️ Moderate - application glue (exercised end-to-end via api/preflight) |
 | main.go | 0.0% | ✅ **Acceptable** - entry point |
 
-**Overall**: 70.1% coverage (exceeds typical Go project standards of 50-60%; `app` orchestration paths are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests)
+**Overall**: 70.6% coverage (exceeds typical Go project standards of 50-60%; `app` orchestration paths are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests)
 
 ### Why main.go Has 0% Coverage
 
@@ -678,6 +678,7 @@ These files test component interactions:
 |-----------|-------|---------|
 | `validation_integration_test.go` | 7 test functions | End-to-end validation with real cached data and expected values files |
 | `client_functional_test.go` | API client tests | HTTP interactions with mock server |
+| `client_caching_test.go` | Characterization tests | Pin `makeCachedAPIRequest` fallback branches (validation/no-cache modes, 429/503/network-error → cache) via a switchable mock server with one stable cache key |
 | `client_lifetime_test.go` | Lifetime Data tests | Month, Year, and True-Up Mode queries via `_lifetime` API endpoints |
 | `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
 | `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 Query Mode × Period combinations; preflight warning on/off; exercises `RecordAPICall`/`RemainingBudget` along the way |

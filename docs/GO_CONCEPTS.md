@@ -144,7 +144,7 @@ httpClient: &http.Client{
 
 ### Pointer Receiver Method
 
-**Location**: `internal/config/config.go:135`
+**Location**: `internal/config/config.go:139`
 
 `(c *ColorConfig)` means this is a method on `ColorConfig` with a pointer receiver. We use a pointer receiver because:
 1. We modify the struct (set ANSI codes in place)
@@ -177,7 +177,7 @@ func (c *ColorConfig) convertHexFields() {
 
 ### Struct Definition
 
-**Location**: `internal/oauth/oauth.go:83-87`
+**Location**: `internal/oauth/oauth.go:84-88`
 
 Structs group related data together. This struct holds token information. Fields are exported (PascalCase) so they can be accessed from other packages.
 
@@ -257,7 +257,7 @@ rateLimitErrors = append(rateLimitErrors, sys.Name)
 
 ### Array to Slice Conversion
 
-**Location**: `internal/cache/cache.go:224-225`
+**Location**: `internal/cache/cache.go:225-226`
 
 `hash[:]` converts the `[32]byte` array to a `[]byte` slice. This is necessary because `hex.EncodeToString` expects `[]byte`, not `[32]byte`. The `[:]` syntax creates a slice that views the entire array.
 
@@ -537,7 +537,7 @@ httpClient: &http.Client{
 
 ### Time Ticker
 
-**Location**: `internal/app/runner.go:68-69`
+**Location**: `internal/app/runner.go:75-76`
 
 `time.NewTicker` creates a ticker that sends a value on its channel at regular intervals. `time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second` converts seconds to Duration. We use `defer` to ensure the ticker is stopped when the function returns.
 
@@ -579,7 +579,7 @@ When running in continuous mode, the program needs to:
 #### Step 1 & 2: Create Context with Signal Handling
 
 ```go
-// main.go:169-170
+// main.go:195-196
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
 ```
@@ -605,7 +605,7 @@ defer stop()
 #### Step 3: Create Timer Ticker
 
 ```go
-// internal/app/runner.go:68-69
+// internal/app/runner.go:75-76
 ticker := time.NewTicker(time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second)
 defer ticker.Stop()
 ```
@@ -622,7 +622,7 @@ defer ticker.Stop()
 #### Step 4: The Main Loop with Select
 
 ```go
-// internal/app/runner.go:76-89
+// internal/app/runner.go:83-94
 for {
     select {
     case <-ticker.C:
@@ -954,7 +954,7 @@ for {
 
 ### Defer Statement
 
-**Location**: `internal/app/runner.go:69`
+**Location**: `internal/app/runner.go:76`
 
 `defer` schedules a function call to execute when the surrounding function returns. This ensures cleanup happens even if the function returns early or panics. Here we ensure the ticker is stopped to prevent resource leaks.
 
@@ -968,7 +968,7 @@ defer ticker.Stop()
 
 ### Package-Level Variable
 
-**Location**: `internal/oauth/oauth.go:89`
+**Location**: `internal/oauth/oauth.go:90`
 
 Variables declared outside functions are package-level (shared across all functions). We use `*TokenCache` (pointer) so it can be `nil` (meaning "no cache yet"). This is a singleton pattern - one cache for the entire application.
 
@@ -982,7 +982,7 @@ var tokenCache *TokenCache
 
 ### Hash Functions and Array Slices
 
-**Location**: `internal/cache/cache.go:224-225`
+**Location**: `internal/cache/cache.go:225-226`
 
 `sha256.Sum256()` computes a SHA-256 hash and returns a `[32]byte` array (fixed size). We convert it to a string using hex encoding for a readable cache key.
 

@@ -281,10 +281,30 @@ type intervalMetric struct {
 }
 
 var (
-	importMetric      = intervalMetric{"energy_import_telemetry", "energy_import_lifetime", constants.FieldWhImported, parser.ParseNestedTelemetryResponse}
-	exportMetric      = intervalMetric{"energy_export_telemetry", "energy_export_lifetime", constants.FieldWhExported, parser.ParseNestedTelemetryResponse}
-	productionMetric  = intervalMetric{"telemetry/production_meter", "energy_lifetime", constants.FieldWhDel, parseProductionIntervals}
-	consumptionMetric = intervalMetric{"telemetry/consumption_meter", "consumption_lifetime", constants.FieldEnwh, parser.ParseTelemetryResponse}
+	importMetric = intervalMetric{
+		dayEndpoint:      "energy_import_telemetry",
+		lifetimeEndpoint: "energy_import_lifetime",
+		field:            constants.FieldWhImported,
+		parseDay:         parser.ParseNestedTelemetryResponse,
+	}
+	exportMetric = intervalMetric{
+		dayEndpoint:      "energy_export_telemetry",
+		lifetimeEndpoint: "energy_export_lifetime",
+		field:            constants.FieldWhExported,
+		parseDay:         parser.ParseNestedTelemetryResponse,
+	}
+	productionMetric = intervalMetric{
+		dayEndpoint:      "telemetry/production_meter",
+		lifetimeEndpoint: "energy_lifetime",
+		field:            constants.FieldWhDel,
+		parseDay:         parseProductionIntervals,
+	}
+	consumptionMetric = intervalMetric{
+		dayEndpoint:      "telemetry/consumption_meter",
+		lifetimeEndpoint: "consumption_lifetime",
+		field:            constants.FieldEnwh,
+		parseDay:         parser.ParseTelemetryResponse,
+	}
 )
 
 // parseProductionIntervals parses the production_meter response, which has appeared in
@@ -393,7 +413,7 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	}
 
 	// Extract SOC from last_reported_aggregate_soc field (format: "97%" as string)
-	socPercent := 0
+	var socPercent int
 	if data.LastReportedAggregateSOC != "" {
 		// Parse string like "97%" to integer 97
 		socStr := strings.TrimSuffix(data.LastReportedAggregateSOC, constants.BatterySOCPercentSuffix)
@@ -730,163 +750,215 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 //   - bool: true if cache was used, false if fresh API call
 //   - error: Any error encountered
 func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url string, targetDate time.Time, queryMode constants.QueryMode) (*http.Response, bool, error) {
-	// ─────────────────────────────────────────────────────────────────────────
-	// SECTION 1: INITIALIZATION
-	// Determine if we are querying a Past Period (affects caching strategy).
-	// IsPastPeriod is granularity-aware (not a naive "date before today" check) so that
-	// Month and Year Mode queries for the Current Period are NOT treated as past — e.g. a
-	// month query with testDate=2026-03-01 is the current month, not a Past Period, even
-	// though March 1 is before today.
-	// ─────────────────────────────────────────────────────────────────────────
+	// Load any existing cached response for this URL. It is used either directly
+	// (Past Period / validation mode / budget exhausted) or as a fallback when a
+	// live call fails. IsPastPeriod is granularity-aware, so a current-month or
+	// current-year query is not treated as past even though its start date is
+	// before today; that flag only gates the past-date cache rescan below, which
+	// recovers a hit when URL normalization differs from the original query.
 	isDateInPast := timezone.IsPastPeriod(targetDate, queryMode, c.timezone)
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// SECTION 2: CACHE LOOKUP
-	// First, try to load any existing cached response for this URL.
-	// We will use this either directly (if valid) or as fallback (if API fails).
-	// ─────────────────────────────────────────────────────────────────────────
 	cached, cacheErr := cache.LoadCachedResponse(url, c.timezone)
 	if cacheErr != nil && isDateInPast && !targetDate.IsZero() {
 		if found, ok := c.tryLoadPastDateCache(url, targetDate); ok {
-			cached = found
-			cacheErr = nil
+			cached, cacheErr = found, nil
 		}
 	}
+	fb := cacheFallback{c: c, url: url, cached: cached, cacheErr: cacheErr}
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// SECTION 3: VALIDATION MODE HANDLING
-	// In Validation Mode, ONLY use cache - never make live API calls.
-	// This allows validating behavior without hitting the real API.
-	// ─────────────────────────────────────────────────────────────────────────
-	if cache.ValidationMode() {
-		if cacheErr == nil {
-			resp := cached.ToHTTPResponse()
-			return resp, true, nil // Cache was used (Validation Mode)
-		}
-		// In Validation Mode, provide more detailed error about missing cache
-		cachePath := cache.GetCachePath(url, c.timezone)
-		normalizedURL := cache.NormalizeURLForCache(url, c.timezone)
-		return nil, false, fmt.Errorf("validation mode: no cached response available; cache path: %s, normalized URL: %s", cachePath, cache.RedactURLKey(normalizedURL))
+	switch {
+	case cache.ValidationMode():
+		return c.serveValidationMode(fb)
+	case cache.CacheDisabled():
+		return c.requestNoCacheMode(ctx, fb)
+	case fb.has() && c.cacheMaxAge(targetDate, queryMode) == 0:
+		// Past Period: the data is immutable (maxAge == 0 is the "never expires"
+		// sentinel from cacheMaxAge), so serving cache avoids a live call that
+		// would waste budget and return identical results.
+		cache.Debugf("serving cache (Past Period, age %s): %s", time.Since(fb.cached.CachedAt).Round(time.Second), cache.RedactURLKey(url))
+		return fb.serve()
+	case budgetExhausted():
+		// Current period, no budget left: cache is the fallback, not the default.
+		return c.serveBudgetExhausted(fb)
+	default:
+		// Current period with budget available: prefer a live call — data changes
+		// throughout the day — with cache as the failure fallback.
+		return c.requestLiveMode(ctx, fb)
 	}
+}
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// SECTION 4: LIVE CACHE MODE HANDLING (--no-cache)
-	// When cache is disabled, skip cache lookup and always make live API calls.
-	// Note: We still fall back to cache on 429 errors as a safety measure.
-	// ─────────────────────────────────────────────────────────────────────────
-	if cache.CacheDisabled() {
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to create request: %w", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.accessToken))
-		req.Header.Set("Accept", "application/json")
+// cacheFallback bundles the cache entry loaded for a request (if any) with the
+// request URL, so the various failure paths can serve or re-find it without
+// re-threading these values through every helper.
+type cacheFallback struct {
+	c        *EnlightenCloudClient
+	url      string
+	cached   *cache.CachedResponse // valid only when cacheErr == nil
+	cacheErr error
+}
 
-		resp, err := c.httpClient.Do(req)
-		if err != nil && cacheErr != nil {
-			return nil, false, fmt.Errorf("API request failed: %w", err)
-		}
-		if err != nil {
-			maybeShowNoCacheFallbackWarning("API error")
-			return cached.ToHTTPResponse(), true, nil
-		}
+// has reports whether a usable cache entry was loaded for this request.
+func (f cacheFallback) has() bool { return f.cacheErr == nil }
 
-		if resp.StatusCode == http.StatusTooManyRequests && cacheErr != nil {
-			resp.Body.Close()
-			return nil, false, errors.New(constants.RateLimitError)
-		}
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			maybeShowNoCacheFallbackWarning("Rate limited (429)")
-			return cached.ToHTTPResponse(), true, nil
-		}
-		if resp.StatusCode == http.StatusServiceUnavailable && cacheErr != nil {
-			resp.Body.Close()
-			return nil, false, errors.New("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
-		}
-		if resp.StatusCode == http.StatusServiceUnavailable {
-			resp.Body.Close()
-			maybeShowNoCacheFallbackWarning("Service unavailable (503)")
-			return cached.ToHTTPResponse(), true, nil
-		}
-		cache.RecordAPICall()
+// serve returns the loaded cache entry as an HTTP response, flagged as a cache
+// hit. Only valid when has() is true.
+func (f cacheFallback) serve() (*http.Response, bool, error) {
+	return f.cached.ToHTTPResponse(), true, nil
+}
 
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			resp.Body.Close()
-			return nil, false, fmt.Errorf("failed to read response: %w", err)
-		}
-		resp.Body.Close()
-		tempResp := &http.Response{StatusCode: resp.StatusCode, Header: resp.Header}
-		// Save to cache (ignore errors - caching is best effort)
-		_ = cache.SaveCachedResponseFromBytes(url, tempResp, bodyBytes, c.timezone)
-		return &http.Response{
-			StatusCode: resp.StatusCode,
-			Header:     resp.Header,
-			Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
-		}, false, nil
+// reload re-reads the cache from disk for this URL, covering the case where the
+// initial load missed but an entry exists now. Returns (entry, true) on a hit.
+func (f cacheFallback) reload() (*cache.CachedResponse, bool) {
+	if retry, err := cache.LoadCachedResponse(f.url, f.c.timezone); err == nil {
+		return retry, true
 	}
+	return nil, false
+}
 
-	// isPast is true for Past Periods whose data is immutable (closed Day, Month, Year, or True-Up).
-	// maxAge == 0 is the sentinel for "never expires" returned by cacheMaxAge for Past Periods.
-	isPast := c.cacheMaxAge(targetDate, queryMode) == 0
+// crossDate returns the most recent cache entry for the same endpoint+system as
+// this URL, regardless of date or age — the last-resort fallback when no
+// exact-URL cache exists. Returns (resp, true) on a hit.
+func (f cacheFallback) crossDate() (*http.Response, bool) {
+	return serveRecentEndpointCache(f.url, 0)
+}
 
-	// Past periods: always serve from cache — the data will never change, so a
-	// live call would waste budget and return identical results.
-	if cacheErr == nil && isPast {
-		cache.Debugf("serving cache (Past Period, age %s): %s", time.Since(cached.CachedAt).Round(time.Second), cache.RedactURLKey(url))
-		return cached.ToHTTPResponse(), true, nil
-	}
-
-	// Current periods (today / current month / current year / current true-up year):
-	// prefer a live API call when budget allows — data changes throughout the day.
-	// Cache is the fallback when budget is exhausted, not the default.
-	if budgetExhausted() {
-		cache.Debugf("budget exhausted (%d/%d), falling back to cache: %s", cache.RemainingBudget(), cache.MaxRequestsPerWindow, cache.RedactURLKey(url))
-		if cacheErr == nil {
-			cache.Debugf("serving cache (budget exhausted, age %s)", time.Since(cached.CachedAt).Round(time.Second))
-			return cached.ToHTTPResponse(), true, nil
-		}
-		if recent, ok := serveRecentEndpointCache(url, 0); ok {
-			cache.Debugf("cross-date cache hit (budget exhausted, any age)")
-			return recent, true, nil
-		}
-		cache.Debugf("budget exhausted, no cache available — returning RateLimitError")
-		return nil, false, errors.New(constants.RateLimitError)
-	}
-
-	// Make the API request
-	cache.Debugf("live API call (budget %d/%d): %s", cache.RemainingBudget(), cache.MaxRequestsPerWindow, cache.RedactURLKey(url))
+// newAPIRequest builds an authenticated GET request for url. A build failure is
+// fatal (callers never fall back to cache on it), matching the original behavior.
+func (c *EnlightenCloudClient) newAPIRequest(ctx context.Context, url string) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.accessToken))
+	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 	req.Header.Set("Accept", "application/json")
+	return req, nil
+}
+
+// finalizeAndCache reads resp's body, saves it to cache (best effort), and
+// returns a fresh response carrying a readable copy of that body. It consumes
+// and closes resp.Body. The returned bool is always false: this is the
+// fresh-API-call path, so the cache was not used. (SaveCachedResponseFromBytes
+// reads only the status code and headers from the temp response, not its body.)
+func (c *EnlightenCloudClient) finalizeAndCache(url string, resp *http.Response) (*http.Response, bool, error) {
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		resp.Body.Close()
+		return nil, false, fmt.Errorf("failed to read response: %w", err)
+	}
+	resp.Body.Close()
+
+	tempResp := &http.Response{StatusCode: resp.StatusCode, Header: resp.Header}
+	_ = cache.SaveCachedResponseFromBytes(url, tempResp, bodyBytes, c.timezone)
+
+	return &http.Response{
+		StatusCode: resp.StatusCode,
+		Header:     resp.Header,
+		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
+	}, false, nil
+}
+
+// serveValidationMode handles validation mode: only cache is used, never a live
+// call. Returns the cache entry, or a detailed error when none is available.
+func (c *EnlightenCloudClient) serveValidationMode(fb cacheFallback) (*http.Response, bool, error) {
+	if fb.has() {
+		return fb.serve() // Cache was used (Validation Mode)
+	}
+	// Provide a detailed error about the missing cache to aid debugging.
+	cachePath := cache.GetCachePath(fb.url, c.timezone)
+	normalizedURL := cache.NormalizeURLForCache(fb.url, c.timezone)
+	return nil, false, fmt.Errorf("validation mode: no cached response available; cache path: %s, normalized URL: %s", cachePath, cache.RedactURLKey(normalizedURL))
+}
+
+// errServiceUnavailable is returned when Enphase responds 503 and there is no
+// cached data to fall back on.
+var errServiceUnavailable = errors.New("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
+
+// requestNoCacheMode handles --no-cache: always make a live call, but still fall
+// back to (and populate) the cache on transport errors, 429, and 503 as a safety
+// measure. Any other status is returned as-is after caching.
+func (c *EnlightenCloudClient) requestNoCacheMode(ctx context.Context, fb cacheFallback) (*http.Response, bool, error) {
+	req, err := c.newAPIRequest(ctx, fb.url)
+	if err != nil {
+		return nil, false, err
+	}
 
 	resp, err := c.httpClient.Do(req)
-	if err != nil && cacheErr != nil {
-		return nil, false, fmt.Errorf("API request failed: %w", err)
-	}
 	if err != nil {
-		return cached.ToHTTPResponse(), true, nil // Cache was used (error fallback)
+		if !fb.has() {
+			return nil, false, fmt.Errorf("API request failed: %w", err)
+		}
+		maybeShowNoCacheFallbackWarning("API error")
+		return fb.serve()
 	}
 
-	// Handle rate limit (429)
 	if resp.StatusCode == http.StatusTooManyRequests {
 		resp.Body.Close()
-		cache.Debugf("server returned 429: %s", cache.RedactURLKey(url))
-		if cacheErr == nil {
-			cache.Debugf("429 fallback: serving existing cache (age %s)", time.Since(cached.CachedAt).Round(time.Second))
-			return cached.ToHTTPResponse(), true, nil // Cache was used (429 fallback)
+		if !fb.has() {
+			return nil, false, errors.New(constants.RateLimitError)
 		}
-		// Try one more time to load cache
-		if retryCached, retryErr := cache.LoadCachedResponse(url, c.timezone); retryErr == nil {
-			cache.Debugf("429 fallback: serving reloaded cache (age %s)", time.Since(retryCached.CachedAt).Round(time.Second))
-			return retryCached.ToHTTPResponse(), true, nil // Cache was used (429 retry)
+		maybeShowNoCacheFallbackWarning("Rate limited (429)")
+		return fb.serve()
+	}
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		resp.Body.Close()
+		if !fb.has() {
+			return nil, false, errServiceUnavailable
 		}
-		// Last resort: find any cached response for the same endpoint+system, regardless of age
-		if recent, ok := serveRecentEndpointCache(url, 0); ok {
+		maybeShowNoCacheFallbackWarning("Service unavailable (503)")
+		return fb.serve()
+	}
+
+	cache.RecordAPICall()
+	return c.finalizeAndCache(fb.url, resp)
+}
+
+// serveBudgetExhausted handles current-period queries when the API Budget is
+// spent: serve the exact-URL cache, else any same-endpoint cache, else fail.
+func (c *EnlightenCloudClient) serveBudgetExhausted(fb cacheFallback) (*http.Response, bool, error) {
+	cache.Debugf("budget exhausted (%d/%d), falling back to cache: %s", cache.RemainingBudget(), cache.MaxRequestsPerWindow, cache.RedactURLKey(fb.url))
+	if fb.has() {
+		cache.Debugf("serving cache (budget exhausted, age %s)", time.Since(fb.cached.CachedAt).Round(time.Second))
+		return fb.serve()
+	}
+	if recent, ok := fb.crossDate(); ok {
+		cache.Debugf("cross-date cache hit (budget exhausted, any age)")
+		return recent, true, nil
+	}
+	cache.Debugf("budget exhausted, no cache available — returning RateLimitError")
+	return nil, false, errors.New(constants.RateLimitError)
+}
+
+// requestLiveMode handles the normal current-period path: make a live call with
+// budget available, falling back to cache on transport errors, 429, 503, and
+// other non-OK statuses. On success the response is cached and returned fresh.
+func (c *EnlightenCloudClient) requestLiveMode(ctx context.Context, fb cacheFallback) (*http.Response, bool, error) {
+	cache.Debugf("live API call (budget %d/%d): %s", cache.RemainingBudget(), cache.MaxRequestsPerWindow, cache.RedactURLKey(fb.url))
+	req, err := c.newAPIRequest(ctx, fb.url)
+	if err != nil {
+		return nil, false, err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		if !fb.has() {
+			return nil, false, fmt.Errorf("API request failed: %w", err)
+		}
+		return fb.serve() // Cache was used (error fallback)
+	}
+
+	// Handle rate limit (429): serve existing cache, then a reload, then any
+	// same-endpoint cache, before giving up with a rate-limit error.
+	if resp.StatusCode == http.StatusTooManyRequests {
+		resp.Body.Close()
+		cache.Debugf("server returned 429: %s", cache.RedactURLKey(fb.url))
+		if fb.has() {
+			cache.Debugf("429 fallback: serving existing cache (age %s)", time.Since(fb.cached.CachedAt).Round(time.Second))
+			return fb.serve() // Cache was used (429 fallback)
+		}
+		if retry, ok := fb.reload(); ok {
+			cache.Debugf("429 fallback: serving reloaded cache (age %s)", time.Since(retry.CachedAt).Round(time.Second))
+			return retry.ToHTTPResponse(), true, nil // Cache was used (429 retry)
+		}
+		if recent, ok := fb.crossDate(); ok {
 			cache.Debugf("429 fallback: serving cross-date cache (any age)")
 			return recent, true, nil // Cache was used (429 cross-date fallback)
 		}
@@ -897,13 +969,13 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// Handle 503 Service Unavailable - Enphase server temporarily down, use cache if available (even stale)
 	if resp.StatusCode == http.StatusServiceUnavailable {
 		resp.Body.Close()
-		if cacheErr == nil {
-			return cached.ToHTTPResponse(), true, nil // Cache was used (503 fallback)
+		if fb.has() {
+			return fb.serve() // Cache was used (503 fallback)
 		}
-		if retryCached, retryErr := cache.LoadCachedResponse(url, c.timezone); retryErr == nil {
-			return retryCached.ToHTTPResponse(), true, nil // Cache was used (503 retry)
+		if retry, ok := fb.reload(); ok {
+			return retry.ToHTTPResponse(), true, nil // Cache was used (503 retry)
 		}
-		return nil, false, errors.New("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
+		return nil, false, errServiceUnavailable
 	}
 	cache.RecordAPICall()
 	cache.Debugf("live API call succeeded (budget now %d/%d)", cache.RemainingBudget(), cache.MaxRequestsPerWindow)
@@ -912,41 +984,19 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	// when available, otherwise surface the error. Age is not gated here —
 	// when the API itself is failing, any cache we have is better than
 	// nothing, and the per-query-mode freshness policy was already applied
-	// at the top of this function before we attempted the live call.
+	// before we attempted the live call.
 	if resp.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
 			return nil, false, fmt.Errorf("API request failed with status %d: failed to read body: %w", resp.StatusCode, err)
 		}
-		if cacheErr == nil {
-			return cached.ToHTTPResponse(), true, nil
+		if fb.has() {
+			return fb.serve()
 		}
 		return nil, false, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	// API call succeeded
-
-	// Read the response body before caching
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		resp.Body.Close()
-		return nil, false, fmt.Errorf("failed to read response: %w", err)
-	}
-	resp.Body.Close()
-
-	// Save to cache (ignore errors - caching is best effort)
-	tempResp := &http.Response{
-		StatusCode: resp.StatusCode,
-		Header:     resp.Header,
-		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
-	}
-	_ = cache.SaveCachedResponseFromBytes(url, tempResp, bodyBytes, c.timezone)
-
-	// Return response with readable body
-	return &http.Response{
-		StatusCode: resp.StatusCode,
-		Header:     resp.Header,
-		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
-	}, false, nil // Cache was NOT used (fresh API call)
+	return c.finalizeAndCache(fb.url, resp)
 }

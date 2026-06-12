@@ -14,7 +14,7 @@
 // The caching system:
 //   - Stores API responses on disk for reuse
 //   - Supports Validation Mode (--test flag) and Cached Mode (--cache flag)
-//   - Exposes inspection and clear-cache helpers (cli.go) used by --clear-cache and --clear-all-cache
+//   - Exposes inspection and clear-cache helpers (cli.go) used by --clear-cache, --clear-cache-date, and --clear-all-cache
 //   - Handles past date queries with cache fallback
 //   - Normalizes URLs for consistent cache keys (timestamps → dates)
 //   - Tags each cache entry with its endpoint + system ID so the API client can
@@ -523,31 +523,29 @@ func SaveCachedResponseFromBytes(url string, resp *http.Response, bodyBytes []by
 	return nil
 }
 
-// HasCacheForDate checks if any cached responses exist for the specified date.
-// Returns true if at least one cache file exists with a matching queried_date.
-// This is used to validate that --test mode has data available before running.
-func HasCacheForDate(targetDate string) (bool, error) {
-	cacheDir := getCacheDir()
-
-	// Check if cache directory exists
-	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
-		return false, nil
+// forEachCacheEntry invokes fn for every parseable JSON cache file in the cache
+// directory, passing the file path and decoded response. Files that cannot be
+// read or unmarshalled are skipped silently. fn returns false to stop iteration
+// early. A missing cache directory is treated as empty (no error); only a
+// failure to read an existing directory is returned as an error.
+func forEachCacheEntry(fn func(path string, cached *CachedResponse) bool) error {
+	dir := getCacheDir()
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil
 	}
 
-	// Read all files in cache directory
-	entries, err := os.ReadDir(cacheDir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return false, fmt.Errorf("failed to read cache directory: %w", err)
+		return fmt.Errorf("failed to read cache directory: %w", err)
 	}
 
-	// Check each JSON file for matching queried_date
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), constants.JSONExtension) {
 			continue
 		}
 
-		filePath := filepath.Join(cacheDir, entry.Name())
-		data, err := os.ReadFile(filePath)
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
 		if err != nil {
 			continue // Skip files we can't read
 		}
@@ -557,12 +555,27 @@ func HasCacheForDate(targetDate string) (bool, error) {
 			continue // Skip files we can't parse
 		}
 
-		if cached.QueriedDate == targetDate {
-			return true, nil
+		if !fn(path, &cached) {
+			break
 		}
 	}
 
-	return false, nil
+	return nil
+}
+
+// HasCacheForDate checks if any cached responses exist for the specified date.
+// Returns true if at least one cache file exists with a matching queried_date.
+// This is used to validate that --test mode has data available before running.
+func HasCacheForDate(targetDate string) (bool, error) {
+	var found bool
+	err := forEachCacheEntry(func(_ string, cached *CachedResponse) bool {
+		if cached.QueriedDate == targetDate {
+			found = true
+			return false // stop on first match
+		}
+		return true
+	})
+	return found, err
 }
 
 // GetCacheDir returns the cache directory path for external use (e.g., error messages).

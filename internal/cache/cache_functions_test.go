@@ -64,6 +64,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -429,4 +430,114 @@ func TestHasCacheForDate(t *testing.T) {
 			t.Error("HasCacheForDate() should return false for date with no cache")
 		}
 	})
+}
+
+func TestClearCacheForDate(t *testing.T) {
+	useTempCacheDir(t)
+	tz := time.UTC
+	resp := &http.Response{StatusCode: 200, Header: http.Header{}}
+
+	// start_at=1768809600 -> 2026-01-19, start_at=1768896000 -> 2026-01-20
+	jan19 := "https://api.example.com/a?key=k&start_at=1768809600"
+	jan20 := "https://api.example.com/b?key=k&start_at=1768896000"
+	for _, u := range []string{jan19, jan20} {
+		if err := SaveCachedResponseFromBytes(u, resp, []byte(`{}`), tz); err != nil {
+			t.Fatalf("SaveCachedResponseFromBytes() error = %v", err)
+		}
+	}
+
+	if err := ClearCacheForDate("2026-01-19"); err != nil {
+		t.Fatalf("ClearCacheForDate() error = %v", err)
+	}
+
+	// The cleared date should be gone; the untouched date should remain.
+	if has, _ := HasCacheForDate("2026-01-19"); has {
+		t.Error("expected cache for 2026-01-19 to be cleared")
+	}
+	if has, _ := HasCacheForDate("2026-01-20"); !has {
+		t.Error("expected cache for 2026-01-20 to be preserved")
+	}
+}
+
+func TestClearCacheForDate_NoMatch(t *testing.T) {
+	useTempCacheDir(t)
+	// No cache files exist for this date; should not error.
+	if err := ClearCacheForDate("2026-01-19"); err != nil {
+		t.Errorf("ClearCacheForDate() error = %v", err)
+	}
+}
+
+func TestClearCacheForDate_EmptyDate(t *testing.T) {
+	useTempCacheDir(t)
+	if err := ClearCacheForDate(""); err == nil {
+		t.Error("ClearCacheForDate(\"\") = nil, want error for empty date")
+	}
+}
+
+// TestClearCacheForDate_AggregateSemantics documents that matching is on the
+// exact queried_date: clearing a mid-period day leaves an aggregate that starts
+// on a different day intact, while clearing the aggregate's start day removes it.
+func TestClearCacheForDate_AggregateSemantics(t *testing.T) {
+	useTempCacheDir(t)
+	tz := time.UTC
+	resp := &http.Response{StatusCode: 200, Header: http.Header{}}
+
+	// A month aggregate caches under the period's first day (start_date); a day
+	// query caches under its exact date.
+	monthAgg := "https://api.example.com/energy_lifetime?key=k&start_date=2026-03-01"
+	midMonthDay := "https://api.example.com/telemetry?key=k&start_date=2026-03-15"
+	for _, u := range []string{monthAgg, midMonthDay} {
+		if err := SaveCachedResponseFromBytes(u, resp, []byte(`{}`), tz); err != nil {
+			t.Fatalf("SaveCachedResponseFromBytes() error = %v", err)
+		}
+	}
+
+	// Clearing a mid-period day must NOT remove the month aggregate.
+	if err := ClearCacheForDate("2026-03-15"); err != nil {
+		t.Fatalf("ClearCacheForDate() error = %v", err)
+	}
+	if has, _ := HasCacheForDate("2026-03-15"); has {
+		t.Error("expected day cache for 2026-03-15 to be cleared")
+	}
+	if has, _ := HasCacheForDate("2026-03-01"); !has {
+		t.Error("month aggregate (2026-03-01) should survive clearing a mid-period day")
+	}
+
+	// Clearing the aggregate's start day removes it.
+	if err := ClearCacheForDate("2026-03-01"); err != nil {
+		t.Fatalf("ClearCacheForDate() error = %v", err)
+	}
+	if has, _ := HasCacheForDate("2026-03-01"); has {
+		t.Error("expected month aggregate (2026-03-01) to be cleared")
+	}
+}
+
+// TestClearCacheForDate_RemoveFailureReturnsError verifies that a matched file
+// which cannot be deleted surfaces an error rather than reporting success.
+func TestClearCacheForDate_RemoveFailureReturnsError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod-based permission test is not meaningful on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory write permissions")
+	}
+	useTempCacheDir(t)
+	tz := time.UTC
+	resp := &http.Response{StatusCode: 200, Header: http.Header{}}
+	if err := SaveCachedResponseFromBytes("https://api.example.com/a?key=k&start_date=2026-01-19", resp, []byte(`{}`), tz); err != nil {
+		t.Fatalf("SaveCachedResponseFromBytes() error = %v", err)
+	}
+
+	cacheDir := getCacheDir()
+	// Read-only directory: entries can still be listed and read, but files
+	// inside cannot be removed.
+	if err := os.Chmod(cacheDir, 0o500); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	// Restore writability before t.TempDir's own cleanup runs.
+	t.Cleanup(func() { _ = os.Chmod(cacheDir, 0o700) })
+
+	if err := ClearCacheForDate("2026-01-19"); err == nil {
+		t.Error("ClearCacheForDate() = nil, want error when a matching file cannot be removed")
+	}
 }

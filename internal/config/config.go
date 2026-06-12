@@ -37,7 +37,9 @@
 //   - Ensures all required API fields are present
 //   - Validates each system has a name and ID
 //   - Checks refresh_interval is positive and clamps values below the API Budget
-//     window (60s) up to that floor, since faster refreshes exhaust the budget
+//     window (60s) up to that floor, since faster refreshes exhaust the budget;
+//     the pre-clamp value is recorded in RefreshIntervalClampedFromSeconds so
+//     Continuous Mode can warn (the only place refresh_interval is used)
 //   - Trims whitespace from refresh_token (common copy/paste issue)
 //   - Sets default refresh_interval to 3600 (1 hour) if not specified
 //
@@ -169,6 +171,13 @@ type Config struct {
 	RefreshIntervalSeconds int            `yaml:"refresh_interval"`   // How often to query API (seconds)
 	Colors                 *ColorConfig   `yaml:"colors,omitempty"`   // Color customization
 	Timezone               string         `yaml:"timezone,omitempty"` // Timezone for reporting/display (e.g., "US/Pacific"). If not set, uses system timezone.
+
+	// RefreshIntervalClampedFromSeconds records the originally-requested
+	// refresh_interval when it was clamped up to the API Budget window floor; it
+	// is zero when no clamp occurred. The floor only affects Continuous Mode, so
+	// the warning is emitted there (see app.RunContinuous) rather than on every
+	// invocation.
+	RefreshIntervalClampedFromSeconds int `yaml:"-"`
 }
 
 // LoadConfig reads and parses the configuration file.
@@ -208,9 +217,10 @@ func LoadConfig(filename string) (*Config, error) {
 	} else if config.RefreshIntervalSeconds < constants.APIBudgetWindowSeconds {
 		// Enforce the documented floor: refreshing faster than one API Budget window
 		// would exhaust the budget on every Continuous Mode tick and trigger 429s.
-		// Clamp up to the window length and warn (to stderr, so reports stay clean).
-		fmt.Fprintf(os.Stderr, "WARNING: refresh_interval of %ds is below the %ds minimum (one API Budget window); using %ds instead\n",
-			config.RefreshIntervalSeconds, constants.APIBudgetWindowSeconds, constants.APIBudgetWindowSeconds)
+		// Clamp up to the window length silently here; the warning is deferred to
+		// Continuous Mode, the only consumer of refresh_interval, so one-off runs
+		// keep clean output.
+		config.RefreshIntervalClampedFromSeconds = config.RefreshIntervalSeconds
 		config.RefreshIntervalSeconds = constants.APIBudgetWindowSeconds
 	}
 

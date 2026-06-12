@@ -145,7 +145,7 @@ Each system requires:
 - `refresh_interval`: How often to query the API in continuous mode (default: 3600 seconds = 1 hour)
   - **⚠️ Important**: Only applies when running in continuous mode (with `--continuous` flag)
   - **Recommended**: Use 3600 seconds (1 hour) to stay within the API Budget
-  - **API Budget Consideration**: The API Budget is 10 calls per minute. With multiple systems, a low `refresh_interval` (e.g., 5 seconds) can quickly exhaust it. For 2 systems that is 10 API calls per cycle (2 systems × 5 metrics). At `refresh_interval: 5`, that is 10 × 12 = 120 requests per minute, far above the budget.
+  - **API Budget Consideration**: The API Budget is 10 calls per minute. For 2 systems that is 10 API calls per cycle (2 systems × 5 metrics) — exactly the limit. Values below 60 seconds are automatically clamped up to a 60-second floor (one API Budget window), so a configured `refresh_interval: 5` actually runs at 60 seconds; in continuous mode a warning is printed when this clamping happens. This prevents a low value from exhausting the budget on every tick.
   - **Best Practice**: Use 3600 seconds (1 hour) or higher to stay well within the API Budget
 - `timezone`: Timezone for reporting and display (optional)
   - **Default**: Uses your OS system timezone, or US/Pacific if OS timezone is UTC
@@ -327,6 +327,7 @@ Serves the report entirely from cache (no live API calls) and compares each metr
 - `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429)
 - `--cache` - Serve report from cache only; print diagnostic listing missing endpoints if cache is incomplete
 - `--clear-cache` - Clear cached API responses for today's date only
+- `--clear-cache-date YYYY-MM-DD` - Clear cached API responses for a specific past date (matches the query start date exactly)
 - `--clear-all-cache` - Clear all cached API responses (all dates)
 - `--debug` - Print debug information: last run time, API budget remaining, and per-request cache/live decisions
 
@@ -544,8 +545,8 @@ The `refresh_interval` setting controls how often the application queries the AP
 
 - **Recommended**: `refresh_interval: 3600` (1 hour)
 - **Why**: Each today's Day Mode query fetches 5 metrics per System (Production, Consumption, Grid Import, Grid Export, battery). With 2 Systems that is exactly 10 requests per cycle — right at the limit. At 3600 seconds, that is ~10 requests per hour, well within limits. (Past Period Day, Month, Year, and True-Up Mode queries omit battery and use 4 calls per System.)
-- **Not Recommended**: Values below 60 seconds (e.g., `refresh_interval: 5`) can quickly exceed the 10 requests/minute limit, especially with multiple systems.
-- **Calculation**: If you have N Systems, each today's Day Mode query makes N×5 requests. With 2 Systems that is 10/cycle. At `refresh_interval: 5`, that is 10×12 = 120 requests per minute, far above the limit.
+- **Enforced floor**: Values below 60 seconds (e.g., `refresh_interval: 5`) are automatically clamped up to 60 seconds — one API Budget window — so they cannot exhaust the budget on every tick. In continuous mode a warning is printed when this clamping happens.
+- **Calculation**: If you have N Systems, each today's Day Mode query makes N×5 requests. With 2 Systems that is 10/cycle — at the clamped 60-second floor, that is 10 requests/minute, exactly the limit. (Without the floor, `refresh_interval: 5` would have attempted 10×12 = 120 requests/minute.)
 
 ### Caching Strategy
 
@@ -597,6 +598,9 @@ The cache directory also contains an `api_calls` file (no JSON extension) holdin
 ```bash
 # Clear today's cache only (preserves data for past dates)
 ./enphase-monitor --clear-cache
+
+# Clear cache for a specific past date (forces a re-fetch of that day)
+./enphase-monitor --clear-cache-date 2026-01-19
 
 # Clear all cached data
 ./enphase-monitor --clear-all-cache
@@ -710,6 +714,7 @@ enphase-monitor/
 │   │   ├── types.go                       # API request/response types
 │   │   ├── cache_check.go                 # Per-system/endpoint cache availability check (--cache mode)
 │   │   ├── client_test.go                 # API client unit tests
+│   │   ├── client_caching_test.go         # Characterization tests for makeCachedAPIRequest fallback branches (validation/no-cache modes, 429/503/network-error cache fallbacks)
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
 │   │   ├── client_lifetime_test.go        # Lifetime Data tests (Month, Year, True-Up Mode queries)
 │   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 Query Mode × Period combinations)
@@ -792,7 +797,7 @@ enphase-monitor/
 
 ## Testing
 
-The project includes a comprehensive test suite with **70.1% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
+The project includes a comprehensive test suite with **70.6% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
 
 ### Test Coverage by Package
 
@@ -807,12 +812,12 @@ The project includes a comprehensive test suite with **70.1% code coverage** acr
 | timezone | 92.0% | ✅ |
 | cli | 90.5% | ✅ |
 | aggregator | 78.3% | ✅ |
-| api | 71.8% | ✅ |
+| api | 77.1% | ✅ |
 | oauth | 69.2% | ✅ |
-| cache | 66.9% | ✅ |
+| cache | 71.6% | ✅ |
 | app | 45.0% | ⚠️ |
 
-**Total: 70.1% coverage** (exceeds typical Go project standards of 50-60%; `app` covers orchestration glue that is exercised more thoroughly via the api-package integration tests)
+**Total: 70.6% coverage** (exceeds typical Go project standards of 50-60%; `app` covers orchestration glue that is exercised more thoroughly via the api-package integration tests)
 
 ### Running Tests
 
@@ -975,8 +980,8 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 
 This project follows Go best practices and coding standards:
 
-- **Test Coverage**: 70.1% overall, 100% for urlbuilder and constants, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and config
-- **Test Suite**: 29 test files across 13 tested packages with comprehensive unit, integration, and edge case tests
+- **Test Coverage**: 70.6% overall, 100% for urlbuilder and constants, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and config
+- **Test Suite**: 30 test files across 13 tested packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -988,7 +993,7 @@ This project follows Go best practices and coding standards:
 - Total Lines: ~5,500 (excluding tests)
 - Test Lines: ~9,300 (comprehensive test suite)
 - Packages: 14 internal packages (13 with tests; `types` is a pure type-definition package)
-- Test Files: 29 (unit, integration, functional, edge case, and benchmark tests)
+- Test Files: 30 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)
 
 ## License

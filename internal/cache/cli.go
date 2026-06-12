@@ -1,5 +1,5 @@
-// cli.go implements cache management commands (--clear-cache, --clear-all-cache) and
-// cache entry listing used by the --cache diagnostic path.
+// cli.go implements cache management commands (--clear-cache, --clear-cache-date,
+// --clear-all-cache) and cache entry listing used by the --cache diagnostic path.
 package cache
 
 import (
@@ -99,6 +99,54 @@ func ClearTodayCache() error {
 		fmt.Printf("Found %d cache file(s) from other dates (preserved)\n", skippedCount)
 	}
 
+	return nil
+}
+
+// ClearCacheForDate clears cache files whose queried_date exactly matches the
+// given date (YYYY-MM-DD). Unlike ClearTodayCache, it identifies entries by the
+// date the data was queried for rather than when the file was cached, so it can
+// target a specific past date regardless of when its cache was written.
+//
+// Matching is on the exact queried_date, which is the query's start date. Day
+// queries store that day; Month / Year / True-Up aggregates store the period's
+// first day (e.g. a March monthly total is "2026-03-01"). Consequently clearing
+// a mid-period day does not invalidate an aggregate that spans it, and clearing
+// a period's first day also removes that aggregate's cache. It returns an error
+// if any matching file could not be deleted.
+func ClearCacheForDate(targetDate string) error {
+	if targetDate == "" {
+		return fmt.Errorf("targetDate must not be empty")
+	}
+
+	var matched, deleted int
+	var firstRemoveErr error
+	err := forEachCacheEntry(func(path string, cached *CachedResponse) bool {
+		if cached.QueriedDate != targetDate {
+			return true
+		}
+		matched++
+		if rmErr := os.Remove(path); rmErr != nil {
+			if firstRemoveErr == nil {
+				firstRemoveErr = rmErr
+			}
+			return true
+		}
+		deleted++
+		return true
+	})
+	if err != nil {
+		return err
+	}
+
+	if matched == 0 {
+		fmt.Printf("No cache files found for %s\n", targetDate)
+		return nil
+	}
+	if deleted < matched {
+		return fmt.Errorf("cleared %d of %d matching cache file(s); %d could not be deleted: %w",
+			deleted, matched, matched-deleted, firstRemoveErr)
+	}
+	fmt.Printf("Cleared %d cache file(s) for %s\n", deleted, targetDate)
 	return nil
 }
 

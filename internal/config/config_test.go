@@ -46,6 +46,9 @@ timezone: US/Pacific
 				if cfg.RefreshIntervalSeconds != 3600 {
 					t.Errorf("RefreshIntervalSeconds = %d, want 3600", cfg.RefreshIntervalSeconds)
 				}
+				if cfg.RefreshIntervalClampedFromSeconds != 0 {
+					t.Errorf("RefreshIntervalClampedFromSeconds = %d, want 0 (no clamp for valid interval)", cfg.RefreshIntervalClampedFromSeconds)
+				}
 			},
 		},
 		{
@@ -136,6 +139,9 @@ refresh_interval: 30
 			validate: func(t *testing.T, cfg *Config) {
 				if cfg.RefreshIntervalSeconds != constants.APIBudgetWindowSeconds {
 					t.Errorf("RefreshIntervalSeconds = %d, want %d (clamped to floor)", cfg.RefreshIntervalSeconds, constants.APIBudgetWindowSeconds)
+				}
+				if cfg.RefreshIntervalClampedFromSeconds != 30 {
+					t.Errorf("RefreshIntervalClampedFromSeconds = %d, want 30 (original pre-clamp value)", cfg.RefreshIntervalClampedFromSeconds)
 				}
 			},
 		},
