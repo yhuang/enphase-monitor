@@ -80,6 +80,75 @@ func TestShowMetrics_ContainsHeader(t *testing.T) {
 	}
 }
 
+// TestShowMetrics_WeatherShownWhenPresent verifies the weather block is rendered
+// when the metrics carry it.
+func TestShowMetrics_WeatherShownWhenPresent(t *testing.T) {
+	var buf bytes.Buffer
+	tz := mustLoadLocation(t, "US/Pacific")
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+	metrics := &aggregator.AggregatedMetrics{
+		Timestamp: time.Now(),
+		Weather: &aggregator.DailyWeather{
+			TempHigh:       78.4,
+			TempLow:        54.1,
+			TempUnit:       "°F",
+			Condition:      "Partly cloudy",
+			CloudCoverPct:  41,
+			SolarRadiation: 6.8,
+		},
+	}
+	d.ShowMetrics(metrics)
+
+	output := buf.String()
+	for _, want := range []string{"Temperature", "78°F", "54°F", "Partly cloudy", "41% cloud", "Irradiance", "6.8 kWh/m²"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("output should contain %q\n%s", want, output)
+		}
+	}
+}
+
+// TestShowMetrics_WeatherCurrentLayout verifies the live-today layout shows the
+// current condition/temp plus the day's range.
+func TestShowMetrics_WeatherCurrentLayout(t *testing.T) {
+	var buf bytes.Buffer
+	tz := mustLoadLocation(t, "US/Pacific")
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+	metrics := &aggregator.AggregatedMetrics{
+		Timestamp: time.Now(),
+		Weather: &aggregator.DailyWeather{
+			TempHigh: 77, TempLow: 59, TempUnit: "°F", SolarRadiation: 6.9,
+			HasCurrent: true, CurrentTemp: 63, CurrentCondition: "Clear", CurrentCloudCoverPct: 2,
+		},
+	}
+	d.ShowMetrics(metrics)
+
+	output := buf.String()
+	for _, want := range []string{"63°F now", "59°F — 77°F", "Clear", "2% cloud", "kWh/m² forecasted"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("current layout should contain %q\n%s", want, output)
+		}
+	}
+}
+
+// TestShowMetrics_WeatherAbsentWhenNil verifies no weather block is rendered
+// when Weather is nil (e.g. month/year/true-up reports).
+func TestShowMetrics_WeatherAbsentWhenNil(t *testing.T) {
+	var buf bytes.Buffer
+	tz := mustLoadLocation(t, "US/Pacific")
+	d := NewDisplayWithWriter(config.ColorConfig{}, tz, &buf)
+
+	metrics := &aggregator.AggregatedMetrics{Timestamp: time.Now()}
+	d.ShowMetrics(metrics)
+
+	for _, unwanted := range []string{"Temperature", "Conditions", "Irradiance"} {
+		if strings.Contains(buf.String(), unwanted) {
+			t.Errorf("output should not contain %q when Weather is nil\n%s", unwanted, buf.String())
+		}
+	}
+}
+
 // TestShowMetrics_ContainsMetricValues verifies that ShowMetrics outputs metric values.
 func TestShowMetrics_ContainsMetricValues(t *testing.T) {
 	var buf bytes.Buffer

@@ -24,24 +24,29 @@ The project follows a pragmatic approach to testing:
 |---------|----------|--------|
 | urlbuilder | 100.0% | ✅ Full coverage - URL construction |
 | constants | 100.0% | ✅ Full coverage - pure constants |
-| display | 99.2% | ✅ Near-full - output formatting |
+| display | 98.7% | ✅ Near-full - output formatting |
 | validation | 95.5% | ✅ Near-full - metrics validation |
 | parser | 94.8% | ✅ Near-full - JSON parsing |
-| config | 83.1% | ✅ High - YAML parsing |
-| timezone | 92.0% | ✅ High - timezone handling |
-| cli | 90.5% | ✅ High - CLI interface |
-| aggregator | 78.3% | ✅ Adequate - data aggregation |
+| credentials | 94.6% | ✅ Near-full - credential pool |
+| timezone | 92.7% | ✅ High - timezone handling |
+| cli | 91.4% | ✅ High - CLI interface |
+| aggregator | 88.9% | ✅ High - data aggregation |
+| weather | 87.5% | ✅ High - Open-Meteo client |
+| history | 83.3% | ✅ High - per-day record schema/write |
+| config | 82.1% | ✅ High - YAML parsing |
+| geocode | 81.5% | ✅ High - ZIP geolocation |
+| location | 81.0% | ✅ High - location resolver/cache |
+| oauth | 80.1% | ✅ High - OAuth flows |
 | api | 77.1% | ✅ Adequate - HTTP client |
-| oauth | 69.2% | ✅ Adequate - OAuth flows |
 | cache | 71.6% | ✅ Adequate - file caching (budget counter also tested directly in api_budget_test.go) |
-| app | 45.0% | ⚠️ Moderate - application glue (exercised end-to-end via api/preflight) |
+| app | 40.1% | ⚠️ Moderate - application glue incl. RunBackfill (exercised end-to-end via api/preflight) |
 | main.go | 0.0% | ✅ **Acceptable** - entry point |
 
-**Overall**: 70.6% coverage (exceeds typical Go project standards of 50-60%; `app` orchestration paths are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests)
+**Overall**: 70.4% coverage (exceeds typical Go project standards of 50-60%; `app` orchestration paths — including `RunBackfill` — are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests)
 
 ### Why main.go Has 0% Coverage
 
-The `main.go` file is pure orchestration (~307 lines) and has 0% coverage by design. This is an **industry standard** because:
+The `main.go` file is pure orchestration (~560 lines) and has 0% coverage by design. This is an **industry standard** because:
 
 1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
 2. **All logic tested**: All functions `main.go` calls are tested in internal packages
@@ -453,7 +458,7 @@ func TestValidationModeGetterSetter(t *testing.T) {
 ```go
 func TestValidateMetrics_RealData(t *testing.T) {
     // Load expected values from JSON file
-    expected := loadExpectedValues("test-data/expected_values_2026-01-20.json")
+    expected := loadExpectedValues("test-data/enphase_api_2026-01-20.json")
 
     // Load cached API responses and aggregate
     metrics := aggregateFromCache("2026-01-20")
@@ -751,7 +756,7 @@ go test -v ./internal/app/ -run TestValidateValidationModeCache
 The `--test` flag enables Validation Mode (cache only, with validation against expected values). This requires:
 
 1. **Cached API responses** - Run `./enphase-monitor` first to populate the cache
-2. **Expected values file** - Create `test-data/expected_values_YYYY-MM-DD.json`
+2. **Expected values file** - Create `test-data/enphase_api_YYYY-MM-DD.json`
 
 #### Early Cache Validation
 
@@ -777,7 +782,7 @@ $ ./enphase-monitor --test --date 2026-01-01
 Validation failed: no expected values file found for 2026-01-01.
 
 To run validation, create the file:
-  test-data/expected_values_2026-01-01.json
+  test-data/enphase_api_2026-01-01.json
 
 Example format:
   {

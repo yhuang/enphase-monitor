@@ -1,0 +1,43 @@
+{
+  "total": 2,
+  "current_page": 1,
+  "size": 10,
+  "count": 2,
+  "items": "systems",
+  "systems": [
+    {
+      "system_id": 5392556,
+      "name": "Left Subpanel (2) Top Batteries",
+      "public_name": "Residential System",
+      "timezone": "US/Pacific",
+      "address": {
+        "city": "Pleasanton",
+        "state": "CA",
+        "country": "US",
+        "postal_code": "94566"
+      },
+      "connection_type": "wifi",
+      "status": "normal",
+      "last_report_at": 1781847666,
+      "last_energy_at": 1781847601,
+      "operational_at": 1724443500
+    },
+    {
+      "system_id": 5525881,
+      "name": "Right Subpanel (1) Bottom Batteries",
+      "public_name": "Residential System",
+      "timezone": "US/Pacific",
+      "address": {
+        "city": "Pleasanton",
+        "state": "CA",
+        "country": "US",
+        "postal_code": "94566"
+      },
+      "connection_type": "wifi",
+      "status": "normal",
+      "last_report_at": 1781847632,
+      "last_energy_at": 1781847540,
+      "operational_at": 1729520438
+    }
+  ]
+}

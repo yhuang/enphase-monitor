@@ -8,14 +8,14 @@
 // SETUP GUIDE
 // -----------
 // For step-by-step OAuth setup instructions, see docs/OAUTH_SETUP.md
-// To run the interactive setup wizard: ./enphase-monitor --oauth-setup
+// To run the interactive setup wizard: ./enphase-monitor --update-refresh-token
 //
 // AUTHENTICATION FLOW
 // -------------------
 // The Enphase Cloud API uses OAuth 2.0 with two supported grant types:
 //
 //  1. Refresh Token Grant (Developer Plan - Free Tier):
-//     - One-time setup via --oauth-setup wizard
+//     - One-time setup via --update-refresh-token wizard
 //     - Uses refresh_token to obtain access_token
 //     - Access tokens expire (typically 1 hour)
 //     - Refresh tokens are long-lived (do not expire)
@@ -27,7 +27,8 @@
 // TOKEN CACHING
 // -------------
 // Access tokens are cached in memory to avoid unnecessary refresh calls:
-//   - Cache key: combination of client_id and grant type
+//   - Cache key: the credential's client_id (each credential set in the pool
+//     caches its own token independently)
 //   - Cache lifetime: until token expires (ExpiresIn seconds)
 //   - Thread safety: tokenCache is accessed from main goroutine only (no mutex needed)
 //
@@ -45,7 +46,7 @@
 //   - Network errors: Returned to caller for handling
 //
 // The GetAccessToken() function provides helpful error messages suggesting
-// users run --oauth-setup if refresh token is missing or invalid.
+// users run --update-refresh-token if refresh token is missing or invalid.
 package oauth
 
 import (
@@ -69,7 +70,16 @@ const (
 	tokenRefreshBuffer = 5 * time.Minute
 	// oauthRequestTimeout is the HTTP timeout for OAuth requests
 	oauthRequestTimeout = 30 * time.Second
+	// tokenMaxAttempts is the total number of token-request tries (1 initial + retries).
+	// Only transient failures (network errors and 5xx) are retried; 4xx are not.
+	tokenMaxAttempts = 3
 )
+
+// tokenRetryBackoff is the base linear backoff between token-request retries
+// (the Nth retry waits N×base). It's a var so tests can shrink it. Enphase's
+// OAuth endpoint returns 5xx fairly often, so a couple of quick retries usually
+// turns a transient failure into a success.
+var tokenRetryBackoff = 500 * time.Millisecond
 
 // TokenResponse represents the OAuth token response.
 type TokenResponse struct {
@@ -87,7 +97,9 @@ type TokenCache struct {
 	ExpiresAt    time.Time // When the access token expires
 }
 
-var tokenCache *TokenCache
+// tokenCache holds one cached access/refresh token per credential, keyed by the
+// credential's client_id. Accessed from the main goroutine only (no mutex).
+var tokenCache = make(map[string]*TokenCache)
 
 // oauthHTTPClient is reused across OAuth calls to enable connection reuse.
 var oauthHTTPClient = &http.Client{
@@ -175,13 +187,15 @@ func ExchangeAuthorizationCode(ctx context.Context, apiConfig *types.APIConfig, 
 
 // GetAccessToken retrieves an OAuth access token using refresh token or other available methods.
 func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, error) {
-	// Check cache first - refresh if within buffer window of expiration
-	if tokenCache != nil && time.Now().Before(tokenCache.ExpiresAt.Add(-tokenRefreshBuffer)) {
-		return tokenCache.Token, nil
-	}
-
 	if apiConfig == nil {
 		return "", errors.New("API configuration is required")
+	}
+
+	// Check this credential's cache first - refresh if within buffer window of
+	// expiration. Each credential set caches its own token under its client_id.
+	cached := tokenCache[apiConfig.ClientID]
+	if cached != nil && time.Now().Before(cached.ExpiresAt.Add(-tokenRefreshBuffer)) {
+		return cached.Token, nil
 	}
 
 	if apiConfig.AuthorizationURL == "" {
@@ -212,21 +226,46 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 		return "", errors.New("no valid authentication method available: for developer plan run one-time authorization to get a refresh_token (see README)")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", apiConfig.AuthorizationURL, bytes.NewBufferString(formData.Encode()))
-	if err != nil {
-		return "", fmt.Errorf("failed to create token request: %w", err)
-	}
+	// Send the token request, retrying transient failures (network errors and 5xx
+	// from Enphase's OAuth endpoint). 4xx are not retried — they won't improve.
+	var resp *http.Response
+	var lastErr error
+	for attempt := 0; attempt < tokenMaxAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case <-time.After(time.Duration(attempt) * tokenRetryBackoff):
+			}
+		}
 
-	// Use Basic Auth with client_id:client_secret as per Enphase API v4 docs
-	req.SetBasicAuth(apiConfig.ClientID, apiConfig.ClientSecret)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	if apiConfig.Key != "" {
-		req.Header.Set("key", apiConfig.Key)
-	}
+		req, err := http.NewRequestWithContext(ctx, "POST", apiConfig.AuthorizationURL, bytes.NewBufferString(formData.Encode()))
+		if err != nil {
+			return "", fmt.Errorf("failed to create token request: %w", err)
+		}
+		// Use Basic Auth with client_id:client_secret as per Enphase API v4 docs
+		req.SetBasicAuth(apiConfig.ClientID, apiConfig.ClientSecret)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if apiConfig.Key != "" {
+			req.Header.Set("key", apiConfig.Key)
+		}
 
-	resp, err := oauthHTTPClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to get token: %w", err)
+		r, err := oauthHTTPClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to get token: %w", err)
+			continue // network error — retry
+		}
+		if r.StatusCode >= 500 {
+			body, _ := io.ReadAll(r.Body)
+			r.Body.Close()
+			lastErr = fmt.Errorf("token request failed with status %d: %s", r.StatusCode, string(body))
+			continue // transient server error — retry
+		}
+		resp = r
+		break
+	}
+	if resp == nil {
+		return "", lastErr // exhausted retries on transient failures
 	}
 	defer resp.Body.Close()
 
@@ -241,12 +280,12 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 		if resp.StatusCode == http.StatusUnauthorized && apiConfig.RefreshToken != "" {
 			return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
 				"Your refresh token appears to be invalid or expired. Please regenerate it by running:\n"+
-				"  ./enphase-monitor --oauth-setup\n\n"+
-				"Then update the refresh_token in your config.yaml file.", resp.StatusCode, errorMsg)
+				"  ./enphase-monitor --update-refresh-token\n\n"+
+				"Then update the refresh_token in your credentials.yaml file.", resp.StatusCode, errorMsg)
 		}
 		if resp.StatusCode == http.StatusUnauthorized {
 			return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
-				"Authentication failed. Please check your credentials in config.yaml.", resp.StatusCode, errorMsg)
+				"Authentication failed. Please check your credentials in credentials.yaml.", resp.StatusCode, errorMsg)
 		}
 		return "", fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, errorMsg)
 	}
@@ -267,12 +306,12 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 	}
 
 	refreshToken := tokenResp.RefreshToken
-	if refreshToken == "" && tokenCache != nil {
+	if refreshToken == "" && cached != nil {
 		// Keep existing refresh token if new one not provided
-		refreshToken = tokenCache.RefreshToken
+		refreshToken = cached.RefreshToken
 	}
 
-	tokenCache = &TokenCache{
+	tokenCache[apiConfig.ClientID] = &TokenCache{
 		Token:        tokenResp.AccessToken,
 		RefreshToken: refreshToken,
 		ExpiresAt:    time.Now().Add(time.Duration(expiresIn) * time.Second),

@@ -11,6 +11,7 @@ import (
 	"enphase-monitor/internal/cache"
 	"enphase-monitor/internal/config"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/credentials"
 	"enphase-monitor/internal/types"
 )
 
@@ -53,11 +54,12 @@ func TestSetupDisplay(t *testing.T) {
 		Systems: []types.SystemConfig{
 			{Name: "Test System", ID: "12345"},
 		},
-		API: &types.APIConfig{
+		Credentials: []*types.APIConfig{{
+			Name:         "key1",
 			Key:          "test-key",
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
-		},
+		}},
 		RefreshIntervalSeconds: 3600,
 	}
 
@@ -77,11 +79,12 @@ func TestSetupDisplay_WithCustomColors(t *testing.T) {
 		Systems: []types.SystemConfig{
 			{Name: "Test System", ID: "12345"},
 		},
-		API: &types.APIConfig{
+		Credentials: []*types.APIConfig{{
+			Name:         "key1",
 			Key:          "test-key",
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
-		},
+		}},
 		RefreshIntervalSeconds: 3600,
 		Colors: &config.ColorConfig{
 			Production: "#FF0000",
@@ -165,47 +168,31 @@ func TestParseTestDate_InvalidDate(t *testing.T) {
 	}
 }
 
-func TestGetAggregatorTypes(t *testing.T) {
+func TestGetSystems(t *testing.T) {
 	cfg := &config.Config{
 		Systems: []types.SystemConfig{
 			{Name: "System 1", ID: "12345"},
 			{Name: "System 2", ID: "67890"},
 		},
-		API: &types.APIConfig{
-			Key:          "test-key",
-			ClientID:     "test-client",
-			ClientSecret: "test-secret",
-		},
 	}
 
-	systems, apiConfig := GetAggregatorTypes(cfg)
+	systems := GetSystems(cfg)
 
 	if len(systems) != 2 {
-		t.Errorf("GetAggregatorTypes() returned %d systems, want 2", len(systems))
+		t.Errorf("GetSystems() returned %d systems, want 2", len(systems))
 	}
-	if apiConfig == nil {
-		t.Fatal("GetAggregatorTypes() returned nil API config")
-	}
-	if apiConfig.Key != "test-key" {
-		t.Errorf("GetAggregatorTypes() API key = %v, want test-key", apiConfig.Key)
+	// Verify the returned slice is a copy (mutating it must not affect cfg).
+	systems[0].Name = "mutated"
+	if cfg.Systems[0].Name != "System 1" {
+		t.Error("GetSystems() returned slice aliases the config; want a copy")
 	}
 }
 
-func TestGetAggregatorTypes_EmptySystems(t *testing.T) {
-	cfg := &config.Config{
-		Systems: []types.SystemConfig{},
-		API: &types.APIConfig{
-			Key: "test-key",
-		},
-	}
+func TestGetSystems_EmptySystems(t *testing.T) {
+	cfg := &config.Config{Systems: []types.SystemConfig{}}
 
-	systems, apiConfig := GetAggregatorTypes(cfg)
-
-	if len(systems) != 0 {
-		t.Errorf("GetAggregatorTypes() returned %d systems, want 0", len(systems))
-	}
-	if apiConfig == nil {
-		t.Error("GetAggregatorTypes() returned nil API config")
+	if systems := GetSystems(cfg); len(systems) != 0 {
+		t.Errorf("GetSystems() returned %d systems, want 0", len(systems))
 	}
 }
 
@@ -224,18 +211,19 @@ func TestRunOnce_ContextCancelled(t *testing.T) {
 		Systems: []types.SystemConfig{
 			{Name: "Test", ID: "12345"},
 		},
-		API: &types.APIConfig{
+		Credentials: []*types.APIConfig{{
+			Name:         "key1",
 			Key:          "test-key",
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
-		},
+		}},
 	}
 
 	tz := time.UTC
 	disp := SetupDisplay(cfg, tz)
 
 	// RunOnce with cancelled context should return error (no os.Exit)
-	err := RunOnce(ctx, RunConfig{Agg: agg, Disp: disp, Cfg: cfg, QueryMode: constants.QueryModeDay, ReportTZ: tz}, false)
+	err := RunOnce(ctx, RunConfig{Agg: agg, Pool: credentials.NewPool(cfg.Credentials), Disp: disp, Cfg: cfg, QueryMode: constants.QueryModeDay, ReportTZ: tz}, false)
 	if err == nil {
 		t.Fatal("RunOnce() with cancelled context: error = nil, want non-nil")
 	}

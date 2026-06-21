@@ -11,6 +11,7 @@ import (
 	"enphase-monitor/internal/api"
 	"enphase-monitor/internal/config"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/credentials"
 	"enphase-monitor/internal/display"
 	"enphase-monitor/internal/types"
 )
@@ -53,7 +54,7 @@ func (m *mockCloudClient) GetBatteryDataForDate(ctx context.Context, testDate ti
 
 // makeRunConfig creates a RunConfig for tests with QueryModeDay and zero TestDate.
 func makeRunConfig(agg *aggregator.DataAggregator, disp *display.Display, cfg *config.Config, tz *time.Location) RunConfig {
-	return RunConfig{Agg: agg, Disp: disp, Cfg: cfg, QueryMode: constants.QueryModeDay, ReportTZ: tz}
+	return RunConfig{Agg: agg, Pool: credentials.NewPool(cfg.Credentials), Disp: disp, Cfg: cfg, QueryMode: constants.QueryModeDay, ReportTZ: tz}
 }
 
 // createMockAggregator creates an aggregator with a mock cloud client
@@ -86,12 +87,13 @@ func TestRunOnce_Success(t *testing.T) {
 		Systems: []types.SystemConfig{
 			{Name: "Test System", ID: "12345"},
 		},
-		API: &types.APIConfig{
+		Credentials: []*types.APIConfig{{
+			Name:         "key1",
 			Key:          "test-key",
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
 			RefreshToken: "test-refresh",
-		},
+		}},
 		RefreshIntervalSeconds: 3600,
 	}
 
@@ -135,12 +137,13 @@ func TestFetchAndDisplay_Success(t *testing.T) {
 		Systems: []types.SystemConfig{
 			{Name: "Test System", ID: "12345"},
 		},
-		API: &types.APIConfig{
+		Credentials: []*types.APIConfig{{
+			Name:         "key1",
 			Key:          "test-key",
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
 			RefreshToken: "test-refresh",
-		},
+		}},
 		RefreshIntervalSeconds: 3600,
 	}
 
@@ -177,12 +180,13 @@ func TestFetchAndDisplay_ContextCancelled(t *testing.T) {
 		Systems: []types.SystemConfig{
 			{Name: "Test", ID: "12345"},
 		},
-		API: &types.APIConfig{
+		Credentials: []*types.APIConfig{{
+			Name:         "key1",
 			Key:          "test-key",
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
 			RefreshToken: "test-refresh",
-		},
+		}},
 	}
 
 	// Create display with buffer
@@ -214,12 +218,13 @@ func TestFetchAndDisplay_Error(t *testing.T) {
 		Systems: []types.SystemConfig{
 			{Name: "Test", ID: "12345"},
 		},
-		API: &types.APIConfig{
+		Credentials: []*types.APIConfig{{
+			Name:         "key1",
 			Key:          "test-key",
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
 			RefreshToken: "test-refresh",
-		},
+		}},
 	}
 
 	// Create display with buffer
@@ -260,12 +265,13 @@ func TestRunContinuous_ImmediateExecution(t *testing.T) {
 		Systems: []types.SystemConfig{
 			{Name: "Test System", ID: "12345"},
 		},
-		API: &types.APIConfig{
+		Credentials: []*types.APIConfig{{
+			Name:         "key1",
 			Key:          "test-key",
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
 			RefreshToken: "test-refresh",
-		},
+		}},
 		RefreshIntervalSeconds: 1, // 1 second (won't actually fire in 100ms test)
 	}
 
@@ -313,12 +319,13 @@ func TestRunContinuous_GracefulShutdown(t *testing.T) {
 		Systems: []types.SystemConfig{
 			{Name: "Test", ID: "12345"},
 		},
-		API: &types.APIConfig{
+		Credentials: []*types.APIConfig{{
+			Name:         "key1",
 			Key:          "test-key",
 			ClientID:     "test-client",
 			ClientSecret: "test-secret",
 			RefreshToken: "test-refresh",
-		},
+		}},
 		RefreshIntervalSeconds: 3600,
 	}
 

@@ -21,12 +21,6 @@ func TestLoadConfig(t *testing.T) {
 		{
 			name: "valid config with all fields",
 			yamlContent: `
-api:
-  key: test-key
-  client_id: test-client
-  client_secret: test-secret
-  authorization_url: https://api.enphaseenergy.com/oauth/token
-  refresh_token: test-refresh-token
 systems:
   - name: System 1
     id: "12345"
@@ -37,9 +31,6 @@ timezone: US/Pacific
 `,
 			wantErr: false,
 			validate: func(t *testing.T, cfg *Config) {
-				if cfg.API.Key != "test-key" {
-					t.Errorf("API.Key = %s, want test-key", cfg.API.Key)
-				}
 				if len(cfg.Systems) != 2 {
 					t.Errorf("len(Systems) = %d, want 2", len(cfg.Systems))
 				}
@@ -54,10 +45,6 @@ timezone: US/Pacific
 		{
 			name: "missing systems",
 			yamlContent: `
-api:
-  key: test-key
-  client_id: test-client
-  client_secret: test-secret
 systems: []
 `,
 			wantErr:     true,
@@ -66,10 +53,6 @@ systems: []
 		{
 			name: "system without id",
 			yamlContent: `
-api:
-  key: test-key
-  client_id: test-client
-  client_secret: test-secret
 systems:
   - name: System 1
 `,
@@ -77,22 +60,8 @@ systems:
 			errContains: constants.ErrInvalidSystemID,
 		},
 		{
-			name: "missing api config",
-			yamlContent: `
-systems:
-  - name: System 1
-    id: "12345"
-`,
-			wantErr:     true,
-			errContains: constants.ErrAPIConfigRequired,
-		},
-		{
 			name: "default refresh interval",
 			yamlContent: `
-api:
-  key: test-key
-  client_id: test-client
-  client_secret: test-secret
 systems:
   - name: System 1
     id: "12345"
@@ -107,10 +76,6 @@ systems:
 		{
 			name: "negative refresh interval defaults to 3600",
 			yamlContent: `
-api:
-  key: test-key
-  client_id: test-client
-  client_secret: test-secret
 systems:
   - name: System 1
     id: "12345"
@@ -126,10 +91,6 @@ refresh_interval: -1
 		{
 			name: "below-minimum refresh interval is clamped to the 60s floor",
 			yamlContent: `
-api:
-  key: test-key
-  client_id: test-client
-  client_secret: test-secret
 systems:
   - name: System 1
     id: "12345"
@@ -146,68 +107,10 @@ refresh_interval: 30
 			},
 		},
 		{
-			name: "refresh token with whitespace is trimmed",
-			yamlContent: `
-api:
-  key: test-key
-  client_id: test-client
-  client_secret: test-secret
-  refresh_token: "  token-with-spaces  "
-systems:
-  - name: System 1
-    id: "12345"
-`,
-			wantErr: false,
-			validate: func(t *testing.T, cfg *Config) {
-				if cfg.API.RefreshToken != "token-with-spaces" {
-					t.Errorf("RefreshToken = %q, want %q (trimmed)", cfg.API.RefreshToken, "token-with-spaces")
-				}
-			},
-		},
-		{
 			name:        "invalid YAML syntax",
 			yamlContent: `this is not valid yaml: [[[`,
 			wantErr:     true,
 			errContains: "failed to parse config file",
-		},
-		{
-			name: "missing API key",
-			yamlContent: `
-api:
-  client_id: test-client
-  client_secret: test-secret
-systems:
-  - name: System 1
-    id: "12345"
-`,
-			wantErr:     true,
-			errContains: "api.key",
-		},
-		{
-			name: "missing client_id",
-			yamlContent: `
-api:
-  key: test-key
-  client_secret: test-secret
-systems:
-  - name: System 1
-    id: "12345"
-`,
-			wantErr:     true,
-			errContains: "client_id",
-		},
-		{
-			name: "missing client_secret",
-			yamlContent: `
-api:
-  key: test-key
-  client_id: test-client
-systems:
-  - name: System 1
-    id: "12345"
-`,
-			wantErr:     true,
-			errContains: "client_secret",
 		},
 	}
 

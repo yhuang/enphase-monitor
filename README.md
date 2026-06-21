@@ -33,6 +33,8 @@ A Go application for monitoring and aggregating data from one or more Enphase so
 - **Multi-System Monitoring**: Query and combine metrics from multiple independent Systems at a Site
 - **Comprehensive Metrics**: Track Production, Consumption, battery charge/discharge, Grid Import/Export, and Net Flow
 - **Flexible Querying**: Query past dates or monitor real-time with auto-refresh
+- **Weather Enrichment**: Day-Mode reports annotated with temperature, conditions, cloud cover, precipitation, and solar radiation (Open-Meteo; requires one-time `--init`)
+- **Historical Backfill**: Build a per-day energy + weather dataset over a date range as JSON records for offline analysis (`--backfill-from`)
 - **True-Up Report**: Energy metrics across a full utility True-Up Period (`--true-up`)
 - **Clean Display**: Formatted terminal output with customizable colors
 - **API Caching**: Automatic caching of API responses to reduce API calls and enable offline validation
@@ -75,22 +77,41 @@ go build -o enphase-monitor
 
 ### Initial Setup
 
-1. **Copy the example configuration file:**
+Configuration is split across two files:
+- **`config.yaml`** — non-secret settings (systems, refresh interval, timezone, colors). Safe to share/commit.
+- **`credentials.yaml`** — your API key and OAuth secrets. Kept local (gitignored); never commit it.
+
+1. **Copy the example files:**
    ```bash
    cp config.yaml.example config.yaml
+   cp credentials.yaml.example credentials.yaml
    ```
 
-2. **Edit `config.yaml` with your credentials:**
+2. **Edit `credentials.yaml` with your API credentials:**
+
+   `credentials:` is a list of one or more credential sets (secrets only). A single
+   entry is fine; add more keys to spread the per-key rate limit (10 req/min,
+   1000/month) across systems and fail over when a key is throttled. Each entry
+   needs a unique `name`. The non-secret `authorization_url` and `redirect_uri` are
+   shared by all credentials and set once in `config.yaml` under `api:` (see below).
 
    ```yaml
+   credentials:
+     - name: enphase-monitor-001
+       key: "YOUR_API_KEY"  # API Key from Enphase Developer Portal
+       client_id: "YOUR_CLIENT_ID"  # OAuth Client ID
+       client_secret: "YOUR_CLIENT_SECRET"  # OAuth Client Secret
+       refresh_token: "YOUR_REFRESH_TOKEN"  # From OAuth setup (see below)
+   ```
+
+3. **Edit `config.yaml` with your systems and preferences:**
+
+   ```yaml
+   # Shared, non-secret OAuth settings applied to every credential set
    api:
-     key: "YOUR_API_KEY"  # API Key from Enphase Developer Portal
-     client_id: "YOUR_CLIENT_ID"  # OAuth Client ID
-     client_secret: "YOUR_CLIENT_SECRET"  # OAuth Client Secret
      authorization_url: "https://api.enphaseenergy.com/oauth/token"
-     redirect_uri: "http://localhost:8080/callback"
-     refresh_token: "YOUR_REFRESH_TOKEN"  # From OAuth setup (see below)
-   
+     redirect_uri: "http://localhost:8080/callback"  # Must match your Developer Portal app settings
+
    systems:
      - name: "Left Subpanel"
        id: "YOUR_SYSTEM_ID"  # Enlighten system ID
@@ -128,11 +149,16 @@ go build -o enphase-monitor
 
 #### API Credentials
 
-You will need these from the [Enphase Developer Portal](https://developer-v4.enphase.com/):
-- `api.key`: Your API key
-- `api.client_id`: OAuth client ID
-- `api.client_secret`: OAuth client secret
-- `api.refresh_token`: Obtained from OAuth setup (see [OAuth Setup](#oauth-setup) below)
+These live in `credentials.yaml` (kept separate from `config.yaml` so secrets stay local) under a `credentials:` list of one or more credential sets. You will need the values from the [Enphase Developer Portal](https://developer-v4.enphase.com/). Each entry has:
+- `name`: A unique label for the credential set (names a credential for `--update-refresh-token <name>` and is the token-cache key)
+- `key`: Your API key
+- `client_id`: OAuth client ID
+- `client_secret`: OAuth client secret
+- `refresh_token`: Obtained from OAuth setup (see [OAuth Setup](#oauth-setup) below)
+
+The non-secret `authorization_url` and `redirect_uri` are **not** repeated per credential — they are configured once in `config.yaml` under `api:` and shared by every credential set (a credential may override them by setting its own). `authorization_url` defaults to the Enphase token endpoint if omitted.
+
+Listing more than one credential set lets the app spread the per-key rate limit (10 requests/minute, 1000/month) round-robin across systems and fail over to a spare key when one is throttled (429).
 
 #### System Configuration
 
@@ -178,13 +204,30 @@ This application uses OAuth 2.0 for authentication. You must complete a one-time
 ### Quick Setup
 
 ```bash
-./enphase-monitor --oauth-setup
+./enphase-monitor --update-refresh-token
 ```
-Run the interactive setup wizard that will guid you through:
-1. Generating an authorization URL
-2. Authorizing the application in your browser
-3. Exchanging the authorization code for tokens
-4. Adding the refresh token to your config
+Run the interactive setup wizard that will:
+1. Open your browser to the Enphase authorization page
+2. Wait while you log in and authorize the application
+3. Capture the authorization code automatically (a local listener on your
+   `redirect_uri`, e.g. `http://localhost:8080/callback`) and exchange it for tokens
+4. Write the refresh token straight into the matching entry in your `credentials.yaml`
+
+You normally just authorize in the browser — no copy-paste. If your `redirect_uri`
+isn't a localhost address (or its port is busy), the wizard falls back to asking you
+to paste the redirect URL from your browser's address bar.
+
+With more than one credential set configured, name the one to set up:
+
+```bash
+./enphase-monitor --update-refresh-token enphase-monitor-002
+```
+
+Or re-authorize every credential in turn (e.g. after they've all expired):
+
+```bash
+./enphase-monitor --update-refresh-token --all
+```
 
 ### Detailed Guide
 
@@ -199,14 +242,10 @@ For a comprehensive explanation of OAuth 2.0, what each component does, and how 
 
 ### After OAuth Setup
 
-Once you have your `refresh_token`, add it to your `config.yaml`:
-
-```yaml
-api:
-  refresh_token: YOUR_REFRESH_TOKEN  # From OAuth setup
-```
-
-The application will automatically use this token to get new access tokens when needed.
+The wizard writes the obtained `refresh_token` directly into the matching credential
+entry in your `credentials.yaml` (preserving your comments and other entries) — the
+secret is never displayed for copy-paste. From then on, the application automatically
+uses this token to get new access tokens when needed.
 
 ## API Configuration
 
@@ -251,6 +290,23 @@ The application automatically caches API responses to minimize API calls. The de
 4. **Complete OAuth Setup**: See [OAuth Setup](#oauth-setup) section above
 
 ## Usage
+
+### Initialization & Weather
+
+Before running any report, initialize the systems' location once:
+```bash
+./enphase-monitor --init
+```
+
+`--init` makes a single `/systems` call, geocodes each system's postal code to coordinates, and caches the result. This enables **weather enrichment**: Day-Mode reports are annotated with the day's temperature high/low, conditions, cloud cover, precipitation, and solar radiation (from the [Open-Meteo](https://open-meteo.com/) API). Resolving the location out of band keeps it off the per-minute telemetry budget on a live day.
+
+`--init` also writes `weather_codes.json` to the project root — the authoritative WMO legend decoding the `weather_code` field carried by reports and History Records (each of the codes Open-Meteo emits, defined individually so intensities are preserved). It is a general reference rather than a dataset artifact, regenerated on each `--init`.
+
+**Initialization is required.** Every report mode (`--date`, `--continuous`, `--true-up`, `--backfill-from`, and the default today query) refuses to run until `--init` has populated the location cache, exiting with:
+```
+enphase-monitor: not initialized — run `enphase-monitor --init` first.
+```
+Cache-management commands (`--clear-cache`, etc.) and `--update-refresh-token` are exempt. Re-run `--init` if the cache is cleared; add `--force` to re-resolve even when a cached value exists.
 
 ### Run Once (Single Query, Default)
 
@@ -307,6 +363,55 @@ The application will query all systems at the configured `refresh_interval` (def
 
 Press `Ctrl+C` to stop.
 
+### Historical Backfill
+
+Build a local dataset of per-day energy + weather records for offline analysis (e.g. correlating production/consumption with weather):
+```bash
+# Fetch every day from this date through yesterday into history/
+./enphase-monitor --backfill-from 2025-06-19
+
+# Bound the range with an explicit end date
+./enphase-monitor --backfill-from 2025-06-19 --date 2026-01-15
+
+# Re-fetch and overwrite days already on disk
+./enphase-monitor --backfill-from 2025-06-19 --force
+```
+
+Backfill walks the date range one calendar day at a time and writes one JSON file per day to `history/<YYYY-MM-DD>.json`. Key behaviors:
+
+- **Always live.** Backfill disables the cache for the run and pulls fresh from the API, so the records are authoritative. With the credential pool's combined budget, a full year of daily queries is comfortably within limits.
+- **Idempotent.** Days that already have a `history/` file are skipped (no API calls) unless `--force` is given.
+- **Resilient.** A failure on one day is reported and skipped; the range continues.
+- **Progress** redraws in place on a terminal (one advancing line), or falls back to plain lines when output is redirected.
+
+Backfill is the **only** writer of History Records — a plain `./enphase-monitor --date 2026-01-15` stays a read-only terminal report and writes nothing. To capture a single day to `history/`, run `./enphase-monitor --backfill-from 2026-01-15 --date 2026-01-15`. This keeps every record authoritative (live-sourced) and avoids a casual cache-served `--date` view silently shadowing a date that backfill would then skip.
+
+Each backfill also (re)writes a manifest, `history/.index.json`, by **scanning the directory** — so it reflects the whole dataset (this run plus prior runs), not just the latest run. It lists the covered date range, present/missing counts, and every missing day with its reason (the API error for days the run attempted, or "not attempted in last run" otherwise) so gaps in the dataset are visible without diffing the directory:
+```json
+{
+  "updated_at": "2026-06-20T14:03:00-07:00",
+  "range": { "from": "2025-06-19", "to": "2026-06-19" },
+  "counts": { "present": 360, "missing": 5 },
+  "missing": [ { "date": "2025-12-03", "error": "API request failed with status 503" } ]
+}
+```
+The manifest is a dotfile so it stays out of a `history/*.json` glob when you feed the dataset to your analysis tool. It is best-effort as of the last backfill — hand-deleting a record afterward won't update it until the next run.
+
+Each record's `weather_code` is the precise WMO interpretation code — the stable categorical feature for modeling, which (unlike the human `condition` label) distinguishes intensities (e.g. 61/63/65 = slight/moderate/heavy rain) and never drifts on rewording. Decode it with `weather_codes.json`, written at the project root by `--init` (see [Initialization & Weather](#initialization--weather)).
+
+**Record schema** (`history/<date>.json`):
+```json
+{
+  "date": "2026-01-15",
+  "totals": { "production_kwh": 44.6, "consumption_kwh": 49.1, "grid_import_kwh": 34.7, "grid_export_kwh": 24.3, "net_flow_kwh": 10.4 },
+  "systems": [
+    { "id": "5525881", "name": "Right Subpanel", "production_kwh": 20.8, "consumption_kwh": 26.7, "grid_import_kwh": 18.4, "grid_export_kwh": 11.0, "net_flow_kwh": 7.4 }
+  ],
+  "weather": { "temp_high": 58.2, "temp_low": 42.1, "temp_unit": "°F", "weather_code": 2, "condition": "Partly Cloudy", "cloud_cover_pct": 34, "precipitation_mm": 0, "solar_radiation_kwh_m2": 2.4 }
+}
+```
+Battery charge/discharge/SOC are intentionally omitted: they are unavailable for historical dates (the lifetime endpoints that serve past days carry no battery data). Every backfilled record carries a `weather` object — a day whose weather is unavailable is treated as a failure and is not written (it appears in the manifest's `missing` and is retried on a plain re-run), so the dataset stays usable for correlation. (The field is `omitempty` at the schema level, but Backfill Mode never emits a weatherless record.)
+
 ### Validation Mode
 
 Validate cached metrics against a pre-recorded set of expected values:
@@ -319,10 +424,15 @@ Serves the report entirely from cache (no live API calls) and compares each metr
 ### Command-Line Options
 
 - `--config <path>` - Path to configuration file (default: `config.yaml`)
+- `--credentials <path>` - Path to credentials file (default: `credentials.yaml`)
+- `--init` - Resolve and cache the systems' location for weather reporting. Run once before normal use; re-run if the cache is cleared. Required before any report mode (see [Initialization & Weather](#initialization--weather))
+- `--force` - With `--init`, re-resolve the location from the API even if a cached value already exists. With `--backfill-from`, re-fetch and overwrite history records that already exist instead of skipping them
 - `--continuous` - Run continuously with periodic refresh (default is run once and exit)
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
+- `--backfill-from <YYYY-MM-DD>` - Backfill Mode: fetch each day from this date through `--date` (or yesterday) with live API calls, writing one JSON record per day into `history/`. Skips days already written unless `--force` is given. Cannot be combined with `--continuous`, `--true-up`, or `--init` (see [Historical Backfill](#historical-backfill))
 - `--true-up <YYYY-MM-DD>` - Activate True-Up Mode using this utility True-Up Start Date. Covers the 12-month True-Up Window (Current Period: through yesterday; Past True-Up Period: through last day of 12-month window). Takes precedence over `--date`
-- `--oauth-setup` - Run OAuth setup wizard (one-time for developer plan)
+- `--update-refresh-token [name]` - Run OAuth setup wizard (one-time for developer plan); pass a credential name when more than one is configured (e.g. `--update-refresh-token enphase-monitor-002`)
+- `--all` - With `--update-refresh-token`, re-authorize every configured credential in turn (e.g. `--update-refresh-token --all`)
 - `--test` - Validation Mode: use cache only, no live API calls, validate against expected values
 - `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429)
 - `--cache` - Serve report from cache only; print diagnostic listing missing endpoints if cache is incomplete
@@ -499,14 +609,14 @@ colors:
 
 ## Troubleshooting
 
-### "API configuration required"
-- Make sure you have copied `config.yaml.example` to `config.yaml`
-- Verify you have filled in `api.key`, `api.client_id`, and `api.client_secret`
-- For developer plan, complete OAuth setup with `--oauth-setup` to get `refresh_token`
+### "no credentials configured"
+- Make sure you have copied `credentials.yaml.example` to `credentials.yaml`
+- Verify each entry under `credentials:` has a unique `name` plus `key`, `client_id`, and `client_secret`
+- For developer plan, complete OAuth setup with `--update-refresh-token` to get `refresh_token`
 
 ### "API request failed with status 401"
 - Your refresh token may have expired or been revoked
-- Re-run OAuth setup: `./enphase-monitor --oauth-setup`
+- Re-run OAuth setup: `./enphase-monitor --update-refresh-token`
 - Verify your API credentials are correct
 
 ### "API request failed with status 404"
@@ -702,97 +812,121 @@ This project includes comprehensive documentation for different learning paths:
 
 ```
 enphase-monitor/
-├── main.go                                # Application entry point (orchestration only)
-├── internal/                              # Internal packages
-│   ├── aggregator/                        # Multi-system data aggregation
-│   │   ├── types.go                       # Metric data structures
-│   │   ├── aggregator.go                  # Aggregation logic with dependency injection
-│   │   ├── aggregator_test.go             # Aggregator tests with mock clients
-│   │   └── aggregator_bench_test.go       # Benchmark tests
-│   ├── api/                               # HTTP client for Cloud API v4
-│   │   ├── client.go                      # Enlighten Cloud API client
-│   │   ├── types.go                       # API request/response types
-│   │   ├── cache_check.go                 # Per-system/endpoint cache availability check (--cache mode)
-│   │   ├── client_test.go                 # API client unit tests
-│   │   ├── client_caching_test.go         # Characterization tests for makeCachedAPIRequest fallback branches (validation/no-cache modes, 429/503/network-error cache fallbacks)
-│   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
-│   │   ├── client_lifetime_test.go        # Lifetime Data tests (Month, Year, True-Up Mode queries)
-│   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 Query Mode × Period combinations)
-│   │   ├── query_cost_test.go             # QueryCost unit tests (all Query Mode × hasBattery combos)
-│   │   └── testmain_test.go               # TestMain: redirects cache I/O to temp dir for all api tests
-│   ├── app/                               # Application execution logic
-│   │   ├── setup.go                       # App initialization & configuration
-│   │   ├── setup_test.go                  # Setup tests
-│   │   ├── runner.go                      # Execution modes (once/continuous)
-│   │   ├── runner_test.go                 # Runner tests
-│   │   ├── trueup.go                      # True-Up Mode: single-batch Lifetime Data query and report conversion
-│   │   ├── trueup_test.go                 # True-up logic tests
-│   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
-│   ├── cache/                             # Disk-based response caching
-│   │   ├── cache.go                       # Cache implementation + sliding-window budget
-│   │   ├── cache_test.go                  # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
-│   │   ├── cache_functions_test.go        # Core caching tests (URL normalization, key generation, save/load, HasCacheForDate)
-│   │   ├── api_budget_test.go             # Sliding-window API Budget counter tests (RecordAPICall, RemainingBudget, pruning)
-│   │   ├── cli.go                         # Cache inspection utilities
-│   │   └── cli_test.go                    # CLI utilities tests
-│   ├── cli/                               # Command-line interface
-│   │   ├── flags.go                       # CLI flag parsing
-│   │   ├── flags_test.go                  # Flag parsing tests
-│   │   ├── cache_commands.go              # Cache management commands
-│   │   └── cache_commands_test.go         # Cache commands tests
-│   ├── config/                            # Configuration types
-│   │   ├── config.go                      # YAML loading & validation (uses type aliases)
-│   │   └── config_test.go                 # Configuration tests
-│   ├── constants/                         # Centralized constants
-│   │   ├── constants.go                   # Application-wide constants
-│   │   └── constants_test.go              # Constants tests
-│   ├── display/                           # Terminal output formatting
-│   │   ├── display.go                     # Display with io.Writer injection
-│   │   └── display_test.go                # Display output tests
-│   ├── oauth/                             # OAuth 2.0 authentication
-│   │   ├── oauth.go                       # Token management & refresh
-│   │   ├── setup.go                       # Interactive OAuth wizard
-│   │   ├── oauth_test.go                  # Basic unit tests
-│   │   ├── oauth_functional_test.go       # Integration tests with mock servers
-│   │   └── oauth_edge_cases_test.go       # Edge case tests
-│   ├── parser/                            # JSON telemetry parsing
-│   │   ├── parser.go                      # Response parsing utilities
-│   │   ├── parser_test.go                 # Parser tests
-│   │   └── parser_bench_test.go           # Benchmark tests
-│   ├── timezone/                          # Timezone handling
-│   │   ├── timezone.go                    # Timezone utilities
-│   │   └── timezone_test.go               # Timezone tests
-│   ├── types/                             # Shared type definitions
-│   │   └── types.go                       # SystemConfig, APIConfig (breaks circular deps)
-│   ├── urlbuilder/                        # API URL construction
-│   │   ├── urlbuilder.go                  # URL building helpers
-│   │   └── urlbuilder_test.go             # URL builder tests
-│   └── validation/                        # Validation Mode (--test flag)
-│       ├── validation.go                  # Metrics validation logic (uses io.Writer for testability)
-│       ├── validation_test.go             # Unit tests (tolerance calculations, edge cases)
-│       └── validation_integration_test.go # Integration tests (real expected values)
-├── docs/                                  # Project documentation
-│   ├── ARCHITECTURE.md                    # Architecture documentation
-│   ├── GO_BEST_PRACTICES.md               # Go best practices guide
-│   ├── GO_CONCEPTS.md                     # Go concepts reference (channels, signals, and more)
-│   ├── OAUTH_SETUP.md                     # OAuth setup documentation (detailed)
-│   ├── TESTING.md                         # Testing patterns and guidelines
-│   └── adr/                               # Architecture Decision Records
-│       └── 0001-true-up-window-end-date.md # ADR for the True-Up Window end-date rule
-├── test-data/                             # Test validation data
-│   └── expected_values_*.json             # Expected values for validation
-├── config.yaml.example                    # Example configuration with all options
-├── config.yaml                            # Your actual configuration (create from example)
-├── cache/                                 # Cached API responses (created at runtime)
-├── go.mod                                 # Go module definition
-├── go.sum                                 # Go module checksums
-├── scripts/                               # Utility scripts
-│   ├── run-tests.sh                       # Test runner script
-│   └── history.py                         # Git history inspection helper
-├── Makefile                               # Build automation
-├── CONTEXT.md                             # Domain glossary (project terminology, "avoid" terms)
-├── README.md                              # This file
-└── QUICKSTART.md                          # Quick start guide
+├── main.go                                  # Application entry point (orchestration only)
+├── internal/                                # Internal packages
+│   ├── aggregator/                          # Multi-system data aggregation
+│   │   ├── types.go                         # Metric data structures
+│   │   ├── aggregator.go                    # Aggregation logic with dependency injection
+│   │   ├── aggregator_test.go               # Aggregator tests with mock clients
+│   │   └── aggregator_bench_test.go         # Benchmark tests
+│   ├── api/                                 # HTTP client for Cloud API v4
+│   │   ├── client.go                        # Enlighten Cloud API client
+│   │   ├── types.go                         # API request/response types
+│   │   ├── cache_check.go                   # Per-system/endpoint cache availability check (--cache mode)
+│   │   ├── client_test.go                   # API client unit tests
+│   │   ├── client_caching_test.go           # Characterization tests for makeCachedAPIRequest fallback branches (validation/no-cache modes, 429/503/network-error cache fallbacks)
+│   │   ├── client_functional_test.go        # Functional tests with mock HTTP servers
+│   │   ├── client_lifetime_test.go          # Lifetime Data tests (Month, Year, True-Up Mode queries)
+│   │   ├── preflight_test.go                # Budget-exhaustion cache-fallback tests (all 8 Query Mode × Period combinations)
+│   │   ├── query_cost_test.go               # QueryCost unit tests (all Query Mode × hasBattery combos)
+│   │   └── testmain_test.go                 # TestMain: redirects cache I/O to temp dir for all api tests
+│   ├── app/                                 # Application execution logic
+│   │   ├── setup.go                         # App initialization & configuration
+│   │   ├── setup_test.go                    # Setup tests
+│   │   ├── runner.go                        # Execution modes (once/continuous)
+│   │   ├── runner_test.go                   # Runner tests
+│   │   ├── trueup.go                        # True-Up Mode: single-batch Lifetime Data query and report conversion
+│   │   ├── trueup_test.go                   # True-up logic tests
+│   │   ├── backfill.go                      # Backfill Mode: live per-day fetch over a date range into history/
+│   │   ├── weather.go                       # Best-effort weather enrichment for Day-Mode reports
+│   │   └── cache_report.go                  # --cache mode: completeness check and diagnostic output
+│   ├── cache/                               # Disk-based response caching
+│   │   ├── cache.go                         # Cache implementation + sliding-window budget
+│   │   ├── cache_test.go                    # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
+│   │   ├── cache_functions_test.go          # Core caching tests (URL normalization, key generation, save/load, HasCacheForDate)
+│   │   ├── api_budget_test.go               # Sliding-window API Budget counter tests (RecordAPICall, RemainingBudget, pruning)
+│   │   ├── cli.go                           # Cache inspection utilities
+│   │   └── cli_test.go                      # CLI utilities tests
+│   ├── cli/                                 # Command-line interface
+│   │   ├── flags.go                         # CLI flag parsing
+│   │   ├── flags_test.go                    # Flag parsing tests
+│   │   ├── cache_commands.go                # Cache management commands
+│   │   └── cache_commands_test.go           # Cache commands tests
+│   ├── config/                              # Configuration types
+│   │   ├── config.go                        # YAML loading & validation (uses type aliases)
+│   │   ├── config_test.go                   # Configuration tests
+│   │   ├── credentials.go                   # Loads & validates the credentials: pool
+│   │   └── credentials_test.go              # Credentials loading/validation tests
+│   ├── constants/                           # Centralized constants
+│   │   ├── constants.go                     # Application-wide constants
+│   │   └── constants_test.go                # Constants tests
+│   ├── credentials/                         # Credential pool: spread + 429 failover
+│   │   ├── pool.go                          # Round-robin assignment, cooldown, failover
+│   │   └── pool_test.go                     # Pool selection/failover tests
+│   ├── display/                             # Terminal output formatting
+│   │   ├── display.go                       # Display with io.Writer injection
+│   │   └── display_test.go                  # Display output tests
+│   ├── geocode/                             # ZIP/postal code → coordinates (Zippopotam.us)
+│   │   ├── geocode.go                       # ZIP lookup for weather geolocation
+│   │   └── geocode_test.go                  # Geocode tests
+│   ├── history/                             # Per-day energy+weather JSON records (history/)
+│   │   ├── history.go                       # DayRecord schema, FromMetrics, WriteRecord
+│   │   └── history_test.go                  # History mapping and write tests
+│   ├── location/                            # Resolve & cache systems' coordinates (--init)
+│   │   ├── location.go                      # Location resolver with disk cache
+│   │   └── location_test.go                 # Location resolver tests
+│   ├── oauth/                               # OAuth 2.0 authentication
+│   │   ├── oauth.go                         # Token management & refresh
+│   │   ├── authorization.go                 # Interactive OAuth authorization wizard
+│   │   ├── oauth_test.go                    # Basic unit tests
+│   │   ├── oauth_functional_test.go         # Integration tests with mock servers
+│   │   └── oauth_edge_cases_test.go         # Edge case tests
+│   ├── parser/                              # JSON telemetry parsing
+│   │   ├── parser.go                        # Response parsing utilities
+│   │   ├── parser_test.go                   # Parser tests
+│   │   └── parser_bench_test.go             # Benchmark tests
+│   ├── timezone/                            # Timezone handling
+│   │   ├── timezone.go                      # Timezone utilities
+│   │   └── timezone_test.go                 # Timezone tests
+│   ├── types/                               # Shared type definitions
+│   │   └── types.go                         # SystemConfig, APIConfig (breaks circular deps)
+│   ├── urlbuilder/                          # API URL construction
+│   │   ├── urlbuilder.go                    # URL building helpers
+│   │   └── urlbuilder_test.go               # URL builder tests
+│   ├── validation/                          # Validation Mode (--test flag)
+│   │   ├── validation.go                    # Metrics validation logic (uses io.Writer for testability)
+│   │   ├── validation_test.go               # Unit tests (tolerance calculations, edge cases)
+│   │   └── validation_integration_test.go   # Integration tests (real expected values)
+│   └── weather/                             # Open-Meteo daily/current weather client
+│       ├── weather.go                       # DailyWeather/CurrentWeather fetch + WMO code mapping
+│       └── weather_test.go                  # Weather client tests
+├── docs/                                    # Project documentation
+│   ├── ARCHITECTURE.md                      # Architecture documentation
+│   ├── GO_BEST_PRACTICES.md                 # Go best practices guide
+│   ├── GO_CONCEPTS.md                       # Go concepts reference (channels, signals, and more)
+│   ├── OAUTH_SETUP.md                       # OAuth setup documentation (detailed)
+│   ├── TESTING.md                           # Testing patterns and guidelines
+│   └── adr/                                 # Architecture Decision Records
+│       ├── 0001-true-up-window-end-date.md  # ADR for the True-Up Window end-date rule
+│       └── 0002-init-guard-requires-weather-init.md  # ADR: report modes require --init (weather)
+├── test-data/                               # Test validation data
+│   └── enphase_api_*.json                   # Expected values for validation
+├── config.yaml.example                      # Example non-secret configuration (systems, colors, etc.)
+├── config.yaml                              # Your actual configuration (create from example)
+├── credentials.yaml.example                 # Example credentials (credentials: list)
+├── credentials.yaml                         # Your actual API secrets (create from example; gitignored)
+├── cache/                                   # Cached API responses (created at runtime)
+├── history/                                 # Per-day energy+weather JSON records (created by Backfill Mode)
+├── weather_codes.json                       # WMO weather-code legend (written by --init)
+├── go.mod                                   # Go module definition
+├── go.sum                                   # Go module checksums
+├── scripts/                                 # Utility scripts
+│   ├── run-tests.sh                         # Test runner script
+│   └── history.py                           # Git history inspection helper
+├── Makefile                                 # Build automation
+├── CONTEXT.md                               # Domain glossary (project terminology, "avoid" terms)
+├── README.md                                # This file
+└── QUICKSTART.md                            # Quick start guide
 ```
 
 ## Testing
@@ -805,19 +939,24 @@ The project includes a comprehensive test suite with **70.6% code coverage** acr
 |---------|----------|--------|
 | urlbuilder | 100.0% | ✅ |
 | constants | 100.0% | ✅ |
-| display | 99.2% | ✅ |
+| display | 98.7% | ✅ |
 | validation | 95.5% | ✅ |
 | parser | 94.8% | ✅ |
-| config | 83.1% | ✅ |
-| timezone | 92.0% | ✅ |
-| cli | 90.5% | ✅ |
-| aggregator | 78.3% | ✅ |
+| credentials | 94.6% | ✅ |
+| timezone | 92.7% | ✅ |
+| cli | 91.4% | ✅ |
+| aggregator | 88.9% | ✅ |
+| weather | 87.5% | ✅ |
+| history | 83.3% | ✅ |
+| config | 82.1% | ✅ |
+| geocode | 81.5% | ✅ |
+| location | 81.0% | ✅ |
+| oauth | 80.1% | ✅ |
 | api | 77.1% | ✅ |
-| oauth | 69.2% | ✅ |
 | cache | 71.6% | ✅ |
-| app | 45.0% | ⚠️ |
+| app | 40.1% | ⚠️ |
 
-**Total: 70.6% coverage** (exceeds typical Go project standards of 50-60%; `app` covers orchestration glue that is exercised more thoroughly via the api-package integration tests)
+**Total: 70.4% coverage** (exceeds typical Go project standards of 50-60%; `app` covers orchestration glue — including `RunBackfill` — that is exercised more thoroughly via the api-package integration tests)
 
 ### Running Tests
 
@@ -879,7 +1018,7 @@ Then retry with --test.
 Validation failed: no expected values file found for 2026-01-01.
 
 To run validation, create the file:
-  test-data/expected_values_2026-01-01.json
+  test-data/enphase_api_2026-01-01.json
 
 Example format:
   { "date": "2026-01-01", "systems": [...] }
@@ -908,7 +1047,7 @@ To run without validation, omit the --test flag:
    ```
    This will make live API calls and cache the responses in `cache/`
 
-3. **Update `expected_values_YYYY-MM-DD.json`** with the correct values from the Enphase app
+3. **Update `enphase_api_YYYY-MM-DD.json`** with the correct values from the Enphase app
 
 4. **Now you can iterate rapidly using Validation Mode** (uses cache only, no API calls):
    ```bash
@@ -980,8 +1119,8 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 
 This project follows Go best practices and coding standards:
 
-- **Test Coverage**: 70.6% overall, 100% for urlbuilder and constants, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and config
-- **Test Suite**: 30 test files across 13 tested packages with comprehensive unit, integration, and edge case tests
+- **Test Coverage**: 70.4% overall, 100% for urlbuilder and constants, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and aggregator
+- **Test Suite**: 38 test files across 18 tested packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -990,10 +1129,10 @@ This project follows Go best practices and coding standards:
 - **Performance**: Benchmarks included for hot paths
 
 **Code Metrics:**
-- Total Lines: ~5,500 (excluding tests)
-- Test Lines: ~9,300 (comprehensive test suite)
-- Packages: 14 internal packages (13 with tests; `types` is a pure type-definition package)
-- Test Files: 30 (unit, integration, functional, edge case, and benchmark tests)
+- Total Lines: ~7,600 (excluding tests)
+- Test Lines: ~11,600 (comprehensive test suite)
+- Packages: 19 internal packages (18 with tests; `types` is a pure type-definition package)
+- Test Files: 38 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 1 (gopkg.in/yaml.v3)
 
 ## License

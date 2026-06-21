@@ -61,6 +61,22 @@ _Avoid_: Loop mode, polling mode, watch mode
 The user-configured number of seconds between re-fetches in Continuous Mode. Set via `refresh_interval` in `config.yaml`; defaults to 3600 (1 hour). Values below 60 seconds are clamped up to a 60-second floor (one API Budget window) to avoid exhausting the API Budget on every tick; the clamp is silent at load time and warns only when Continuous Mode actually starts (the only consumer of `refresh_interval`).
 _Avoid_: Polling interval, refresh rate, refresh period
 
+**Backfill Mode**:
+A run mode activated by `--backfill-from <YYYY-MM-DD>` that fetches each calendar day from the given date through `--date` (or yesterday when `--date` is omitted), one day at a time, and writes a History Record per day into `history/`. Always makes live API calls (cache disabled for the run) so the dataset is authoritative. Weather is an invariant here: a day whose Weather Enrichment is unavailable is treated as a per-day failure (no record written) rather than persisting a weatherless record — so every History Record is usable for correlation, and the day is retried on a plain re-run. Idempotent — days already on disk are skipped unless `--force` overwrites them; per-day failures are reported and skipped rather than aborting the range. At the end it refreshes the Backfill Index. Cannot be combined with `--continuous`, `--true-up`, or `--init`.
+_Avoid_: Bulk fetch, history dump, sync mode
+
+**Backfill Index**:
+The manifest `history/.index.json`, rewritten at the end of each Backfill Mode run by scanning the `history/` directory (so it reflects the whole dataset, not just the latest run). Records the covered date range, present/missing counts, and each missing day with its reason. A dotfile so it stays out of a `history/*.json` glob; best-effort as of the last backfill. Code identifiers: `history.Index`, `history.WriteIndex`.
+_Avoid_: Manifest (use Backfill Index), catalog, registry
+
+**Weather Code Legend**:
+The reference `weather_codes.json` at the project root, written by `--init` (Initialization), decoding every `weather_code` carried by a report or History Record. It is the authoritative WMO interpretation table for the codes Open-Meteo emits — distinct from the lossy display label (a record's `condition`): the legend preserves intensity (61/63/65 = slight/moderate/heavy rain) that the label collapses. A general weather reference, not a dataset artifact, so it lives at the root rather than under `history/`. A fixed standard, regenerated on each `--init`. Code identifiers: `weather.WMOCodeLegend`, `weather.WriteCodeLegend`, `weather.CodeLegendFileName`.
+_Avoid_: Condition map (that is the lossy display collapse, `conditionFromCode`), weather dictionary
+
+**Initialization**:
+The one-time `--init` step that resolves each System's location (one `/systems` call, geocoding the postal code), caches the coordinates for Weather Enrichment, and writes the Weather Code Legend to the project root. Required before any report mode: the program refuses to run a report until the location cache exists (the "init guard"), exempting only cache-management commands and `--update-refresh-token`. `--force` re-resolves even when a cached value exists. Location resolution is done out of band so it never competes with the per-minute telemetry budget on a live day.
+_Avoid_: Setup mode, bootstrap, first-run
+
 ## Query Modes
 
 **Query Mode**:
@@ -128,6 +144,16 @@ _Avoid_: Battery percentage, battery level, charge percentage
 **Net Flow**:
 Grid Import minus Grid Export for a System or Site (positive = net import from grid, negative = net export to grid). Code identifiers: `NetFlowToday` (per-day), `NetFlow` (period totals). Config color keys are directional — `net_import` / `net_export` set the foreground color, and `net_import_background` / `net_export_background` set the row-highlight truecolor background. Validation JSON key: `net_flow`.
 _Avoid_: Net Import, Net Imported, Net Energy (as a substitute for Net Flow itself — the directional *color* keys `net_import` / `net_export` / `net_import_background` / `net_export_background` are the one exception, since they name the visual treatment, not the metric)
+
+## Weather & Dataset
+
+**Weather Enrichment**:
+The best-effort annotation of a Day-Mode report with the day's weather (temperature high/low, WMO weather code, condition, cloud cover, precipitation, solar radiation) from the Open-Meteo API, plus current conditions overlaid for today's live report. Runs only for Day Mode (never Month, Year, True-Up, or cache-only reports) and only after Initialization has cached the location. Any failure leaves the energy report untouched. Code identifier: `enrichWithTemperature`; carrier type `aggregator.DailyWeather`.
+_Avoid_: Temperature lookup, forecast (the daily values are observed/aggregated, not a forecast)
+
+**History Record**:
+The per-day JSON document written to `history/<YYYY-MM-DD>.json`, holding the day's Site totals, per-System energy values, and Weather Enrichment for offline analysis. Written only by Backfill Mode, which is its sole producer — a plain `--date` report never writes one (it stays a read-only terminal report). This single-writer rule keeps every record authoritative (live-sourced) and avoids a cache-sourced record silently shadowing a date that backfill would then skip. Deliberately excludes Battery Charge/Discharge/SOC — they are unavailable for historical dates. Code identifiers: `history.DayRecord`, `history.FromMetrics`, `history.WriteRecord`.
+_Avoid_: Export, dump, snapshot
 
 ## Example Dialogue
 

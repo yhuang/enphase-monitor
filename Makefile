@@ -30,9 +30,16 @@ setup:
 	@if [ ! -f config.yaml ]; then \
 		echo "Creating config.yaml from template..."; \
 		cp config.yaml.example config.yaml; \
-		echo "Please edit config.yaml with your API token and system IDs"; \
+		echo "Please edit config.yaml with your system IDs"; \
 	else \
 		echo "config.yaml already exists"; \
+	fi
+	@if [ ! -f credentials.yaml ]; then \
+		echo "Creating credentials.yaml from template..."; \
+		cp credentials.yaml.example credentials.yaml; \
+		echo "Please edit credentials.yaml with your API key and OAuth credentials"; \
+	else \
+		echo "credentials.yaml already exists"; \
 	fi
 
 # Clean build artifacts
@@ -89,7 +96,7 @@ help:
 	@echo "  make run       - Build and run in continuous mode (--continuous)"
 	@echo "  make run-once  - Build and run single query (default behavior)"
 	@echo "  make install   - Download Go dependencies"
-	@echo "  make setup     - Create config.yaml from template"
+	@echo "  make setup     - Create config.yaml and credentials.yaml from templates"
 	@echo "  make clean     - Remove built binaries"
 	@echo "  make test      - Run tests"
 	@echo "  make fmt       - Format Go code"

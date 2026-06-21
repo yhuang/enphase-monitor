@@ -77,6 +77,8 @@ enphase-monitor/
 │   │   ├── runner_test.go                 # Runner tests
 │   │   ├── trueup.go                      # True-Up Mode: single-batch Lifetime Data query, True-Up Window end-date logic, report conversion
 │   │   ├── trueup_test.go                 # True-up Window end-date logic (trueUpWindowEnd) and report conversion tests
+│   │   ├── backfill.go                    # Backfill Mode: live per-day fetch over a date range into history/
+│   │   ├── weather.go                     # Best-effort weather enrichment for Day-Mode reports
 │   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
@@ -99,9 +101,18 @@ enphase-monitor/
 │   ├── display/                           # Terminal output formatting
 │   │   ├── display.go                     # Display with io.Writer injection for testability
 │   │   └── display_test.go                # Display output tests
+│   ├── geocode/                           # ZIP/postal code → coordinates (Zippopotam.us)
+│   │   ├── geocode.go                     # ZIP lookup for weather geolocation
+│   │   └── geocode_test.go                # Geocode tests
+│   ├── history/                           # Per-day energy+weather JSON records (history/)
+│   │   ├── history.go                     # DayRecord schema, FromMetrics, WriteRecord
+│   │   └── history_test.go                # History mapping and write tests
+│   ├── location/                          # Resolve & cache systems' coordinates (--init)
+│   │   ├── location.go                    # Location resolver with disk cache
+│   │   └── location_test.go               # Location resolver tests
 │   ├── oauth/                             # OAuth 2.0 authentication
 │   │   ├── oauth.go                       # Token management & refresh
-│   │   ├── setup.go                       # Interactive OAuth wizard
+│   │   ├── authorization.go               # Interactive OAuth authorization wizard
 │   │   ├── oauth_test.go                  # Basic unit tests
 │   │   ├── oauth_functional_test.go       # Integration tests with mock servers
 │   │   └── oauth_edge_cases_test.go       # Edge case and error path tests
@@ -117,10 +128,13 @@ enphase-monitor/
 │   ├── urlbuilder/                        # API URL construction
 │   │   ├── urlbuilder.go                  # URL building helpers
 │   │   └── urlbuilder_test.go             # URL builder tests
-│   └── validation/                        # Validation Mode (--test flag)
-│       ├── validation.go                  # Metrics validation logic (uses io.Writer for testability)
-│       ├── validation_test.go             # Unit tests (tolerance calculations, edge cases)
-│       └── validation_integration_test.go # Integration tests (real expected values)
+│   ├── validation/                        # Validation Mode (--test flag)
+│   │   ├── validation.go                  # Metrics validation logic (uses io.Writer for testability)
+│   │   ├── validation_test.go             # Unit tests (tolerance calculations, edge cases)
+│   │   └── validation_integration_test.go # Integration tests (real expected values)
+│   └── weather/                           # Open-Meteo daily/current weather client
+│       ├── weather.go                     # DailyWeather/CurrentWeather fetch + WMO code mapping
+│       └── weather_test.go                # Weather client tests
 │
 ├── docs/                                  # Additional documentation
 │   ├── ARCHITECTURE.md                    # Architecture and design decisions
@@ -129,11 +143,14 @@ enphase-monitor/
 │   ├── OAUTH_SETUP.md                     # OAuth setup guide
 │   ├── TESTING.md                         # Testing patterns and guidelines
 │   └── adr/                               # Architecture Decision Records
-│       └── 0001-true-up-window-end-date.md # ADR for the True-Up Window end-date rule
+│       ├── 0001-true-up-window-end-date.md # ADR for the True-Up Window end-date rule
+│       └── 0002-init-guard-requires-weather-init.md # ADR: report modes require --init (weather)
 ├── CONTEXT.md                             # Domain glossary (Site, System, Query Mode, Net Flow, API Budget, ...)
 ├── test-data/                             # Test validation data (expected values)
-├── config.yaml                            # User configuration (not in git)
+├── config.yaml                            # User configuration: non-secret settings (not in git)
 ├── config.yaml.example                    # Configuration template
+├── credentials.yaml                       # API secrets: credentials: pool (not in git)
+├── credentials.yaml.example               # Credentials template
 └── cache/                                 # Cached API responses (created at runtime)
 ```
 
@@ -164,21 +181,22 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ### Primary Path: Report Generation
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│  1. ENTRY POINT (main.go)                                          │
-│     └─► cli.ParseFlags() from internal/cli                         │
-│     └─► Handle cache commands (internal/cli) or continue           │
-│     └─► If --oauth-setup: signal context, then oauth.Setup(ctx,    │
-│         cfg) so Ctrl+C cancels token exchange                      │
-└────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  1. ENTRY POINT (main.go)                                           │
+│     └─► cli.ParseFlags() from internal/cli                          │
+│     └─► Handle cache commands (internal/cli) or continue            │
+│     └─► Build credentials.Pool from cfg.Credentials                 │
+│     └─► If --update-refresh-token: select credential (positional name),       │
+│         signal context, oauth.Authorize(ctx, cred); Ctrl+C cancels it │
+└─────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-┌────────────────────────────────────────────────────────────────────┐
-│  2. SETUP (internal/app)                                           │
-│     └─► config.LoadConfig() reads YAML file                        │
-│         └─► app.CreateOAuthAdapter() for token management          │
-│             └─► app.SetupDisplay() with colors                     │
-└────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  2. SETUP (internal/app)                                            │
+│     └─► config.LoadConfig() reads YAML file                         │
+│         └─► app.CreateOAuthAdapter() for token management           │
+│             └─► app.SetupDisplay() with colors                      │
+└─────────────────────────────────────────────────────────────────────┘
                                     │
                           ┌─────────┴─────────┐
                           │                   │
@@ -198,43 +216,43 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 └──────────────────────────────┘
                                     │
                                     ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  4. AGGREGATION (internal/aggregator)                                │
+│     └─► GetAggregatedMetrics() loops through systems                 │
+│         └─► Uses internal/api for HTTP requests                      │
+│             └─► Fetches Production, Consumption, Grid Import/Export  │
+│                 battery fetched only for today's Day query           │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  5. API CALLS (internal/api)                                         │
+│     └─► Each call goes through caching layer (internal/cache)        │
+│         ├─► Past periods: always served from cache (data immutable)  │
+│         ├─► Current periods: live call when budget allows;           │
+│         │   cache is fallback only when budget exhausted             │
+│         ├─► Budget exhausted: exact-URL cache → cross-endpoint       │
+│         │   same-system cache (any age) → RateLimitError             │
+│         ├─► Make HTTP request if Current Period and budget > 0       │
+│         └─► Save response to cache + append timestamp to api_calls   │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  4. AGGREGATION (internal/aggregator)                               │
-│     └─► GetAggregatedMetrics() loops through systems                │
-│         └─► Uses internal/api for HTTP requests                     │
-│             └─► Fetches Production, Consumption, Grid Import/Export │
-│                 battery fetched only for today's Day query          │
+│  6. RESPONSE PARSING (internal/parser)                              │
+│     └─► Parse JSON API response data                                │
+│         └─► Sum interval values for daily totals                    │
+│             └─► Convert Wh to kWh                                   │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  5. API CALLS (internal/api)                                        │
-│     └─► Each call goes through caching layer (internal/cache)       │
-│         ├─► Past periods: always served from cache (data immutable) │
-│         ├─► Current periods: live call when budget allows;          │
-│         │   cache is fallback only when budget exhausted            │
-│         ├─► Budget exhausted: exact-URL cache → cross-endpoint      │
-│         │   same-system cache (any age) → RateLimitError            │
-│         ├─► Make HTTP request if Current Period and budget > 0      │
-│         └─► Save response to cache + append timestamp to api_calls  │
+│  7. DISPLAY (internal/display)                                      │
+│     └─► ShowMetrics() formats output                                │
+│         ├─► printHeader() - Query range and timestamp               │
+│         ├─► printTodayEnergy() - Combined totals                    │
+│         └─► printIndividualSystems() - Per-system breakdown         │
 └─────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────┐
-│  6. RESPONSE PARSING (internal/parser)                             │
-│     └─► Parse JSON API response data                               │
-│         └─► Sum interval values for daily totals                   │
-│             └─► Convert Wh to kWh                                  │
-└────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────┐
-│  7. DISPLAY (internal/display)                                     │
-│     └─► ShowMetrics() formats output                               │
-│         ├─► printHeader() - Query range and timestamp              │
-│         ├─► printTodayEnergy() - Combined totals                   │
-│         └─► printIndividualSystems() - Per-system breakdown        │
-└────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -242,15 +260,25 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ## Data Flow Diagram
 
 ```
-                    ┌──────────────────┐
-                    │   config.yaml    │
-                    └────────┬─────────┘
-                             │
+          ┌──────────────────┐   ┌──────────────────────┐
+          │   config.yaml    │   │   credentials.yaml   │
+          └────────┬─────────┘   └──────────┬───────────┘
+                   │                        │
+                   ▼                        ▼
+┌────────────────────────────────┐ ┌─────────────────────────────────────┐
+│  internal/config/LoadConfig()  │ │  internal/config/LoadCredentials()  │
+│  Parses YAML: systems, colors, │ │  Parses the credentials: list       │
+│  shared api: OAuth settings    │ │  (secrets only)                     │
+└────────────────┬───────────────┘ └────────────────┬────────────────────┘
+                 │                                  │
+                 └───────────┬──────────────────────┘
                              ▼
-┌────────────────────────────────────────────────────────────────────┐
-│                  internal/config/LoadConfig()                      │
-│   Parses YAML, validates systems, converts colors                  │
-└────────────────────────────┬───────────────────────────────────────┘
+              ┌──────────────────────────────────────┐
+              │   Config.ApplyCredentials()          │
+              │   Merges shared api: settings into   │
+              │   each credential; validates pool    │
+              │   (unique names, required secrets)   │
+              └──────────────┬───────────────────────┘
                              │
                              ▼
 ┌────────────────────────────────────────────────────────────────────┐
@@ -275,13 +303,13 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 └────────────────────────────┬───────────────────────────────────────┘
                              │
                              ▼
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│              internal/aggregator/AggregatedMetrics                                │
-│   - Sums production, consumption across systems                                   │
-│   - Battery tracked per System only (today's live Day Mode query); zero otherwise │
-│   - Tracks cache usage flags (CacheUsed, AllFromCache)                            │
-│   - TrueUpReport built from a single lifetime-endpoint batch                      │
-└──────────────────────────┬────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│              internal/aggregator/AggregatedMetrics                                  │
+│   - Sums production, consumption across systems                                     │
+│   - Battery tracked per System only (today's live Day Mode query); zero otherwise   │
+│   - Tracks cache usage flags (CacheUsed, AllFromCache)                              │
+│   - TrueUpReport built from a single lifetime-endpoint batch                        │  
+└──────────────────────────┬──────────────────────────────────────────────────────────┘
                            │
                            ▼
 ┌────────────────────────────────────────────────────────────────────┐
@@ -662,7 +690,7 @@ when possible to improve testability.
 | Package/File | Responsibility |
 |--------------|----------------|
 | [internal/oauth/oauth.go](../internal/oauth/oauth.go) | OAuth token management & refresh |
-| [internal/oauth/setup.go](../internal/oauth/setup.go) | Interactive OAuth setup wizard |
+| [internal/oauth/authorization.go](../internal/oauth/authorization.go) | Interactive OAuth authorization wizard |
 | [internal/oauth/oauth_test.go](../internal/oauth/oauth_test.go) | OAuth tests |
 
 ### Internal Packages - Business Logic

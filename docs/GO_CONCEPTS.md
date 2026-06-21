@@ -1071,7 +1071,7 @@ internal/
 │   └── display_test.go          # Display tests
 ├── oauth/                       # OAuth 2.0 authentication
 │   ├── oauth.go                 # Token acquisition/refresh
-│   ├── setup.go                 # Interactive setup wizard
+│   ├── authorization.go         # Interactive OAuth authorization wizard
 │   └── *_test.go                # Unit, functional, and edge case tests
 ├── parser/                      # JSON response parsing
 │   ├── parser.go                # API response data parsing

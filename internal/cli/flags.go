@@ -6,18 +6,24 @@ import "flag"
 
 // Flags holds all command-line flag values.
 type Flags struct {
-	ConfigFile     string
-	Continuous     bool
-	OAuthSetup     bool
-	ClearCache     bool
-	ClearCacheDate string
-	ClearAllCache  bool
-	TestDate       string
-	TrueUp         string
-	Validation     bool
-	NoCache        bool
-	CachedMode     bool
-	Debug          bool
+	ConfigFile         string
+	CredentialsFile    string
+	Credential         string
+	Continuous         bool
+	Initialize         bool
+	Force              bool
+	UpdateRefreshToken bool
+	All                bool
+	ClearCache         bool
+	ClearCacheDate     string
+	ClearAllCache      bool
+	TestDate           string
+	BackfillFrom       string
+	TrueUp             string
+	Validation         bool
+	NoCache            bool
+	CachedMode         bool
+	Debug              bool
 }
 
 // ParseFlags parses command-line flags and returns the flag values.
@@ -25,12 +31,17 @@ func ParseFlags() *Flags {
 	flags := &Flags{}
 
 	flag.StringVar(&flags.ConfigFile, "config", "config.yaml", "Path to configuration file")
+	flag.StringVar(&flags.CredentialsFile, "credentials", "credentials.yaml", "Path to credentials file holding the credentials: list (OAuth key/secret/refresh token per credential set)")
 	flag.BoolVar(&flags.Continuous, "continuous", false, "Run continuously with periodic refresh (default is run once and exit)")
-	flag.BoolVar(&flags.OAuthSetup, "oauth-setup", false, "Run OAuth setup wizard (one-time for developer plan)")
+	flag.BoolVar(&flags.Initialize, "init", false, "Initialize: resolve and cache the systems' location for weather reporting (run once before normal use; re-run if the cache is cleared)")
+	flag.BoolVar(&flags.Force, "force", false, "With --init, re-resolve the location from the API even if a cached value already exists. With --backfill-from, re-fetch and overwrite history records that already exist instead of skipping them.")
+	flag.BoolVar(&flags.UpdateRefreshToken, "update-refresh-token", false, "Run the OAuth wizard to obtain a refresh token and save it into credentials.yaml. Pass the credential name as an argument when more than one is configured: --update-refresh-token <name>")
+	flag.BoolVar(&flags.All, "all", false, "With --update-refresh-token, re-authorize every configured credential in turn")
 	flag.BoolVar(&flags.ClearCache, "clear-cache", false, "Clear cached API responses for today's date only (preserves yesterday and earlier)")
 	flag.StringVar(&flags.ClearCacheDate, "clear-cache-date", "", "Clear cached API responses whose queried date matches YYYY-MM-DD (e.g. 2026-01-19). Matches the query start date exactly: a day query for that date, plus any month/year aggregate that starts on it.")
 	flag.BoolVar(&flags.ClearAllCache, "clear-all-cache", false, "Clear all cached API responses (all dates)")
 	flag.StringVar(&flags.TestDate, "date", "", "Query a specific date/period. Formats: YYYY-MM-DD (day), YYYY-MM (month), YYYY (year). Examples: 2026-01-19, 2026-01, 2026. Defaults to today if not specified.")
+	flag.StringVar(&flags.BackfillFrom, "backfill-from", "", "Backfill Mode: fetch each day from this date (YYYY-MM-DD) through --date (or yesterday) with live API calls, writing one JSON record per day into history/. Skips days already written unless --force is given. Cannot be combined with --continuous, --true-up, or --init.")
 	flag.StringVar(&flags.TrueUp, "true-up", "", "Activate True-Up Mode. Provide your utility True-Up Start Date in YYYY-MM-DD format (e.g. 2025-01-15). Covers the 12-month True-Up Window: full calendar months from that month through yesterday (Current Period) or the last day of the 12-month window (Past True-Up Period). Takes precedence over --date.")
 	flag.BoolVar(&flags.Validation, "test", false, "Validation Mode: use cache only, no live API calls, validate against expected values")
 	flag.BoolVar(&flags.NoCache, "no-cache", false, "Bypass cache and always make live API calls")
@@ -38,6 +49,11 @@ func ParseFlags() *Flags {
 	flag.BoolVar(&flags.Debug, "debug", false, "Print debug information: last run time, API budget, and cache/API decisions")
 
 	flag.Parse()
+
+	// The first positional argument names the credential for --update-refresh-token
+	// (e.g. `enphase-monitor --update-refresh-token app-011`). Optional when only one
+	// credential is configured.
+	flags.Credential = flag.Arg(0)
 
 	return flags
 }

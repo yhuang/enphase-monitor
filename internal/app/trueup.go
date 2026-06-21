@@ -29,8 +29,7 @@ func RunTrueUp(ctx context.Context, rc RunConfig, trueUpStartStr string) error {
 	endDay := trueUpWindowEnd(trueUpStart, now)
 	endDate := time.Date(endDay.Year(), endDay.Month(), endDay.Day(), 23, 59, 59, 0, rc.ReportTZ)
 
-	aggSystems, aggAPIConfig := GetAggregatorTypes(rc.Cfg)
-	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, trueUpStart, constants.QueryModeTrueUp, rc.ReportTZ)
+	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, GetSystems(rc.Cfg), rc.Pool, trueUpStart, constants.QueryModeTrueUp, rc.ReportTZ)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil
