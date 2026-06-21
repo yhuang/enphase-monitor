@@ -24,9 +24,9 @@ var ErrCacheIncomplete = errors.New("cached report unavailable: one or more endp
 // trueUpStart, when non-empty, selects the True-Up Mode path (mirrors RunTrueUp).
 // Otherwise rc.TestDate and rc.QueryMode drive the query mode.
 func RunCacheReport(ctx context.Context, rc RunConfig, trueUpStart string) error {
-	systems, apiConfig := GetAggregatorTypes(rc.Cfg)
-	if apiConfig == nil || apiConfig.Key == "" {
-		return errors.New("api.key required to check cache")
+	systems := GetSystems(rc.Cfg)
+	if rc.Pool == nil || rc.Pool.Len() == 0 {
+		return errors.New("at least one credential is required to check cache")
 	}
 
 	// Determine the effective date and query mode for the cache pre-check.
@@ -42,11 +42,15 @@ func RunCacheReport(ctx context.Context, rc RunConfig, trueUpStart string) error
 		effectiveQueryMode = constants.QueryModeTrueUp
 	}
 
-	// Check each system's cache coverage.
+	// Check each system's cache coverage. The cache key is derived from the
+	// request URL, which embeds the API key, so each system must be checked with
+	// the same credential it is assigned for fetching (pool.ForSystem) — otherwise
+	// the check would look under a different cache key than RunOnce uses.
 	statuses := make([]api.SystemCacheStatus, 0, len(systems))
 	allComplete := true
-	for _, sys := range systems {
-		s := api.CheckCacheForSystem(sys.ID, sys.Name, apiConfig.Key, effectiveDate, effectiveQueryMode, rc.ReportTZ)
+	for i, sys := range systems {
+		apiKey := rc.Pool.ForSystem(i).Key
+		s := api.CheckCacheForSystem(sys.ID, sys.Name, apiKey, effectiveDate, effectiveQueryMode, rc.ReportTZ)
 		statuses = append(statuses, s)
 		if !s.AllRequiredPresent() {
 			allComplete = false

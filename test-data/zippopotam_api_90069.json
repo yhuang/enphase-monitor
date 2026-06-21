@@ -1,0 +1,14 @@
+{
+  "country": "United States",
+  "country abbreviation": "US",
+  "post code": "90069",
+  "places": [
+    {
+      "place name": "West Hollywood",
+      "longitude": "-118.3788",
+      "latitude": "34.0906",
+      "state": "California",
+      "state abbreviation": "CA"
+    }
+  ]
+}

@@ -10,3 +10,8 @@ scripts/
 
 # Compiled binary at repo root
 enphase-monitor
+
+# Runtime data and test fixtures — not source architecture
+cache/
+history/
+test-data/

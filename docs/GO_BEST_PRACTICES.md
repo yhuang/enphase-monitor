@@ -882,15 +882,15 @@ ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.
 defer stop()
 app.RunOnce(ctx, rc, validationMode)
 
-// Good: OAuth setup receives ctx so Ctrl+C cancels token exchange
-oauth.Setup(ctx, cfg)
+// Good: OAuth authorization receives ctx so Ctrl+C cancels token exchange
+oauth.Authorize(ctx, cred)
 ```
 
 ### In this codebase
 
 - **First parameter** — All context-using functions take `ctx context.Context` as the first parameter (`RunOnce`, `GetAccessToken`, `ExchangeAuthorizationCode`, `GetMetricsFromCloud`, etc.).
 - **No context in structs** — `EnlightenCloudClient`, `DataAggregator`, and `Display` do not store context; it is passed into methods.
-- **Propagation** — `main` creates a signal context and passes it to `RunOnce`/`RunContinuous` and to `oauth.Setup` so shutdown and Ctrl+C cancel in-flight work.
+- **Propagation** — `main` creates a signal context and passes it to `RunOnce`/`RunContinuous` and to `oauth.Authorize` so shutdown and Ctrl+C cancel in-flight work.
 
 ---
 

@@ -310,7 +310,7 @@ func TestValidateMetrics_MissingFile_HelpfulError(t *testing.T) {
 
 	t.Run("contains file path", func(t *testing.T) {
 		// The error should tell the user WHERE the file should be
-		if !strings.Contains(errMsg, "test-data/expected_values_") {
+		if !strings.Contains(errMsg, "test-data/enphase_api_") {
 			t.Error("Error message should contain expected file path")
 		}
 	})

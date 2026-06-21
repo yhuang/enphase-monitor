@@ -10,38 +10,51 @@
 //
 // CONFIGURATION TEMPLATE
 // ----------------------
-// See config.yaml.example for a complete configuration template with detailed comments.
-// For setup instructions, see QUICKSTART.md or README.md
+// See config.yaml.example and credentials.yaml.example for complete templates
+// with detailed comments. For setup instructions, see QUICKSTART.md or README.md
 //
 // CONFIGURATION STRUCTURE
 // -----------------------
-// The configuration is defined in config.yaml with three main sections:
+// Configuration is split across two files:
 //
-//  1. API Configuration (api:)
-//     - OAuth credentials (key, client_id, client_secret)
-//     - OAuth settings (authorization_url, redirect_uri)
-//     - Refresh token (obtained from --oauth-setup)
+//  1. credentials.yaml — secrets, loaded by LoadCredentials():
+//     - Credentials (credentials:): a list of one or more credential sets, each
+//     with a unique name plus OAuth fields (key, client_id, client_secret),
+//     OAuth settings (authorization_url, redirect_uri), and the refresh_token
+//     (obtained from --update-refresh-token). The app rotates across the pool to spread
+//     the per-key rate limit and to fail over when a key is throttled.
 //
-//  2. Systems Configuration (systems:)
-//     - List of Systems to monitor
-//     - Each system requires: name and ID (system ID from Enlighten)
-//
-//  3. Application Settings
+//  2. config.yaml — non-secret settings, loaded by LoadConfig():
+//     - Systems Configuration (systems:): list of Systems to monitor; each
+//     requires a name and ID (system ID from Enlighten)
+//     - Shared OAuth settings (api:): the non-secret authorization_url and
+//     redirect_uri shared by every credential set, so they need not be repeated
+//     in each credentials.yaml entry
 //     - refresh_interval: How often to query API (seconds)
 //     - timezone: Optional timezone for reporting/display (e.g., "US/Pacific")
 //     - colors: Optional color customization (hex codes or ANSI)
 //
+// The secrets (key/client_id/client_secret/refresh_token) are kept out of
+// config.yaml so the non-secret settings can be shared/committed while the
+// credentials file stays local. Config.ApplyCredentials() copies the shared api:
+// settings into each credential, attaches the credential pool to the Config, and
+// validates it.
+//
 // VALIDATION
 // ----------
-// LoadConfig() performs comprehensive validation:
-//   - Ensures all required API fields are present
+// LoadConfig() validates the non-secret config:
 //   - Validates each system has a name and ID
 //   - Checks refresh_interval is positive and clamps values below the API Budget
 //     window (60s) up to that floor, since faster refreshes exhaust the budget;
 //     the pre-clamp value is recorded in RefreshIntervalClampedFromSeconds so
 //     Continuous Mode can warn (the only place refresh_interval is used)
-//   - Trims whitespace from refresh_token (common copy/paste issue)
 //   - Sets default refresh_interval to 3600 (1 hour) if not specified
+//
+// ApplyCredentials() validates the credential pool:
+//   - Requires at least one credential set
+//   - Ensures each set has a unique name and all required API fields
+//     (key, client_id, client_secret)
+//   - Trims whitespace from each refresh_token (common copy/paste issue)
 //
 // COLOR CUSTOMIZATION
 // -------------------
@@ -164,9 +177,24 @@ func (c *ColorConfig) convertHexFields() {
 	}
 }
 
+// OAuthSettings holds the non-secret OAuth settings shared by every credential
+// set: the token endpoint (authorization_url) and the redirect URI. They live in
+// config.yaml under api: so they need not be repeated in each credentials.yaml
+// entry. ApplyCredentials copies them into any credential that does not set its
+// own (per-credential values take precedence; authorization_url falls back to a
+// built-in default).
+type OAuthSettings struct {
+	AuthorizationURL string `yaml:"authorization_url,omitempty"`
+	RedirectURI      string `yaml:"redirect_uri,omitempty"`
+}
+
 // Config represents the application configuration.
 type Config struct {
-	API                    *APIConfig     `yaml:"api,omitempty"` // API configuration
+	API *OAuthSettings `yaml:"api,omitempty"` // Shared, non-secret OAuth settings (token endpoint, redirect URI)
+
+	// Credentials is the pool of API credential sets, populated by
+	// ApplyCredentials from credentials.yaml (not parsed from config.yaml).
+	Credentials            []*APIConfig   `yaml:"-"`
 	Systems                []SystemConfig `yaml:"systems"`
 	RefreshIntervalSeconds int            `yaml:"refresh_interval"`   // How often to query API (seconds)
 	Colors                 *ColorConfig   `yaml:"colors,omitempty"`   // Color customization
@@ -202,13 +230,6 @@ func LoadConfig(filename string) (*Config, error) {
 		if sys.ID == "" {
 			return nil, fmt.Errorf("%s (system %d: %s) for Cloud API", constants.ErrInvalidSystemID, i, sys.Name)
 		}
-		// API credentials are required for Cloud API
-		if config.API == nil {
-			return nil, fmt.Errorf("%s for system %d (%s) using Cloud API", constants.ErrAPIConfigRequired, i, sys.Name)
-		}
-		if config.API.Key == "" || config.API.ClientID == "" || config.API.ClientSecret == "" {
-			return nil, fmt.Errorf("api.key, api.client_id, and api.client_secret required for system %d (%s) using Cloud API", i, sys.Name)
-		}
 	}
 
 	// Default refresh interval to 1 hour if not specified or invalid.
@@ -222,11 +243,6 @@ func LoadConfig(filename string) (*Config, error) {
 		// keep clean output.
 		config.RefreshIntervalClampedFromSeconds = config.RefreshIntervalSeconds
 		config.RefreshIntervalSeconds = constants.APIBudgetWindowSeconds
-	}
-
-	// Trim whitespace from refresh token (common issue with copy/paste)
-	if config.API.RefreshToken != "" {
-		config.API.RefreshToken = strings.TrimSpace(config.API.RefreshToken)
 	}
 
 	// Convert hex color codes to ANSI codes if needed

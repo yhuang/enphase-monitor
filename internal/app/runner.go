@@ -20,6 +20,7 @@ import (
 	"enphase-monitor/internal/aggregator"
 	"enphase-monitor/internal/config"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/credentials"
 	"enphase-monitor/internal/display"
 	"enphase-monitor/internal/validation"
 )
@@ -27,24 +28,30 @@ import (
 // RunConfig groups the parameters shared across RunOnce, RunContinuous, and fetchAndDisplay.
 type RunConfig struct {
 	Agg       *aggregator.DataAggregator
+	Pool      *credentials.Pool
 	Disp      *display.Display
 	Cfg       *config.Config
 	TestDate  time.Time
 	QueryMode constants.QueryMode
 	ReportTZ  *time.Location
 	Debug     bool
+
+	// Location and Weather drive best-effort weather enrichment for Day-Mode
+	// reports. Both nil (e.g. cache-only and true-up paths) disables it.
+	// See weather.go.
+	Location CoordinateProvider
+	Weather  WeatherProvider
 }
 
 // RunOnce executes a single query, displays results, and returns an error on failure.
 // The caller (main) is responsible for exiting with a non-zero code.
 func RunOnce(ctx context.Context, rc RunConfig, validationMode bool) error {
-	aggSystems, aggAPIConfig := GetAggregatorTypes(rc.Cfg)
-
-	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, rc.TestDate, rc.QueryMode, rc.ReportTZ)
+	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, GetSystems(rc.Cfg), rc.Pool, rc.TestDate, rc.QueryMode, rc.ReportTZ)
 	if err != nil {
 		return err
 	}
 
+	enrichWithTemperature(ctx, rc, metrics)
 	rc.Disp.ShowMetrics(metrics)
 
 	// If in Validation Mode and test date is provided, validate against expected values
@@ -98,9 +105,7 @@ func RunContinuous(ctx context.Context, rc RunConfig) error {
 // Returns a non-nil error only on fatal failures (e.g. 429); caller may exit.
 // On non-fatal errors it shows the error and returns nil so the loop can continue.
 func fetchAndDisplay(ctx context.Context, rc RunConfig) error {
-	aggSystems, aggAPIConfig := GetAggregatorTypes(rc.Cfg)
-
-	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, aggSystems, aggAPIConfig, rc.TestDate, rc.QueryMode, rc.ReportTZ)
+	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, GetSystems(rc.Cfg), rc.Pool, rc.TestDate, rc.QueryMode, rc.ReportTZ)
 	if err != nil {
 		// If context was cancelled (shutdown in progress), exit silently
 		if ctx.Err() != nil {
@@ -119,6 +124,7 @@ func fetchAndDisplay(ctx context.Context, rc RunConfig) error {
 		rc.Disp.ClearScreen()
 	}
 
+	enrichWithTemperature(ctx, rc, metrics)
 	rc.Disp.ShowMetrics(metrics)
 	return nil
 }

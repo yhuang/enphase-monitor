@@ -6,11 +6,90 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"enphase-monitor/internal/types"
 )
+
+// TestGetAccessToken_RetriesOn5xx verifies transient 5xx responses are retried
+// and eventually succeed.
+func TestGetAccessToken_RetriesOn5xx(t *testing.T) {
+	originalCache := tokenCache
+	tokenCache = make(map[string]*TokenCache)
+	origBackoff := tokenRetryBackoff
+	tokenRetryBackoff = time.Millisecond
+	defer func() { tokenCache = originalCache; tokenRetryBackoff = origBackoff }()
+
+	var hits int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&hits, 1) < 3 {
+			w.WriteHeader(http.StatusInternalServerError) // fail the first two
+			return
+		}
+		_ = json.NewEncoder(w).Encode(TokenResponse{AccessToken: "after-retry", ExpiresIn: 3600})
+	}))
+	defer server.Close()
+
+	cfg := &types.APIConfig{Key: "k", AuthorizationURL: server.URL, ClientID: "retry-client", ClientSecret: "s", RefreshToken: "rt"}
+	tok, err := GetAccessToken(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("GetAccessToken() error = %v", err)
+	}
+	if tok != "after-retry" {
+		t.Errorf("token = %q, want after-retry", tok)
+	}
+	if got := atomic.LoadInt32(&hits); got != 3 {
+		t.Errorf("server hits = %d, want 3 (2 retries then success)", got)
+	}
+}
+
+// TestGetAccessToken_GivesUpAfterMax5xx verifies retries are bounded.
+func TestGetAccessToken_GivesUpAfterMax5xx(t *testing.T) {
+	originalCache := tokenCache
+	tokenCache = make(map[string]*TokenCache)
+	origBackoff := tokenRetryBackoff
+	tokenRetryBackoff = time.Millisecond
+	defer func() { tokenCache = originalCache; tokenRetryBackoff = origBackoff }()
+
+	var hits int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		w.WriteHeader(http.StatusBadGateway) // always 502
+	}))
+	defer server.Close()
+
+	cfg := &types.APIConfig{Key: "k", AuthorizationURL: server.URL, ClientID: "giveup-client", ClientSecret: "s", RefreshToken: "rt"}
+	if _, err := GetAccessToken(context.Background(), cfg); err == nil {
+		t.Fatal("expected error after exhausting retries")
+	}
+	if got := atomic.LoadInt32(&hits); got != tokenMaxAttempts {
+		t.Errorf("server hits = %d, want %d (no more than the attempt cap)", got, tokenMaxAttempts)
+	}
+}
+
+// TestGetAccessToken_DoesNotRetry4xx verifies client errors are not retried.
+func TestGetAccessToken_DoesNotRetry4xx(t *testing.T) {
+	originalCache := tokenCache
+	tokenCache = make(map[string]*TokenCache)
+	defer func() { tokenCache = originalCache }()
+
+	var hits int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		w.WriteHeader(http.StatusUnauthorized) // 401
+	}))
+	defer server.Close()
+
+	cfg := &types.APIConfig{Key: "k", AuthorizationURL: server.URL, ClientID: "no-retry-client", ClientSecret: "s", RefreshToken: "rt"}
+	if _, err := GetAccessToken(context.Background(), cfg); err == nil {
+		t.Fatal("expected error for 401")
+	}
+	if got := atomic.LoadInt32(&hits); got != 1 {
+		t.Errorf("server hits = %d, want 1 (4xx must not be retried)", got)
+	}
+}
 
 // TestExchangeAuthorizationCode_Success tests successful token exchange with mock HTTP server
 func TestExchangeAuthorizationCode_Success(t *testing.T) {
@@ -183,7 +262,7 @@ func TestExchangeAuthorizationCode_InvalidJSON(t *testing.T) {
 func TestGetAccessToken_WithRefreshToken(t *testing.T) {
 	// Clear token cache before test
 	originalCache := tokenCache
-	tokenCache = nil
+	tokenCache = make(map[string]*TokenCache)
 	defer func() {
 		tokenCache = originalCache
 	}()
@@ -235,17 +314,18 @@ func TestGetAccessToken_WithRefreshToken(t *testing.T) {
 	}
 
 	// Verify token was cached
-	if tokenCache == nil {
+	cached := tokenCache["test-client-id"]
+	if cached == nil {
 		t.Fatal("Token should be cached")
 	}
-	if tokenCache.Token != "new-access-token" {
-		t.Errorf("Cached token = %s, want new-access-token", tokenCache.Token)
+	if cached.Token != "new-access-token" {
+		t.Errorf("Cached token = %s, want new-access-token", cached.Token)
 	}
 
 	// Verify expiration time is reasonable (should be ~1 hour from now)
 	expectedExpiry := time.Now().Add(3600 * time.Second)
-	if tokenCache.ExpiresAt.Before(time.Now()) || tokenCache.ExpiresAt.After(expectedExpiry.Add(1*time.Minute)) {
-		t.Errorf("ExpiresAt = %v, expected around %v", tokenCache.ExpiresAt, expectedExpiry)
+	if cached.ExpiresAt.Before(time.Now()) || cached.ExpiresAt.After(expectedExpiry.Add(1*time.Minute)) {
+		t.Errorf("ExpiresAt = %v, expected around %v", cached.ExpiresAt, expectedExpiry)
 	}
 }
 
@@ -253,7 +333,7 @@ func TestGetAccessToken_WithRefreshToken(t *testing.T) {
 func TestGetAccessToken_WithPasswordGrant(t *testing.T) {
 	// Clear token cache before test
 	originalCache := tokenCache
-	tokenCache = nil
+	tokenCache = make(map[string]*TokenCache)
 	defer func() {
 		tokenCache = originalCache
 	}()
@@ -312,11 +392,11 @@ func TestGetAccessToken_WithPasswordGrant(t *testing.T) {
 func TestGetAccessToken_CacheHit(t *testing.T) {
 	// Set up cache with valid token
 	originalCache := tokenCache
-	tokenCache = &TokenCache{
+	tokenCache = map[string]*TokenCache{"test-client-id": {
 		Token:        "cached-token",
 		RefreshToken: "cached-refresh",
 		ExpiresAt:    time.Now().Add(30 * time.Minute), // Valid for 30 more minutes
-	}
+	}}
 	defer func() {
 		tokenCache = originalCache
 	}()
@@ -355,11 +435,11 @@ func TestGetAccessToken_CacheHit(t *testing.T) {
 func TestGetAccessToken_CacheMiss_NearExpiry(t *testing.T) {
 	// Set up cache with token that expires soon (within buffer window)
 	originalCache := tokenCache
-	tokenCache = &TokenCache{
+	tokenCache = map[string]*TokenCache{"test-client-id": {
 		Token:        "expiring-token",
 		RefreshToken: "test-refresh",
 		ExpiresAt:    time.Now().Add(3 * time.Minute), // Expires in 3 minutes (< 5 min buffer)
-	}
+	}}
 	defer func() {
 		tokenCache = originalCache
 	}()
@@ -406,7 +486,7 @@ func TestGetAccessToken_CacheMiss_NearExpiry(t *testing.T) {
 func TestGetAccessToken_EmptyAccessToken(t *testing.T) {
 	// Clear token cache
 	originalCache := tokenCache
-	tokenCache = nil
+	tokenCache = make(map[string]*TokenCache)
 	defer func() {
 		tokenCache = originalCache
 	}()
@@ -446,7 +526,7 @@ func TestGetAccessToken_EmptyAccessToken(t *testing.T) {
 func TestGetAccessToken_UnauthorizedError(t *testing.T) {
 	// Clear token cache
 	originalCache := tokenCache
-	tokenCache = nil
+	tokenCache = make(map[string]*TokenCache)
 	defer func() {
 		tokenCache = originalCache
 	}()
@@ -459,7 +539,7 @@ func TestGetAccessToken_UnauthorizedError(t *testing.T) {
 		{
 			name:              "with_refresh_token",
 			hasRefreshToken:   true,
-			expectedErrSubstr: "--oauth-setup",
+			expectedErrSubstr: "--update-refresh-token",
 		},
 		{
 			name:              "without_refresh_token",
@@ -508,7 +588,7 @@ func TestGetAccessToken_UnauthorizedError(t *testing.T) {
 func TestGetAccessToken_DefaultExpiresIn(t *testing.T) {
 	// Clear token cache
 	originalCache := tokenCache
-	tokenCache = nil
+	tokenCache = make(map[string]*TokenCache)
 	defer func() {
 		tokenCache = originalCache
 	}()
@@ -540,14 +620,15 @@ func TestGetAccessToken_DefaultExpiresIn(t *testing.T) {
 	}
 
 	// Verify default expires_in of 3600 seconds (1 hour) was used
-	if tokenCache == nil {
+	cached := tokenCache["test-client-id"]
+	if cached == nil {
 		t.Fatal("Token should be cached")
 	}
 
 	expectedExpiry := time.Now().Add(3600 * time.Second)
 	// Allow 1 minute tolerance for test execution time
-	if tokenCache.ExpiresAt.Before(time.Now()) || tokenCache.ExpiresAt.After(expectedExpiry.Add(1*time.Minute)) {
-		t.Errorf("ExpiresAt = %v, expected around %v (default 1 hour)", tokenCache.ExpiresAt, expectedExpiry)
+	if cached.ExpiresAt.Before(time.Now()) || cached.ExpiresAt.After(expectedExpiry.Add(1*time.Minute)) {
+		t.Errorf("ExpiresAt = %v, expected around %v (default 1 hour)", cached.ExpiresAt, expectedExpiry)
 	}
 }
 
@@ -555,11 +636,11 @@ func TestGetAccessToken_DefaultExpiresIn(t *testing.T) {
 func TestGetAccessToken_PreservesRefreshToken(t *testing.T) {
 	// Set up cache with existing refresh token
 	originalCache := tokenCache
-	tokenCache = &TokenCache{
+	tokenCache = map[string]*TokenCache{"test-client-id": {
 		Token:        "old-token",
 		RefreshToken: "existing-refresh-token",
 		ExpiresAt:    time.Now().Add(-1 * time.Hour), // Expired
-	}
+	}}
 	defer func() {
 		tokenCache = originalCache
 	}()
@@ -592,7 +673,7 @@ func TestGetAccessToken_PreservesRefreshToken(t *testing.T) {
 	}
 
 	// Verify existing refresh token was preserved
-	if tokenCache.RefreshToken != "existing-refresh-token" {
-		t.Errorf("RefreshToken = %s, want existing-refresh-token (should be preserved)", tokenCache.RefreshToken)
+	if cached := tokenCache["test-client-id"]; cached.RefreshToken != "existing-refresh-token" {
+		t.Errorf("RefreshToken = %s, want existing-refresh-token (should be preserved)", cached.RefreshToken)
 	}
 }

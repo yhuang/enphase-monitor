@@ -27,6 +27,37 @@ type AggregatedMetrics struct {
 	// Cache status
 	CacheUsed    bool // True if any cached data was used
 	AllFromCache bool // True only when every System was served entirely from Cache
+
+	// Weather for the queried day, populated best-effort by the app layer for
+	// Day Mode only (never for month, year, true-up, or cache-only reports).
+	// Nil when the query mode is not Day or the weather lookup failed; consumers
+	// must nil-check before reading.
+	Weather *DailyWeather
+}
+
+// DailyWeather is the day's weather summary attached to a Day-Mode report.
+// It mirrors weather.DailyWeather but is defined here so the aggregator and
+// display packages do not depend on the weather package (the app layer maps
+// between them).
+type DailyWeather struct {
+	TempHigh        float64
+	TempLow         float64
+	TempUnit        string  // display symbol, e.g. "°F"
+	WeatherCode     int     // WMO weather interpretation code (precise; Condition is its collapsed label)
+	Condition       string  // human-readable label (from WMO weather code)
+	CloudCoverPct   float64 // mean cloud cover, %
+	PrecipitationMM float64 // total precipitation, mm
+	SolarRadiation  float64 // daily shortwave radiation, kWh/m²
+
+	// Current snapshot ("now"), populated only for a live today report. When
+	// HasCurrent, the display shows these instantaneous values for condition and
+	// temperature alongside the day's high/low range. Display-only — the dataset
+	// and export use the daily aggregates above.
+	HasCurrent             bool
+	CurrentTemp            float64
+	CurrentCondition       string
+	CurrentCloudCoverPct   float64
+	CurrentPrecipitationMM float64
 }
 
 // TrueUpReport holds energy metrics for a True-Up Period.

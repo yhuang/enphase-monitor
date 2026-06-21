@@ -1,91 +1,11 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "e447f94996b4c5a70e17d5230b93df1f9361e768",
-  "generatedAt": "2026-05-23T08:32:31.837Z",
+  "gitCommitHash": "5bb35864e0fca163131660e8d46555077be09cd6",
+  "generatedAt": "2026-06-21T01:58:50.224Z",
   "files": {
-    ".golangci.yml": {
-      "filePath": ".golangci.yml",
-      "contentHash": "d9ebb1b76c89ba71a1eb7910ff3f0ca6d1d9e4047bbd639d28c387c4aaf8422c",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 26,
-      "hasStructuralAnalysis": true
-    },
-    "CONTEXT.md": {
-      "filePath": "CONTEXT.md",
-      "contentHash": "f7fef90225f305b2b6977c3a35d34d60eea97c50c20ac3acd3c835ff58204e92",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 147,
-      "hasStructuralAnalysis": true
-    },
-    "Makefile": {
-      "filePath": "Makefile",
-      "contentHash": "70dd32c04d58355591e25418c9af345e29ceab30416f074555f480851a42369c",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 99,
-      "hasStructuralAnalysis": true
-    },
-    "QUICKSTART.md": {
-      "filePath": "QUICKSTART.md",
-      "contentHash": "e19c6e49ea0812f4fbecd884535857a54b4ab0f926d12aaba701d43447210f08",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 147,
-      "hasStructuralAnalysis": true
-    },
-    "README.md": {
-      "filePath": "README.md",
-      "contentHash": "01814d1455a94469783cf8f4237e1ea958bef8f8a6f30542d2bb57fc936cdf3d",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 998,
-      "hasStructuralAnalysis": true
-    },
-    "config.yaml.example": {
-      "filePath": "config.yaml.example",
-      "contentHash": "5a3ffe7fff99282776337b78fb7ba72189610605dc2c455bb3dbad7eb1a5810b",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 51,
-      "hasStructuralAnalysis": false
-    },
-    "go.mod": {
-      "filePath": "go.mod",
-      "contentHash": "964eb3384ccd51a4b95b1c5311336e02eb917f41815d68012eb4c89f2073fce6",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 6,
-      "hasStructuralAnalysis": false
-    },
-    "go.sum": {
-      "filePath": "go.sum",
-      "contentHash": "e42794fa9b56301ad073de55cac1dea683b320ed951454d8709ffc7156088dd2",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 5,
-      "hasStructuralAnalysis": false
-    },
     "internal/aggregator/aggregator.go": {
       "filePath": "internal/aggregator/aggregator.go",
-      "contentHash": "415f9e1b0a64ebea9acef9d3de845c587d6639de3c181fb7a51554cd72b01441",
+      "contentHash": "6d2c8a3dc567dc77e1fd846f824f59a307a7c55963499a48edbf414f32e67688",
       "functions": [
         {
           "name": "defaultCloudClientFactory",
@@ -96,7 +16,7 @@
             "accessToken",
             "tz"
           ],
-          "returnType": "api.CloudClient",
+          "returnType": "CloudClient",
           "exported": false,
           "lineCount": 3
         },
@@ -124,17 +44,36 @@
           "params": [
             "ctx",
             "systems",
-            "apiConfig",
+            "pool",
             "testDate",
             "queryMode",
             "reportTimezone"
           ],
           "returnType": "(*AggregatedMetrics, error)",
           "exported": true,
-          "lineCount": 99
+          "lineCount": 134
+        },
+        {
+          "name": "isContextError",
+          "params": [
+            "ctx",
+            "err"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 3
         }
       ],
       "classes": [
+        {
+          "name": "CloudClient",
+          "methods": [
+            "GetMetricsFromCloud"
+          ],
+          "properties": [],
+          "exported": true,
+          "lineCount": 3
+        },
         {
           "name": "DataAggregator",
           "methods": [
@@ -168,6 +107,18 @@
           ]
         },
         {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
           "source": "time",
           "specifiers": [
             "time"
@@ -186,6 +137,12 @@
           ]
         },
         {
+          "source": "enphase-monitor/internal/credentials",
+          "specifiers": [
+            "credentials"
+          ]
+        },
+        {
           "source": "enphase-monitor/internal/types",
           "specifiers": [
             "types"
@@ -193,17 +150,18 @@
         }
       ],
       "exports": [
+        "CloudClient",
         "DataAggregator",
         "NewDataAggregator",
         "NewDataAggregatorWithFactory",
         "GetAggregatedMetrics"
       ],
-      "totalLines": 179,
+      "totalLines": 231,
       "hasStructuralAnalysis": true
     },
     "internal/aggregator/aggregator_bench_test.go": {
       "filePath": "internal/aggregator/aggregator_bench_test.go",
-      "contentHash": "b15c28972845e58d9fde66711c5b9b0c6f66b0b9757e00201cc019bfbef61857",
+      "contentHash": "8328bdf9c9a709c46e88c1a02f0e7da466db71665f140f45b3342596c4c08bf0",
       "functions": [
         {
           "name": "GetMetricsFromCloud",
@@ -214,7 +172,7 @@
           ],
           "returnType": "(*api.LocalMetrics, bool, error)",
           "exported": true,
-          "lineCount": 3
+          "lineCount": 6
         },
         {
           "name": "GetEnergyImportForDate",
@@ -277,7 +235,7 @@
             "b"
           ],
           "exported": true,
-          "lineCount": 63
+          "lineCount": 55
         },
         {
           "name": "BenchmarkGetAggregatedMetrics_MultiSystem",
@@ -285,7 +243,7 @@
             "b"
           ],
           "exported": true,
-          "lineCount": 45
+          "lineCount": 46
         },
         {
           "name": "BenchmarkNetFlowCalculation",
@@ -346,6 +304,12 @@
           ]
         },
         {
+          "source": "enphase-monitor/internal/credentials",
+          "specifiers": [
+            "credentials"
+          ]
+        },
+        {
           "source": "enphase-monitor/internal/types",
           "specifiers": [
             "types"
@@ -363,13 +327,20 @@
         "BenchmarkGetAggregatedMetrics_MultiSystem",
         "BenchmarkNetFlowCalculation"
       ],
-      "totalLines": 308,
+      "totalLines": 163,
       "hasStructuralAnalysis": true
     },
     "internal/aggregator/aggregator_test.go": {
       "filePath": "internal/aggregator/aggregator_test.go",
-      "contentHash": "9ffc037e104e5cc0ee1a21c412a7eeac5e629b27485d326f9f2faa06e5651799",
+      "contentHash": "1a7cca1dee9ca2d7c5bea6260e30d445655de8bf1320ac05727f60179b60f422",
       "functions": [
+        {
+          "name": "poolOf",
+          "params": [],
+          "returnType": "*credentials.Pool",
+          "exported": false,
+          "lineCount": 3
+        },
         {
           "name": "mustLoadLocation",
           "params": [
@@ -389,7 +360,7 @@
           ],
           "returnType": "(*api.LocalMetrics, bool, error)",
           "exported": true,
-          "lineCount": 6
+          "lineCount": 9
         },
         {
           "name": "GetEnergyImportForDate",
@@ -503,6 +474,38 @@
           "lineCount": 17
         },
         {
+          "name": "TestGetAggregatedMetrics_FailoverOn429",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "TestGetAggregatedMetrics_TokenFailover",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "TestGetAggregatedMetrics_AllCredentialsTokenFail",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "TestGetAggregatedMetrics_AllCredentialsRateLimited",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
           "name": "TestGetAggregatedMetrics_ContextCancellation",
           "params": [
             "t"
@@ -567,6 +570,12 @@
           "specifiers": [
             "constants"
           ]
+        },
+        {
+          "source": "enphase-monitor/internal/credentials",
+          "specifiers": [
+            "credentials"
+          ]
         }
       ],
       "exports": [
@@ -584,14 +593,18 @@
         "TestGetAggregatedMetrics_MissingAPIConfig",
         "TestGetAggregatedMetrics_MissingAPIKey",
         "TestGetAggregatedMetrics_TokenError",
+        "TestGetAggregatedMetrics_FailoverOn429",
+        "TestGetAggregatedMetrics_TokenFailover",
+        "TestGetAggregatedMetrics_AllCredentialsTokenFail",
+        "TestGetAggregatedMetrics_AllCredentialsRateLimited",
         "TestGetAggregatedMetrics_ContextCancellation"
       ],
-      "totalLines": 385,
+      "totalLines": 470,
       "hasStructuralAnalysis": true
     },
     "internal/aggregator/types.go": {
       "filePath": "internal/aggregator/types.go",
-      "contentHash": "4a3f4edeb252be0168db894f1e6dd5256fcc5ce4afe2a4cae75e8f7c1bb24dcd",
+      "contentHash": "9ac1cd5814f6a13aedfaf076152c121cb39b35782c852cb025672a8e7c09513a",
       "functions": [],
       "classes": [
         {
@@ -608,10 +621,32 @@
             "NetFlowToday",
             "Systems",
             "CacheUsed",
-            "AllFromCache"
+            "AllFromCache",
+            "Weather"
           ],
           "exported": true,
-          "lineCount": 21
+          "lineCount": 27
+        },
+        {
+          "name": "DailyWeather",
+          "methods": [],
+          "properties": [
+            "TempHigh",
+            "TempLow",
+            "TempUnit",
+            "WeatherCode",
+            "Condition",
+            "CloudCoverPct",
+            "PrecipitationMM",
+            "SolarRadiation",
+            "HasCurrent",
+            "CurrentTemp",
+            "CurrentCondition",
+            "CurrentCloudCoverPct",
+            "CurrentPrecipitationMM"
+          ],
+          "exported": true,
+          "lineCount": 20
         },
         {
           "name": "TrueUpReport",
@@ -681,16 +716,17 @@
       ],
       "exports": [
         "AggregatedMetrics",
+        "DailyWeather",
         "TrueUpReport",
         "TrueUpSystemReport",
         "SystemMetrics"
       ],
-      "totalLines": 74,
+      "totalLines": 105,
       "hasStructuralAnalysis": true
     },
     "internal/api/cache_check.go": {
       "filePath": "internal/api/cache_check.go",
-      "contentHash": "6d83f411f0bee015a1ae537ae27220260b9be9ca05fd9a8324e83f67f2777033",
+      "contentHash": "4c1795c964ee3c0887abfd8d5cfc40a6fca696c960e6562a711c7927d98c6544",
       "functions": [
         {
           "name": "AllRequiredPresent",
@@ -743,12 +779,6 @@
       ],
       "imports": [
         {
-          "source": "fmt",
-          "specifiers": [
-            "fmt"
-          ]
-        },
-        {
           "source": "time",
           "specifiers": [
             "time"
@@ -771,6 +801,12 @@
           "specifiers": [
             "timezone"
           ]
+        },
+        {
+          "source": "enphase-monitor/internal/urlbuilder",
+          "specifiers": [
+            "urlbuilder"
+          ]
         }
       ],
       "exports": [
@@ -784,7 +820,7 @@
     },
     "internal/api/client.go": {
       "filePath": "internal/api/client.go",
-      "contentHash": "f5cb5fc2300d688cbede81a9fedf9eaae4e2d510ddc8f156da961bc918d28926",
+      "contentHash": "8dbc3f3bf63bb06b0618411a1db3d5fc1497be874a40b9466e24b3a44814daa5",
       "functions": [
         {
           "name": "WithSystemName",
@@ -851,7 +887,40 @@
           ],
           "returnType": "string",
           "exported": false,
-          "lineCount": 6
+          "lineCount": 3
+        },
+        {
+          "name": "parseProductionIntervals",
+          "params": [
+            "body"
+          ],
+          "returnType": "([]parser.TelemetryInterval, error)",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "fetchMetric",
+          "params": [
+            "ctx",
+            "m",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "fetchLifetimeMetric",
+          "params": [
+            "ctx",
+            "endpoint",
+            "testDate",
+            "queryMode"
+          ],
+          "returnType": "(float64, error)",
+          "exported": false,
+          "lineCount": 23
         },
         {
           "name": "GetEnergyImportForDate",
@@ -862,7 +931,7 @@
           ],
           "returnType": "(float64, error)",
           "exported": true,
-          "lineCount": 20
+          "lineCount": 3
         },
         {
           "name": "GetEnergyExportForDate",
@@ -873,7 +942,7 @@
           ],
           "returnType": "(float64, error)",
           "exported": true,
-          "lineCount": 17
+          "lineCount": 3
         },
         {
           "name": "GetProductionForDate",
@@ -884,7 +953,7 @@
           ],
           "returnType": "(float64, error)",
           "exported": true,
-          "lineCount": 20
+          "lineCount": 3
         },
         {
           "name": "GetConsumptionForDate",
@@ -895,7 +964,7 @@
           ],
           "returnType": "(float64, error)",
           "exported": true,
-          "lineCount": 17
+          "lineCount": 3
         },
         {
           "name": "GetBatteryDataForDate",
@@ -955,16 +1024,6 @@
           "lineCount": 16
         },
         {
-          "name": "cacheServable",
-          "params": [
-            "cached",
-            "maxAge"
-          ],
-          "returnType": "bool",
-          "exported": false,
-          "lineCount": 9
-        },
-        {
           "name": "serveRecentEndpointCache",
           "params": [
             "url",
@@ -994,51 +1053,93 @@
           ],
           "returnType": "(*http.Response, bool, error)",
           "exported": false,
-          "lineCount": 221
+          "lineCount": 36
         },
         {
-          "name": "getEnergyLifetime",
-          "params": [
-            "ctx",
-            "testDate",
-            "queryMode"
-          ],
-          "returnType": "(float64, error)",
+          "name": "has",
+          "params": [],
+          "returnType": "bool",
           "exported": false,
-          "lineCount": 31
+          "lineCount": 1
         },
         {
-          "name": "getConsumptionLifetime",
-          "params": [
-            "ctx",
-            "testDate",
-            "queryMode"
-          ],
-          "returnType": "(float64, error)",
+          "name": "serve",
+          "params": [],
+          "returnType": "(*http.Response, bool, error)",
           "exported": false,
-          "lineCount": 27
+          "lineCount": 3
         },
         {
-          "name": "getEnergyImportLifetime",
-          "params": [
-            "ctx",
-            "testDate",
-            "queryMode"
-          ],
-          "returnType": "(float64, error)",
+          "name": "reload",
+          "params": [],
+          "returnType": "(*cache.CachedResponse, bool)",
           "exported": false,
-          "lineCount": 27
+          "lineCount": 6
         },
         {
-          "name": "getEnergyExportLifetime",
+          "name": "crossDate",
+          "params": [],
+          "returnType": "(*http.Response, bool)",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "newAPIRequest",
           "params": [
             "ctx",
-            "testDate",
-            "queryMode"
+            "url"
           ],
-          "returnType": "(float64, error)",
+          "returnType": "(*http.Request, error)",
           "exported": false,
-          "lineCount": 27
+          "lineCount": 9
+        },
+        {
+          "name": "finalizeAndCache",
+          "params": [
+            "url",
+            "resp"
+          ],
+          "returnType": "(*http.Response, bool, error)",
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "serveValidationMode",
+          "params": [
+            "fb"
+          ],
+          "returnType": "(*http.Response, bool, error)",
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "requestNoCacheMode",
+          "params": [
+            "ctx",
+            "fb"
+          ],
+          "returnType": "(*http.Response, bool, error)",
+          "exported": false,
+          "lineCount": 35
+        },
+        {
+          "name": "serveBudgetExhausted",
+          "params": [
+            "fb"
+          ],
+          "returnType": "(*http.Response, bool, error)",
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "requestLiveMode",
+          "params": [
+            "ctx",
+            "fb"
+          ],
+          "returnType": "(*http.Response, bool, error)",
+          "exported": false,
+          "lineCount": 70
         }
       ],
       "classes": [
@@ -1049,6 +1150,8 @@
             "lifetimeEndDate",
             "fetchTelemetryData",
             "buildTelemetryURL",
+            "fetchMetric",
+            "fetchLifetimeMetric",
             "GetEnergyImportForDate",
             "GetEnergyExportForDate",
             "GetProductionForDate",
@@ -1058,10 +1161,12 @@
             "cacheMaxAge",
             "tryLoadPastDateCache",
             "makeCachedAPIRequest",
-            "getEnergyLifetime",
-            "getConsumptionLifetime",
-            "getEnergyImportLifetime",
-            "getEnergyExportLifetime"
+            "newAPIRequest",
+            "finalizeAndCache",
+            "serveValidationMode",
+            "requestNoCacheMode",
+            "serveBudgetExhausted",
+            "requestLiveMode"
           ],
           "properties": [
             "baseURL",
@@ -1075,6 +1180,35 @@
           ],
           "exported": true,
           "lineCount": 10
+        },
+        {
+          "name": "intervalMetric",
+          "methods": [],
+          "properties": [
+            "dayEndpoint",
+            "lifetimeEndpoint",
+            "field",
+            "parseDay"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "cacheFallback",
+          "methods": [
+            "has",
+            "serve",
+            "reload",
+            "crossDate"
+          ],
+          "properties": [
+            "c",
+            "url",
+            "cached",
+            "cacheErr"
+          ],
+          "exported": false,
+          "lineCount": 6
         }
       ],
       "imports": [
@@ -1094,6 +1228,12 @@
           "source": "encoding/json",
           "specifiers": [
             "json"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
           ]
         },
         {
@@ -1118,6 +1258,12 @@
           "source": "net/url",
           "specifiers": [
             "neturl"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
           ]
         },
         {
@@ -1161,6 +1307,12 @@
           "specifiers": [
             "timezone"
           ]
+        },
+        {
+          "source": "enphase-monitor/internal/urlbuilder",
+          "specifiers": [
+            "urlbuilder"
+          ]
         }
       ],
       "exports": [
@@ -1176,7 +1328,210 @@
         "QueryCost",
         "GetMetricsFromCloud"
       ],
-      "totalLines": 1078,
+      "totalLines": 1003,
+      "hasStructuralAnalysis": true
+    },
+    "internal/api/client_caching_test.go": {
+      "filePath": "internal/api/client_caching_test.go",
+      "contentHash": "d73ad7c8e4a02c65c91fcdc26d8f86db93376cfd10a4369806603fba9c4ebf7f",
+      "functions": [
+        {
+          "name": "newSwitchableServer",
+          "params": [],
+          "returnType": "*switchableServer",
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "setStatus",
+          "params": [
+            "code"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "newProdClient",
+          "params": [
+            "t",
+            "baseURL"
+          ],
+          "returnType": "*EnlightenCloudClient",
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "fetchToday",
+          "params": [
+            "client"
+          ],
+          "returnType": "(float64, error)",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "TestMakeCachedAPIRequest_ValidationMode_CacheHit",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "TestMakeCachedAPIRequest_ValidationMode_CacheMiss",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "TestMakeCachedAPIRequest_NoCache_429_FallsBackToCache",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 24
+        },
+        {
+          "name": "TestMakeCachedAPIRequest_NoCache_429_NoCache_RateLimitError",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "TestMakeCachedAPIRequest_NoCache_503_FallsBackToCache",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "TestMakeCachedAPIRequest_NoCache_503_NoCache_Error",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "TestMakeCachedAPIRequest_429_FallsBackToExistingCache",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "TestMakeCachedAPIRequest_503_FallsBackToExistingCache",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "TestMakeCachedAPIRequest_503_NoCache_Error",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "TestMakeCachedAPIRequest_NetworkError_FallsBackToCache",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 21
+        }
+      ],
+      "classes": [
+        {
+          "name": "switchableServer",
+          "methods": [
+            "setStatus"
+          ],
+          "properties": [
+            "status"
+          ],
+          "exported": false,
+          "lineCount": 4
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/http/httptest",
+          "specifiers": [
+            "httptest"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "sync/atomic",
+          "specifiers": [
+            "atomic"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "TestMakeCachedAPIRequest_ValidationMode_CacheHit",
+        "TestMakeCachedAPIRequest_ValidationMode_CacheMiss",
+        "TestMakeCachedAPIRequest_NoCache_429_FallsBackToCache",
+        "TestMakeCachedAPIRequest_NoCache_429_NoCache_RateLimitError",
+        "TestMakeCachedAPIRequest_NoCache_503_FallsBackToCache",
+        "TestMakeCachedAPIRequest_NoCache_503_NoCache_Error",
+        "TestMakeCachedAPIRequest_429_FallsBackToExistingCache",
+        "TestMakeCachedAPIRequest_503_FallsBackToExistingCache",
+        "TestMakeCachedAPIRequest_503_NoCache_Error",
+        "TestMakeCachedAPIRequest_NetworkError_FallsBackToCache"
+      ],
+      "totalLines": 319,
       "hasStructuralAnalysis": true
     },
     "internal/api/client_functional_test.go": {
@@ -1434,7 +1789,7 @@
     },
     "internal/api/client_lifetime_test.go": {
       "filePath": "internal/api/client_lifetime_test.go",
-      "contentHash": "1856677082ad8793e342d319cba06d54921477874e887f11dcdb02e1ee933f48",
+      "contentHash": "df421ba2c876c3817de11b4a5efbf16d6302894e3f070fdfa6047f8765a6297f",
       "functions": [
         {
           "name": "pastMonth",
@@ -1586,12 +1941,12 @@
         "TestGetEnergyImportForDate_RateLimited",
         "TestMaybeShowNoCacheFallbackWarning"
       ],
-      "totalLines": 306,
+      "totalLines": 305,
       "hasStructuralAnalysis": true
     },
     "internal/api/client_test.go": {
       "filePath": "internal/api/client_test.go",
-      "contentHash": "7ed9c5f064003372c1a8124ed3bbe6ea11358021da148d546288067026059d9a",
+      "contentHash": "459db7ee588dae04bc93d8d1dd3a764b803d64f2551ca524e20d14d4609da0ad",
       "functions": [
         {
           "name": "TestEnlightenCloudClient_GetProductionForDate",
@@ -1686,58 +2041,12 @@
         "TestTryLoadPastDateCache_InvalidURL",
         "TestTryLoadPastDateCache_NoMatch"
       ],
-      "totalLines": 203,
-      "hasStructuralAnalysis": true
-    },
-    "internal/api/interface.go": {
-      "filePath": "internal/api/interface.go",
-      "contentHash": "d23154f8f1f43ca86db929e3a81bfb12d13ba1dbc68de90b0c7ca94f48358b87",
-      "functions": [],
-      "classes": [
-        {
-          "name": "CloudClient",
-          "methods": [
-            "GetMetricsFromCloud",
-            "GetEnergyImportForDate",
-            "GetEnergyExportForDate",
-            "GetProductionForDate",
-            "GetConsumptionForDate",
-            "GetBatteryDataForDate"
-          ],
-          "properties": [],
-          "exported": true,
-          "lineCount": 77
-        }
-      ],
-      "imports": [
-        {
-          "source": "context",
-          "specifiers": [
-            "context"
-          ]
-        },
-        {
-          "source": "time",
-          "specifiers": [
-            "time"
-          ]
-        },
-        {
-          "source": "enphase-monitor/internal/constants",
-          "specifiers": [
-            "constants"
-          ]
-        }
-      ],
-      "exports": [
-        "CloudClient"
-      ],
-      "totalLines": 128,
+      "totalLines": 152,
       "hasStructuralAnalysis": true
     },
     "internal/api/preflight_test.go": {
       "filePath": "internal/api/preflight_test.go",
-      "contentHash": "16cd96d2990ff0d2b18d9c82c02670f53acf2a8265915bfc7fc4705b8643ea75",
+      "contentHash": "e11afe386dfeadc0baee816b815b6db51ecbc76b295c71fdfe1e4bc16df00874",
       "functions": [
         {
           "name": "uniqueSysID",
@@ -1773,7 +2082,7 @@
           "lineCount": 15
         },
         {
-          "name": "captureStdout",
+          "name": "captureStderr",
           "params": [
             "fn"
           ],
@@ -1964,7 +2273,7 @@
         "TestPreflightWarning_CurrentPeriod",
         "TestPreflightWarning_PastPeriod"
       ],
-      "totalLines": 557,
+      "totalLines": 489,
       "hasStructuralAnalysis": true
     },
     "internal/api/query_cost_test.go": {
@@ -2055,7 +2364,7 @@
     },
     "internal/api/types.go": {
       "filePath": "internal/api/types.go",
-      "contentHash": "eaa651465ae033849c9533930c3570a1b9daae1a3fa7d590af58d5d309c222b2",
+      "contentHash": "e94068b837ac70541997c20657e744e7c42f9526fddbc0bcea97c1982a914b46",
       "functions": [],
       "classes": [
         {
@@ -2086,12 +2395,128 @@
       "exports": [
         "LocalMetrics"
       ],
-      "totalLines": 34,
+      "totalLines": 21,
+      "hasStructuralAnalysis": true
+    },
+    "internal/app/backfill.go": {
+      "filePath": "internal/app/backfill.go",
+      "contentHash": "893a599332559f5ced9e5494f97577616e496a96d70f72d65b73a8cb486da91e",
+      "functions": [
+        {
+          "name": "RunBackfill",
+          "params": [
+            "ctx",
+            "rc",
+            "fromDate",
+            "force"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 91
+        },
+        {
+          "name": "isTerminal",
+          "params": [
+            "f"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "backfillDay",
+          "params": [
+            "ctx",
+            "rc",
+            "day"
+          ],
+          "returnType": "error",
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "dayStart",
+          "params": [
+            "t",
+            "tz"
+          ],
+          "returnType": "time.Time",
+          "exported": false,
+          "lineCount": 4
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/history",
+          "specifiers": [
+            "history"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/timezone",
+          "specifiers": [
+            "timezone"
+          ]
+        }
+      ],
+      "exports": [
+        "RunBackfill"
+      ],
+      "totalLines": 178,
       "hasStructuralAnalysis": true
     },
     "internal/app/cache_report.go": {
       "filePath": "internal/app/cache_report.go",
-      "contentHash": "01166528dad30811ebabe628fbf851ec1331e93f1772bf6dcac020ca76c7c6fc",
+      "contentHash": "a0feb80231d395f71699faa6c9d0c037aad23ced48e0f6ffbf0ce94921c5f731",
       "functions": [
         {
           "name": "RunCacheReport",
@@ -2102,7 +2527,7 @@
           ],
           "returnType": "error",
           "exported": true,
-          "lineCount": 46
+          "lineCount": 50
         },
         {
           "name": "printCacheDiagnostic",
@@ -2202,12 +2627,12 @@
       "exports": [
         "RunCacheReport"
       ],
-      "totalLines": 149,
+      "totalLines": 153,
       "hasStructuralAnalysis": true
     },
     "internal/app/runner.go": {
       "filePath": "internal/app/runner.go",
-      "contentHash": "b6f0ad7ed59bc7e9eab4e67e038c6aa7ff8e95f454b7eb5e1b9cc9a4cab6118f",
+      "contentHash": "4e550cd27eb31c8f1ba6c11b0cc4765b96c63f3db2068cb45fabcd780cd352e9",
       "functions": [
         {
           "name": "RunOnce",
@@ -2218,7 +2643,7 @@
           ],
           "returnType": "error",
           "exported": true,
-          "lineCount": 22
+          "lineCount": 21
         },
         {
           "name": "RunContinuous",
@@ -2228,7 +2653,7 @@
           ],
           "returnType": "error",
           "exported": true,
-          "lineCount": 27
+          "lineCount": 31
         },
         {
           "name": "fetchAndDisplay",
@@ -2238,7 +2663,7 @@
           ],
           "returnType": "error",
           "exported": false,
-          "lineCount": 25
+          "lineCount": 24
         }
       ],
       "classes": [
@@ -2247,15 +2672,18 @@
           "methods": [],
           "properties": [
             "Agg",
+            "Pool",
             "Disp",
             "Cfg",
             "TestDate",
             "QueryMode",
             "ReportTZ",
-            "Debug"
+            "Debug",
+            "Location",
+            "Weather"
           ],
           "exported": true,
-          "lineCount": 9
+          "lineCount": 16
         }
       ],
       "imports": [
@@ -2263,6 +2691,12 @@
           "source": "context",
           "specifiers": [
             "context"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
           ]
         },
         {
@@ -2302,6 +2736,12 @@
           ]
         },
         {
+          "source": "enphase-monitor/internal/credentials",
+          "specifiers": [
+            "credentials"
+          ]
+        },
+        {
           "source": "enphase-monitor/internal/display",
           "specifiers": [
             "display"
@@ -2319,12 +2759,12 @@
         "RunOnce",
         "RunContinuous"
       ],
-      "totalLines": 120,
+      "totalLines": 131,
       "hasStructuralAnalysis": true
     },
     "internal/app/runner_test.go": {
       "filePath": "internal/app/runner_test.go",
-      "contentHash": "fc3bbab3a3d79989887c29517388cf1905029fc261017c279c43940fc45742e2",
+      "contentHash": "6d03f8da364eef21a221226037e1e8c29fbecbed98af1ea30738ff86c2af4b04",
       "functions": [
         {
           "name": "GetMetricsFromCloud",
@@ -2335,7 +2775,7 @@
           ],
           "returnType": "(*api.LocalMetrics, bool, error)",
           "exported": true,
-          "lineCount": 6
+          "lineCount": 9
         },
         {
           "name": "GetEnergyImportForDate",
@@ -2420,7 +2860,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 47
+          "lineCount": 48
         },
         {
           "name": "TestFetchAndDisplay_Success",
@@ -2428,7 +2868,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 46
+          "lineCount": 47
         },
         {
           "name": "TestFetchAndDisplay_ContextCancelled",
@@ -2436,7 +2876,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 36
+          "lineCount": 37
         },
         {
           "name": "TestFetchAndDisplay_Error",
@@ -2444,7 +2884,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 35
+          "lineCount": 36
         },
         {
           "name": "TestRunContinuous_ImmediateExecution",
@@ -2452,7 +2892,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 55
+          "lineCount": 56
         },
         {
           "name": "TestRunContinuous_GracefulShutdown",
@@ -2460,7 +2900,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 51
+          "lineCount": 52
         }
       ],
       "classes": [
@@ -2538,6 +2978,12 @@
           ]
         },
         {
+          "source": "enphase-monitor/internal/credentials",
+          "specifiers": [
+            "credentials"
+          ]
+        },
+        {
           "source": "enphase-monitor/internal/display",
           "specifiers": [
             "display"
@@ -2564,12 +3010,12 @@
         "TestRunContinuous_ImmediateExecution",
         "TestRunContinuous_GracefulShutdown"
       ],
-      "totalLines": 348,
+      "totalLines": 357,
       "hasStructuralAnalysis": true
     },
     "internal/app/setup.go": {
       "filePath": "internal/app/setup.go",
-      "contentHash": "1a47274e63dbdafe856b6b01ef9a2979046fca765621bf9c61ebc3e5a3e31b71",
+      "contentHash": "fa87c34ad681f3efbc3911fae8b35117bd8a15b58699c3181e8c3fa99198a7a3",
       "functions": [
         {
           "name": "CreateOAuthAdapter",
@@ -2619,11 +3065,11 @@
           "lineCount": 10
         },
         {
-          "name": "GetAggregatorTypes",
+          "name": "GetSystems",
           "params": [
             "cfg"
           ],
-          "returnType": "([]aggregator.SystemConfig, *aggregator.APIConfig)",
+          "returnType": "[]aggregator.SystemConfig",
           "exported": true,
           "lineCount": 8
         },
@@ -2719,7 +3165,7 @@
         "ConfigureModes",
         "ParseTestDate",
         "FormatDateForQueryMode",
-        "GetAggregatorTypes",
+        "GetSystems",
         "ValidateValidationModeCache"
       ],
       "totalLines": 162,
@@ -2727,7 +3173,7 @@
     },
     "internal/app/setup_test.go": {
       "filePath": "internal/app/setup_test.go",
-      "contentHash": "8440374f0ddbd600674a25bff901048237480774843240f0d6f295fe6f97da84",
+      "contentHash": "91df21ee96ec561c02d28ed219fc0d3840c72dfcd386e77b1500f9add1a38c19",
       "functions": [
         {
           "name": "TestFormatDateForQueryMode",
@@ -2751,7 +3197,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 22
+          "lineCount": 23
         },
         {
           "name": "TestSetupDisplay_WithCustomColors",
@@ -2759,7 +3205,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 27
+          "lineCount": 28
         },
         {
           "name": "TestParseTestDate_EmptyString",
@@ -2794,20 +3240,20 @@
           "lineCount": 12
         },
         {
-          "name": "TestGetAggregatorTypes",
+          "name": "TestGetSystems",
           "params": [
             "t"
           ],
           "exported": true,
-          "lineCount": 25
+          "lineCount": 19
         },
         {
-          "name": "TestGetAggregatorTypes_EmptySystems",
+          "name": "TestGetSystems_EmptySystems",
           "params": [
             "t"
           ],
           "exported": true,
-          "lineCount": 17
+          "lineCount": 7
         },
         {
           "name": "TestRunOnce_ContextCancelled",
@@ -2815,7 +3261,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 34
+          "lineCount": 35
         },
         {
           "name": "TestConfigureModes",
@@ -2823,7 +3269,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 58
+          "lineCount": 27
         },
         {
           "name": "TestValidateValidationModeCache",
@@ -2873,6 +3319,12 @@
           ]
         },
         {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
           "source": "enphase-monitor/internal/config",
           "specifiers": [
             "config"
@@ -2882,6 +3334,12 @@
           "source": "enphase-monitor/internal/constants",
           "specifiers": [
             "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/credentials",
+          "specifiers": [
+            "credentials"
           ]
         },
         {
@@ -2900,18 +3358,18 @@
         "TestParseTestDate_ValidDate",
         "TestParseTestDate_InvalidFormat",
         "TestParseTestDate_InvalidDate",
-        "TestGetAggregatorTypes",
-        "TestGetAggregatorTypes_EmptySystems",
+        "TestGetSystems",
+        "TestGetSystems_EmptySystems",
         "TestRunOnce_ContextCancelled",
         "TestConfigureModes",
         "TestValidateValidationModeCache"
       ],
-      "totalLines": 573,
+      "totalLines": 368,
       "hasStructuralAnalysis": true
     },
     "internal/app/trueup.go": {
       "filePath": "internal/app/trueup.go",
-      "contentHash": "f453cf1f75eba6601d7dffa0d3ccbed37aa477eaeb54b0691926533f96b27842",
+      "contentHash": "71bc4d0dad02850e324a144febc1267281573ab7e6b5bc84fef6123f0bb7f8b2",
       "functions": [
         {
           "name": "RunTrueUp",
@@ -2922,7 +3380,7 @@
           ],
           "returnType": "error",
           "exported": true,
-          "lineCount": 29
+          "lineCount": 28
         },
         {
           "name": "trueUpWindowEnd",
@@ -2988,12 +3446,12 @@
       "exports": [
         "RunTrueUp"
       ],
-      "totalLines": 87,
+      "totalLines": 86,
       "hasStructuralAnalysis": true
     },
     "internal/app/trueup_test.go": {
       "filePath": "internal/app/trueup_test.go",
-      "contentHash": "fe84f124e408ade7ee525335e293b603b1c7de2485721100100e2fe9ff765b54",
+      "contentHash": "0b9d6dad931f85c7034bd713aec90dc248be48b4f7bcb7a56bc10be9334faf92",
       "functions": [
         {
           "name": "makeTestMetrics",
@@ -3107,12 +3565,463 @@
         "TestBuildTrueUpReport_SystemsConverted",
         "TestBuildTrueUpReport_PerSystemNetFlow"
       ],
-      "totalLines": 188,
+      "totalLines": 177,
+      "hasStructuralAnalysis": true
+    },
+    "internal/app/weather.go": {
+      "filePath": "internal/app/weather.go",
+      "contentHash": "d5309115af00876916846383aed09525fada1da0b5f56d3a3b08a339d29d3ec2",
+      "functions": [
+        {
+          "name": "enrichWithTemperature",
+          "params": [
+            "ctx",
+            "rc",
+            "metrics"
+          ],
+          "exported": false,
+          "lineCount": 61
+        },
+        {
+          "name": "sameDate",
+          "params": [
+            "a",
+            "b"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [
+        {
+          "name": "CoordinateProvider",
+          "methods": [
+            "CachedPrimaryCoordinates"
+          ],
+          "properties": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "WeatherProvider",
+          "methods": [
+            "DailyWeather",
+            "CurrentWeather"
+          ],
+          "properties": [],
+          "exported": true,
+          "lineCount": 4
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "sync",
+          "specifiers": [
+            "sync"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/geocode",
+          "specifiers": [
+            "geocode"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/weather",
+          "specifiers": [
+            "weather"
+          ]
+        }
+      ],
+      "exports": [
+        "CoordinateProvider",
+        "WeatherProvider"
+      ],
+      "totalLines": 114,
+      "hasStructuralAnalysis": true
+    },
+    "internal/app/weather_test.go": {
+      "filePath": "internal/app/weather_test.go",
+      "contentHash": "f93d5f3578dabdf7b765fb7efe3976271430e2c5f7a93108ef70e37f9507901d",
+      "functions": [
+        {
+          "name": "CachedPrimaryCoordinates",
+          "params": [],
+          "returnType": "(geocode.Coordinates, bool)",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "DailyWeather",
+          "params": [],
+          "returnType": "(weather.DailyWeather, error)",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "CurrentWeather",
+          "params": [],
+          "returnType": "(weather.CurrentWeather, error)",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "CachedPrimaryCoordinates",
+          "params": [],
+          "returnType": "(geocode.Coordinates, bool)",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "DailyWeather",
+          "params": [],
+          "returnType": "(weather.DailyWeather, error)",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "CurrentWeather",
+          "params": [],
+          "returnType": "(weather.CurrentWeather, error)",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "minimalConfig",
+          "params": [],
+          "returnType": "*config.Config",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "cachedAt",
+          "params": [
+            "coords"
+          ],
+          "returnType": "stubCoord",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "TestEnrichWithTemperature_SkipsNonDayMode",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "TestEnrichWithTemperature_SkipsWhenProvidersNil",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "TestEnrichWithTemperature_SkipsWhenLocationUncached",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "TestEnrichWithTemperature_TodayOverlaysCurrent",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "TestEnrichWithTemperature_PastDateNoCurrent",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 28
+        }
+      ],
+      "classes": [
+        {
+          "name": "failingCoord",
+          "methods": [
+            "CachedPrimaryCoordinates"
+          ],
+          "properties": [
+            "t"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "failingTemp",
+          "methods": [
+            "DailyWeather",
+            "CurrentWeather"
+          ],
+          "properties": [
+            "t"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "stubCoord",
+          "methods": [
+            "CachedPrimaryCoordinates"
+          ],
+          "properties": [
+            "coords",
+            "ok"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "stubTemp",
+          "methods": [
+            "DailyWeather",
+            "CurrentWeather"
+          ],
+          "properties": [
+            "w",
+            "cur",
+            "dailyCalled",
+            "currentCalled"
+          ],
+          "exported": false,
+          "lineCount": 6
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/config",
+          "specifiers": [
+            "config"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/geocode",
+          "specifiers": [
+            "geocode"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/types",
+          "specifiers": [
+            "types"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/weather",
+          "specifiers": [
+            "weather"
+          ]
+        }
+      ],
+      "exports": [
+        "CachedPrimaryCoordinates",
+        "DailyWeather",
+        "CurrentWeather",
+        "CachedPrimaryCoordinates",
+        "DailyWeather",
+        "CurrentWeather",
+        "TestEnrichWithTemperature_SkipsNonDayMode",
+        "TestEnrichWithTemperature_SkipsWhenProvidersNil",
+        "TestEnrichWithTemperature_SkipsWhenLocationUncached",
+        "TestEnrichWithTemperature_TodayOverlaysCurrent",
+        "TestEnrichWithTemperature_PastDateNoCurrent"
+      ],
+      "totalLines": 189,
+      "hasStructuralAnalysis": true
+    },
+    "internal/cache/api_budget_test.go": {
+      "filePath": "internal/cache/api_budget_test.go",
+      "contentHash": "0c139551370940d3c7a8a22c4a93c98d8665eb8d3dc4d6360b5a4410d1f7b448",
+      "functions": [
+        {
+          "name": "TestRemainingBudget_FreshState",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "TestRemainingBudget_AfterCalls",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "TestRemainingBudget_Exhausted",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "TestRemainingBudget_OldEntriesPruned",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 28
+        },
+        {
+          "name": "TestRecordAPICall_PrunesOldEntries",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "TestClearAPICalls",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "TestLastAPICallTime_NoCallsYet",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "TestLastAPICallTime_AfterCalls",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        }
+      ],
+      "exports": [
+        "TestRemainingBudget_FreshState",
+        "TestRemainingBudget_AfterCalls",
+        "TestRemainingBudget_Exhausted",
+        "TestRemainingBudget_OldEntriesPruned",
+        "TestRecordAPICall_PrunesOldEntries",
+        "TestClearAPICalls",
+        "TestLastAPICallTime_NoCallsYet",
+        "TestLastAPICallTime_AfterCalls"
+      ],
+      "totalLines": 186,
       "hasStructuralAnalysis": true
     },
     "internal/cache/cache.go": {
       "filePath": "internal/cache/cache.go",
-      "contentHash": "c1613bbc6784b02577f150aab3c3e85b03708f675d9b1918659e4464c85d2dce",
+      "contentHash": "13df687b06a74f6864194f016b25ef5b10452a6d24cdb87ab879e2e6d1d1e8fc",
       "functions": [
         {
           "name": "getCacheDir",
@@ -3335,13 +4244,22 @@
           "lineCount": 42
         },
         {
+          "name": "forEachCacheEntry",
+          "params": [
+            "fn"
+          ],
+          "returnType": "error",
+          "exported": false,
+          "lineCount": 34
+        },
+        {
           "name": "HasCacheForDate",
           "params": [
             "targetDate"
           ],
           "returnType": "(bool, error)",
           "exported": true,
-          "lineCount": 38
+          "lineCount": 11
         },
         {
           "name": "GetCacheDir",
@@ -3404,6 +4322,12 @@
           "source": "encoding/json",
           "specifiers": [
             "json"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
           ]
         },
         {
@@ -3495,12 +4419,12 @@
         "HasCacheForDate",
         "GetCacheDir"
       ],
-      "totalLines": 571,
+      "totalLines": 585,
       "hasStructuralAnalysis": true
     },
     "internal/cache/cache_functions_test.go": {
       "filePath": "internal/cache/cache_functions_test.go",
-      "contentHash": "c2b600cddf49e6333d1592d632da08a3c0b550eb054cf6ee5a850f8318c89d5c",
+      "contentHash": "8248ebd4da8f5354c8a290cc83bd29a2eb40dc81cb700d4313fad24a72f37a34",
       "functions": [
         {
           "name": "TestRedactURLKey",
@@ -3612,7 +4536,47 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 41
+          "lineCount": 23
+        },
+        {
+          "name": "TestClearCacheForDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "TestClearCacheForDate_NoMatch",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "TestClearCacheForDate_EmptyDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "TestClearCacheForDate_AggregateSemantics",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 34
+        },
+        {
+          "name": "TestClearCacheForDate_RemoveFailureReturnsError",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 27
         }
       ],
       "classes": [],
@@ -3633,6 +4597,12 @@
           "source": "path/filepath",
           "specifiers": [
             "filepath"
+          ]
+        },
+        {
+          "source": "runtime",
+          "specifiers": [
+            "runtime"
           ]
         },
         {
@@ -3668,9 +4638,14 @@
         "TestGetCacheDirExported",
         "TestNormalizeURLForCache_TimestampConversion",
         "TestCachedResponse_EmptyHeaders",
-        "TestHasCacheForDate"
+        "TestHasCacheForDate",
+        "TestClearCacheForDate",
+        "TestClearCacheForDate_NoMatch",
+        "TestClearCacheForDate_EmptyDate",
+        "TestClearCacheForDate_AggregateSemantics",
+        "TestClearCacheForDate_RemoveFailureReturnsError"
       ],
-      "totalLines": 451,
+      "totalLines": 544,
       "hasStructuralAnalysis": true
     },
     "internal/cache/cache_test.go": {
@@ -3730,7 +4705,7 @@
     },
     "internal/cache/cli.go": {
       "filePath": "internal/cache/cli.go",
-      "contentHash": "ba39dccea0d6bc61cbb73d75e2b67600b5bb1010c5b7e1eecb7ed77efab44924",
+      "contentHash": "0463a447166517e82188501fa2148a66c0cf01fc46384c97de42ec04fd34cb27",
       "functions": [
         {
           "name": "ClearTodayCache",
@@ -3738,6 +4713,15 @@
           "returnType": "error",
           "exported": true,
           "lineCount": 85
+        },
+        {
+          "name": "ClearCacheForDate",
+          "params": [
+            "targetDate"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 36
         },
         {
           "name": "ClearAllCache",
@@ -3749,9 +4733,9 @@
         {
           "name": "ListCacheEntries",
           "params": [],
-          "returnType": "([]CacheEntry, error)",
+          "returnType": "([]Entry, error)",
           "exported": true,
-          "lineCount": 73
+          "lineCount": 77
         },
         {
           "name": "LoadCachedResponseByPath",
@@ -3767,14 +4751,14 @@
           "params": [
             "body"
           ],
-          "returnType": "(endpoint, systemID, date, summary string)",
+          "returnType": "(endpoint, summary string)",
           "exported": false,
-          "lineCount": 80
+          "lineCount": 87
         }
       ],
       "classes": [
         {
-          "name": "CacheEntry",
+          "name": "Entry",
           "methods": [],
           "properties": [
             "Key",
@@ -3837,17 +4821,18 @@
       ],
       "exports": [
         "ClearTodayCache",
+        "ClearCacheForDate",
         "ClearAllCache",
-        "CacheEntry",
+        "Entry",
         "ListCacheEntries",
         "LoadCachedResponseByPath"
       ],
-      "totalLines": 322,
+      "totalLines": 355,
       "hasStructuralAnalysis": true
     },
     "internal/cache/cli_test.go": {
       "filePath": "internal/cache/cli_test.go",
-      "contentHash": "aca85660137484324110caf848382508d79ad3865a2340798dca7723770bddf6",
+      "contentHash": "85cf24de1945144cc76f038a8ce51109cc988c2c4da30aa9b9793b567979e08e",
       "functions": [
         {
           "name": "useTempCacheDir",
@@ -3942,7 +4927,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 27
+          "lineCount": 23
         },
         {
           "name": "TestParseCacheResponse_ProductionMeter",
@@ -3950,7 +4935,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 20
+          "lineCount": 17
         },
         {
           "name": "TestParseCacheResponse_InvalidJSON",
@@ -3958,7 +4943,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 8
+          "lineCount": 6
         },
         {
           "name": "TestParseCacheResponse_EmptyResponse",
@@ -3966,7 +4951,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 8
+          "lineCount": 6
         },
         {
           "name": "TestParseCacheResponse_ConsumptionMeter",
@@ -3974,10 +4959,10 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 17
+          "lineCount": 13
         },
         {
-          "name": "TestCacheEntry_Structure",
+          "name": "TestEntry_Structure",
           "params": [
             "t"
           ],
@@ -4006,7 +4991,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 20
+          "lineCount": 19
         },
         {
           "name": "TestListCacheEntries_WithRealFile",
@@ -4076,18 +5061,18 @@
         "TestParseCacheResponse_InvalidJSON",
         "TestParseCacheResponse_EmptyResponse",
         "TestParseCacheResponse_ConsumptionMeter",
-        "TestCacheEntry_Structure",
+        "TestEntry_Structure",
         "TestListCacheEntries_SkipsMetadataFiles",
         "TestClearTodayCache_Integration",
         "TestParseCacheResponse_EdgeCases",
         "TestListCacheEntries_WithRealFile"
       ],
-      "totalLines": 358,
+      "totalLines": 342,
       "hasStructuralAnalysis": true
     },
     "internal/cli/cache_commands.go": {
       "filePath": "internal/cli/cache_commands.go",
-      "contentHash": "d01256aab0ccf17ebf1182e32a1226669a82c1975b774badd70745bc9fa3fc7c",
+      "contentHash": "f7744d9627ad15efc3045f8bfdd6510ee0e80e429cb56695ad00c0c4d437c4fd",
       "functions": [
         {
           "name": "HandleClearCache",
@@ -4095,6 +5080,15 @@
           "returnType": "error",
           "exported": true,
           "lineCount": 6
+        },
+        {
+          "name": "HandleClearCacheForDate",
+          "params": [
+            "date"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 15
         },
         {
           "name": "HandleClearAllCache",
@@ -4113,22 +5107,35 @@
           ]
         },
         {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
           "source": "enphase-monitor/internal/cache",
           "specifiers": [
             "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
           ]
         }
       ],
       "exports": [
         "HandleClearCache",
+        "HandleClearCacheForDate",
         "HandleClearAllCache"
       ],
-      "totalLines": 36,
+      "totalLines": 56,
       "hasStructuralAnalysis": true
     },
     "internal/cli/cache_commands_test.go": {
       "filePath": "internal/cli/cache_commands_test.go",
-      "contentHash": "8937827224dd30b57e7937124355023d15902b7d23f13503b9d8a86fde6903d7",
+      "contentHash": "17cb3ce6df413839a0bd3af7368c9c2c4d7c454f6e10680eaa7696d4c7db5627",
       "functions": [
         {
           "name": "useTempCacheDir",
@@ -4153,6 +5160,30 @@
           ],
           "exported": true,
           "lineCount": 25
+        },
+        {
+          "name": "TestHandleClearCacheForDate_ValidPastDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "TestHandleClearCacheForDate_InvalidFormat",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "TestHandleClearCacheForDate_FutureDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 6
         },
         {
           "name": "TestHandleClearCache_Idempotent",
@@ -4207,22 +5238,25 @@
       "exports": [
         "TestHandleClearCache_Success",
         "TestHandleClearAllCache_Success",
+        "TestHandleClearCacheForDate_ValidPastDate",
+        "TestHandleClearCacheForDate_InvalidFormat",
+        "TestHandleClearCacheForDate_FutureDate",
         "TestHandleClearCache_Idempotent",
         "TestHandleClearAllCache_Idempotent"
       ],
-      "totalLines": 77,
+      "totalLines": 100,
       "hasStructuralAnalysis": true
     },
     "internal/cli/flags.go": {
       "filePath": "internal/cli/flags.go",
-      "contentHash": "f913883f2f481c23a80fbb9a12dd66e7dcb74b143d2d34a147a12b6261f4aba9",
+      "contentHash": "68ae706105937143e5e1d94746a6b980a770aa122addb9e24c34ec953472b545",
       "functions": [
         {
           "name": "ParseFlags",
           "params": [],
           "returnType": "*Flags",
           "exported": true,
-          "lineCount": 19
+          "lineCount": 30
         }
       ],
       "classes": [
@@ -4231,11 +5265,18 @@
           "methods": [],
           "properties": [
             "ConfigFile",
+            "CredentialsFile",
+            "Credential",
             "Continuous",
-            "OAuthSetup",
+            "Initialize",
+            "Force",
+            "UpdateRefreshToken",
+            "All",
             "ClearCache",
+            "ClearCacheDate",
             "ClearAllCache",
             "TestDate",
+            "BackfillFrom",
             "TrueUp",
             "Validation",
             "NoCache",
@@ -4243,7 +5284,7 @@
             "Debug"
           ],
           "exported": true,
-          "lineCount": 13
+          "lineCount": 20
         }
       ],
       "imports": [
@@ -4258,12 +5299,12 @@
         "Flags",
         "ParseFlags"
       ],
-      "totalLines": 42,
+      "totalLines": 60,
       "hasStructuralAnalysis": true
     },
     "internal/cli/flags_test.go": {
       "filePath": "internal/cli/flags_test.go",
-      "contentHash": "175f155654869732f75b98d7c953e8bb9c5511895e55791843e61e4794c08a2a",
+      "contentHash": "d8864f74769d523c38df19f5506413c1b8a691e16edb23b5509e6a44e2a66882",
       "functions": [
         {
           "name": "resetFlags",
@@ -4322,7 +5363,15 @@
           "lineCount": 21
         },
         {
-          "name": "TestParseFlags_OAuthSetup",
+          "name": "TestParseFlags_UpdateRefreshToken",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "TestParseFlags_UpdateRefreshTokenAll",
           "params": [
             "t"
           ],
@@ -4406,7 +5455,8 @@
         "TestParseFlags_Validation",
         "TestParseFlags_TestDate",
         "TestParseFlags_MultipleFlags",
-        "TestParseFlags_OAuthSetup",
+        "TestParseFlags_UpdateRefreshToken",
+        "TestParseFlags_UpdateRefreshTokenAll",
         "TestParseFlags_ClearCache",
         "TestParseFlags_ClearAllCache",
         "TestParseFlags_NoCache",
@@ -4414,12 +5464,12 @@
         "TestParseFlags_AllCacheFlags",
         "TestParseFlags_ComplexCombination"
       ],
-      "totalLines": 268,
+      "totalLines": 234,
       "hasStructuralAnalysis": true
     },
     "internal/config/config.go": {
       "filePath": "internal/config/config.go",
-      "contentHash": "ed14183f42c43a4d1428c89c099de1cfd3b5e95f47f93359233f310ffa2a33d9",
+      "contentHash": "ad877fb75374043c6bd07c3dc52b60d106182e714eda84a514688539580016b5",
       "functions": [
         {
           "name": "MergeWithDefaults",
@@ -4442,7 +5492,7 @@
           ],
           "returnType": "(*Config, error)",
           "exported": true,
-          "lineCount": 47
+          "lineCount": 43
         },
         {
           "name": "convertIfHex",
@@ -4517,20 +5567,38 @@
           "lineCount": 16
         },
         {
+          "name": "OAuthSettings",
+          "methods": [],
+          "properties": [
+            "AuthorizationURL",
+            "RedirectURI"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
           "name": "Config",
           "methods": [],
           "properties": [
             "API",
+            "Credentials",
             "Systems",
             "RefreshIntervalSeconds",
             "Colors",
-            "Timezone"
+            "Timezone",
+            "RefreshIntervalClampedFromSeconds"
           ],
           "exported": true,
-          "lineCount": 7
+          "lineCount": 18
         }
       ],
       "imports": [
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
         {
           "source": "fmt",
           "specifiers": [
@@ -4583,15 +5651,16 @@
       "exports": [
         "ColorConfig",
         "MergeWithDefaults",
+        "OAuthSettings",
         "Config",
         "LoadConfig"
       ],
-      "totalLines": 330,
+      "totalLines": 365,
       "hasStructuralAnalysis": true
     },
     "internal/config/config_test.go": {
       "filePath": "internal/config/config_test.go",
-      "contentHash": "ec32866d131a7e3a481b04c2ee75a55e6701c1a416c349957585dd7ad105b9c6",
+      "contentHash": "ed21dfd2ef4af4c7b3b8f360d977ea12ce6497c77fdf6ca90b2e4cc5325753b2",
       "functions": [
         {
           "name": "TestLoadConfig",
@@ -4599,7 +5668,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 213
+          "lineCount": 141
         },
         {
           "name": "TestConvertIfHex",
@@ -4618,16 +5687,6 @@
           "lineCount": 57
         },
         {
-          "name": "contains",
-          "params": [
-            "s",
-            "substr"
-          ],
-          "returnType": "bool",
-          "exported": false,
-          "lineCount": 4
-        },
-        {
           "name": "TestMergeWithDefaults",
           "params": [
             "t"
@@ -4642,16 +5701,6 @@
           ],
           "exported": true,
           "lineCount": 20
-        },
-        {
-          "name": "stringContains",
-          "params": [
-            "s",
-            "substr"
-          ],
-          "returnType": "bool",
-          "exported": false,
-          "lineCount": 8
         }
       ],
       "classes": [],
@@ -4666,6 +5715,12 @@
           "source": "path/filepath",
           "specifiers": [
             "filepath"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
           ]
         },
         {
@@ -4688,12 +5743,244 @@
         "TestMergeWithDefaults",
         "TestConvertHexFields"
       ],
-      "totalLines": 462,
+      "totalLines": 329,
+      "hasStructuralAnalysis": true
+    },
+    "internal/config/credentials.go": {
+      "filePath": "internal/config/credentials.go",
+      "contentHash": "14cbbde9aefe007acbb7c7857dafd2c52456991d4bc64a7cff6ee74f790f7432",
+      "functions": [
+        {
+          "name": "LoadCredentials",
+          "params": [
+            "filename"
+          ],
+          "returnType": "([]*APIConfig, error)",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "ApplyCredentials",
+          "params": [
+            "creds"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "applySharedOAuth",
+          "params": [
+            "cred"
+          ],
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "UpdateRefreshToken",
+          "params": [
+            "filename",
+            "name",
+            "refreshToken"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 31
+        },
+        {
+          "name": "mappingValue",
+          "params": [
+            "m",
+            "key"
+          ],
+          "returnType": "*yaml.Node",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "setMappingString",
+          "params": [
+            "m",
+            "key",
+            "value"
+          ],
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "writeFilePreservingMode",
+          "params": [
+            "filename",
+            "doc"
+          ],
+          "returnType": "error",
+          "exported": false,
+          "lineCount": 39
+        }
+      ],
+      "classes": [
+        {
+          "name": "credentialsFile",
+          "methods": [],
+          "properties": [
+            "Credentials"
+          ],
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "imports": [
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "gopkg.in/yaml.v3",
+          "specifiers": [
+            "yaml.v3"
+          ]
+        }
+      ],
+      "exports": [
+        "LoadCredentials",
+        "ApplyCredentials",
+        "UpdateRefreshToken"
+      ],
+      "totalLines": 214,
+      "hasStructuralAnalysis": true
+    },
+    "internal/config/credentials_test.go": {
+      "filePath": "internal/config/credentials_test.go",
+      "contentHash": "5f4699714ef4967ebbb6c2d13500d7a1fe1b75f34bcd62479f5707bef2b760ce",
+      "functions": [
+        {
+          "name": "TestLoadCredentials",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 45
+        },
+        {
+          "name": "TestApplyCredentials",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 105
+        },
+        {
+          "name": "TestUpdateRefreshToken",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 69
+        },
+        {
+          "name": "readFile",
+          "params": [
+            "t",
+            "path"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "writeTempFile",
+          "params": [
+            "t",
+            "name",
+            "content"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 8
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "TestLoadCredentials",
+        "TestApplyCredentials",
+        "TestUpdateRefreshToken"
+      ],
+      "totalLines": 258,
       "hasStructuralAnalysis": true
     },
     "internal/constants/constants.go": {
       "filePath": "internal/constants/constants.go",
-      "contentHash": "31d60644a85c112ca19f749a6dd789a0c4e765a5c63e17227e95e8fd2abdf4e1",
+      "contentHash": "ef521b7eb9f142fbeb8eddae6ba5cb91218953983621defee402655bf8ff7a46",
       "functions": [
         {
           "name": "String",
@@ -4731,12 +6018,12 @@
         "String",
         "IsRateLimitError"
       ],
-      "totalLines": 216,
+      "totalLines": 208,
       "hasStructuralAnalysis": true
     },
     "internal/constants/constants_test.go": {
       "filePath": "internal/constants/constants_test.go",
-      "contentHash": "dab73124652bf57e5da609c0c992aa90094752658f74f87cfa08b3bec4ebb407",
+      "contentHash": "5c02e32476d287d42a0e9565445532c82aaee464c4432225fe658584e57b33fd",
       "functions": [
         {
           "name": "Error",
@@ -4767,7 +6054,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 72
+          "lineCount": 62
         }
       ],
       "classes": [
@@ -4797,12 +6084,230 @@
         "TestIsRateLimitError",
         "TestConstants"
       ],
-      "totalLines": 201,
+      "totalLines": 144,
+      "hasStructuralAnalysis": true
+    },
+    "internal/credentials/pool.go": {
+      "filePath": "internal/credentials/pool.go",
+      "contentHash": "522e97e304d1eafcd61e85cbfc012cc430a492e5acc1caccb9bb68e938dcfdf6",
+      "functions": [
+        {
+          "name": "NewPool",
+          "params": [
+            "creds"
+          ],
+          "returnType": "*Pool",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "Len",
+          "params": [],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "First",
+          "params": [],
+          "returnType": "*types.APIConfig",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "Names",
+          "params": [],
+          "returnType": "[]string",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "ByName",
+          "params": [
+            "name"
+          ],
+          "returnType": "(*types.APIConfig, bool)",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "ForSystem",
+          "params": [
+            "index"
+          ],
+          "returnType": "*types.APIConfig",
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "MarkUnavailable",
+          "params": [
+            "c"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "Failover",
+          "params": [
+            "tried"
+          ],
+          "returnType": "(*types.APIConfig, bool)",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "available",
+          "params": [
+            "c"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 7
+        }
+      ],
+      "classes": [
+        {
+          "name": "Pool",
+          "methods": [
+            "Len",
+            "First",
+            "Names",
+            "ByName",
+            "ForSystem",
+            "MarkUnavailable",
+            "Failover",
+            "available"
+          ],
+          "properties": [
+            "creds",
+            "cooldownUntil",
+            "now"
+          ],
+          "exported": true,
+          "lineCount": 5
+        }
+      ],
+      "imports": [
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/types",
+          "specifiers": [
+            "types"
+          ]
+        }
+      ],
+      "exports": [
+        "Pool",
+        "NewPool",
+        "Len",
+        "First",
+        "Names",
+        "ByName",
+        "ForSystem",
+        "MarkUnavailable",
+        "Failover"
+      ],
+      "totalLines": 132,
+      "hasStructuralAnalysis": true
+    },
+    "internal/credentials/pool_test.go": {
+      "filePath": "internal/credentials/pool_test.go",
+      "contentHash": "a8c263d4b6110d211071c9f4de28e9b644cc73790fef010aeef8a9cbe642a3e4",
+      "functions": [
+        {
+          "name": "makePool",
+          "params": [],
+          "returnType": "*Pool",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "TestForSystemSpread",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "TestForSystemSkipsCooldown",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "TestForSystemAllCoolingDown",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "TestFailover",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 25
+        },
+        {
+          "name": "TestHelpers",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 23
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/types",
+          "specifiers": [
+            "types"
+          ]
+        }
+      ],
+      "exports": [
+        "TestForSystemSpread",
+        "TestForSystemSkipsCooldown",
+        "TestForSystemAllCoolingDown",
+        "TestFailover",
+        "TestHelpers"
+      ],
+      "totalLines": 114,
       "hasStructuralAnalysis": true
     },
     "internal/display/display.go": {
       "filePath": "internal/display/display.go",
-      "contentHash": "5753a55ed59cfd029b2f5fe771506a100effd76a78d0403302b71ca008945967",
+      "contentHash": "ce9539d345372f48456a40a8518f321b40b126ff8eeb5e8caa2877dc9dcd39cb",
       "functions": [
         {
           "name": "GetDefaultColors",
@@ -4833,6 +6338,12 @@
           "lineCount": 12
         },
         {
+          "name": "ClearScreen",
+          "params": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
           "name": "ShowMetrics",
           "params": [
             "metrics"
@@ -4843,13 +6354,18 @@
         {
           "name": "printHeader",
           "params": [
-            "timestamp",
-            "cacheUsed",
-            "queryDate",
-            "queryMode"
+            "metrics"
           ],
           "exported": false,
-          "lineCount": 30
+          "lineCount": 35
+        },
+        {
+          "name": "printWeather",
+          "params": [
+            "w"
+          ],
+          "exported": false,
+          "lineCount": 25
         },
         {
           "name": "printTodayEnergy",
@@ -4857,7 +6373,7 @@
             "metrics"
           ],
           "exported": false,
-          "lineCount": 10
+          "lineCount": 17
         },
         {
           "name": "printIndividualSystems",
@@ -4880,8 +6396,7 @@
             "value",
             "valueColor",
             "indent",
-            "labelWidth",
-            "rightAlign"
+            "labelWidth"
           ],
           "exported": false,
           "lineCount": 19
@@ -4893,7 +6408,6 @@
             "netValue",
             "indent",
             "labelWidth",
-            "rightAlign",
             "netImportBg",
             "netExportBg"
           ],
@@ -4953,8 +6467,10 @@
         {
           "name": "Display",
           "methods": [
+            "ClearScreen",
             "ShowMetrics",
             "printHeader",
+            "printWeather",
             "printTodayEnergy",
             "printIndividualSystems",
             "printSeparator",
@@ -5039,17 +6555,18 @@
         "Display",
         "NewDisplayWithColorsAndTimezone",
         "NewDisplayWithWriter",
+        "ClearScreen",
         "ShowMetrics",
         "ShowTrueUpReport",
         "ShowError",
         "ShowInfo"
       ],
-      "totalLines": 320,
+      "totalLines": 372,
       "hasStructuralAnalysis": true
     },
     "internal/display/display_test.go": {
       "filePath": "internal/display/display_test.go",
-      "contentHash": "307f3e3229985e1d63e6b3303de839ac194436d5d0d8e36c838e9ebdaf0619a5",
+      "contentHash": "84e0beb9e6f9ed1f127180e5b33ef5f1fea7dc4bdd3ab6ace0b6bc91a71a7a71",
       "functions": [
         {
           "name": "mustLoadLocation",
@@ -5084,6 +6601,30 @@
           ],
           "exported": true,
           "lineCount": 24
+        },
+        {
+          "name": "TestShowMetrics_WeatherShownWhenPresent",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 25
+        },
+        {
+          "name": "TestShowMetrics_WeatherCurrentLayout",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "TestShowMetrics_WeatherAbsentWhenNil",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 14
         },
         {
           "name": "TestShowMetrics_ContainsMetricValues",
@@ -5307,6 +6848,9 @@
         "TestNewDisplayWithWriter",
         "TestNewDisplayWithColorsAndTimezone",
         "TestShowMetrics_ContainsHeader",
+        "TestShowMetrics_WeatherShownWhenPresent",
+        "TestShowMetrics_WeatherCurrentLayout",
+        "TestShowMetrics_WeatherAbsentWhenNil",
         "TestShowMetrics_ContainsMetricValues",
         "TestShowMetrics_CombinedSectionLabels",
         "TestShowMetrics_CacheIndicator",
@@ -5327,12 +6871,1315 @@
         "TestShowTrueUpReport_PerSystemMetrics",
         "Error"
       ],
-      "totalLines": 643,
+      "totalLines": 663,
+      "hasStructuralAnalysis": true
+    },
+    "internal/geocode/geocode.go": {
+      "filePath": "internal/geocode/geocode.go",
+      "contentHash": "845518245612e12119c842488d3477642f93e443f2cc1d2d1fedfb5058ad92cf",
+      "functions": [
+        {
+          "name": "LookupZip",
+          "params": [
+            "ctx",
+            "zip"
+          ],
+          "returnType": "(Coordinates, error)",
+          "exported": true,
+          "lineCount": 45
+        }
+      ],
+      "classes": [
+        {
+          "name": "Coordinates",
+          "methods": [],
+          "properties": [
+            "Latitude",
+            "Longitude"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "zippopotamResponse",
+          "methods": [],
+          "properties": [
+            "PostCode",
+            "Places"
+          ],
+          "exported": false,
+          "lineCount": 8
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "encoding/json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/url",
+          "specifiers": [
+            "url"
+          ]
+        },
+        {
+          "source": "strconv",
+          "specifiers": [
+            "strconv"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        }
+      ],
+      "exports": [
+        "Coordinates",
+        "LookupZip"
+      ],
+      "totalLines": 115,
+      "hasStructuralAnalysis": true
+    },
+    "internal/geocode/geocode_test.go": {
+      "filePath": "internal/geocode/geocode_test.go",
+      "contentHash": "4fd201233eccdddad305bc79428f47ad7ac12eacad0b621798f2765d3037a22f",
+      "functions": [
+        {
+          "name": "withBaseURL",
+          "params": [
+            "t",
+            "url"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "TestLookupZip_RequestPath",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "TestLookupZip_EmptyZip",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "TestLookupZip_NotFound",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "TestLookupZip_NoPlaces",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "TestLookupZip_InvalidCoordinate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "withinUSBounds",
+          "params": [
+            "c"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "testProjectRoot",
+          "params": [
+            "t"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "forwardFixture",
+          "params": [
+            "zip"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "readFixture",
+          "params": [
+            "t",
+            "name"
+          ],
+          "returnType": "[]byte",
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "staticHandler",
+          "params": [
+            "body"
+          ],
+          "returnType": "http.HandlerFunc",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "TestLookupZip_FixtureCoordinates",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 20
+        }
+      ],
+      "classes": [
+        {
+          "name": "geocodeCase",
+          "methods": [],
+          "properties": [
+            "name",
+            "zip",
+            "lat",
+            "lon"
+          ],
+          "exported": false,
+          "lineCount": 6
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/http/httptest",
+          "specifiers": [
+            "httptest"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "runtime",
+          "specifiers": [
+            "runtime"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        }
+      ],
+      "exports": [
+        "TestLookupZip_RequestPath",
+        "TestLookupZip_EmptyZip",
+        "TestLookupZip_NotFound",
+        "TestLookupZip_NoPlaces",
+        "TestLookupZip_InvalidCoordinate",
+        "TestLookupZip_FixtureCoordinates"
+      ],
+      "totalLines": 190,
+      "hasStructuralAnalysis": true
+    },
+    "internal/history/history.go": {
+      "filePath": "internal/history/history.go",
+      "contentHash": "2da3a8b3d40a617b1b75c32ecb6512ce34fbefe9685d8a6d29bab5ded6d4d108",
+      "functions": [
+        {
+          "name": "FromMetrics",
+          "params": [
+            "metrics",
+            "tz"
+          ],
+          "returnType": "(DayRecord, error)",
+          "exported": true,
+          "lineCount": 44
+        },
+        {
+          "name": "WriteRecord",
+          "params": [
+            "dir",
+            "record"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "WriteIndex",
+          "params": [
+            "dir",
+            "from",
+            "to",
+            "tz",
+            "runErrors"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 49
+        },
+        {
+          "name": "scanPresentDates",
+          "params": [
+            "dir",
+            "tz"
+          ],
+          "returnType": "(set map[string]bool, earliest, latest time.Time, err error)",
+          "exported": false,
+          "lineCount": 29
+        }
+      ],
+      "classes": [
+        {
+          "name": "DayRecord",
+          "methods": [],
+          "properties": [
+            "Date",
+            "Totals",
+            "Systems",
+            "Weather"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "Totals",
+          "methods": [],
+          "properties": [
+            "ProductionKWh",
+            "ConsumptionKWh",
+            "GridImportKWh",
+            "GridExportKWh",
+            "NetFlowKWh"
+          ],
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "SystemRec",
+          "methods": [],
+          "properties": [
+            "ID",
+            "Name",
+            "ProductionKWh",
+            "ConsumptionKWh",
+            "GridImportKWh",
+            "GridExportKWh",
+            "NetFlowKWh"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "WeatherRec",
+          "methods": [],
+          "properties": [
+            "TempHigh",
+            "TempLow",
+            "TempUnit",
+            "WeatherCode",
+            "Condition",
+            "CloudCoverPct",
+            "PrecipitationMM",
+            "SolarRadiationKWhM2"
+          ],
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "Index",
+          "methods": [],
+          "properties": [
+            "UpdatedAt",
+            "Range",
+            "Counts",
+            "Missing"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "IndexRange",
+          "methods": [],
+          "properties": [
+            "From",
+            "To"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "IndexCounts",
+          "methods": [],
+          "properties": [
+            "Present",
+            "Missing"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "MissingDay",
+          "methods": [],
+          "properties": [
+            "Date",
+            "Error"
+          ],
+          "exported": true,
+          "lineCount": 4
+        }
+      ],
+      "imports": [
+        {
+          "source": "encoding/json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "DayRecord",
+        "Totals",
+        "SystemRec",
+        "WeatherRec",
+        "FromMetrics",
+        "WriteRecord",
+        "Index",
+        "IndexRange",
+        "IndexCounts",
+        "MissingDay",
+        "WriteIndex"
+      ],
+      "totalLines": 264,
+      "hasStructuralAnalysis": true
+    },
+    "internal/history/history_test.go": {
+      "filePath": "internal/history/history_test.go",
+      "contentHash": "f4f8853f569e8aecf3c64c7e4b1f176964822fd957f0700cddd470b5f5e75975",
+      "functions": [
+        {
+          "name": "sampleMetrics",
+          "params": [
+            "tz"
+          ],
+          "returnType": "*aggregator.AggregatedMetrics",
+          "exported": false,
+          "lineCount": 45
+        },
+        {
+          "name": "TestFromMetrics",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 35
+        },
+        {
+          "name": "TestFromMetrics_OmitsBatteryFields",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "TestFromMetrics_ZeroDate",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "TestFromMetrics_NilWeather",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "TestWriteRecord",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 24
+        },
+        {
+          "name": "TestWriteRecord_Overwrites",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "writeDayFile",
+          "params": [
+            "t",
+            "dir",
+            "date"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "readIndex",
+          "params": [
+            "t",
+            "dir"
+          ],
+          "returnType": "Index",
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "TestWriteIndex",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 32
+        },
+        {
+          "name": "TestWriteIndex_ExpandsRangeForPriorRecords",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "TestWriteIndex_DotfileNotCountedAsRecord",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 16
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "encoding/json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/aggregator",
+          "specifiers": [
+            "aggregator"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        }
+      ],
+      "exports": [
+        "TestFromMetrics",
+        "TestFromMetrics_OmitsBatteryFields",
+        "TestFromMetrics_ZeroDate",
+        "TestFromMetrics_NilWeather",
+        "TestWriteRecord",
+        "TestWriteRecord_Overwrites",
+        "TestWriteIndex",
+        "TestWriteIndex_ExpandsRangeForPriorRecords",
+        "TestWriteIndex_DotfileNotCountedAsRecord"
+      ],
+      "totalLines": 283,
+      "hasStructuralAnalysis": true
+    },
+    "internal/location/location.go": {
+      "filePath": "internal/location/location.go",
+      "contentHash": "4c9281709cd82b58967736c7c2bf2f08c230b25c0c51a78ab665f8e4ca7862c7",
+      "functions": [
+        {
+          "name": "NewResolver",
+          "params": [],
+          "returnType": "*Resolver",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "SystemLocations",
+          "params": [
+            "ctx",
+            "apiKey",
+            "accessToken"
+          ],
+          "returnType": "([]SystemLocation, error)",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "RefreshSystemLocations",
+          "params": [
+            "ctx",
+            "apiKey",
+            "accessToken"
+          ],
+          "returnType": "([]SystemLocation, error)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "resolve",
+          "params": [
+            "ctx",
+            "apiKey",
+            "accessToken"
+          ],
+          "returnType": "([]SystemLocation, error)",
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "CachedSystemLocations",
+          "params": [],
+          "returnType": "([]SystemLocation, bool)",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "CachedPrimaryCoordinates",
+          "params": [],
+          "returnType": "(geocode.Coordinates, bool)",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "fetchSystems",
+          "params": [
+            "ctx",
+            "apiKey",
+            "accessToken"
+          ],
+          "returnType": "([]SystemLocation, error)",
+          "exported": false,
+          "lineCount": 40
+        },
+        {
+          "name": "resolveCoordinates",
+          "params": [
+            "ctx",
+            "locs"
+          ],
+          "returnType": "error",
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "loadCache",
+          "params": [],
+          "returnType": "([]SystemLocation, bool)",
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "saveCache",
+          "params": [
+            "locs"
+          ],
+          "exported": false,
+          "lineCount": 10
+        }
+      ],
+      "classes": [
+        {
+          "name": "SystemLocation",
+          "methods": [],
+          "properties": [
+            "SystemID",
+            "Name",
+            "Timezone",
+            "City",
+            "State",
+            "Country",
+            "PostalCode",
+            "Latitude",
+            "Longitude"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "Resolver",
+          "methods": [
+            "SystemLocations",
+            "RefreshSystemLocations",
+            "resolve",
+            "CachedSystemLocations",
+            "CachedPrimaryCoordinates",
+            "fetchSystems",
+            "resolveCoordinates",
+            "loadCache",
+            "saveCache"
+          ],
+          "properties": [
+            "BaseURL",
+            "CacheTTL",
+            "CachePath",
+            "HTTPClient",
+            "Geocode"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "systemsResponse",
+          "methods": [],
+          "properties": [
+            "Systems"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "cacheFile",
+          "methods": [],
+          "properties": [
+            "FetchedAt",
+            "Systems"
+          ],
+          "exported": false,
+          "lineCount": 4
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "encoding/json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/url",
+          "specifiers": [
+            "url"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/cache",
+          "specifiers": [
+            "cache"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/constants",
+          "specifiers": [
+            "constants"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/geocode",
+          "specifiers": [
+            "geocode"
+          ]
+        }
+      ],
+      "exports": [
+        "SystemLocation",
+        "Resolver",
+        "NewResolver",
+        "SystemLocations",
+        "RefreshSystemLocations",
+        "CachedSystemLocations",
+        "CachedPrimaryCoordinates"
+      ],
+      "totalLines": 252,
+      "hasStructuralAnalysis": true
+    },
+    "internal/location/location_test.go": {
+      "filePath": "internal/location/location_test.go",
+      "contentHash": "7976a7ce0a3e4427f1e8c548bc1c4a712b7aa32efca5279ac51c283886ab3d63",
+      "functions": [
+        {
+          "name": "testProjectRoot",
+          "params": [
+            "t"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "stubGeocoder",
+          "params": [
+            "_",
+            "zip"
+          ],
+          "returnType": "(geocode.Coordinates, error)",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "newTestResolver",
+          "params": [
+            "t"
+          ],
+          "returnType": "(*Resolver, *int)",
+          "exported": false,
+          "lineCount": 30
+        },
+        {
+          "name": "TestSystemLocations_FetchAndGeocode",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 27
+        },
+        {
+          "name": "TestSystemLocations_WarmCacheSkipsNetwork",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "TestSystemLocations_ExpiredCacheRefetches",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "TestCachedPrimaryCoordinates_MissBeforeResolve",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "TestCachedPrimaryCoordinates_HitAfterResolve",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "TestRefreshSystemLocations_BypassesCache",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "TestSystemLocations_HTTPError",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/http/httptest",
+          "specifiers": [
+            "httptest"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "runtime",
+          "specifiers": [
+            "runtime"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/geocode",
+          "specifiers": [
+            "geocode"
+          ]
+        }
+      ],
+      "exports": [
+        "TestSystemLocations_FetchAndGeocode",
+        "TestSystemLocations_WarmCacheSkipsNetwork",
+        "TestSystemLocations_ExpiredCacheRefetches",
+        "TestCachedPrimaryCoordinates_MissBeforeResolve",
+        "TestCachedPrimaryCoordinates_HitAfterResolve",
+        "TestRefreshSystemLocations_BypassesCache",
+        "TestSystemLocations_HTTPError"
+      ],
+      "totalLines": 196,
+      "hasStructuralAnalysis": true
+    },
+    "internal/oauth/authorization.go": {
+      "filePath": "internal/oauth/authorization.go",
+      "contentHash": "ca020357bc555988698e767b1c4c7b928a422e58cf97a74ac10df43fb4dfeeda",
+      "functions": [
+        {
+          "name": "Authorize",
+          "params": [
+            "ctx",
+            "api"
+          ],
+          "returnType": "(string, error)",
+          "exported": true,
+          "lineCount": 80
+        },
+        {
+          "name": "obtainAuthorizationCode",
+          "params": [
+            "ctx",
+            "authURL",
+            "redirectURI"
+          ],
+          "returnType": "(string, error)",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "listenForCallback",
+          "params": [
+            "redirectURI"
+          ],
+          "returnType": "(net.Listener, string, bool)",
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "isLoopbackHost",
+          "params": [
+            "host"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "captureCodeViaCallback",
+          "params": [
+            "ctx",
+            "ln",
+            "callbackPath",
+            "authURL"
+          ],
+          "returnType": "(string, error)",
+          "exported": false,
+          "lineCount": 56
+        },
+        {
+          "name": "writeCallbackPage",
+          "params": [
+            "w",
+            "success"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "trySend",
+          "params": [
+            "ch",
+            "v"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "pasteAuthorizationCode",
+          "params": [
+            "authURL",
+            "redirectURI"
+          ],
+          "returnType": "(string, error)",
+          "exported": false,
+          "lineCount": 62
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "bufio",
+          "specifiers": [
+            "bufio"
+          ]
+        },
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "net",
+          "specifiers": [
+            "net"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/url",
+          "specifiers": [
+            "url"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "os/exec",
+          "specifiers": [
+            "exec"
+          ]
+        },
+        {
+          "source": "runtime",
+          "specifiers": [
+            "runtime"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/types",
+          "specifiers": [
+            "types"
+          ]
+        }
+      ],
+      "exports": [
+        "Authorize"
+      ],
+      "totalLines": 332,
+      "hasStructuralAnalysis": true
+    },
+    "internal/oauth/authorization_test.go": {
+      "filePath": "internal/oauth/authorization_test.go",
+      "contentHash": "accf82fc831ff2f305af3e6c3f8cef0495ecb922bff4cd4d5eb13394f8856284",
+      "functions": [
+        {
+          "name": "TestIsLoopbackHost",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "TestListenForCallback",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 48
+        },
+        {
+          "name": "TestCaptureCodeViaCallback",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 69
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        }
+      ],
+      "exports": [
+        "TestIsLoopbackHost",
+        "TestListenForCallback",
+        "TestCaptureCodeViaCallback"
+      ],
+      "totalLines": 143,
       "hasStructuralAnalysis": true
     },
     "internal/oauth/oauth.go": {
       "filePath": "internal/oauth/oauth.go",
-      "contentHash": "d09c1e02ef3c4747b80e832270ddf68e0470a39e9fba1fda233a75bfc211bb9c",
+      "contentHash": "3795b92e356ddaf1a9ca36cfe0c199c42d22f4ea74a3f58278d79e209c86c635",
       "functions": [
         {
           "name": "GetAuthorizationURL",
@@ -5350,7 +8197,7 @@
             "apiConfig",
             "code"
           ],
-          "returnType": "(*OAuthTokenResponse, error)",
+          "returnType": "(*TokenResponse, error)",
           "exported": true,
           "lineCount": 55
         },
@@ -5362,12 +8209,12 @@
           ],
           "returnType": "(string, error)",
           "exported": true,
-          "lineCount": 106
+          "lineCount": 133
         }
       ],
       "classes": [
         {
-          "name": "OAuthTokenResponse",
+          "name": "TokenResponse",
           "methods": [],
           "properties": [
             "AccessToken",
@@ -5408,6 +8255,12 @@
           "source": "encoding/json",
           "specifiers": [
             "json"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
           ]
         },
         {
@@ -5454,18 +8307,18 @@
         }
       ],
       "exports": [
-        "OAuthTokenResponse",
+        "TokenResponse",
         "TokenCache",
         "GetAuthorizationURL",
         "ExchangeAuthorizationCode",
         "GetAccessToken"
       ],
-      "totalLines": 284,
+      "totalLines": 322,
       "hasStructuralAnalysis": true
     },
     "internal/oauth/oauth_edge_cases_test.go": {
       "filePath": "internal/oauth/oauth_edge_cases_test.go",
-      "contentHash": "939929f3560efda8ebdd36c4a013770c9de966ec9dbee15cd0076ac617ebc4c2",
+      "contentHash": "4018310a5fd072a0be67c766ace3552ccc0d8cea9fa5936c31163453573d3ce1",
       "functions": [
         {
           "name": "TestExchangeAuthorizationCode_MissingAPIConfig",
@@ -5620,28 +8473,28 @@
           "lineCount": 11
         },
         {
-          "name": "TestSetup_NilAPI",
+          "name": "TestAuthorize_NilAPI",
           "params": [
             "t"
           ],
           "exported": true,
-          "lineCount": 10
+          "lineCount": 9
         },
         {
-          "name": "TestSetup_EmptyClientID",
+          "name": "TestAuthorize_EmptyClientID",
           "params": [
             "t"
           ],
           "exported": true,
-          "lineCount": 10
+          "lineCount": 9
         },
         {
-          "name": "TestSetup_AuthorizationError",
+          "name": "TestAuthorize_AuthorizationError",
           "params": [
             "t"
           ],
           "exported": true,
-          "lineCount": 29
+          "lineCount": 32
         }
       ],
       "classes": [],
@@ -5689,12 +8542,6 @@
           ]
         },
         {
-          "source": "enphase-monitor/internal/config",
-          "specifiers": [
-            "config"
-          ]
-        },
-        {
           "source": "enphase-monitor/internal/types",
           "specifiers": [
             "types"
@@ -5721,17 +8568,41 @@
         "TestGetAccessToken_ContextCancellation",
         "TestGetAuthorizationURL_EmptyClientID",
         "TestGetAuthorizationURL_EmptyRedirectURI",
-        "TestSetup_NilAPI",
-        "TestSetup_EmptyClientID",
-        "TestSetup_AuthorizationError"
+        "TestAuthorize_NilAPI",
+        "TestAuthorize_EmptyClientID",
+        "TestAuthorize_AuthorizationError"
       ],
-      "totalLines": 561,
+      "totalLines": 503,
       "hasStructuralAnalysis": true
     },
     "internal/oauth/oauth_functional_test.go": {
       "filePath": "internal/oauth/oauth_functional_test.go",
-      "contentHash": "115eb784a8beba258a1b8905ae930ee18004a9d64e531ed27d9cc28cf6af8658",
+      "contentHash": "c4787202cc0bc8d7c89f4b74d8649ac98bc761d131fd85e07b5f63e9298f3ed8",
       "functions": [
+        {
+          "name": "TestGetAccessToken_RetriesOn5xx",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "TestGetAccessToken_GivesUpAfterMax5xx",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "TestGetAccessToken_DoesNotRetry4xx",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 20
+        },
         {
           "name": "TestExchangeAuthorizationCode_Success",
           "params": [
@@ -5762,7 +8633,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 68
+          "lineCount": 69
         },
         {
           "name": "TestGetAccessToken_WithPasswordGrant",
@@ -5810,7 +8681,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 45
+          "lineCount": 46
         },
         {
           "name": "TestGetAccessToken_PreservesRefreshToken",
@@ -5854,6 +8725,12 @@
           ]
         },
         {
+          "source": "sync/atomic",
+          "specifiers": [
+            "atomic"
+          ]
+        },
+        {
           "source": "testing",
           "specifiers": [
             "testing"
@@ -5873,6 +8750,9 @@
         }
       ],
       "exports": [
+        "TestGetAccessToken_RetriesOn5xx",
+        "TestGetAccessToken_GivesUpAfterMax5xx",
+        "TestGetAccessToken_DoesNotRetry4xx",
         "TestExchangeAuthorizationCode_Success",
         "TestExchangeAuthorizationCode_HTTPError",
         "TestExchangeAuthorizationCode_InvalidJSON",
@@ -5885,12 +8765,12 @@
         "TestGetAccessToken_DefaultExpiresIn",
         "TestGetAccessToken_PreservesRefreshToken"
       ],
-      "totalLines": 653,
+      "totalLines": 680,
       "hasStructuralAnalysis": true
     },
     "internal/oauth/oauth_test.go": {
       "filePath": "internal/oauth/oauth_test.go",
-      "contentHash": "c70b09c6bd973a79d80c954d908bd91436588511e7b8c8bed718033efafb899d",
+      "contentHash": "a4e04377ab886bfeac4c1f0547fe8b291baea6da7c29a9edcad12cd569bf05ff",
       "functions": [
         {
           "name": "TestGetAuthorizationURL",
@@ -5922,7 +8802,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 33
+          "lineCount": 34
         }
       ],
       "classes": [],
@@ -5952,9 +8832,9 @@
           ]
         },
         {
-          "source": "enphase-monitor/internal/config",
+          "source": "enphase-monitor/internal/types",
           "specifiers": [
-            "config"
+            "types"
           ]
         }
       ],
@@ -5964,105 +8844,12 @@
         "TestGetAccessToken_Errors",
         "TestTokenCache"
       ],
-      "totalLines": 317,
-      "hasStructuralAnalysis": true
-    },
-    "internal/oauth/setup.go": {
-      "filePath": "internal/oauth/setup.go",
-      "contentHash": "2e6030c24ec3e1e30d34e4c84ca2db47d2fe8b6b767aba4ec629edcfdefc279d",
-      "functions": [
-        {
-          "name": "openBrowser",
-          "params": [
-            "url"
-          ],
-          "returnType": "error",
-          "exported": false,
-          "lineCount": 15
-        },
-        {
-          "name": "Setup",
-          "params": [
-            "ctx",
-            "cfg"
-          ],
-          "returnType": "error",
-          "exported": true,
-          "lineCount": 178
-        }
-      ],
-      "classes": [],
-      "imports": [
-        {
-          "source": "bufio",
-          "specifiers": [
-            "bufio"
-          ]
-        },
-        {
-          "source": "context",
-          "specifiers": [
-            "context"
-          ]
-        },
-        {
-          "source": "fmt",
-          "specifiers": [
-            "fmt"
-          ]
-        },
-        {
-          "source": "net/url",
-          "specifiers": [
-            "url"
-          ]
-        },
-        {
-          "source": "os",
-          "specifiers": [
-            "os"
-          ]
-        },
-        {
-          "source": "os/exec",
-          "specifiers": [
-            "exec"
-          ]
-        },
-        {
-          "source": "runtime",
-          "specifiers": [
-            "runtime"
-          ]
-        },
-        {
-          "source": "strings",
-          "specifiers": [
-            "strings"
-          ]
-        },
-        {
-          "source": "enphase-monitor/internal/config",
-          "specifiers": [
-            "config"
-          ]
-        },
-        {
-          "source": "enphase-monitor/internal/constants",
-          "specifiers": [
-            "constants"
-          ]
-        }
-      ],
-      "exports": [
-        "Setup"
-      ],
-      "totalLines": 236,
+      "totalLines": 273,
       "hasStructuralAnalysis": true
     },
     "internal/parser/parser.go": {
       "filePath": "internal/parser/parser.go",
-      "contentHash": "ec298e0d2f3d5bb65ab830e196ce717eb2a6c5330f15307fdefa85a9c170bb1f",
+      "contentHash": "40c0d100feea88a2fa923e2a65cc8418bd62797bfd161d322144e643d54cab4d",
       "functions": [
         {
           "name": "ParseNestedTelemetryResponse",
@@ -6234,7 +9021,7 @@
     },
     "internal/parser/parser_bench_test.go": {
       "filePath": "internal/parser/parser_bench_test.go",
-      "contentHash": "fdfdde59943eda71568554552ce18eb7aeb6081da101862691b1c165ac83acdb",
+      "contentHash": "f054bc95dab06cdf2212cbcfbcb3c1626a9844977b11d17fc54a5d54a8a7acd4",
       "functions": [
         {
           "name": "BenchmarkParseTelemetryResponse",
@@ -6323,12 +9110,12 @@
         "BenchmarkParseTelemetryResponse_WithUnmarshal",
         "BenchmarkParseNestedTelemetryResponse_Complete"
       ],
-      "totalLines": 228,
+      "totalLines": 163,
       "hasStructuralAnalysis": true
     },
     "internal/parser/parser_test.go": {
       "filePath": "internal/parser/parser_test.go",
-      "contentHash": "075f0c031ed7d8ca7f6610795438a58de70c83e0d77e785da530cbd8c44991c4",
+      "contentHash": "5e28b78b4e694ba87440878dcd8aef837318655a187763bf199ae9661ce6eb75",
       "functions": [
         {
           "name": "TestParseTelemetryResponse",
@@ -6414,12 +9201,12 @@
         "TestSumDailyIntervals",
         "TestSumIntervalValues"
       ],
-      "totalLines": 456,
+      "totalLines": 412,
       "hasStructuralAnalysis": true
     },
     "internal/timezone/timezone.go": {
       "filePath": "internal/timezone/timezone.go",
-      "contentHash": "2f74b417f08fcb6ef17c6c554213d936fea98250a2690788ed528d8dfd0c6d30",
+      "contentHash": "86fd8302e91420508264178de59a897e1e821def57ad1768be28eb776524c085",
       "functions": [
         {
           "name": "LoadTimezone",
@@ -6439,16 +9226,6 @@
           "returnType": "(dayStart, dayEnd time.Time)",
           "exported": true,
           "lineCount": 19
-        },
-        {
-          "name": "IsPastDate",
-          "params": [
-            "targetDate",
-            "tz"
-          ],
-          "returnType": "bool",
-          "exported": true,
-          "lineCount": 11
         },
         {
           "name": "ParseDateInTimezone",
@@ -6537,6 +9314,12 @@
       ],
       "imports": [
         {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
           "source": "fmt",
           "specifiers": [
             "fmt"
@@ -6559,7 +9342,6 @@
         "ParseResult",
         "LoadTimezone",
         "GetDayBoundaries",
-        "IsPastDate",
         "ParseDateInTimezone",
         "ParseDateString",
         "GetMonthBoundaries",
@@ -6568,12 +9350,12 @@
         "GetBoundaries",
         "IsPastPeriod"
       ],
-      "totalLines": 244,
+      "totalLines": 232,
       "hasStructuralAnalysis": true
     },
     "internal/timezone/timezone_test.go": {
       "filePath": "internal/timezone/timezone_test.go",
-      "contentHash": "a0e8eeadb94df4630e8716c55a88457c1bce9f21d6c01893e10ce301f1cb4f03",
+      "contentHash": "52aa11e4f13115360504b54b4747dc35ba29173f153422b35e607ce5274bf712",
       "functions": [
         {
           "name": "TestLoadTimezone",
@@ -6590,14 +9372,6 @@
           ],
           "exported": true,
           "lineCount": 53
-        },
-        {
-          "name": "TestIsPastDate",
-          "params": [
-            "t"
-          ],
-          "exported": true,
-          "lineCount": 51
         },
         {
           "name": "TestParseDateString",
@@ -6688,7 +9462,6 @@
       "exports": [
         "TestLoadTimezone",
         "TestGetDayBoundaries",
-        "TestIsPastDate",
         "TestParseDateString",
         "TestGetMonthBoundaries",
         "TestGetYearBoundaries",
@@ -6698,12 +9471,12 @@
         "TestGetBoundaries_TrueUp",
         "TestParseDateInTimezone"
       ],
-      "totalLines": 636,
+      "totalLines": 536,
       "hasStructuralAnalysis": true
     },
     "internal/types/types.go": {
       "filePath": "internal/types/types.go",
-      "contentHash": "9072fd15b551bd16885017940cc70b924cb291d05e413963558b7921d3240dbd",
+      "contentHash": "1a483d4d8d97cb8d32912136ae12f0f5981b269825d926d315c07600b6dfb704",
       "functions": [],
       "classes": [
         {
@@ -6720,6 +9493,7 @@
           "name": "APIConfig",
           "methods": [],
           "properties": [
+            "Name",
             "Key",
             "ClientID",
             "ClientSecret",
@@ -6730,7 +9504,7 @@
             "Password"
           ],
           "exported": true,
-          "lineCount": 10
+          "lineCount": 11
         }
       ],
       "imports": [],
@@ -6738,16 +9512,17 @@
         "SystemConfig",
         "APIConfig"
       ],
-      "totalLines": 99,
+      "totalLines": 100,
       "hasStructuralAnalysis": true
     },
     "internal/urlbuilder/urlbuilder.go": {
       "filePath": "internal/urlbuilder/urlbuilder.go",
-      "contentHash": "e87084aa67df8efc21d5ccf5598f87beca5229e74608d293922492e633ec2f22",
+      "contentHash": "8c4249928cc871c412235ba3f367cdb1556106b8898b0fc2e31763090037e275",
       "functions": [
         {
           "name": "BuildTelemetryURL",
           "params": [
+            "base",
             "systemID",
             "endpoint",
             "apiKey",
@@ -6757,6 +9532,19 @@
           "returnType": "string",
           "exported": true,
           "lineCount": 6
+        },
+        {
+          "name": "BuildLifetimeURL",
+          "params": [
+            "base",
+            "systemID",
+            "endpoint",
+            "apiKey",
+            "startDate"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
         }
       ],
       "classes": [],
@@ -6778,23 +9566,18 @@
           "specifiers": [
             "time"
           ]
-        },
-        {
-          "source": "enphase-monitor/internal/constants",
-          "specifiers": [
-            "constants"
-          ]
         }
       ],
       "exports": [
-        "BuildTelemetryURL"
+        "BuildTelemetryURL",
+        "BuildLifetimeURL"
       ],
-      "totalLines": 32,
+      "totalLines": 41,
       "hasStructuralAnalysis": true
     },
     "internal/urlbuilder/urlbuilder_test.go": {
       "filePath": "internal/urlbuilder/urlbuilder_test.go",
-      "contentHash": "d38ef577966a33cb6b0a7f395c5132e8a921e8ebb7940470b0cf93a1f5ea92af",
+      "contentHash": "752f6447de1a130e53aedeec0a9b7d92ea302090027fc54e7a64db9074ea1909",
       "functions": [
         {
           "name": "TestBuildTelemetryURL",
@@ -6819,6 +9602,22 @@
           ],
           "exported": true,
           "lineCount": 41
+        },
+        {
+          "name": "TestBuildLifetimeURL",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "TestBuildLifetimeURL_CustomBase",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 6
         }
       ],
       "classes": [],
@@ -6851,14 +9650,16 @@
       "exports": [
         "TestBuildTelemetryURL",
         "TestBuildTelemetryURL_TimestampConversion",
-        "TestBuildTelemetryURL_SpecialCharacters"
+        "TestBuildTelemetryURL_SpecialCharacters",
+        "TestBuildLifetimeURL",
+        "TestBuildLifetimeURL_CustomBase"
       ],
-      "totalLines": 223,
+      "totalLines": 201,
       "hasStructuralAnalysis": true
     },
     "internal/validation/validation.go": {
       "filePath": "internal/validation/validation.go",
-      "contentHash": "3c2de92226becb4ec4956e5b018a8fc4a5e39b95a44ffe40d28c55fbfb70cd9c",
+      "contentHash": "c0b8d8d93fc54f51044b8f390eaa0e3d057c59c62d4915dbda032cfd087b3f40",
       "functions": [
         {
           "name": "ValidateMetrics",
@@ -6869,6 +9670,18 @@
           ],
           "returnType": "error",
           "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "validateMetricsFromRoot",
+          "params": [
+            "w",
+            "metrics",
+            "dateStr",
+            "root"
+          ],
+          "returnType": "error",
+          "exported": false,
           "lineCount": 95
         },
         {
@@ -6889,7 +9702,7 @@
           ],
           "returnType": "(total, passed int, anyFailed bool)",
           "exported": false,
-          "lineCount": 13
+          "lineCount": 12
         },
         {
           "name": "validateMetric",
@@ -7009,20 +9822,29 @@
         "ExpectedMetrics",
         "ValidateMetrics"
       ],
-      "totalLines": 225,
+      "totalLines": 230,
       "hasStructuralAnalysis": true
     },
     "internal/validation/validation_integration_test.go": {
       "filePath": "internal/validation/validation_integration_test.go",
-      "contentHash": "4654b820e01fef111f8e509fd6936087ed9acb3dae9450427446d39e9ce2ff0f",
+      "contentHash": "e9aab885365868f8be3ff6f109c52482f370a3317a937aeb15a7fb07273df916",
       "functions": [
+        {
+          "name": "testProjectRoot",
+          "params": [
+            "t"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 9
+        },
         {
           "name": "TestValidateMetrics_FullFlow_Success",
           "params": [
             "t"
           ],
           "exported": true,
-          "lineCount": 58
+          "lineCount": 41
         },
         {
           "name": "TestValidateMetrics_FullFlow_WithinTolerance",
@@ -7030,7 +9852,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 58
+          "lineCount": 41
         },
         {
           "name": "TestValidateMetrics_FullFlow_OutsideTolerance",
@@ -7038,7 +9860,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 62
+          "lineCount": 46
         },
         {
           "name": "TestValidateMetrics_MissingSystem",
@@ -7046,7 +9868,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 48
+          "lineCount": 32
         },
         {
           "name": "TestValidateMetrics_DateMismatch",
@@ -7054,7 +9876,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 39
+          "lineCount": 21
         },
         {
           "name": "TestValidateMetrics_MultipleExpectedValuesFiles",
@@ -7062,7 +9884,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 54
+          "lineCount": 35
         },
         {
           "name": "TestValidateMetrics_RealWorldScenario",
@@ -7070,7 +9892,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 61
+          "lineCount": 41
         }
       ],
       "classes": [],
@@ -7085,6 +9907,18 @@
           "source": "os",
           "specifiers": [
             "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "runtime",
+          "specifiers": [
+            "runtime"
           ]
         },
         {
@@ -7115,12 +9949,12 @@
         "TestValidateMetrics_MultipleExpectedValuesFiles",
         "TestValidateMetrics_RealWorldScenario"
       ],
-      "totalLines": 446,
+      "totalLines": 301,
       "hasStructuralAnalysis": true
     },
     "internal/validation/validation_test.go": {
       "filePath": "internal/validation/validation_test.go",
-      "contentHash": "97ff127721dbd2d8a534b760ec31334cdfd8673e43306b8f8f130fe30124d5be",
+      "contentHash": "c77d383a5f9e5cdd34c4fc9562cfb745a97d692a4bc2ce9a45bf1f53c2917746",
       "functions": [
         {
           "name": "TestValidateMetric_ExactMatch",
@@ -7128,7 +9962,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 40
+          "lineCount": 24
         },
         {
           "name": "TestValidateMetric_WithinTolerance",
@@ -7168,7 +10002,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 27
+          "lineCount": 23
         },
         {
           "name": "TestValidateMetrics_MissingFile_HelpfulError",
@@ -7176,17 +10010,7 @@
             "t"
           ],
           "exported": true,
-          "lineCount": 57
-        },
-        {
-          "name": "containsString",
-          "params": [
-            "s",
-            "substr"
-          ],
-          "returnType": "bool",
-          "exported": false,
-          "lineCount": 8
+          "lineCount": 52
         },
         {
           "name": "TestValidateMetrics_InvalidJSON",
@@ -7258,6 +10082,12 @@
           ]
         },
         {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
           "source": "testing",
           "specifiers": [
             "testing"
@@ -7291,18 +10121,614 @@
         "TestValidateMetrics_EmptyMetrics",
         "TestValidateMetrics_SystemIDMismatch"
       ],
-      "totalLines": 696,
+      "totalLines": 533,
+      "hasStructuralAnalysis": true
+    },
+    "internal/weather/weather.go": {
+      "filePath": "internal/weather/weather.go",
+      "contentHash": "c3fcea4f907addddf7f3ac1022a640d02a4007e50ef09ce56823d34f5985d31e",
+      "functions": [
+        {
+          "name": "NewClient",
+          "params": [
+            "cacheDir"
+          ],
+          "returnType": "*Client",
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "unitSymbol",
+          "params": [],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "DailyWeather",
+          "params": [
+            "ctx",
+            "coords",
+            "date"
+          ],
+          "returnType": "(DailyWeather, error)",
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "CurrentWeather",
+          "params": [
+            "ctx",
+            "coords"
+          ],
+          "returnType": "(CurrentWeather, error)",
+          "exported": true,
+          "lineCount": 49
+        },
+        {
+          "name": "fetch",
+          "params": [
+            "ctx",
+            "coords",
+            "date",
+            "dateStr",
+            "symbol"
+          ],
+          "returnType": "(DailyWeather, error)",
+          "exported": false,
+          "lineCount": 66
+        },
+        {
+          "name": "firstFloat",
+          "params": [
+            "s"
+          ],
+          "returnType": "*float64",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "firstInt",
+          "params": [
+            "s"
+          ],
+          "returnType": "*int",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "mostPrevalentCondition",
+          "params": [
+            "hourly"
+          ],
+          "returnType": "(label string, code int, ok bool)",
+          "exported": false,
+          "lineCount": 47
+        },
+        {
+          "name": "conditionFromCode",
+          "params": [
+            "code"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 36
+        },
+        {
+          "name": "WMOCodeLegend",
+          "params": [],
+          "returnType": "map[int]string",
+          "exported": true,
+          "lineCount": 32
+        },
+        {
+          "name": "WriteCodeLegend",
+          "params": [
+            "path"
+          ],
+          "returnType": "error",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "endpointFor",
+          "params": [
+            "date"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "cachePath",
+          "params": [
+            "coords",
+            "dateStr"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "loadCache",
+          "params": [
+            "coords",
+            "dateStr",
+            "symbol"
+          ],
+          "returnType": "(DailyWeather, bool)",
+          "exported": false,
+          "lineCount": 32
+        },
+        {
+          "name": "saveCache",
+          "params": [
+            "coords",
+            "dateStr",
+            "w"
+          ],
+          "exported": false,
+          "lineCount": 25
+        },
+        {
+          "name": "isToday",
+          "params": [
+            "dateStr"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [
+        {
+          "name": "DailyWeather",
+          "methods": [],
+          "properties": [
+            "Date",
+            "TempHigh",
+            "TempLow",
+            "TempUnit",
+            "WeatherCode",
+            "Condition",
+            "CloudCoverPct",
+            "PrecipitationMM",
+            "SolarRadiation"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "Client",
+          "methods": [
+            "unitSymbol",
+            "DailyWeather",
+            "CurrentWeather",
+            "fetch",
+            "endpointFor",
+            "cachePath",
+            "loadCache",
+            "saveCache",
+            "isToday"
+          ],
+          "properties": [
+            "ForecastURL",
+            "ArchiveURL",
+            "Unit",
+            "HTTPClient",
+            "CacheDir",
+            "now"
+          ],
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "CurrentWeather",
+          "methods": [],
+          "properties": [
+            "Temp",
+            "Unit",
+            "WeatherCode",
+            "Condition",
+            "CloudCoverPct",
+            "PrecipitationMM"
+          ],
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "openMeteoResponse",
+          "methods": [],
+          "properties": [
+            "Daily",
+            "Hourly"
+          ],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "cacheEntry",
+          "methods": [],
+          "properties": [
+            "FetchedAt",
+            "Date",
+            "TempHigh",
+            "TempLow",
+            "TempUnit",
+            "WeatherCode",
+            "Condition",
+            "CloudCoverPct",
+            "PrecipitationMM",
+            "SolarRadiation"
+          ],
+          "exported": false,
+          "lineCount": 12
+        }
+      ],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "encoding/json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "errors",
+          "specifiers": [
+            "errors"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/url",
+          "specifiers": [
+            "url"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "strconv",
+          "specifiers": [
+            "strconv"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/geocode",
+          "specifiers": [
+            "geocode"
+          ]
+        }
+      ],
+      "exports": [
+        "DailyWeather",
+        "Client",
+        "NewClient",
+        "DailyWeather",
+        "CurrentWeather",
+        "CurrentWeather",
+        "WMOCodeLegend",
+        "WriteCodeLegend"
+      ],
+      "totalLines": 561,
+      "hasStructuralAnalysis": true
+    },
+    "internal/weather/weather_test.go": {
+      "filePath": "internal/weather/weather_test.go",
+      "contentHash": "a3956670078c2f26017f84a244b619bb17f56d7d61754a8d29fd029d4071f8f9",
+      "functions": [
+        {
+          "name": "fixedClock",
+          "params": [
+            "s"
+          ],
+          "returnType": "func() time.Time",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "dailyJSON",
+          "params": [
+            "date",
+            "code",
+            "max",
+            "min",
+            "cloud",
+            "precip",
+            "shortwave"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "newTestClient",
+          "params": [
+            "t",
+            "forecastBody",
+            "archiveBody"
+          ],
+          "returnType": "(*Client, *int, *int)",
+          "exported": false,
+          "lineCount": 21
+        },
+        {
+          "name": "day",
+          "params": [
+            "s"
+          ],
+          "returnType": "time.Time",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "TestDailyWeather_TodayUsesForecast",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "TestDailyWeather_OldDateUsesArchive",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "TestDailyWeather_PastDateCachedPermanently",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "TestDailyWeather_TodayCacheExpires",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "TestDailyWeather_NullTemperature",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "TestDailyWeather_MissingOptionalFields",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "TestDailyWeather_CelsiusUnitSymbol",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "TestConditionFromCode",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "codePtrs",
+          "params": [],
+          "returnType": "[]*int",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "TestMostPrevalentCondition",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 37
+        },
+        {
+          "name": "ptrInt",
+          "params": [
+            "v"
+          ],
+          "returnType": "*int",
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "TestDailyWeather_ConditionUsesHourlyMode",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "TestCurrentWeather",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 27
+        },
+        {
+          "name": "TestCurrentWeather_NullTemp",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "TestDailyWeather_HTTPError",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "TestWMOCodeLegendComplete",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "TestWriteCodeLegend",
+          "params": [
+            "t"
+          ],
+          "exported": true,
+          "lineCount": 20
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "context",
+          "specifiers": [
+            "context"
+          ]
+        },
+        {
+          "source": "encoding/json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "fmt",
+          "specifiers": [
+            "fmt"
+          ]
+        },
+        {
+          "source": "net/http",
+          "specifiers": [
+            "http"
+          ]
+        },
+        {
+          "source": "net/http/httptest",
+          "specifiers": [
+            "httptest"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "path/filepath",
+          "specifiers": [
+            "filepath"
+          ]
+        },
+        {
+          "source": "testing",
+          "specifiers": [
+            "testing"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/geocode",
+          "specifiers": [
+            "geocode"
+          ]
+        }
+      ],
+      "exports": [
+        "TestDailyWeather_TodayUsesForecast",
+        "TestDailyWeather_OldDateUsesArchive",
+        "TestDailyWeather_PastDateCachedPermanently",
+        "TestDailyWeather_TodayCacheExpires",
+        "TestDailyWeather_NullTemperature",
+        "TestDailyWeather_MissingOptionalFields",
+        "TestDailyWeather_CelsiusUnitSymbol",
+        "TestConditionFromCode",
+        "TestMostPrevalentCondition",
+        "TestDailyWeather_ConditionUsesHourlyMode",
+        "TestCurrentWeather",
+        "TestCurrentWeather_NullTemp",
+        "TestDailyWeather_HTTPError",
+        "TestWMOCodeLegendComplete",
+        "TestWriteCodeLegend"
+      ],
+      "totalLines": 372,
       "hasStructuralAnalysis": true
     },
     "main.go": {
       "filePath": "main.go",
-      "contentHash": "52e32431a0eebf1807812948f12530fbcdbb03f39b644649a8d90e008b084f69",
+      "contentHash": "dc48ef120c788adf2e42e38421be904b5ead6c64c4970cdbdf371d42c0b6797d",
       "functions": [
         {
           "name": "main",
           "params": [],
           "exported": false,
-          "lineCount": 166
+          "lineCount": 310
         },
         {
           "name": "printDebugStartup",
@@ -7312,6 +10738,49 @@
           ],
           "exported": false,
           "lineCount": 27
+        },
+        {
+          "name": "initializeLocation",
+          "params": [
+            "ctx",
+            "cred",
+            "force"
+          ],
+          "returnType": "error",
+          "exported": false,
+          "lineCount": 36
+        },
+        {
+          "name": "selectCredential",
+          "params": [
+            "pool",
+            "name"
+          ],
+          "returnType": "(*config.APIConfig, error)",
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "updateOneRefreshToken",
+          "params": [
+            "ctx",
+            "cred",
+            "credentialsFile"
+          ],
+          "returnType": "error",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "updateAllRefreshTokens",
+          "params": [
+            "ctx",
+            "pool",
+            "credentialsFile"
+          ],
+          "returnType": "error",
+          "exported": false,
+          "lineCount": 23
         }
       ],
       "classes": [],
@@ -7344,6 +10813,12 @@
           "source": "os/signal",
           "specifiers": [
             "signal"
+          ]
+        },
+        {
+          "source": "strings",
+          "specifiers": [
+            "strings"
           ]
         },
         {
@@ -7395,6 +10870,18 @@
           ]
         },
         {
+          "source": "enphase-monitor/internal/credentials",
+          "specifiers": [
+            "credentials"
+          ]
+        },
+        {
+          "source": "enphase-monitor/internal/location",
+          "specifiers": [
+            "location"
+          ]
+        },
+        {
           "source": "enphase-monitor/internal/oauth",
           "specifiers": [
             "oauth"
@@ -7405,110 +10892,16 @@
           "specifiers": [
             "timezone"
           ]
+        },
+        {
+          "source": "enphase-monitor/internal/weather",
+          "specifiers": [
+            "weather"
+          ]
         }
       ],
       "exports": [],
-      "totalLines": 308,
-      "hasStructuralAnalysis": true
-    },
-    "test-data/expected_values_2025-12.json": {
-      "filePath": "test-data/expected_values_2025-12.json",
-      "contentHash": "dfaf89551c8e21b6503d0696065300a959bbcdebd22d46d047120b2f96368d9f",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
-      "hasStructuralAnalysis": true
-    },
-    "test-data/expected_values_2025.json": {
-      "filePath": "test-data/expected_values_2025.json",
-      "contentHash": "b698ff898a7bba91c0449e7faac7b90552cc56b1c19ab7f4317de121b8aa6039",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
-      "hasStructuralAnalysis": true
-    },
-    "test-data/expected_values_2026-01-14.json": {
-      "filePath": "test-data/expected_values_2026-01-14.json",
-      "contentHash": "f89ed0a5ddc0093a91784743e91cfbf7cde0e3dfbc47bb23ec1cc9f6e29a43e0",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
-      "hasStructuralAnalysis": true
-    },
-    "test-data/expected_values_2026-01-15.json": {
-      "filePath": "test-data/expected_values_2026-01-15.json",
-      "contentHash": "6d0a1a90bd4b48a7ba7f8555d531bd7d54a3746a53b1388e8232b07bfd45fe1a",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
-      "hasStructuralAnalysis": true
-    },
-    "test-data/expected_values_2026-01-16.json": {
-      "filePath": "test-data/expected_values_2026-01-16.json",
-      "contentHash": "1ec1d3202642cb809b32cff8c2485d62051f69bfb264e475bf1626f8a93de123",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
-      "hasStructuralAnalysis": true
-    },
-    "test-data/expected_values_2026-01-17.json": {
-      "filePath": "test-data/expected_values_2026-01-17.json",
-      "contentHash": "79dc1a933b09ae439bdc7361d4b96ca0b0a090805ef2cbf00b979e890d7c6fb3",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
-      "hasStructuralAnalysis": true
-    },
-    "test-data/expected_values_2026-01-18.json": {
-      "filePath": "test-data/expected_values_2026-01-18.json",
-      "contentHash": "1dd7a1cddbb7a4107cdee655301615453402f123573af1e6e6431c04b8ae8144",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
-      "hasStructuralAnalysis": true
-    },
-    "test-data/expected_values_2026-01-19.json": {
-      "filePath": "test-data/expected_values_2026-01-19.json",
-      "contentHash": "012ff977ab570291118967cdb0ddef8c04f0eee915feaebfabf85ca88622e916",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
-      "hasStructuralAnalysis": true
-    },
-    "test-data/expected_values_2026-01-20.json": {
-      "filePath": "test-data/expected_values_2026-01-20.json",
-      "contentHash": "73a3affd3475e1fd313107014d4dcb927ec86b2ab3da1e25a1600b09222f34ea",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
-      "hasStructuralAnalysis": true
-    },
-    "test-data/expected_values_2026-01.json": {
-      "filePath": "test-data/expected_values_2026-01.json",
-      "contentHash": "50fe23e67c171ac8b5a0736d53c2c65957705db83c687b3e3c2c78256e8a7a55",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 32,
+      "totalLines": 570,
       "hasStructuralAnalysis": true
     }
   }

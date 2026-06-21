@@ -81,13 +81,18 @@ func (d *Display) ClearScreen() {
 
 // ShowMetrics displays the aggregated metrics in a formatted output.
 func (d *Display) ShowMetrics(metrics *aggregator.AggregatedMetrics) {
-	d.printHeader(metrics.Timestamp, metrics.CacheUsed, metrics.QueryDate, metrics.QueryMode)
+	d.printHeader(metrics)
 	d.printTodayEnergy(metrics)
 	d.printIndividualSystems(metrics)
 	d.printSeparator()
 }
 
-func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate time.Time, queryMode constants.QueryMode) {
+func (d *Display) printHeader(metrics *aggregator.AggregatedMetrics) {
+	timestamp := metrics.Timestamp
+	cacheUsed := metrics.CacheUsed
+	queryDate := metrics.QueryDate
+	queryMode := metrics.QueryMode
+
 	fmt.Fprintln(d.writer, "\n  "+d.colors.Headers+d.separatorLine+constants.Reset)
 	fmt.Fprintf(d.writer, "    %s%sENPHASE MULTI-SYSTEM MONITOR%s\n", constants.Bold, d.colors.Headers, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
@@ -118,15 +123,56 @@ func (d *Display) printHeader(timestamp time.Time, cacheUsed bool, queryDate tim
 	fmt.Fprintln(d.writer, "  "+d.colors.Headers+d.separatorLine+constants.Reset)
 }
 
+// weatherValueColor renders weather data values in pure white (#FFFFFF),
+// independent of the configurable PrimaryText color, per report styling.
+const weatherValueColor = "\033[38;2;255;255;255m"
+
+// printWeather renders the three-line weather block (temperature range,
+// conditions, and solar irradiance) within the COMBINED ENERGY REPORT, aligned
+// with the energy metrics above it (indent 4, label column 22). Data values are
+// white.
+func (d *Display) printWeather(w *aggregator.DailyWeather) {
+	const indent = "    "
+	const labelWidth = 18
+	row := func(label, value string) {
+		labelWithColon := label + ":"
+		padding := ""
+		if len(labelWithColon) < labelWidth {
+			padding = strings.Repeat(" ", labelWidth-len(labelWithColon))
+		}
+		fmt.Fprintf(d.writer, "%s%s%s%s%s%s%s\n",
+			indent, d.colors.SecondaryText, labelWithColon, padding, weatherValueColor, value, constants.Reset)
+	}
+
+	if w.HasCurrent {
+		// Live today report: present conditions now, plus the day's range.
+		row("Conditions", fmt.Sprintf("%s · %.0f%% cloud · %.1f mm", w.CurrentCondition, w.CurrentCloudCoverPct, w.CurrentPrecipitationMM))
+		row("Temperature", fmt.Sprintf("%.0f%s now · %.0f%s — %.0f%s", w.CurrentTemp, w.TempUnit, w.TempLow, w.TempUnit, w.TempHigh, w.TempUnit))
+		row("Irradiance", fmt.Sprintf("%.1f kWh/m² forecasted", w.SolarRadiation))
+		return
+	}
+	// Past-date report: whole-day aggregates.
+	row("Conditions", fmt.Sprintf("%s · %.0f%% cloud · %.1f mm", w.Condition, w.CloudCoverPct, w.PrecipitationMM))
+	row("Temperature", fmt.Sprintf("%.0f%s — %.0f%s", w.TempLow, w.TempUnit, w.TempHigh, w.TempUnit))
+	row("Irradiance", fmt.Sprintf("%.1f kWh/m²", w.SolarRadiation))
+}
+
 func (d *Display) printTodayEnergy(metrics *aggregator.AggregatedMetrics) {
 	fmt.Fprintf(d.writer, "\n   %s%sCOMBINED ENERGY REPORT%s\n", constants.Bold, d.colors.PrimaryText, constants.Reset)
 	fmt.Fprintln(d.writer, "  "+d.colors.SecondaryText+d.subSeparator+constants.Reset)
 
-	d.printNetFlow("  Net Flow", metrics.NetFlowToday, "  ", 24, d.colors.NetImportBackground, d.colors.NetExportBackground)
-	d.printMetric("Production", metrics.ProductionToday, d.colors.Production, "    ", 22)
-	d.printMetric("Consumption", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 22)
-	d.printMetric("Grid Import", metrics.GridImportToday, d.colors.Import, "    ", 22)
-	d.printMetric("Grid Export", metrics.GridExportToday, d.colors.Export, "    ", 22)
+	d.printNetFlow("  Net Flow", metrics.NetFlowToday, "  ", 20, d.colors.NetImportBackground, d.colors.NetExportBackground)
+	d.printMetric("Production", metrics.ProductionToday, d.colors.Production, "    ", 18)
+	d.printMetric("Consumption", metrics.ConsumptionToday, d.colors.TotalConsumed, "    ", 18)
+	d.printMetric("Grid Import", metrics.GridImportToday, d.colors.Import, "    ", 18)
+	d.printMetric("Grid Export", metrics.GridExportToday, d.colors.Export, "    ", 18)
+
+	// Day-Mode reports may carry the day's weather (best-effort; absent for
+	// month/year/true-up or when the weather lookup failed). Shown below Grid
+	// Export within this section.
+	if metrics.Weather != nil {
+		d.printWeather(metrics.Weather)
+	}
 }
 
 func (d *Display) printIndividualSystems(metrics *aggregator.AggregatedMetrics) {

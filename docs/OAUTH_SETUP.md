@@ -126,7 +126,7 @@ This separation allows Enphase to:
 - **What it is**: A long-lived token that can obtain new access tokens
 - **Why it exists**: Allows your application to get new access tokens without asking the user to authorize again. This is what you store in your config
 - **Where it is used**: 
-  - Stored in your `config.yaml` (this is the one-time setup step)
+  - Stored in your `credentials.yaml` (this is the one-time setup step)
   - Used to get new access tokens when they expire
 - **Security**: Long-lived but should be kept secure. If compromised, regenerate it
 
@@ -306,17 +306,26 @@ Together, they ensure that:
 
 ## Step-by-Step Instructions
 
-### Step 1: Add Redirect URI to Your Config
+### Step 1: Add Redirect URI to Your Credentials
 
-First, add the `redirect_uri` to your `config.yaml`. This must match **exactly** what you configured in the Enphase Developer Portal:
+First, add the `redirect_uri` to the shared `api:` block in `config.yaml`. This must match **exactly** what you configured in the Enphase Developer Portal, and is shared by every credential set:
 
 ```yaml
+# config.yaml
 api:
-  key: YOUR_API_KEY
-  client_id: YOUR_CLIENT_ID
-  client_secret: YOUR_CLIENT_SECRET
   authorization_url: https://api.enphaseenergy.com/oauth/token
   redirect_uri: http://localhost:8080/callback  # Must match your app settings
+```
+
+Your secrets stay in `credentials.yaml`:
+
+```yaml
+# credentials.yaml
+credentials:
+  - name: enphase-monitor-001
+    key: YOUR_API_KEY
+    client_id: YOUR_CLIENT_ID
+    client_secret: YOUR_CLIENT_SECRET
 ```
 
 **Why this matters**: The redirect URI is a security feature. Enphase will only send authorization codes to URLs you have pre-registered. This prevents attackers from intercepting codes by using a different redirect URI. The redirect_uri must match exactly (including protocol, host, port, and path) between:
@@ -331,8 +340,18 @@ This URL initiates the OAuth flow by redirecting the user to Enphase's authoriza
 
 **Run the setup wizard:**
 ```bash
-./enphase-monitor --oauth-setup
+./enphase-monitor --update-refresh-token
+# With more than one credential set, name the one to set up:
+./enphase-monitor --update-refresh-token enphase-monitor-002
+# Or re-authorize every credential in turn (e.g. after they all expired):
+./enphase-monitor --update-refresh-token --all
 ```
+
+The wizard opens the browser, and — when your `redirect_uri` is a localhost
+address — runs a temporary local listener on that port to capture the
+authorization code automatically, then saves the refresh token to
+`credentials.yaml`. You only authorize in the browser; the manual steps below are
+for the fallback (non-localhost redirect URI) or for doing the flow by hand.
 
 **Or manually construct the authorization URL:**
 ```
@@ -447,18 +466,21 @@ Replace:
 - `token_type`: Always "Bearer" (indicates how to use the token)
 - `expires_in`: Seconds until access_token expires (3600 = 1 hour)
 
-### Step 5: Add Refresh Token to Config
+### Step 5: Add Refresh Token to Credentials
 
-Add the `refresh_token` from the response to your `config.yaml`:
+> If you used the `--update-refresh-token` wizard, this is done for you — it writes the
+> `refresh_token` straight into the matching credential entry in `credentials.yaml`.
+> The steps below apply only if you ran the OAuth flow manually (e.g. with `curl`).
+
+Add the `refresh_token` from the response to the matching credential entry in your `credentials.yaml` (the shared `authorization_url` / `redirect_uri` stay in `config.yaml`):
 
 ```yaml
-api:
-  key: YOUR_API_KEY
-  client_id: YOUR_CLIENT_ID
-  client_secret: YOUR_CLIENT_SECRET
-  authorization_url: https://api.enphaseenergy.com/oauth/token
-  redirect_uri: http://localhost:8080/callback
-  refresh_token: YOUR_REFRESH_TOKEN  # Add this!
+credentials:
+  - name: enphase-monitor-001
+    key: YOUR_API_KEY
+    client_id: YOUR_CLIENT_ID
+    client_secret: YOUR_CLIENT_SECRET
+    refresh_token: YOUR_REFRESH_TOKEN  # Add this!
 ```
 
 **Why this is the only token you store:**
@@ -467,7 +489,7 @@ api:
 - Your application will automatically use the refresh_token to get new access tokens when needed
 - This is a **one-time setup** - you will not need to do this again unless the refresh token is revoked
 
-**Security note**: The refresh_token is sensitive. Keep your `config.yaml` secure and never commit it to version control.
+**Security note**: The refresh_token is sensitive. Keep your `credentials.yaml` secure and never commit it to version control (it is gitignored by default).
 
 ### Step 6: Update Systems to Use Cloud API
 
@@ -512,7 +534,7 @@ Once you have completed the setup, here is what happens automatically when your 
 
 ```
 1. Application starts
-   └─> Loads config.yaml (reads refresh_token)
+   └─> Loads credentials.yaml (reads refresh_token)
 
 2. First API request needed
    └─> No cached access token
@@ -546,7 +568,7 @@ Once you have completed the setup, here is what happens automatically when your 
 **Why this happens**: Enphase validates that authorization codes are only sent to pre-registered URLs. This is a security feature.
 
 **Solution**: 
-- Check your `config.yaml` - the `redirect_uri` must match exactly
+- Check your `credentials.yaml` - the `redirect_uri` must match exactly
 - Check the Enphase Developer Portal - ensure the redirect URI is registered there
 - Check the authorization URL - the `redirect_uri` parameter must match
 - Check the token exchange request - the `redirect_uri` in the body must match
@@ -586,9 +608,9 @@ Once you have completed the setup, here is what happens automatically when your 
 **Why this happens**: Access tokens expire after 1 hour. If the application cannot refresh the token (e.g., refresh_token is invalid), you will get this error.
 
 **Solution**:
-- Check that your `refresh_token` in config.yaml is correct
+- Check that your `refresh_token` in credentials.yaml is correct
 - If the refresh_token was revoked or is invalid, you will need to go through the setup process again (Steps 2-5)
-- Run `./enphase-monitor --oauth-setup` to regenerate your refresh token
+- Run `./enphase-monitor --update-refresh-token` to regenerate your refresh token
 
 ### Token refresh fails
 

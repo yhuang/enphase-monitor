@@ -70,7 +70,7 @@ func ValidateMetrics(w io.Writer, metrics *aggregator.AggregatedMetrics, dateStr
 // Tests use this to pass an absolute project root, avoiding os.Chdir.
 func validateMetricsFromRoot(w io.Writer, metrics *aggregator.AggregatedMetrics, dateStr, root string) error {
 	// Load expected values
-	expectedPath := filepath.Join(root, "test-data", fmt.Sprintf("expected_values_%s.json", dateStr))
+	expectedPath := filepath.Join(root, "test-data", fmt.Sprintf("enphase_api_%s.json", dateStr))
 	expectedData, err := os.ReadFile(expectedPath)
 	if err != nil {
 		if os.IsNotExist(err) {

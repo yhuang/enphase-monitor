@@ -31,7 +31,7 @@ func testProjectRoot(t *testing.T) string {
 // TestValidateMetrics_FullFlow_Success tests successful validation with matching metrics
 func TestValidateMetrics_FullFlow_Success(t *testing.T) {
 	root := testProjectRoot(t)
-	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "test-data/enphase_api_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
@@ -74,7 +74,7 @@ func TestValidateMetrics_FullFlow_Success(t *testing.T) {
 // TestValidateMetrics_FullFlow_WithinTolerance tests validation with metrics within tolerance
 func TestValidateMetrics_FullFlow_WithinTolerance(t *testing.T) {
 	root := testProjectRoot(t)
-	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "test-data/enphase_api_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
@@ -117,7 +117,7 @@ func TestValidateMetrics_FullFlow_WithinTolerance(t *testing.T) {
 // TestValidateMetrics_FullFlow_OutsideTolerance tests validation with metrics outside tolerance
 func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
 	root := testProjectRoot(t)
-	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "test-data/enphase_api_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
@@ -165,7 +165,7 @@ func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
 // TestValidateMetrics_MissingSystem tests validation when a system is missing
 func TestValidateMetrics_MissingSystem(t *testing.T) {
 	root := testProjectRoot(t)
-	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "test-data/enphase_api_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
@@ -199,7 +199,7 @@ func TestValidateMetrics_MissingSystem(t *testing.T) {
 // TestValidateMetrics_DateMismatch tests handling of a date with no expected-values file
 func TestValidateMetrics_DateMismatch(t *testing.T) {
 	root := testProjectRoot(t)
-	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "test-data/enphase_api_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 
@@ -238,7 +238,7 @@ func TestValidateMetrics_MultipleExpectedValuesFiles(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filename := filepath.Join(root, "test-data", "expected_values_"+tt.date+".json")
+			filename := filepath.Join(root, "test-data", "enphase_api_"+tt.date+".json")
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
 				t.Skipf("Expected values file %s not found - skipping", filename)
 			}
@@ -259,7 +259,7 @@ func TestValidateMetrics_MultipleExpectedValuesFiles(t *testing.T) {
 // TestValidateMetrics_RealWorldScenario tests a realistic validation scenario
 func TestValidateMetrics_RealWorldScenario(t *testing.T) {
 	root := testProjectRoot(t)
-	if _, err := os.Stat(filepath.Join(root, "test-data/expected_values_2026-01-20.json")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "test-data/enphase_api_2026-01-20.json")); os.IsNotExist(err) {
 		t.Skip("Expected values file not found - skipping integration test")
 	}
 

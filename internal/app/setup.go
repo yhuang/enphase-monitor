@@ -115,17 +115,17 @@ func FormatDateForQueryMode(date time.Time, queryMode constants.QueryMode) strin
 	}
 }
 
-// GetAggregatorTypes extracts systems and API config from the main config.
-// Returns a copy of the systems slice so callers cannot mutate the config.
-// Since config.SystemConfig and config.APIConfig are type aliases to the same
-// underlying types, no conversion is needed for the API config.
-func GetAggregatorTypes(cfg *config.Config) ([]aggregator.SystemConfig, *aggregator.APIConfig) {
+// GetSystems returns a copy of the configured systems so callers cannot mutate
+// the config. The credential pool is built once in main and passed via
+// RunConfig.Pool rather than re-derived per call (so cooldown state survives
+// across Continuous Mode ticks).
+func GetSystems(cfg *config.Config) []aggregator.SystemConfig {
 	if len(cfg.Systems) == 0 {
-		return nil, cfg.API
+		return nil
 	}
 	systems := make([]aggregator.SystemConfig, len(cfg.Systems))
 	copy(systems, cfg.Systems)
-	return systems, cfg.API
+	return systems
 }
 
 // ValidateValidationModeCache checks if cache exists for the target date when in Validation Mode.

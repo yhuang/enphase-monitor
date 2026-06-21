@@ -1,26 +1,20 @@
 # Enphase Monitor Configuration
-# Copy this file to config.yaml and fill in your actual values
-
-# API Configuration (for Cloud API authentication)
-# Get these from Enphase Developer Portal: https://developer-v4.enphase.com/
-api:
-  key: "YOUR_API_KEY"  # API Key from Enphase Developer Portal
-  client_id: "YOUR_CLIENT_ID"  # OAuth Client ID
-  client_secret: "YOUR_CLIENT_SECRET"  # OAuth Client Secret
-  authorization_url: "https://api.enphaseenergy.com/oauth/token"  # OAuth token endpoint
-  redirect_uri: "http://localhost:8080/callback"  # Redirect URI (must match your app settings in developer portal)
-  refresh_token: "YOUR_REFRESH_TOKEN"  # Obtained from one-time OAuth setup (run: ./enphase-monitor --oauth-setup)
+# Copy this file to config.yaml and fill in your actual values.
+#
+# SECRETS (key, client_id, client_secret, refresh_token) live in a SEPARATE file:
+# credentials.yaml. Copy credentials.yaml.example to credentials.yaml and fill it
+# in. Keeping secrets out of config.yaml lets you share/commit these non-secret
+# settings while the credentials file stays local (it is gitignored).
 
 # Your Enphase Systems
 # Each system requires a system ID from Enlighten (get from Enlighten URL)
-# All systems use the same API credentials configured above
 
 systems:
   - name: "Left Subpanel"
     id: "YOUR_SYSTEM_ID"  # Enlighten system ID (get from Enlighten URL)
 
   - name: "Right Subpanel"
-    id: "YOUR_OTHER_SYSTEM_ID"  # Different system ID, same API credentials
+    id: "YOUR_OTHER_SYSTEM_ID"  # Different system ID
 
 # Refresh interval in seconds (how often to query the API)
 refresh_interval: 3600  # 1 hour (recommended to stay within the API Budget)

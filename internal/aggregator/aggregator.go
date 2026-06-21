@@ -16,6 +16,7 @@ import (
 
 	"enphase-monitor/internal/api"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/credentials"
 	"enphase-monitor/internal/types"
 )
 
@@ -80,10 +81,16 @@ func NewDataAggregatorWithFactory(getAccessToken OAuthTokenGetter, factory Cloud
 // If testDate is provided, uses that date instead of today.
 // queryMode specifies the Query Mode (Day, Month, Year, or True-Up).
 // reportTimezone is the timezone to use for all systems' data queries (from config, system, or US/Pacific fallback).
+//
+// The credential pool is used two ways: each system is assigned a credential
+// round-robin (pool.ForSystem) to spread the per-key rate limit, and when a
+// system's credential is rate-limited (429) the call fails over to a spare
+// credential (pool.Failover). A system only contributes a rate-limit error once
+// every credential has been exhausted for it.
 func (a *DataAggregator) GetAggregatedMetrics(
 	ctx context.Context,
 	systems []SystemConfig,
-	apiConfig *APIConfig,
+	pool *credentials.Pool,
 	testDate time.Time,
 	queryMode constants.QueryMode,
 	reportTimezone *time.Location,
@@ -98,39 +105,82 @@ func (a *DataAggregator) GetAggregatedMetrics(
 	allFromCache := len(systems) > 0 // optimistic; flipped false if any live call is made
 	var rateLimitErrors []string     // system names that hit the rate limit
 
-	for _, sys := range systems {
-		if apiConfig == nil {
+	for i, sys := range systems {
+		if pool == nil || pool.Len() == 0 {
 			return nil, fmt.Errorf("%s for system %s", constants.ErrAPIConfigRequired, sys.Name)
 		}
-		if apiConfig.Key == "" {
-			return nil, fmt.Errorf("api.key required for system %s", sys.Name)
-		}
-
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
 
-		accessToken, err := a.getAccessToken(ctx, apiConfig)
-		if err != nil {
-			return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, sys.Name, err)
+		// Assign a credential (spread) and retry across spares on 429 (failover).
+		cred := pool.ForSystem(i)
+		tried := make(map[string]bool, pool.Len())
+		var localMetrics *api.LocalMetrics
+		var cacheUsed bool
+		rateLimited := false
+
+		for {
+			tried[cred.Name] = true
+
+			if cred.Key == "" {
+				return nil, fmt.Errorf("api.key required for system %s", sys.Name)
+			}
+
+			accessToken, err := a.getAccessToken(ctx, cred)
+			if err != nil {
+				// Token acquisition failed for this credential (e.g. an expired/
+				// revoked refresh token or an Enphase 5xx). Context errors are not
+				// credential-specific, so they stay fatal; otherwise cool this
+				// credential down and fail over to a spare, only erroring once every
+				// credential has been exhausted.
+				if isContextError(ctx, err) {
+					return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, sys.Name, err)
+				}
+				pool.MarkUnavailable(cred)
+				if next, ok := pool.Failover(tried); ok {
+					fmt.Fprintf(os.Stderr, "WARNING: [%s] token request failed for credential %q, trying %q: %v\n", sys.Name, cred.Name, next.Name, err)
+					cred = next
+					continue
+				}
+				return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, sys.Name, err)
+			}
+
+			cloudClient := a.createCloudClient(sys.ID, sys.Name, cred.Key, accessToken, reportTimezone)
+
+			lm, cu, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryMode)
+			if err != nil && constants.IsRateLimitError(err) {
+				// This credential is throttled; cool it down and fail over to a spare.
+				pool.MarkUnavailable(cred)
+				if next, ok := pool.Failover(tried); ok {
+					cred = next
+					continue
+				}
+				rateLimited = true
+				break
+			}
+			if err != nil {
+				if isContextError(ctx, err) {
+					return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
+				}
+				fmt.Fprintf(os.Stderr, "WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
+				allFromCache = false
+				break // localMetrics stays nil → skipped below
+			}
+			localMetrics = lm
+			cacheUsed = cu
+			break
 		}
 
-		cloudClient := a.createCloudClient(sys.ID, sys.Name, apiConfig.Key, accessToken, reportTimezone)
-
-		localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryMode)
-		if err != nil && constants.IsRateLimitError(err) {
+		if rateLimited {
 			rateLimitErrors = append(rateLimitErrors, sys.Name)
 			allFromCache = false
 			continue
 		}
-		if err != nil {
-			if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
-			}
-			fmt.Fprintf(os.Stderr, "WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
-			allFromCache = false
-			continue
+		if localMetrics == nil {
+			continue // non-429 failure already warned/skipped
 		}
+
 		if cacheUsed {
 			anyCacheUsed = true
 		} else {
@@ -170,4 +220,11 @@ func (a *DataAggregator) GetAggregatedMetrics(
 	}
 
 	return metrics, nil
+}
+
+// isContextError reports whether err is (or wraps) a context cancellation or
+// deadline, or whether ctx itself is done. Such errors are not credential- or
+// system-specific, so callers treat them as fatal rather than failing over.
+func isContextError(ctx context.Context, err error) bool {
+	return ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
 }

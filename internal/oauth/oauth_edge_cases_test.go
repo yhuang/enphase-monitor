@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"enphase-monitor/internal/config"
 	"enphase-monitor/internal/types"
 )
 
@@ -269,7 +268,7 @@ func TestGetAccessToken_NoAuthMethod(t *testing.T) {
 // TestGetAccessToken_NetworkError tests network failure
 func TestGetAccessToken_NetworkError(t *testing.T) {
 	// Clear token cache to force new request
-	tokenCache = nil
+	tokenCache = make(map[string]*TokenCache)
 
 	apiConfig := &types.APIConfig{
 		AuthorizationURL: "http://invalid-host-12345.com/token",
@@ -287,7 +286,7 @@ func TestGetAccessToken_NetworkError(t *testing.T) {
 // TestGetAccessToken_PasswordGrant tests password grant flow
 func TestGetAccessToken_PasswordGrant(t *testing.T) {
 	// Clear token cache
-	tokenCache = nil
+	tokenCache = make(map[string]*TokenCache)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify password grant parameters
@@ -335,11 +334,11 @@ func TestGetAccessToken_PasswordGrant(t *testing.T) {
 // TestGetAccessToken_CacheValid tests cache behavior with valid token
 func TestGetAccessToken_CacheValid(t *testing.T) {
 	// Set up cache with valid token
-	tokenCache = &TokenCache{
+	tokenCache = map[string]*TokenCache{"test_client": {
 		Token:        "cached_token",
 		RefreshToken: "cached_refresh",
 		ExpiresAt:    time.Now().Add(1 * time.Hour), // Valid for 1 hour
-	}
+	}}
 
 	apiConfig := &types.APIConfig{
 		AuthorizationURL: "http://example.com/token",
@@ -358,17 +357,17 @@ func TestGetAccessToken_CacheValid(t *testing.T) {
 	}
 
 	// Clean up
-	tokenCache = nil
+	tokenCache = make(map[string]*TokenCache)
 }
 
 // TestGetAccessToken_CacheExpired tests expired cache token
 func TestGetAccessToken_CacheExpired(t *testing.T) {
 	// Set up cache with expired token
-	tokenCache = &TokenCache{
+	tokenCache = map[string]*TokenCache{"test_client": {
 		Token:        "expired_token",
 		RefreshToken: "expired_refresh",
 		ExpiresAt:    time.Now().Add(-1 * time.Hour), // Expired 1 hour ago
-	}
+	}}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -393,12 +392,12 @@ func TestGetAccessToken_CacheExpired(t *testing.T) {
 	}
 
 	// Clean up
-	tokenCache = nil
+	tokenCache = make(map[string]*TokenCache)
 }
 
 // TestGetAccessToken_ContextCancellation tests context cancellation
 func TestGetAccessToken_ContextCancellation(t *testing.T) {
-	tokenCache = nil
+	tokenCache = make(map[string]*TokenCache)
 
 	// Create a context that's already cancelled
 	ctx, cancel := context.WithCancel(context.Background())
@@ -443,35 +442,38 @@ func TestGetAuthorizationURL_EmptyRedirectURI(t *testing.T) {
 	}
 }
 
-// TestSetup_NilAPI tests that Setup returns an error when cfg.API is nil.
-func TestSetup_NilAPI(t *testing.T) {
-	cfg := &config.Config{API: nil}
-	err := Setup(context.Background(), cfg)
+// TestAuthorize_NilAPI tests that Authorize returns an error when the credential is nil.
+func TestAuthorize_NilAPI(t *testing.T) {
+	_, err := Authorize(context.Background(), nil)
 	if err == nil {
-		t.Fatal("Setup() with nil API: want error, got nil")
+		t.Fatal("Authorize() with nil API: want error, got nil")
 	}
 	if !strings.Contains(err.Error(), "API configuration is required") {
-		t.Errorf("Setup() with nil API: got %q, want 'API configuration is required'", err.Error())
+		t.Errorf("Authorize() with nil API: got %q, want 'API configuration is required'", err.Error())
 	}
 }
 
-// TestSetup_EmptyClientID tests that Setup returns an error when ClientID is empty.
-func TestSetup_EmptyClientID(t *testing.T) {
-	cfg := &config.Config{API: &types.APIConfig{ClientID: ""}}
-	err := Setup(context.Background(), cfg)
+// TestAuthorize_EmptyClientID tests that Authorize returns an error when ClientID is empty.
+func TestAuthorize_EmptyClientID(t *testing.T) {
+	_, err := Authorize(context.Background(), &types.APIConfig{ClientID: ""})
 	if err == nil {
-		t.Fatal("Setup() with empty ClientID: want error, got nil")
+		t.Fatal("Authorize() with empty ClientID: want error, got nil")
 	}
 	if !strings.Contains(err.Error(), "client_id is required") {
-		t.Errorf("Setup() with empty ClientID: got %q, want 'client_id is required'", err.Error())
+		t.Errorf("Authorize() with empty ClientID: got %q, want 'client_id is required'", err.Error())
 	}
 }
 
-// TestSetup_AuthorizationError tests the authorization-error path of Setup.
-// It provides a redirect URL containing "error=" via stdin, which causes Setup
-// to return early without requiring token exchange or browser interaction.
-func TestSetup_AuthorizationError(t *testing.T) {
-	// Redirect os.Stdin so Setup can read from it without blocking.
+// TestAuthorize_AuthorizationError tests the manual-paste fallback's error path.
+// A non-loopback redirect URI forces the paste flow (no local listener); the
+// pasted URL contains "error=", which causes Authorize to return early without
+// token exchange. openBrowser is stubbed so no real browser launches.
+func TestAuthorize_AuthorizationError(t *testing.T) {
+	orig := openBrowser
+	t.Cleanup(func() { openBrowser = orig })
+	openBrowser = func(string) error { return nil }
+
+	// Redirect os.Stdin so Authorize can read from it without blocking.
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("os.Pipe() error = %v", err)
@@ -481,21 +483,20 @@ func TestSetup_AuthorizationError(t *testing.T) {
 	defer func() { os.Stdin = origStdin }()
 
 	// Write an error redirect URL and close so reads don't block.
-	_, _ = w.WriteString("http://localhost:8080/callback?error=access_denied\n")
+	_, _ = w.WriteString("https://example.com/callback?error=access_denied\n")
 	w.Close()
 
-	cfg := &config.Config{
-		API: &types.APIConfig{
-			ClientID:    "test_client_id",
-			RedirectURI: "http://localhost:8080/callback",
-		},
+	// A non-loopback redirect URI forces the manual-paste fallback.
+	api := &types.APIConfig{
+		ClientID:    "test_client_id",
+		RedirectURI: "https://example.com/callback",
 	}
 
-	setupErr := Setup(context.Background(), cfg)
+	_, setupErr := Authorize(context.Background(), api)
 	if setupErr == nil {
-		t.Fatal("Setup() with error redirect: want error, got nil")
+		t.Fatal("Authorize() with error redirect: want error, got nil")
 	}
 	if !strings.Contains(setupErr.Error(), "authorization failed") {
-		t.Errorf("Setup() with error redirect: got %q, want 'authorization failed'", setupErr.Error())
+		t.Errorf("Authorize() with error redirect: got %q, want 'authorization failed'", setupErr.Error())
 	}
 }

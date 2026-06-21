@@ -37,6 +37,8 @@
 //	- setup.go: Application initialization, OAuth adapter, display setup, mode configuration
 //	- runner.go: Execution modes (once/continuous), metric fetching and display
 //	- trueup.go: True-Up Mode report via single-batch Lifetime Data query and report conversion
+//	- backfill.go: Backfill Mode — live per-day fetch over a date range, writing History Records into history/
+//	- weather.go: Best-effort weather enrichment for Day-Mode reports
 //	- cache_report.go: --cache mode — checks per-System endpoint coverage and runs a fully-cached report
 //
 //	CLI Layer (internal/cli):
@@ -45,7 +47,7 @@
 //
 //	Authentication (internal/oauth):
 //	- oauth.go: OAuth 2.0 token acquisition and refresh (with in-memory caching)
-//	- setup.go: Interactive OAuth setup wizard for first-time configuration
+//	- authorization.go: Interactive OAuth authorization wizard that obtains a refresh token
 //
 //	Data Aggregation (internal/aggregator):
 //	- aggregator.go: Multi-system data orchestration, metric aggregation, and the
@@ -62,11 +64,15 @@
 //	- internal/config: YAML configuration loading, validation, color conversion
 //	- internal/constants: Application-wide constants (ANSI codes, error messages, QueryMode enum, etc.)
 //	- internal/display: Terminal output formatting with customizable colors
+//	- internal/geocode: Postal-code-to-coordinates lookup (Zippopotam.us) for weather geolocation
+//	- internal/history: Per-day energy+weather History Record schema and JSON writer (history/)
+//	- internal/location: Resolves and caches the systems' coordinates for weather (populated by --init)
 //	- internal/parser: JSON telemetry response parsing (Interval Data and Lifetime Data shapes)
 //	- internal/timezone: Timezone handling, Past Period detection, and date boundary calculations
 //	- internal/types: Shared type definitions (SystemConfig, APIConfig) that break circular dependencies
 //	- internal/urlbuilder: API URL construction with proper date ranges
 //	- internal/validation: Validation Mode (--test flag) with tolerance-based comparison
+//	- internal/weather: Open-Meteo daily/current weather client with WMO code mapping
 //
 // EXECUTION FLOW
 // --------------
@@ -76,11 +82,14 @@
 //  4. Handle OAuth setup via internal/oauth if requested
 //  5. Create DataAggregator with OAuth adapter from internal/app
 //  6. Setup display with colors from internal/app
-//  7. Configure modes (Validation Mode, Cache Mode) via internal/app
-//  8. Dispatch to one of three run paths and exit:
-//     a. If --cache: call app.RunCacheReport (cache-only run; lists missing endpoints if incomplete) and exit.
-//     b. Else if --true-up: call app.RunTrueUp (single-batch lifetime query, no battery) and exit.
-//     c. Otherwise, run the standard execution mode:
+//  7. Enforce the init guard: every report mode requires a prior --init (cached
+//     location); cache-management and --update-refresh-token are exempt.
+//  8. Configure modes (Validation Mode, Cache Mode) via internal/app
+//  9. Dispatch to one of four run paths and exit:
+//     a. If --backfill-from: call app.RunBackfill (live per-day fetch over a date range into history/) and exit.
+//     b. Else if --cache: call app.RunCacheReport (cache-only run; lists missing endpoints if incomplete) and exit.
+//     c. Else if --true-up: call app.RunTrueUp (single-batch lifetime query, no battery) and exit.
+//     d. Otherwise, run the standard execution mode:
 //     - For each system in config:
 //     i.   Get OAuth access token via internal/oauth (cached or refreshed)
 //     ii.  Create API client via internal/api for the system
@@ -100,6 +109,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -109,8 +119,11 @@ import (
 	"enphase-monitor/internal/cli"
 	"enphase-monitor/internal/config"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/credentials"
+	"enphase-monitor/internal/location"
 	"enphase-monitor/internal/oauth"
 	"enphase-monitor/internal/timezone"
+	"enphase-monitor/internal/weather"
 )
 
 func main() {
@@ -132,6 +145,22 @@ func main() {
 	if clearCommands > 1 {
 		fmt.Fprintln(os.Stderr, "Error: --clear-cache, --clear-cache-date, and --clear-all-cache are mutually exclusive")
 		os.Exit(1)
+	}
+
+	// Backfill Mode is a standalone report mode; reject combinations that would
+	// otherwise be silently ignored by mode-dispatch order.
+	if flags.BackfillFrom != "" {
+		switch {
+		case flags.Continuous:
+			fmt.Fprintln(os.Stderr, "Error: --backfill-from cannot be combined with --continuous")
+			os.Exit(1)
+		case flags.TrueUp != "":
+			fmt.Fprintln(os.Stderr, "Error: --backfill-from cannot be combined with --true-up")
+			os.Exit(1)
+		case flags.Initialize:
+			fmt.Fprintln(os.Stderr, "Error: --backfill-from cannot be combined with --init")
+			os.Exit(1)
+		}
 	}
 
 	// Handle cache management commands
@@ -166,12 +195,58 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Handle OAuth setup (use signal context so Ctrl+C cancels token exchange)
-	if flags.OAuthSetup {
+	// Load API credentials from the separate credentials file. A missing file is
+	// not fatal: ApplyCredentials falls back to a legacy api: block in config.yaml
+	// for backward compatibility, and errors out if neither source has credentials.
+	creds, err := config.LoadCredentials(flags.CredentialsFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		fmt.Fprintf(os.Stderr, "Failed to load credentials: %v\n", err)
+		os.Exit(1)
+	}
+	if err := cfg.ApplyCredentials(creds); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load credentials: %v\n\nPlease copy credentials.yaml.example to credentials.yaml and fill in your details (run --update-refresh-token for the refresh token).\n", err)
+		os.Exit(1)
+	}
+
+	// Build the credential pool once: it is shared by the report path (so 429
+	// cooldown state survives across Continuous Mode ticks), --init, and --update-refresh-token.
+	pool := credentials.NewPool(cfg.Credentials)
+
+	// Handle --update-refresh-token (use signal context so Ctrl+C cancels token exchange)
+	if flags.UpdateRefreshToken {
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		if err := oauth.Setup(ctx, cfg); err != nil {
-			fmt.Fprintf(os.Stderr, "OAuth setup failed: %v\n", err)
+
+		// --all re-authorizes every configured credential in turn.
+		if flags.All {
+			if err := updateAllRefreshTokens(ctx, pool, flags.CredentialsFile); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+
+		cred, err := selectCredential(pool, flags.Credential)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+		if err := updateOneRefreshToken(ctx, cred, flags.CredentialsFile); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Handle --init: resolve and cache the systems' location for weather
+	// reporting. Done out of band (one /systems call) so it never competes with
+	// the per-minute telemetry budget on a live report. Run once before normal
+	// use; re-run if the cache is cleared.
+	if flags.Initialize {
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+		if err := initializeLocation(ctx, pool.First(), flags.Force); err != nil {
+			fmt.Fprintf(os.Stderr, "Initialization failed: %v\n", err)
 			os.Exit(1)
 		}
 		return
@@ -195,6 +270,56 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Require initialization before any report mode. --init caches the systems'
+	// coordinates; without them weather enrichment is impossible, so we gate all
+	// report-generating modes on a successful prior --init. Cache-management and
+	// auth flags are exempt (handled and returned above).
+	loc := location.NewResolver()
+	if _, ok := loc.CachedPrimaryCoordinates(); !ok {
+		fmt.Fprintln(os.Stderr, "enphase-monitor: not initialized — run `enphase-monitor --init` first.")
+		os.Exit(1)
+	}
+
+	// Backfill Mode: fetch a range of past days into history/ and exit.
+	if flags.BackfillFrom != "" {
+		fromDate, err := time.ParseInLocation(constants.DateFormat, flags.BackfillFrom, reportTZ)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: invalid --backfill-from date %q: use YYYY-MM-DD\n", flags.BackfillFrom)
+			os.Exit(1)
+		}
+		// An explicit --date bounds the backfill end; otherwise RunBackfill
+		// defaults to yesterday. Only the day format is meaningful here.
+		var endDate time.Time
+		if flags.TestDate != "" {
+			endDate, err = time.ParseInLocation(constants.DateFormat, flags.TestDate, reportTZ)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: invalid --date %q: use YYYY-MM-DD for backfill\n", flags.TestDate)
+				os.Exit(1)
+			}
+		}
+		// noCache stays false here: RunBackfill disables the cache itself, so we
+		// avoid the redundant "LIVE MODE" notice (backfill is always live).
+		app.ConfigureModes(false /* validationMode */, false /* noCache */, flags.Debug)
+		printDebugStartup(flags.Debug, reportTZ)
+
+		rc := app.RunConfig{
+			Agg:      agg,
+			Pool:     pool,
+			Disp:     disp,
+			Cfg:      cfg,
+			TestDate: endDate,
+			ReportTZ: reportTZ,
+			Debug:    flags.Debug,
+			Location: loc,
+			Weather:  weather.NewClient(cache.GetCacheDir()),
+		}
+		if err := app.RunBackfill(ctx, rc, fromDate, flags.Force); err != nil {
+			disp.ShowError(err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	// --cache: serve report from cache only; diagnose missing endpoints if incomplete.
 	// Handles --cache alone, --cache --date, and --cache --true-up.
 	if flags.CachedMode {
@@ -207,6 +332,7 @@ func main() {
 		}
 		rc := app.RunConfig{
 			Agg:       agg,
+			Pool:      pool,
 			Disp:      disp,
 			Cfg:       cfg,
 			TestDate:  parsedInput.Date,
@@ -229,6 +355,7 @@ func main() {
 		printDebugStartup(flags.Debug, reportTZ)
 		rc := app.RunConfig{
 			Agg:      agg,
+			Pool:     pool,
 			Disp:     disp,
 			Cfg:      cfg,
 			ReportTZ: reportTZ,
@@ -278,12 +405,17 @@ func main() {
 
 	rc := app.RunConfig{
 		Agg:       agg,
+		Pool:      pool,
 		Disp:      disp,
 		Cfg:       cfg,
 		TestDate:  testDateParsed,
 		QueryMode: queryMode,
 		ReportTZ:  reportTZ,
 		Debug:     flags.Debug,
+		// Best-effort temperature enrichment for Day-Mode reports. Both clients
+		// cache aggressively, so this stays off the per-run API hot path.
+		Location: loc,
+		Weather:  weather.NewClient(cache.GetCacheDir()),
 	}
 
 	// Default: run once and exit. With --continuous, loop with periodic refresh.
@@ -334,4 +466,104 @@ func printDebugStartup(debug bool, reportTZ *time.Location) {
 	budget := cache.RemainingBudget()
 	fmt.Fprintf(os.Stderr, "[DEBUG] API budget   : %d/%d calls remaining\n", budget, cache.MaxRequestsPerWindow)
 	fmt.Fprintf(os.Stderr, "[DEBUG] ---\n")
+}
+
+// initializeLocation resolves the systems' coordinates (one /systems call) and
+// caches them for weather reporting. Run by --init, out of band from reports,
+// so it never competes with the per-minute telemetry budget. Returns an error
+// (unlike the report path's best-effort enrichment) so the user knows whether
+// initialization succeeded.
+func initializeLocation(ctx context.Context, cred *config.APIConfig, force bool) error {
+	if cred == nil {
+		return errors.New("API configuration is required")
+	}
+	token, err := oauth.GetAccessToken(ctx, cred)
+	if err != nil {
+		return fmt.Errorf("could not obtain access token: %w", err)
+	}
+	resolver := location.NewResolver()
+	resolve := resolver.SystemLocations
+	if force {
+		resolve = resolver.RefreshSystemLocations
+	}
+	locs, err := resolve(ctx, cred.Key, token)
+	if err != nil {
+		return fmt.Errorf("could not resolve location: %w", err)
+	}
+	action := "Initialized"
+	if force {
+		action = "Re-initialized (forced)"
+	}
+	fmt.Printf("%s: resolved location for %d system(s) and cached it for weather reporting.\n", action, len(locs))
+	for _, l := range locs {
+		fmt.Printf("  - %s: %s, %s %s (%.4f, %.4f)\n", l.Name, l.City, l.State, l.PostalCode, l.Latitude, l.Longitude)
+	}
+
+	// Write the WMO weather-code legend to the project root so the weather_code
+	// field in reports and History Records is decodable. A local write that does
+	// not depend on the location lookup; a failure is non-fatal to init.
+	if err := weather.WriteCodeLegend(weather.CodeLegendFileName); err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: could not write %s: %v\n", weather.CodeLegendFileName, err)
+	} else {
+		fmt.Printf("Wrote %s (WMO weather-code reference).\n", weather.CodeLegendFileName)
+	}
+	return nil
+}
+
+// selectCredential picks which credential set --update-refresh-token operates on. With a
+// single credential the name is optional; with more than one, the name must be
+// passed as an argument (--update-refresh-token <name>) and must match a configured name.
+func selectCredential(pool *credentials.Pool, name string) (*config.APIConfig, error) {
+	if name == "" {
+		if pool.Len() == 1 {
+			return pool.First(), nil
+		}
+		return nil, fmt.Errorf("multiple credentials configured; name one as an argument: --update-refresh-token <name> (available: %s)", strings.Join(pool.Names(), ", "))
+	}
+	cred, ok := pool.ByName(name)
+	if !ok {
+		return nil, fmt.Errorf("no credential named %q (available: %s)", name, strings.Join(pool.Names(), ", "))
+	}
+	return cred, nil
+}
+
+// updateOneRefreshToken runs the OAuth wizard for a single credential and writes
+// the obtained refresh token into the credentials file.
+func updateOneRefreshToken(ctx context.Context, cred *config.APIConfig, credentialsFile string) error {
+	refreshToken, err := oauth.Authorize(ctx, cred)
+	if err != nil {
+		return fmt.Errorf("failed to obtain refresh token for %q: %w", cred.Name, err)
+	}
+	if err := config.UpdateRefreshToken(credentialsFile, cred.Name, refreshToken); err != nil {
+		return fmt.Errorf("obtained a refresh token for %q but failed to save it: %w", cred.Name, err)
+	}
+	fmt.Printf("Saved refresh_token for credential %q to %s\n", cred.Name, credentialsFile)
+	return nil
+}
+
+// updateAllRefreshTokens re-authorizes every configured credential in turn. It
+// attempts each one even if an earlier credential failed, then reports which
+// failed; a Ctrl+C (context cancellation) aborts the remaining credentials.
+func updateAllRefreshTokens(ctx context.Context, pool *credentials.Pool, credentialsFile string) error {
+	names := pool.Names()
+	var failed []string
+	for i, name := range names {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		cred, _ := pool.ByName(name)
+		fmt.Printf("\n=== Credential %d/%d: %s ===\n", i+1, len(names), name)
+		if err := updateOneRefreshToken(ctx, cred, credentialsFile); err != nil {
+			if errors.Is(err, context.Canceled) || ctx.Err() != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "  %v\n", err)
+			failed = append(failed, name)
+		}
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("re-authorization failed for %d of %d credential(s): %s", len(failed), len(names), strings.Join(failed, ", "))
+	}
+	fmt.Printf("\nDone: re-authorized all %d credential(s).\n", len(names))
+	return nil
 }

@@ -25,24 +25,39 @@ Make sure you have:
 # Navigate to the project directory
 cd enphase-monitor
 
-# Create your configuration file
+# Create your configuration files
 make setup
 # OR manually:
 # cp config.yaml.example config.yaml
+# cp credentials.yaml.example credentials.yaml
 ```
 
-## Step 3: Configure Your Systems
+Configuration is split across two files:
+- **`config.yaml`** — non-secret settings (systems, refresh interval, colors). Safe to share/commit.
+- **`credentials.yaml`** — your API key and OAuth secrets. Kept local (gitignored); never commit it.
 
-Edit `config.yaml` with your favorite text editor:
+## Step 3: Configure Your Credentials and Systems
+
+Edit `credentials.yaml` with your API credentials from the Developer Portal.
+`credentials:` is a list — one entry is enough to start; add more keys later to
+spread the rate limit across systems.
+
+```yaml
+credentials:
+  - name: enphase-monitor-001                       # Unique label for this credential set
+    key: "YOUR_API_KEY"              # From Developer Portal
+    client_id: "YOUR_CLIENT_ID"       # From Developer Portal
+    client_secret: "YOUR_CLIENT_SECRET"  # From Developer Portal
+    refresh_token: ""  # Will be filled in Step 4
+```
+
+The shared, non-secret `authorization_url` and `redirect_uri` go in `config.yaml`
+(not per credential). Then edit `config.yaml` with those and your systems:
 
 ```yaml
 api:
-  key: "YOUR_API_KEY"              # From Developer Portal
-  client_id: "YOUR_CLIENT_ID"       # From Developer Portal
-  client_secret: "YOUR_CLIENT_SECRET"  # From Developer Portal
   authorization_url: "https://api.enphaseenergy.com/oauth/token"
-  redirect_uri: "http://localhost:8080/callback"
-  refresh_token: ""  # Will be filled in Step 4
+  redirect_uri: "http://localhost:8080/callback"  # Must match your Developer Portal app settings
 
 systems:
   - name: "Left Subpanel"      # Give it a friendly name
@@ -63,22 +78,18 @@ refresh_interval: 3600         # Query every hour (recommended)
 The application uses OAuth 2.0 for authentication. You need to complete a one-time OAuth setup:
 
 ```bash
-./enphase-monitor --oauth-setup
+./enphase-monitor --update-refresh-token
 ```
 
 This interactive wizard will:
-1. Generate an authorization URL
-2. Guide you to authorize the application in your browser
-3. Help you exchange the authorization code for tokens
-4. Show you the `refresh_token` to add to your config
+1. Open your browser to the authorization page
+2. Wait while you log in and authorize the application
+3. Capture the authorization code automatically (via a local listener on your `redirect_uri`) and exchange it for tokens
+4. Write the `refresh_token` straight into the matching credential entry in your `credentials.yaml`
 
-**After the wizard completes:**
-1. Copy the `refresh_token` from the output
-2. Add it to your `config.yaml`:
-   ```yaml
-   api:
-     refresh_token: "YOUR_REFRESH_TOKEN"  # Paste here
-   ```
+No copy-paste needed — just authorize in the browser and the credential is ready to use. (If your `redirect_uri` isn't a localhost address, the wizard falls back to asking you to paste the redirect URL.)
+
+> With more than one credential set, name the one to set up: `./enphase-monitor --update-refresh-token enphase-monitor-002`.
 
 > **📖 Want to understand OAuth better?** See **[OAUTH_SETUP.md](docs/OAUTH_SETUP.md)** for a detailed explanation of how OAuth works, what each component does, and how authentication is performed.
 
@@ -92,7 +103,17 @@ go mod download
 go build -o enphase-monitor
 ```
 
-## Step 6: Test It!
+## Step 6: Initialize (one-time)
+
+Resolve and cache your systems' location for weather reporting. **This is required before any report will run:**
+
+```bash
+./enphase-monitor --init
+```
+
+Run it once. Re-run it only if you clear the cache (add `--force` to re-resolve from the API).
+
+## Step 7: Test It!
 
 Run a single query to make sure everything works:
 
@@ -102,7 +123,7 @@ Run a single query to make sure everything works:
 
 You should see output showing your combined system metrics!
 
-## Step 7: Start Monitoring
+## Step 8: Start Monitoring
 
 Start continuous monitoring (refreshes every hour by default):
 
@@ -114,17 +135,20 @@ Press `Ctrl+C` to stop.
 
 ## Common First-Time Issues
 
-### "api configuration required"
-→ Make sure you have filled in `api.key`, `api.client_id`, and `api.client_secret` in `config.yaml`
+### "not initialized — run `enphase-monitor --init` first"
+→ You skipped Step 6. Run `./enphase-monitor --init` once to cache your systems' location, then retry.
+
+### "no credentials configured"
+→ Make sure each entry under `credentials:` has a unique `name` plus `key`, `client_id`, and `client_secret` in `credentials.yaml`
 
 ### "API request failed with status 401"
-→ Your refresh token might be missing or expired. Complete OAuth setup: `./enphase-monitor --oauth-setup`
+→ Your refresh token might be missing or expired. Complete OAuth setup: `./enphase-monitor --update-refresh-token`
 
 ### "system must have id"
 → You need to replace the example system IDs with your actual ones from Enlighten (see Step 3)
 
 ### "redirect_uri mismatch"
-→ The redirect URI in your config must match exactly what you registered in the Enphase Developer Portal
+→ The redirect URI in your `credentials.yaml` must match exactly what you registered in the Enphase Developer Portal
 
 ## Next Steps
 
@@ -132,6 +156,7 @@ Once it is working:
 
 - Query a Past Period: `./enphase-monitor --date 2026-01-15`
 - View your True-Up Period balance: `./enphase-monitor --true-up 2025-01-15` (use the True-Up Start Date from your utility account)
+- Build a historical dataset: `./enphase-monitor --backfill-from 2025-06-19` (writes one JSON record per day into `history/`)
 - Run on startup: Add to cron or systemd
 - Build a dashboard: Parse the output or extend the code
 - Set up alerts: Monitor grid dependence and trigger notifications

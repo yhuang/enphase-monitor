@@ -243,29 +243,30 @@ func TestTokenCache(t *testing.T) {
 		tokenCache = originalCache
 	}()
 
-	// Test setting and reading from cache
-	tokenCache = &TokenCache{
+	// Test setting and reading from the per-credential cache (keyed by client_id)
+	tokenCache = map[string]*TokenCache{"test-client-id": {
 		Token:        "test-access-token",
 		RefreshToken: "test-refresh-token",
 		ExpiresAt:    time.Now().Add(1 * time.Hour),
+	}}
+
+	cached := tokenCache["test-client-id"]
+	if cached.Token != "test-access-token" {
+		t.Errorf("Token = %s, want test-access-token", cached.Token)
 	}
 
-	if tokenCache.Token != "test-access-token" {
-		t.Errorf("Token = %s, want test-access-token", tokenCache.Token)
-	}
-
-	if tokenCache.RefreshToken != "test-refresh-token" {
-		t.Errorf("RefreshToken = %s, want test-refresh-token", tokenCache.RefreshToken)
+	if cached.RefreshToken != "test-refresh-token" {
+		t.Errorf("RefreshToken = %s, want test-refresh-token", cached.RefreshToken)
 	}
 
 	// Test expiration check
-	if tokenCache.ExpiresAt.Before(time.Now()) {
+	if cached.ExpiresAt.Before(time.Now()) {
 		t.Error("Token should not be expired yet")
 	}
 
 	// Test with expired token
-	tokenCache.ExpiresAt = time.Now().Add(-1 * time.Hour)
-	if !tokenCache.ExpiresAt.Before(time.Now()) {
+	cached.ExpiresAt = time.Now().Add(-1 * time.Hour)
+	if !cached.ExpiresAt.Before(time.Now()) {
 		t.Error("Token should be expired")
 	}
 }

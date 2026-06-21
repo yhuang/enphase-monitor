@@ -1,0 +1,14 @@
+{
+  "country": "United States",
+  "country abbreviation": "US",
+  "post code": "97201",
+  "places": [
+    {
+      "place name": "Portland",
+      "longitude": "-122.6897",
+      "latitude": "45.5078",
+      "state": "Oregon",
+      "state abbreviation": "OR"
+    }
+  ]
+}

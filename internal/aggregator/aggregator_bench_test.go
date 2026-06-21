@@ -7,6 +7,7 @@ import (
 
 	"enphase-monitor/internal/api"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/credentials"
 	"enphase-monitor/internal/types"
 )
 
@@ -51,12 +52,13 @@ func BenchmarkGetAggregatedMetrics_SingleSystem(b *testing.B) {
 		{Name: "System1", ID: "111"},
 	}
 
-	apiConfig := &types.APIConfig{
+	pool := credentials.NewPool([]*types.APIConfig{{
+		Name:         "key1",
 		Key:          "test-key",
 		ClientID:     "test-client",
 		ClientSecret: "test-secret",
 		RefreshToken: "test-refresh",
-	}
+	}})
 
 	mockMetrics := &api.LocalMetrics{
 		ProductionToday:        25.5,
@@ -89,7 +91,7 @@ func BenchmarkGetAggregatedMetrics_SingleSystem(b *testing.B) {
 	// increases until the benchmark runs long enough for stable measurement.
 	// You MUST use b.N - don't hardcode a number like 1000.
 	for i := 0; i < b.N; i++ {
-		_, err := agg.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryModeDay, reportTZ)
+		_, err := agg.GetAggregatedMetrics(ctx, systems, pool, time.Time{}, constants.QueryModeDay, reportTZ)
 		if err != nil {
 			// b.Fatalf stops the benchmark if something breaks
 			// Use this instead of ignoring errors
@@ -107,12 +109,13 @@ func BenchmarkGetAggregatedMetrics_MultiSystem(b *testing.B) {
 		{Name: "System4", ID: "444"},
 	}
 
-	apiConfig := &types.APIConfig{
+	pool := credentials.NewPool([]*types.APIConfig{{
+		Name:         "key1",
 		Key:          "test-key",
 		ClientID:     "test-client",
 		ClientSecret: "test-secret",
 		RefreshToken: "test-refresh",
-	}
+	}})
 
 	mockMetrics := &api.LocalMetrics{
 		ProductionToday:        25.5,
@@ -138,7 +141,7 @@ func BenchmarkGetAggregatedMetrics_MultiSystem(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := agg.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryModeDay, reportTZ)
+		_, err := agg.GetAggregatedMetrics(ctx, systems, pool, time.Time{}, constants.QueryModeDay, reportTZ)
 		if err != nil {
 			b.Fatalf("GetAggregatedMetrics failed: %v", err)
 		}

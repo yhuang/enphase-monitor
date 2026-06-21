@@ -13,21 +13,21 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Auto-discover test dates from expected_values_*.json files in test-data/
+# Auto-discover test dates from enphase_api_*.json files in test-data/
 # This automatically includes any new test cases without manual maintenance.
 # To disable a test temporarily, rename the file (e.g., add .disabled extension)
 DATES=()
 while IFS= read -r file; do
     if [[ -n "$file" ]]; then
-        # Extract date from filename: expected_values_2026-01-15.json -> 2026-01-15
-        date=$(basename "$file" | sed 's/^expected_values_//' | sed 's/\.json$//')
+        # Extract date from filename: enphase_api_2026-01-15.json -> 2026-01-15
+        date=$(basename "$file" | sed 's/^enphase_api_//' | sed 's/\.json$//')
         DATES+=("$date")
     fi
-done < <(find test-data -name "expected_values_*.json" -type f 2>/dev/null | sort)
+done < <(find test-data -name "enphase_api_*.json" -type f 2>/dev/null | sort)
 
 # Verify we found at least one test case
 if [ ${#DATES[@]} -eq 0 ]; then
-    echo -e "${RED}ERROR: No test cases found in test-data/expected_values_*.json${NC}"
+    echo -e "${RED}ERROR: No test cases found in test-data/enphase_api_*.json${NC}"
     echo "Please create at least one expected values file to run tests."
     exit 1
 fi

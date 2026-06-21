@@ -106,16 +106,29 @@ func TestParseFlags_MultipleFlags(t *testing.T) {
 	}
 }
 
-func TestParseFlags_OAuthSetup(t *testing.T) {
+func TestParseFlags_UpdateRefreshToken(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--oauth-setup"}
+	os.Args = []string{"cmd", "--update-refresh-token"}
 
 	flags := ParseFlags()
 
-	if !flags.OAuthSetup {
-		t.Error("OAuthSetup should be true")
+	if !flags.UpdateRefreshToken {
+		t.Error("UpdateRefreshToken should be true")
+	}
+}
+
+func TestParseFlags_UpdateRefreshTokenAll(t *testing.T) {
+	resetFlags(t)
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"cmd", "--update-refresh-token", "--all"}
+
+	flags := ParseFlags()
+
+	if !flags.UpdateRefreshToken || !flags.All {
+		t.Errorf("UpdateRefreshToken=%v All=%v, want both true", flags.UpdateRefreshToken, flags.All)
 	}
 }
 

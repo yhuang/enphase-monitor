@@ -1,16 +1,17 @@
 enphase-monitor
 
-cache/
-.claude/settings.json
-.claude/settings.local.json
-.github/
-.docs/
-
-*.yaml
-
 .DS_Store
 *.coverprofile
 *.out
 *.prof
 *.test
 *.txt
+*.yaml
+
+.claude/
+.github/
+.docs/
+
+/cache/
+history/*
+weather_codes.json

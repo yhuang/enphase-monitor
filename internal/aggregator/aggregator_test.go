@@ -8,7 +8,13 @@ import (
 
 	"enphase-monitor/internal/api"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/credentials"
 )
+
+// poolOf wraps credential sets in a pool for the aggregator tests.
+func poolOf(creds ...*APIConfig) *credentials.Pool {
+	return credentials.NewPool(creds)
+}
 
 // mustLoadLocation loads a timezone for tests; fails the test if the timezone is invalid.
 func mustLoadLocation(t *testing.T, name string) *time.Location {
@@ -154,10 +160,10 @@ func TestGetAggregatedMetrics_SingleSystem(t *testing.T) {
 	agg := NewDataAggregatorWithFactory(mockTokenGetter, mockFactory)
 
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
-	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
+	pool := poolOf(&APIConfig{Name: "key1", Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"})
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, constants.QueryModeDay, tz)
+	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, pool, time.Time{}, constants.QueryModeDay, tz)
 
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -218,10 +224,10 @@ func TestGetAggregatedMetrics_MultipleSystems(t *testing.T) {
 		{Name: "System 1", ID: "123"},
 		{Name: "System 2", ID: "456"},
 	}
-	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
+	pool := poolOf(&APIConfig{Name: "key1", Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"})
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, constants.QueryModeDay, tz)
+	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, pool, time.Time{}, constants.QueryModeDay, tz)
 
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -281,10 +287,10 @@ func TestGetAggregatedMetrics_MissingAPIConfig(t *testing.T) {
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	_, err := agg.GetAggregatedMetrics(context.Background(), systems, nil, time.Time{}, constants.QueryModeDay, tz)
+	_, err := agg.GetAggregatedMetrics(context.Background(), systems, poolOf(), time.Time{}, constants.QueryModeDay, tz)
 
 	if err == nil {
-		t.Error("Expected error for nil API config")
+		t.Error("Expected error for empty credential pool")
 	}
 }
 
@@ -297,10 +303,10 @@ func TestGetAggregatedMetrics_MissingAPIKey(t *testing.T) {
 	agg := NewDataAggregator(mockTokenGetter)
 
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
-	apiConfig := &APIConfig{ClientID: "test-client", ClientSecret: "test-secret"} // No Key
+	pool := poolOf(&APIConfig{Name: "key1", ClientID: "test-client", ClientSecret: "test-secret"}) // No Key
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	_, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, constants.QueryModeDay, tz)
+	_, err := agg.GetAggregatedMetrics(context.Background(), systems, pool, time.Time{}, constants.QueryModeDay, tz)
 
 	if err == nil {
 		t.Error("Expected error for missing API key")
@@ -316,13 +322,126 @@ func TestGetAggregatedMetrics_TokenError(t *testing.T) {
 	agg := NewDataAggregator(mockTokenGetter)
 
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
-	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
+	pool := poolOf(&APIConfig{Name: "key1", Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"})
 	tz := mustLoadLocation(t, "US/Pacific")
 
-	_, err := agg.GetAggregatedMetrics(context.Background(), systems, apiConfig, time.Time{}, constants.QueryModeDay, tz)
+	_, err := agg.GetAggregatedMetrics(context.Background(), systems, pool, time.Time{}, constants.QueryModeDay, tz)
 
 	if err == nil {
 		t.Error("Expected error for token retrieval failure")
+	}
+}
+
+// TestGetAggregatedMetrics_FailoverOn429 verifies a rate-limited credential fails
+// over to a spare credential and the system still succeeds.
+func TestGetAggregatedMetrics_FailoverOn429(t *testing.T) {
+	mockTokenGetter := func(ctx context.Context, apiConfig *APIConfig) (string, error) {
+		return "test-token", nil
+	}
+	// The first credential ("k1") is throttled; the spare ("k2") returns metrics.
+	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+		if apiKey == "k1" {
+			return &MockCloudClient{Err: errors.New(constants.RateLimitError)}
+		}
+		return &MockCloudClient{Metrics: &api.LocalMetrics{ProductionToday: 9.0}}
+	}
+
+	agg := NewDataAggregatorWithFactory(mockTokenGetter, mockFactory)
+
+	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
+	pool := poolOf(
+		&APIConfig{Name: "key1", Key: "k1", ClientID: "c1", ClientSecret: "s"},
+		&APIConfig{Name: "key2", Key: "k2", ClientID: "c2", ClientSecret: "s"},
+	)
+	tz := mustLoadLocation(t, "US/Pacific")
+
+	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, pool, time.Time{}, constants.QueryModeDay, tz)
+	if err != nil {
+		t.Fatalf("Unexpected error after failover: %v", err)
+	}
+	if metrics.ProductionToday != 9.0 {
+		t.Errorf("ProductionToday = %v, want 9.0 (from spare credential)", metrics.ProductionToday)
+	}
+}
+
+// TestGetAggregatedMetrics_TokenFailover verifies that when token acquisition
+// fails for one credential, the system fails over to a spare and still succeeds.
+func TestGetAggregatedMetrics_TokenFailover(t *testing.T) {
+	// key1's token fetch fails (e.g. expired refresh token / Enphase 500); key2 works.
+	mockTokenGetter := func(ctx context.Context, apiConfig *APIConfig) (string, error) {
+		if apiConfig.Name == "key1" {
+			return "", errors.New("token request failed with status 500")
+		}
+		return "test-token", nil
+	}
+	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+		return &MockCloudClient{Metrics: &api.LocalMetrics{ProductionToday: 7.0}}
+	}
+
+	agg := NewDataAggregatorWithFactory(mockTokenGetter, mockFactory)
+
+	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
+	pool := poolOf(
+		&APIConfig{Name: "key1", Key: "k1", ClientID: "c1", ClientSecret: "s"},
+		&APIConfig{Name: "key2", Key: "k2", ClientID: "c2", ClientSecret: "s"},
+	)
+	tz := mustLoadLocation(t, "US/Pacific")
+
+	metrics, err := agg.GetAggregatedMetrics(context.Background(), systems, pool, time.Time{}, constants.QueryModeDay, tz)
+	if err != nil {
+		t.Fatalf("Unexpected error after token failover: %v", err)
+	}
+	if metrics.ProductionToday != 7.0 {
+		t.Errorf("ProductionToday = %v, want 7.0 (from spare credential)", metrics.ProductionToday)
+	}
+}
+
+// TestGetAggregatedMetrics_AllCredentialsTokenFail verifies a fatal error is
+// returned once every credential's token acquisition fails.
+func TestGetAggregatedMetrics_AllCredentialsTokenFail(t *testing.T) {
+	mockTokenGetter := func(ctx context.Context, apiConfig *APIConfig) (string, error) {
+		return "", errors.New("token request failed with status 500")
+	}
+	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+		return &MockCloudClient{Metrics: &api.LocalMetrics{}}
+	}
+
+	agg := NewDataAggregatorWithFactory(mockTokenGetter, mockFactory)
+
+	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
+	pool := poolOf(
+		&APIConfig{Name: "key1", Key: "k1", ClientID: "c1", ClientSecret: "s"},
+		&APIConfig{Name: "key2", Key: "k2", ClientID: "c2", ClientSecret: "s"},
+	)
+	tz := mustLoadLocation(t, "US/Pacific")
+
+	if _, err := agg.GetAggregatedMetrics(context.Background(), systems, pool, time.Time{}, constants.QueryModeDay, tz); err == nil {
+		t.Error("err = nil, want a fatal token error after all credentials exhausted")
+	}
+}
+
+// TestGetAggregatedMetrics_AllCredentialsRateLimited verifies a rate-limit error is
+// surfaced once every credential is exhausted for a system.
+func TestGetAggregatedMetrics_AllCredentialsRateLimited(t *testing.T) {
+	mockTokenGetter := func(ctx context.Context, apiConfig *APIConfig) (string, error) {
+		return "test-token", nil
+	}
+	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+		return &MockCloudClient{Err: errors.New(constants.RateLimitError)}
+	}
+
+	agg := NewDataAggregatorWithFactory(mockTokenGetter, mockFactory)
+
+	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
+	pool := poolOf(
+		&APIConfig{Name: "key1", Key: "k1", ClientID: "c1", ClientSecret: "s"},
+		&APIConfig{Name: "key2", Key: "k2", ClientID: "c2", ClientSecret: "s"},
+	)
+	tz := mustLoadLocation(t, "US/Pacific")
+
+	_, err := agg.GetAggregatedMetrics(context.Background(), systems, pool, time.Time{}, constants.QueryModeDay, tz)
+	if err == nil || !constants.IsRateLimitError(err) {
+		t.Errorf("err = %v, want a rate-limit error after all credentials exhausted", err)
 	}
 }
 
@@ -335,14 +454,14 @@ func TestGetAggregatedMetrics_ContextCancellation(t *testing.T) {
 	agg := NewDataAggregator(mockTokenGetter)
 
 	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
-	apiConfig := &APIConfig{Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"}
+	pool := poolOf(&APIConfig{Name: "key1", Key: "test-key", ClientID: "test-client", ClientSecret: "test-secret"})
 	tz := mustLoadLocation(t, "US/Pacific")
 
 	// Create a cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := agg.GetAggregatedMetrics(ctx, systems, apiConfig, time.Time{}, constants.QueryModeDay, tz)
+	_, err := agg.GetAggregatedMetrics(ctx, systems, pool, time.Time{}, constants.QueryModeDay, tz)
 
 	if err == nil {
 		t.Error("Expected error for cancelled context")
