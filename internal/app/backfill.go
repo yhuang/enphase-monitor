@@ -61,8 +61,11 @@ func RunBackfill(ctx context.Context, rc RunConfig, fromDate time.Time, force bo
 			end.Format(constants.DateFormat))
 	}
 
-	// Backfill is authoritative: always hit the live API, never the cache.
+	// Backfill is authoritative: always hit the live API, never the cache. Disable
+	// the cache fallback too, so a 429 propagates and the credential pool fails
+	// over to a spare key instead of silently serving (and persisting) stale cache.
 	cache.SetCacheDisabled(true)
+	cache.SetCacheFallbackDisabled(true)
 
 	// On a terminal, progress for written/skipped days redraws on a single line
 	// (carriage return + clear-to-end-of-line) so a long range scrolls in place.

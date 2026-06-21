@@ -97,10 +97,11 @@ const MinRequestInterval = 1 * time.Minute
 // These flags are set once at startup before any concurrent operations begin,
 // so no mutex protection is needed.
 var (
-	validationMode     bool
-	cacheDisabled      bool
-	debugMode          bool
-	budgetWarningShown bool
+	validationMode        bool
+	cacheDisabled         bool
+	cacheFallbackDisabled bool
+	debugMode             bool
+	budgetWarningShown    bool
 )
 
 // ValidationMode returns whether Validation Mode is enabled.
@@ -123,6 +124,22 @@ func CacheDisabled() bool {
 // SetCacheDisabled enables or disables cache bypass.
 func SetCacheDisabled(disabled bool) {
 	cacheDisabled = disabled
+}
+
+// CacheFallbackDisabled reports whether falling back to cached data on a failed
+// live call is disabled. Backfill Mode sets this: its records must be
+// authoritative live data, and a 429 must propagate so the credential pool can
+// fail over to a spare key rather than silently serving (and persisting) stale
+// cache. The plain --no-cache flag leaves it false, keeping the safety net.
+//
+//nolint:revive // exported name clarifies package (cache.CacheFallbackDisabled)
+func CacheFallbackDisabled() bool {
+	return cacheFallbackDisabled
+}
+
+// SetCacheFallbackDisabled enables or disables the live-call cache fallback.
+func SetCacheFallbackDisabled(disabled bool) {
+	cacheFallbackDisabled = disabled
 }
 
 // DebugMode returns whether debug mode is enabled.
@@ -172,6 +189,7 @@ func SetBudgetWarningShown(shown bool) {
 func ResetState() {
 	validationMode = false
 	cacheDisabled = false
+	cacheFallbackDisabled = false
 	debugMode = false
 	budgetWarningShown = false
 	ClearAPICalls()
