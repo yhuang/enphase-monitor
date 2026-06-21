@@ -1,6 +1,8 @@
-enphase-monitor
+/enphase-monitor
+/seed-credentials
 
 .DS_Store
+*.bak
 *.coverprofile
 *.out
 *.prof
