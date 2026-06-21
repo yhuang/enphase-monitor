@@ -17,3 +17,6 @@
 /cache/
 history/*
 weather_codes.json
+
+*bak
+**/*bak
