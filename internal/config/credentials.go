@@ -136,6 +136,128 @@ func UpdateRefreshToken(filename, name, refreshToken string) error {
 	return fmt.Errorf("no credential named %q in %s", name, filename)
 }
 
+// SeedCredential carries the identity fields of one Enphase application as read
+// from the developer portal: the values needed to seed a credentials.yaml entry
+// before its refresh token is obtained via --update-refresh-token.
+type SeedCredential struct {
+	Name         string
+	Key          string
+	ClientID     string
+	ClientSecret string
+}
+
+// MergeSeedCredentials merges seeded portal credentials into the credentials.yaml
+// file at filename, preserving comments, formatting, ordering, and — crucially —
+// any existing refresh_token. For each seed whose name already exists, key,
+// client_id, and client_secret are updated in place (non-empty values only) while
+// refresh_token and any other fields are left untouched (a resync). For each seed
+// whose name is new, a fresh entry is appended with an empty refresh_token, ready
+// to be filled by --update-refresh-token. A missing file is created. It returns
+// the number of entries updated and added.
+//
+// The edit is done on the YAML node tree, so this never clobbers the working
+// refresh tokens of credentials that are already authorized.
+func MergeSeedCredentials(filename string, seeds []SeedCredential) (updated, added int, err error) {
+	data, err := os.ReadFile(filename)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return 0, 0, fmt.Errorf("failed to read credentials file: %w", err)
+	}
+
+	var doc yaml.Node
+	if len(data) > 0 {
+		if err := yaml.Unmarshal(data, &doc); err != nil {
+			return 0, 0, fmt.Errorf("failed to parse credentials file: %w", err)
+		}
+	}
+	root := documentRoot(&doc)
+
+	credsSeq := mappingValue(root, "credentials")
+	if credsSeq == nil {
+		credsSeq = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		root.Content = append(root.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "credentials"},
+			credsSeq)
+	}
+	if credsSeq.Kind != yaml.SequenceNode {
+		return 0, 0, errors.New("credentials: in file is not a list")
+	}
+
+	byName := make(map[string]*yaml.Node, len(credsSeq.Content))
+	for _, entry := range credsSeq.Content {
+		if entry.Kind != yaml.MappingNode {
+			continue
+		}
+		if n := mappingValue(entry, "name"); n != nil {
+			byName[n.Value] = entry
+		}
+	}
+
+	for _, s := range seeds {
+		if entry, ok := byName[s.Name]; ok {
+			setMappingStringIfNotEmpty(entry, "key", s.Key)
+			setMappingStringIfNotEmpty(entry, "client_id", s.ClientID)
+			setMappingStringIfNotEmpty(entry, "client_secret", s.ClientSecret)
+			updated++
+			continue
+		}
+		entry := newCredentialNode(s)
+		credsSeq.Content = append(credsSeq.Content, entry)
+		byName[s.Name] = entry
+		added++
+	}
+
+	if err := writeFilePreservingMode(filename, &doc); err != nil {
+		return 0, 0, err
+	}
+	return updated, added, nil
+}
+
+// documentRoot returns the top-level mapping node of a YAML document, initializing
+// an empty document (and its root mapping) in place when the parsed node is empty
+// so a missing or blank credentials file can be seeded from scratch.
+func documentRoot(doc *yaml.Node) *yaml.Node {
+	if doc.Kind == 0 {
+		doc.Kind = yaml.DocumentNode
+	}
+	if len(doc.Content) == 0 {
+		doc.Content = []*yaml.Node{{Kind: yaml.MappingNode, Tag: "!!map"}}
+	}
+	return doc.Content[0]
+}
+
+// newCredentialNode builds a credentials.yaml entry mapping for a seeded
+// credential, in the canonical field order. The refresh_token is left as a bare
+// empty key (rendered `refresh_token:`, not `refresh_token: ""`) for
+// --update-refresh-token to fill in later.
+func newCredentialNode(s SeedCredential) *yaml.Node {
+	scalar := func(v string) *yaml.Node {
+		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v}
+	}
+	entry := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	for _, kv := range []struct{ key, val string }{
+		{"name", s.Name},
+		{"key", s.Key},
+		{"client_id", s.ClientID},
+		{"client_secret", s.ClientSecret},
+	} {
+		entry.Content = append(entry.Content, scalar(kv.key), scalar(kv.val))
+	}
+	entry.Content = append(entry.Content,
+		scalar("refresh_token"),
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!null", Value: ""},
+	)
+	return entry
+}
+
+// setMappingStringIfNotEmpty sets key in a mapping only when value is non-empty,
+// so a failed scrape (blank field) never overwrites a good stored value.
+func setMappingStringIfNotEmpty(m *yaml.Node, key, value string) {
+	if value == "" {
+		return
+	}
+	setMappingString(m, key, value)
+}
+
 // mappingValue returns the value node for key in a YAML mapping node, or nil.
 func mappingValue(m *yaml.Node, key string) *yaml.Node {
 	if m == nil || m.Kind != yaml.MappingNode {

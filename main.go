@@ -219,7 +219,7 @@ func main() {
 
 		// --all re-authorizes every configured credential in turn.
 		if flags.All {
-			if err := updateAllRefreshTokens(ctx, pool, flags.CredentialsFile); err != nil {
+			if err := updateAllRefreshTokens(ctx, pool, flags.CredentialsFile, flags.NewOnly); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -530,7 +530,11 @@ func selectCredential(pool *credentials.Pool, name string) (*config.APIConfig, e
 // updateOneRefreshToken runs the OAuth wizard for a single credential and writes
 // the obtained refresh token into the credentials file.
 func updateOneRefreshToken(ctx context.Context, cred *config.APIConfig, credentialsFile string) error {
-	refreshToken, err := oauth.Authorize(ctx, cred)
+	authorizer := oauth.NewBrowserAuthorizer(ctx)
+	defer authorizer.Close()
+	fmt.Println("A Chrome window will open. Log in — the app is approved automatically, no clicking required.")
+
+	refreshToken, err := oauth.AuthorizeViaBrowser(ctx, authorizer, cred)
 	if err != nil {
 		return fmt.Errorf("failed to obtain refresh token for %q: %w", cred.Name, err)
 	}
@@ -541,29 +545,65 @@ func updateOneRefreshToken(ctx context.Context, cred *config.APIConfig, credenti
 	return nil
 }
 
-// updateAllRefreshTokens re-authorizes every configured credential in turn. It
-// attempts each one even if an earlier credential failed, then reports which
-// failed; a Ctrl+C (context cancellation) aborts the remaining credentials.
-func updateAllRefreshTokens(ctx context.Context, pool *credentials.Pool, credentialsFile string) error {
+// updateAllRefreshTokens re-authorizes every configured credential in turn,
+// driving one browser session that approves each app's consent automatically —
+// the user logs in once and never clicks "Allow Access". It attempts each
+// credential even if an earlier one failed, then reports which failed; a Ctrl+C
+// (context cancellation) aborts the rest. When newOnly is set, credentials that
+// already have a refresh_token are skipped, so a freshly-seeded batch can be
+// authorized without re-doing the working ones.
+func updateAllRefreshTokens(ctx context.Context, pool *credentials.Pool, credentialsFile string, newOnly bool) error {
 	names := pool.Names()
-	var failed []string
+
+	authorizer := oauth.NewBrowserAuthorizer(ctx)
+	defer authorizer.Close()
+	fmt.Println("A Chrome window will open. Log in once — each app is approved automatically, no clicking required.")
+
+	// status writes a single self-clearing line (\r + ANSI clear-to-EOL) so the
+	// per-credential progress updates in place instead of stacking up.
+	status := func(format string, a ...any) {
+		fmt.Fprintf(os.Stderr, "\r\033[K"+format, a...)
+	}
+
+	var failed, skipped []string
 	for i, name := range names {
 		if ctx.Err() != nil {
+			fmt.Fprintln(os.Stderr)
 			return ctx.Err()
 		}
 		cred, _ := pool.ByName(name)
-		fmt.Printf("\n=== Credential %d/%d: %s ===\n", i+1, len(names), name)
-		if err := updateOneRefreshToken(ctx, cred, credentialsFile); err != nil {
+		if newOnly && cred.RefreshToken != "" {
+			skipped = append(skipped, name)
+			continue
+		}
+		status("[%d/%d] %s — authorizing…", i+1, len(names), name)
+		token, err := oauth.AuthorizeViaBrowser(ctx, authorizer, cred)
+		if err != nil {
 			if errors.Is(err, context.Canceled) || ctx.Err() != nil {
+				fmt.Fprintln(os.Stderr)
 				return err
 			}
-			fmt.Fprintf(os.Stderr, "  %v\n", err)
+			// Persist failures on their own line (they survive later updates).
+			fmt.Fprintf(os.Stderr, "\r\033[K[%d/%d] %s — FAILED: %v\n", i+1, len(names), name, err)
 			failed = append(failed, name)
+			continue
 		}
+		if err := config.UpdateRefreshToken(credentialsFile, cred.Name, token); err != nil {
+			fmt.Fprintf(os.Stderr, "\r\033[K[%d/%d] %s — got token but save failed: %v\n", i+1, len(names), name, err)
+			failed = append(failed, name)
+			continue
+		}
+		status("[%d/%d] %s — saved", i+1, len(names), name)
+	}
+	fmt.Fprint(os.Stderr, "\r\033[K") // clear the last status line before the summary
+
+	if len(skipped) > 0 {
+		fmt.Printf("Skipped %d already-authorized credential(s) (--new-only).\n", len(skipped))
 	}
 	if len(failed) > 0 {
-		return fmt.Errorf("re-authorization failed for %d of %d credential(s): %s", len(failed), len(names), strings.Join(failed, ", "))
+		return fmt.Errorf("authorization failed for %d of %d credential(s): %s", len(failed), len(names), strings.Join(failed, ", "))
 	}
-	fmt.Printf("\nDone: re-authorized all %d credential(s).\n", len(names))
+	authorized := len(names) - len(skipped)
+	fmt.Printf("Done: authorized %d credential(s).\n", authorized)
 	return nil
 }

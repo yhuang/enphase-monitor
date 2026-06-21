@@ -14,6 +14,7 @@ type Flags struct {
 	Force              bool
 	UpdateRefreshToken bool
 	All                bool
+	NewOnly            bool
 	ClearCache         bool
 	ClearCacheDate     string
 	ClearAllCache      bool
@@ -37,6 +38,7 @@ func ParseFlags() *Flags {
 	flag.BoolVar(&flags.Force, "force", false, "With --init, re-resolve the location from the API even if a cached value already exists. With --backfill-from, re-fetch and overwrite history records that already exist instead of skipping them.")
 	flag.BoolVar(&flags.UpdateRefreshToken, "update-refresh-token", false, "Run the OAuth wizard to obtain a refresh token and save it into credentials.yaml. Pass the credential name as an argument when more than one is configured: --update-refresh-token <name>")
 	flag.BoolVar(&flags.All, "all", false, "With --update-refresh-token, re-authorize every configured credential in turn")
+	flag.BoolVar(&flags.NewOnly, "new-only", false, "With --update-refresh-token --all, authorize only credentials that have no refresh_token yet (skip already-authorized ones, e.g. after seeding new apps)")
 	flag.BoolVar(&flags.ClearCache, "clear-cache", false, "Clear cached API responses for today's date only (preserves yesterday and earlier)")
 	flag.StringVar(&flags.ClearCacheDate, "clear-cache-date", "", "Clear cached API responses whose queried date matches YYYY-MM-DD (e.g. 2026-01-19). Matches the query start date exactly: a day query for that date, plus any month/year aggregate that starts on it.")
 	flag.BoolVar(&flags.ClearAllCache, "clear-all-cache", false, "Clear all cached API responses (all dates)")

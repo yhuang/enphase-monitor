@@ -1,13 +1,20 @@
-.PHONY: build run run-once install clean test test-coverage test-verbose test-one fmt lint help
+.PHONY: build seed-credentials run run-once install clean test test-coverage test-verbose test-one fmt lint help
 
-# Binary name
+# Binary names
 BINARY_NAME=enphase-monitor
+SEED_BINARY=seed-credentials
 
-# Build the application
-build:
+# Build the application (and the seed-credentials helper)
+build: seed-credentials
 	@echo "Building $(BINARY_NAME)..."
 	go build -o $(BINARY_NAME)
 	@echo "Build complete: ./$(BINARY_NAME)"
+
+# Build the credential-seeding helper (populates credentials.yaml from the portal)
+seed-credentials:
+	@echo "Building $(SEED_BINARY)..."
+	go build -o $(SEED_BINARY) ./cmd/seed-credentials
+	@echo "Build complete: ./$(SEED_BINARY)"
 
 # Run in continuous monitoring mode
 run: build
@@ -45,7 +52,7 @@ setup:
 # Clean build artifacts
 clean:
 	@echo "Cleaning..."
-	rm -f $(BINARY_NAME)
+	rm -f $(BINARY_NAME) $(SEED_BINARY)
 	rm -f coverage.out coverage.html
 	go clean -testcache
 	@echo "Clean complete"
@@ -92,7 +99,8 @@ pdfs:
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  make build     - Build the application"
+	@echo "  make build     - Build the application (and seed-credentials)"
+	@echo "  make seed-credentials - Build just the credential-seeding helper"
 	@echo "  make run       - Build and run in continuous mode (--continuous)"
 	@echo "  make run-once  - Build and run single query (default behavior)"
 	@echo "  make install   - Download Go dependencies"

@@ -236,6 +236,114 @@ credentials:
 	})
 }
 
+func TestMergeSeedCredentials(t *testing.T) {
+	const content = `# Top comment
+credentials:
+  - name: app-001  # inline comment
+    key: "old-key"
+    client_id: "old-cid"
+    client_secret: "old-secret"
+    refresh_token: "keep-me"
+`
+
+	t.Run("resyncs existing secrets but preserves refresh_token and comments", func(t *testing.T) {
+		path := writeTempFile(t, "credentials.yaml", content)
+		updated, added, err := MergeSeedCredentials(path, []SeedCredential{
+			{Name: "app-001", Key: "new-key", ClientID: "new-cid", ClientSecret: "new-secret"},
+		})
+		if err != nil {
+			t.Fatalf("MergeSeedCredentials() error = %v", err)
+		}
+		if updated != 1 || added != 0 {
+			t.Errorf("updated=%d added=%d, want updated=1 added=0", updated, added)
+		}
+		creds, err := LoadCredentials(path)
+		if err != nil {
+			t.Fatalf("LoadCredentials() error = %v", err)
+		}
+		got := creds[0]
+		if got.Key != "new-key" || got.ClientID != "new-cid" || got.ClientSecret != "new-secret" {
+			t.Errorf("secrets not resynced: %+v", got)
+		}
+		if got.RefreshToken != "keep-me" {
+			t.Errorf("refresh_token = %q, want preserved keep-me", got.RefreshToken)
+		}
+		if raw := readFile(t, path); !strings.Contains(raw, "# Top comment") || !strings.Contains(raw, "# inline comment") {
+			t.Errorf("comments lost:\n%s", raw)
+		}
+	})
+
+	t.Run("appends new entry with empty refresh_token", func(t *testing.T) {
+		path := writeTempFile(t, "credentials.yaml", content)
+		updated, added, err := MergeSeedCredentials(path, []SeedCredential{
+			{Name: "app-002", Key: "k2", ClientID: "c2", ClientSecret: "s2"},
+		})
+		if err != nil {
+			t.Fatalf("MergeSeedCredentials() error = %v", err)
+		}
+		if updated != 0 || added != 1 {
+			t.Errorf("updated=%d added=%d, want updated=0 added=1", updated, added)
+		}
+		creds, err := LoadCredentials(path)
+		if err != nil {
+			t.Fatalf("LoadCredentials() error = %v", err)
+		}
+		if len(creds) != 2 {
+			t.Fatalf("got %d credentials, want 2", len(creds))
+		}
+		if creds[1].Name != "app-002" || creds[1].Key != "k2" {
+			t.Errorf("appended entry = %+v, want app-002/k2", creds[1])
+		}
+		if creds[1].RefreshToken != "" {
+			t.Errorf("new entry refresh_token = %q, want empty", creds[1].RefreshToken)
+		}
+		// The empty token is written bare (refresh_token:), not as "".
+		if raw := readFile(t, path); strings.Contains(raw, `refresh_token: ""`) {
+			t.Errorf("new entry should have a bare refresh_token, not empty quotes:\n%s", raw)
+		}
+		// The untouched first entry keeps its token.
+		if creds[0].RefreshToken != "keep-me" {
+			t.Errorf("app-001 refresh_token = %q, want keep-me", creds[0].RefreshToken)
+		}
+	})
+
+	t.Run("blank scraped field does not clobber a stored secret", func(t *testing.T) {
+		path := writeTempFile(t, "credentials.yaml", content)
+		if _, _, err := MergeSeedCredentials(path, []SeedCredential{
+			{Name: "app-001", Key: "", ClientID: "new-cid", ClientSecret: ""},
+		}); err != nil {
+			t.Fatalf("MergeSeedCredentials() error = %v", err)
+		}
+		creds, _ := LoadCredentials(path)
+		if creds[0].Key != "old-key" || creds[0].ClientSecret != "old-secret" {
+			t.Errorf("blank fields overwrote stored secrets: %+v", creds[0])
+		}
+		if creds[0].ClientID != "new-cid" {
+			t.Errorf("non-blank client_id not applied: %+v", creds[0])
+		}
+	})
+
+	t.Run("creates the file when it does not exist", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "new-credentials.yaml")
+		updated, added, err := MergeSeedCredentials(path, []SeedCredential{
+			{Name: "app-001", Key: "k", ClientID: "c", ClientSecret: "s"},
+		})
+		if err != nil {
+			t.Fatalf("MergeSeedCredentials() error = %v", err)
+		}
+		if updated != 0 || added != 1 {
+			t.Errorf("updated=%d added=%d, want updated=0 added=1", updated, added)
+		}
+		creds, err := LoadCredentials(path)
+		if err != nil {
+			t.Fatalf("LoadCredentials() after create error = %v", err)
+		}
+		if len(creds) != 1 || creds[0].Name != "app-001" {
+			t.Errorf("seeded file = %+v, want one app-001 entry", creds)
+		}
+	})
+}
+
 // readFile returns a temp file's contents, failing the test on error.
 func readFile(t *testing.T, path string) string {
 	t.Helper()
