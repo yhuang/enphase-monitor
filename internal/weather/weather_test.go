@@ -115,6 +115,26 @@ func TestDailyWeather_OldDateUsesArchive(t *testing.T) {
 	}
 }
 
+func TestDailyWeather_BoundaryFallsBackToArchive(t *testing.T) {
+	// A date inside the forecast window (50 days before the fixed clock) that the
+	// forecast endpoint has no data for (null temps) but the archive does. fetch
+	// must try the forecast first, then fall back to the archive — covering the
+	// fuzzy forecast/archive boundary that left a gap of unavailable days.
+	nullForecast := `{"daily":{"time":["2026-04-29"],"temperature_2m_max":[null],"temperature_2m_min":[null]}}`
+	c, fHits, aHits := newTestClient(t, nullForecast, dailyJSON("2026-04-29", 3, 61.0, 44.0, 20, 0, 10.8))
+
+	w, err := c.DailyWeather(context.Background(), testCoords, day("2026-04-29"))
+	if err != nil {
+		t.Fatalf("DailyWeather: %v", err)
+	}
+	if w.TempHigh != 61.0 || w.TempLow != 44.0 {
+		t.Errorf("got high=%v low=%v, want 61.0/44.0 (from archive fallback)", w.TempHigh, w.TempLow)
+	}
+	if *fHits != 1 || *aHits != 1 {
+		t.Errorf("forecast hits=%d archive hits=%d, want 1/1 (forecast then archive fallback)", *fHits, *aHits)
+	}
+}
+
 func TestDailyWeather_PastDateCachedPermanently(t *testing.T) {
 	c, _, aHits := newTestClient(t, "", dailyJSON("2026-01-15", 3, 60.2, 41.0, 19, 0, 10.8))
 
@@ -317,7 +337,10 @@ func TestDailyWeather_HTTPError(t *testing.T) {
 	defer server.Close()
 
 	c := NewClient(t.TempDir())
+	// Point both endpoints at the failing server so the alternate-endpoint
+	// fallback also fails and the error propagates.
 	c.ForecastURL = server.URL
+	c.ArchiveURL = server.URL
 	c.HTTPClient = server.Client()
 	c.now = fixedClock("2026-06-18T12:00:00Z")
 

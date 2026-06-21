@@ -220,8 +220,33 @@ type openMeteoResponse struct {
 }
 
 // fetch queries the endpoint appropriate for date's age and parses the result.
+// fetch retrieves one day's weather, choosing the forecast or archive endpoint by
+// the date's age. That cutoff is approximate and the two datasets do not overlap
+// perfectly, so a date near the boundary can be present in one endpoint but
+// missing from the other (e.g. dates just inside the forecast window that the
+// forecast API no longer serves but the archive does). When the primary endpoint
+// yields no data, fetch retries once on the alternate before giving up.
 func (c *Client) fetch(ctx context.Context, coords geocode.Coordinates, date time.Time, dateStr, symbol string) (DailyWeather, error) {
-	base := c.endpointFor(date)
+	primary := c.endpointFor(date)
+	w, err := c.fetchFrom(ctx, primary, coords, date, dateStr, symbol)
+	if err == nil {
+		return w, nil
+	}
+
+	alt := c.ArchiveURL
+	if primary == c.ArchiveURL {
+		alt = c.ForecastURL
+	}
+	if alt != "" && alt != primary {
+		if w2, altErr := c.fetchFrom(ctx, alt, coords, date, dateStr, symbol); altErr == nil {
+			return w2, nil
+		}
+	}
+	return DailyWeather{}, err
+}
+
+// fetchFrom fetches one day's weather from a specific Open-Meteo endpoint.
+func (c *Client) fetchFrom(ctx context.Context, base string, coords geocode.Coordinates, date time.Time, dateStr, symbol string) (DailyWeather, error) {
 	params := url.Values{}
 	params.Set("latitude", strconv.FormatFloat(coords.Latitude, 'f', -1, 64))
 	params.Set("longitude", strconv.FormatFloat(coords.Longitude, 'f', -1, 64))

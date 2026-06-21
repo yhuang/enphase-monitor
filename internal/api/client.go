@@ -892,7 +892,10 @@ func (c *EnlightenCloudClient) requestNoCacheMode(ctx context.Context, fb cacheF
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		resp.Body.Close()
-		if !fb.has() {
+		// When the cache fallback is disabled (Backfill Mode), propagate the 429 so
+		// the aggregator can fail over to a spare credential. Serving stale cache
+		// here would both hide that failover and persist non-authoritative data.
+		if cache.CacheFallbackDisabled() || !fb.has() {
 			return nil, false, errors.New(constants.RateLimitError)
 		}
 		maybeShowNoCacheFallbackWarning("Rate limited (429)")

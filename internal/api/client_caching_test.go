@@ -153,6 +153,31 @@ func TestMakeCachedAPIRequest_NoCache_429_FallsBackToCache(t *testing.T) {
 	}
 }
 
+// TestMakeCachedAPIRequest_FallbackDisabled_429_RateLimitError: with the cache
+// fallback disabled (Backfill Mode), a 429 surfaces as a rate-limit error even
+// when a cached response exists, so the aggregator can fail over to a spare
+// credential instead of serving stale cache.
+func TestMakeCachedAPIRequest_FallbackDisabled_429_RateLimitError(t *testing.T) {
+	cache.ResetState()
+	defer cache.ResetState()
+	cache.SetCacheDisabled(true)
+	cache.SetCacheFallbackDisabled(true)
+
+	srv := newSwitchableServer()
+	defer srv.Close()
+	client := newProdClient(t, srv.URL)
+
+	// Populate the cache first (a response that would otherwise be served on 429).
+	if _, err := fetchToday(client); err != nil {
+		t.Fatalf("populate: unexpected error: %v", err)
+	}
+
+	srv.setStatus(http.StatusTooManyRequests)
+	if _, err := fetchToday(client); err == nil || !constants.IsRateLimitError(err) {
+		t.Errorf("fallback-disabled 429 with cache: error = %v, want rate-limit error", err)
+	}
+}
+
 // TestMakeCachedAPIRequest_NoCache_429_NoCache_RateLimitError: with cache disabled
 // and no saved response, a 429 surfaces as a rate-limit error.
 func TestMakeCachedAPIRequest_NoCache_429_NoCache_RateLimitError(t *testing.T) {
