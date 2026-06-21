@@ -86,6 +86,11 @@ func RunBackfill(ctx context.Context, rc RunConfig, fromDate time.Time, force bo
 		}
 	}
 
+	// Each fetched day rotates the credential pool by the number of systems, so
+	// consecutive days draw on disjoint keys and stay under each key's per-minute
+	// limit — spreading load proactively instead of relying on 429-failover.
+	numSystems := len(GetSystems(rc.Cfg))
+
 	var written, skipped, errored int
 	runErrors := make(map[string]string) // date -> error, for the manifest
 	for day := from; !day.After(end); day = day.AddDate(0, 0, 1) {
@@ -100,7 +105,9 @@ func RunBackfill(ctx context.Context, rc RunConfig, fromDate time.Time, force bo
 			}
 		}
 
-		if err := backfillDay(ctx, rc, day); err != nil {
+		err := backfillDay(ctx, rc, day)
+		rc.Pool.Rotate(numSystems) // advance to fresh credentials for the next day
+		if err != nil {
 			if tty {
 				fmt.Print("\r\033[K")
 			}

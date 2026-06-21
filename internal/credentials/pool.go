@@ -29,6 +29,7 @@ type Pool struct {
 	creds         []*types.APIConfig
 	cooldownUntil map[string]time.Time // keyed by credential name
 	now           func() time.Time     // injectable clock for tests
+	rotation      int                  // round-robin base offset; advanced by Rotate
 }
 
 // NewPool creates a pool over the given credential sets, in order.
@@ -71,17 +72,32 @@ func (p *Pool) ByName(name string) (*types.APIConfig, bool) {
 	return nil, false
 }
 
+// Rotate advances the round-robin base by step credentials, so the next batch of
+// ForSystem calls starts at a fresh credential. Backfill calls this once per
+// fetched day (step = number of systems) to spread load proactively across the
+// pool: consecutive days use disjoint credentials, keeping each key under its
+// per-minute limit instead of reusing the same few keys until they 429. A
+// non-positive step or an empty pool is a no-op. (Continuous Mode never rotates,
+// so each system keeps a stable credential and its cached token across ticks.)
+func (p *Pool) Rotate(step int) {
+	if step <= 0 || len(p.creds) == 0 {
+		return
+	}
+	p.rotation = (p.rotation + step) % len(p.creds)
+}
+
 // ForSystem returns the credential to use for the system at the given index.
-// The base assignment is round-robin (creds[index % len]) to spread load; if the
-// assigned credential is in cooldown, ForSystem returns the next available one
-// instead, falling back to the round-robin pick when every credential is cooling
-// down. The pool is never empty in practice (validated at load time).
+// The base assignment is round-robin (creds[(rotation+index) % len]) to spread
+// load; if the assigned credential is in cooldown, ForSystem returns the next
+// available one instead, falling back to the round-robin pick when every
+// credential is cooling down. The pool is never empty in practice (validated at
+// load time).
 func (p *Pool) ForSystem(index int) *types.APIConfig {
 	n := len(p.creds)
 	if n == 0 {
 		return nil
 	}
-	base := index % n
+	base := (p.rotation + index) % n
 	if p.available(p.creds[base]) {
 		return p.creds[base]
 	}

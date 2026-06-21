@@ -26,6 +26,33 @@ func TestForSystemSpread(t *testing.T) {
 	}
 }
 
+// TestRotateAdvancesBase verifies Rotate moves the round-robin base so successive
+// batches draw on disjoint credentials, wrapping around the pool.
+func TestRotateAdvancesBase(t *testing.T) {
+	p := makePool("a", "b", "c", "d")
+	const systems = 2
+
+	// Batch 1 (rotation 0): a, b. Batch 2 (after Rotate(2)): c, d. Batch 3 wraps
+	// back to a, b.
+	wantBatches := [][]string{{"a", "b"}, {"c", "d"}, {"a", "b"}}
+	for b, batch := range wantBatches {
+		for i, w := range batch {
+			if got := p.ForSystem(i).Name; got != w {
+				t.Errorf("batch %d ForSystem(%d) = %q, want %q", b, i, got, w)
+			}
+		}
+		p.Rotate(systems)
+	}
+
+	// A non-positive step is a no-op: the assignment is unchanged afterward.
+	before := p.ForSystem(0).Name
+	p.Rotate(0)
+	p.Rotate(-3)
+	if after := p.ForSystem(0).Name; after != before {
+		t.Errorf("Rotate(<=0) changed assignment: before=%q after=%q", before, after)
+	}
+}
+
 // TestForSystemSkipsCooldown verifies a rate-limited credential is skipped while
 // in cooldown and re-used once the window passes.
 func TestForSystemSkipsCooldown(t *testing.T) {
