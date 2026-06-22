@@ -14,6 +14,7 @@
 .docs/
 
 /cache/
+test-data/cache/
 history/*
 weather_codes.json
 
