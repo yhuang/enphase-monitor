@@ -125,10 +125,12 @@ func TestMakeCachedAPIRequest_ValidationMode_CacheMiss(t *testing.T) {
 
 // --- No-cache mode (--no-cache) -----------------------------------------------
 
-// TestMakeCachedAPIRequest_NoCache_429_FallsBackToCache: with cache disabled, a
-// previously-saved response is still served on a 429 (no-cache mode saves to
-// cache and falls back to it as a safety measure).
-func TestMakeCachedAPIRequest_NoCache_429_FallsBackToCache(t *testing.T) {
+// TestMakeCachedAPIRequest_NoCache_429_RateLimitError: with cache disabled, a 429
+// surfaces as a rate-limit error even when a cached response exists — the
+// no-cache path never serves stale cache, so the aggregator can fail over to a
+// spare credential (and Backfill Mode fails the day) instead of returning stale
+// data.
+func TestMakeCachedAPIRequest_NoCache_429_RateLimitError(t *testing.T) {
 	cache.ResetState()
 	defer cache.ResetState()
 	cache.SetCacheDisabled(true)
@@ -138,43 +140,14 @@ func TestMakeCachedAPIRequest_NoCache_429_FallsBackToCache(t *testing.T) {
 	defer srv.Close()
 	client := newProdClient(t, srv.URL)
 
-	// Populate (no-cache mode still writes to cache).
-	if _, err := fetchToday(client); err != nil {
-		t.Fatalf("populate: unexpected error: %v", err)
-	}
-
-	srv.setStatus(http.StatusTooManyRequests)
-	got, err := fetchToday(client)
-	if err != nil {
-		t.Fatalf("no-cache 429 with cache: unexpected error: %v", err)
-	}
-	if got != prodOKValueKWh {
-		t.Errorf("no-cache 429 with cache: got %v kWh, want %v", got, prodOKValueKWh)
-	}
-}
-
-// TestMakeCachedAPIRequest_FallbackDisabled_429_RateLimitError: with the cache
-// fallback disabled (Backfill Mode), a 429 surfaces as a rate-limit error even
-// when a cached response exists, so the aggregator can fail over to a spare
-// credential instead of serving stale cache.
-func TestMakeCachedAPIRequest_FallbackDisabled_429_RateLimitError(t *testing.T) {
-	cache.ResetState()
-	defer cache.ResetState()
-	cache.SetCacheDisabled(true)
-	cache.SetCacheFallbackDisabled(true)
-
-	srv := newSwitchableServer()
-	defer srv.Close()
-	client := newProdClient(t, srv.URL)
-
-	// Populate the cache first (a response that would otherwise be served on 429).
+	// Populate the cache first; it must NOT be served on the subsequent 429.
 	if _, err := fetchToday(client); err != nil {
 		t.Fatalf("populate: unexpected error: %v", err)
 	}
 
 	srv.setStatus(http.StatusTooManyRequests)
 	if _, err := fetchToday(client); err == nil || !constants.IsRateLimitError(err) {
-		t.Errorf("fallback-disabled 429 with cache: error = %v, want rate-limit error", err)
+		t.Errorf("no-cache 429 with cache present: error = %v, want rate-limit error", err)
 	}
 }
 
@@ -200,9 +173,10 @@ func TestMakeCachedAPIRequest_NoCache_429_NoCache_RateLimitError(t *testing.T) {
 	}
 }
 
-// TestMakeCachedAPIRequest_NoCache_503_FallsBackToCache: with cache disabled, a
-// previously-saved response is served on a 503.
-func TestMakeCachedAPIRequest_NoCache_503_FallsBackToCache(t *testing.T) {
+// TestMakeCachedAPIRequest_NoCache_503_Error: with cache disabled, a 503 surfaces
+// as an error even when a cached response exists — the no-cache path never serves
+// stale cache.
+func TestMakeCachedAPIRequest_NoCache_503_Error(t *testing.T) {
 	cache.ResetState()
 	defer cache.ResetState()
 	cache.SetCacheDisabled(true)
@@ -217,12 +191,8 @@ func TestMakeCachedAPIRequest_NoCache_503_FallsBackToCache(t *testing.T) {
 	}
 
 	srv.setStatus(http.StatusServiceUnavailable)
-	got, err := fetchToday(client)
-	if err != nil {
-		t.Fatalf("no-cache 503 with cache: unexpected error: %v", err)
-	}
-	if got != prodOKValueKWh {
-		t.Errorf("no-cache 503 with cache: got %v kWh, want %v", got, prodOKValueKWh)
+	if _, err := fetchToday(client); err == nil {
+		t.Error("no-cache 503 with cache present: want error, got nil")
 	}
 }
 

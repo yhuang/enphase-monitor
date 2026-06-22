@@ -283,22 +283,3 @@ func TestGetEnergyImportForDate_RateLimited(t *testing.T) {
 		}
 	}
 }
-
-// TestMaybeShowNoCacheFallbackWarning tests the warning is printed once and then suppressed.
-func TestMaybeShowNoCacheFallbackWarning(t *testing.T) {
-	cache.ResetState()
-	defer cache.ResetState()
-
-	// First call should print (not suppressed)
-	maybeShowNoCacheFallbackWarning("test reason")
-	if !cache.BudgetWarningShown() {
-		t.Error("maybeShowNoCacheFallbackWarning() should set BudgetWarningShown to true")
-	}
-
-	// Second call should be suppressed (already shown)
-	maybeShowNoCacheFallbackWarning("another reason")
-	// Still true — calling again should not change state
-	if !cache.BudgetWarningShown() {
-		t.Error("BudgetWarningShown should remain true after second call")
-	}
-}

@@ -591,16 +591,6 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	return metrics, cacheUsed, nil
 }
 
-// maybeShowNoCacheFallbackWarning prints a one-time warning when returning cached
-// data despite --no-cache (e.g. on API error or 429). reason is used in the message.
-func maybeShowNoCacheFallbackWarning(reason string) {
-	if cache.BudgetWarningShown() {
-		return
-	}
-	fmt.Fprintf(os.Stderr, "WARNING: %s - returning cached data despite --no-cache flag\n", reason)
-	cache.SetBudgetWarningShown(true)
-}
-
 // budgetExhausted reports whether the per-API-key API Budget for the
 // current MinRequestInterval window has been used up. When true, the client
 // prefers cache over a live API call for any URL that has one.
@@ -872,9 +862,12 @@ func (c *EnlightenCloudClient) serveValidationMode(fb cacheFallback) (*http.Resp
 // cached data to fall back on.
 var errServiceUnavailable = errors.New("API request failed with status 503: Enphase service temporarily unavailable and no cached data available")
 
-// requestNoCacheMode handles --no-cache: always make a live call, but still fall
-// back to (and populate) the cache on transport errors, 429, and 503 as a safety
-// measure. Any other status is returned as-is after caching.
+// requestNoCacheMode handles --no-cache and Backfill Mode: always make a live
+// call and never fall back to cached data. Transport errors, 429, and 503 are
+// returned as errors so the caller (the aggregator) can fail over to a spare
+// credential, or fail explicitly — essential for Backfill Mode, whose records
+// must be authoritative live data rather than silently-served stale cache.
+// Successful responses are still written to cache for later (non-no-cache) reads.
 func (c *EnlightenCloudClient) requestNoCacheMode(ctx context.Context, fb cacheFallback) (*http.Response, bool, error) {
 	req, err := c.newAPIRequest(ctx, fb.url)
 	if err != nil {
@@ -883,31 +876,16 @@ func (c *EnlightenCloudClient) requestNoCacheMode(ctx context.Context, fb cacheF
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		if !fb.has() {
-			return nil, false, fmt.Errorf("API request failed: %w", err)
-		}
-		maybeShowNoCacheFallbackWarning("API error")
-		return fb.serve()
+		return nil, false, fmt.Errorf("API request failed: %w", err)
 	}
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		resp.Body.Close()
-		// When the cache fallback is disabled (Backfill Mode), propagate the 429 so
-		// the aggregator can fail over to a spare credential. Serving stale cache
-		// here would both hide that failover and persist non-authoritative data.
-		if cache.CacheFallbackDisabled() || !fb.has() {
-			return nil, false, errors.New(constants.RateLimitError)
-		}
-		maybeShowNoCacheFallbackWarning("Rate limited (429)")
-		return fb.serve()
+		return nil, false, errors.New(constants.RateLimitError)
 	}
 	if resp.StatusCode == http.StatusServiceUnavailable {
 		resp.Body.Close()
-		if !fb.has() {
-			return nil, false, errServiceUnavailable
-		}
-		maybeShowNoCacheFallbackWarning("Service unavailable (503)")
-		return fb.serve()
+		return nil, false, errServiceUnavailable
 	}
 
 	cache.RecordAPICall()
