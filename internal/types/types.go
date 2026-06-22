@@ -87,7 +87,7 @@ type SystemConfig struct {
 // APIConfig represents API configuration for Enphase Cloud API.
 // Used by config, aggregator, oauth, and app packages.
 type APIConfig struct {
-	Name             string `yaml:"name"`                    // Unique label for this credential set (names a credential for --update-refresh-token and as the token-cache key)
+	Name             string `yaml:"name"`                    // Unique label for this credential set (names a credential for --update-refresh-tokens and as the token-cache key)
 	Key              string `yaml:"key"`                     // API Key
 	ClientID         string `yaml:"client_id"`               // OAuth Client ID
 	ClientSecret     string `yaml:"client_secret"`           // OAuth Client Secret

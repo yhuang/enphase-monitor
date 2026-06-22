@@ -24,6 +24,9 @@ type Flags struct {
 	Validation         bool
 	NoCache            bool
 	CachedMode         bool
+	RefreshQuota       bool
+	SeedCredentials    bool
+	QuotaNamePrefix    string
 	Debug              bool
 }
 
@@ -34,11 +37,11 @@ func ParseFlags() *Flags {
 	flag.StringVar(&flags.ConfigFile, "config", "config.yaml", "Path to configuration file")
 	flag.StringVar(&flags.CredentialsFile, "credentials", "credentials.yaml", "Path to credentials file holding the credentials: list (OAuth key/secret/refresh token per credential set)")
 	flag.BoolVar(&flags.Continuous, "continuous", false, "Run continuously with periodic refresh (default is run once and exit)")
-	flag.BoolVar(&flags.Initialize, "init", false, "Initialize: resolve and cache the systems' location for weather reporting (run once before normal use; re-run if the cache is cleared)")
-	flag.BoolVar(&flags.Force, "force", false, "With --init, re-resolve the location from the API even if a cached value already exists. With --backfill-from, re-fetch and overwrite history records that already exist instead of skipping them.")
-	flag.BoolVar(&flags.UpdateRefreshToken, "update-refresh-token", false, "Run the OAuth wizard to obtain a refresh token and save it into credentials.yaml. Pass the credential name as an argument when more than one is configured: --update-refresh-token <name>")
-	flag.BoolVar(&flags.All, "all", false, "With --update-refresh-token, re-authorize every configured credential in turn")
-	flag.BoolVar(&flags.NewOnly, "new-only", false, "With --update-refresh-token --all, authorize only credentials that have no refresh_token yet (skip already-authorized ones, e.g. after seeding new apps)")
+	flag.BoolVar(&flags.Initialize, "init", false, "Initialize: resolve system location for weather, seed monthly API quota from the developer portal into cache/monthly-quota.json, and write the weather-code legend (run once before normal use)")
+	flag.BoolVar(&flags.Force, "force", false, "With --init, re-resolve location and re-sync monthly quota from the portal. With --backfill-from, re-fetch and overwrite history records that already exist instead of skipping them.")
+	flag.BoolVar(&flags.UpdateRefreshToken, "update-refresh-tokens", false, "Run the OAuth wizard to obtain a refresh token and save it into credentials.yaml. Pass the credential name as an argument when more than one is configured: --update-refresh-tokens <name>")
+	flag.BoolVar(&flags.All, "all", false, "With --update-refresh-tokens, re-authorize every configured credential in turn")
+	flag.BoolVar(&flags.NewOnly, "new-only", false, "With --update-refresh-tokens --all, authorize only credentials that have no refresh_token yet (skip already-authorized ones, e.g. after seeding new apps)")
 	flag.BoolVar(&flags.ClearCache, "clear-cache", false, "Clear cached API responses for today's date only (preserves yesterday and earlier)")
 	flag.StringVar(&flags.ClearCacheDate, "clear-cache-date", "", "Clear cached API responses whose queried date matches YYYY-MM-DD (e.g. 2026-01-19). Matches the query start date exactly: a day query for that date, plus any month/year aggregate that starts on it.")
 	flag.BoolVar(&flags.ClearAllCache, "clear-all-cache", false, "Clear all cached API responses (all dates)")
@@ -49,11 +52,14 @@ func ParseFlags() *Flags {
 	flag.BoolVar(&flags.NoCache, "no-cache", false, "Bypass cache and always make live API calls")
 	flag.BoolVar(&flags.CachedMode, "cache", false, "Serve report from cache only; list missing endpoints if cache is incomplete")
 	flag.BoolVar(&flags.Debug, "debug", false, "Print debug information: last run time, API budget, and cache/API decisions")
+	flag.BoolVar(&flags.RefreshQuota, "refresh-quota", false, "Out-of-band refresh: read each application's monthly API hit total from the Enphase developer portal and update cache/monthly-quota.json")
+	flag.BoolVar(&flags.SeedCredentials, "seed-credentials", false, "Seed credentials.yaml from the Enphase developer portal (name, key, client_id, client_secret). Use --name-prefix to filter applications.")
+	flag.StringVar(&flags.QuotaNamePrefix, "name-prefix", "enphase-monitor-", "Application/credential name prefix filter (--seed-credentials) and quota sync scope (--init, --refresh-quota)")
 
 	flag.Parse()
 
-	// The first positional argument names the credential for --update-refresh-token
-	// (e.g. `enphase-monitor --update-refresh-token app-011`). Optional when only one
+	// The first positional argument names the credential for --update-refresh-tokens
+	// (e.g. `enphase-monitor --update-refresh-tokens app-011`). Optional when only one
 	// credential is configured.
 	flags.Credential = flag.Arg(0)
 

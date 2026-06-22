@@ -1,0 +1,265 @@
+package enphase
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"enphase-monitor/internal/browser"
+
+	"github.com/chromedp/chromedp"
+)
+
+// StatsScraper drives a headed Chrome session on the developer portal stats page.
+type StatsScraper struct {
+	parent  context.Context
+	ctx     context.Context
+	cancel  func()
+	started bool
+}
+
+// NewStatsScraper returns a scraper whose Chrome session is governed by parent.
+func NewStatsScraper(parent context.Context) *StatsScraper {
+	return &StatsScraper{parent: parent}
+}
+
+// Close shuts down the Chrome session.
+func (s *StatsScraper) Close() {
+	if s.cancel != nil {
+		s.cancel()
+	}
+}
+
+func (s *StatsScraper) ensureStarted() error {
+	if s.started {
+		return nil
+	}
+	ctx, cancel, err := browser.LaunchHeaded(s.parent)
+	if err != nil {
+		return err
+	}
+	s.ctx, s.cancel, s.started = ctx, cancel, true
+	return nil
+}
+
+func (s *StatsScraper) openStatsPage() error {
+	if err := s.ensureStarted(); err != nil {
+		return err
+	}
+	return chromedp.Run(s.ctx, chromedp.Navigate(statsPageURL))
+}
+
+func (s *StatsScraper) waitForStatsReady() error {
+	deadline := time.Now().Add(statsWaitTimeout)
+	for {
+		if s.parent.Err() != nil {
+			return s.parent.Err()
+		}
+		ready, err := s.statsPageReady()
+		if err != nil {
+			return err
+		}
+		if ready {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timed out after %s waiting for the stats page (log in at %s)", statsWaitTimeout, statsPageURL)
+		}
+		select {
+		case <-s.parent.Done():
+			return s.parent.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+func (s *StatsScraper) statsPageReady() (bool, error) {
+	var ready bool
+	err := chromedp.Run(s.ctx, chromedp.Evaluate(`(() => {
+		const text = (document.body && document.body.innerText) || '';
+		return /Hits\s*\(\s*hits\s*\)/i.test(text) || /show last/i.test(text);
+	})()`, &ready))
+	return ready, err
+}
+
+func (s *StatsScraper) readAppMonthlyHits(appName, fromDate, untilDate string) (int, error) {
+	if err := s.selectApp(appName); err != nil {
+		return 0, err
+	}
+	if err := s.setDateRange(fromDate, untilDate); err != nil {
+		return 0, err
+	}
+	return s.waitForHits()
+}
+
+func (s *StatsScraper) selectApp(appName string) error {
+	nameJSON, err := json.Marshal(appName)
+	if err != nil {
+		return err
+	}
+	script := fmt.Sprintf(`(function(name) {
+		const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+		const target = norm(name);
+
+		for (const sel of document.querySelectorAll('select')) {
+			for (const opt of sel.options) {
+				if (norm(opt.textContent) === target) {
+					if (sel.value !== opt.value) {
+						sel.value = opt.value;
+						sel.dispatchEvent(new Event('change', { bubbles: true }));
+					}
+					return true;
+				}
+			}
+		}
+
+		const clickMatch = () => {
+			const opts = document.querySelectorAll('li, [role="option"], .ant-select-item, .Select-option, div, span');
+			for (const el of opts) {
+				if (norm(el.textContent) !== target) continue;
+				const r = el.getBoundingClientRect();
+				if (r.width <= 0 || r.height <= 0) continue;
+				el.click();
+				return true;
+			}
+			return false;
+		};
+
+		if (clickMatch()) return true;
+
+		const triggers = document.querySelectorAll('[role="combobox"], .ant-select-selector, .Select-control, select + div, button');
+		for (const tr of triggers) {
+			const t = norm(tr.textContent);
+			if (t.includes('enphase-monitor') || tr.getAttribute('role') === 'combobox') {
+				tr.click();
+				break;
+			}
+		}
+		return clickMatch();
+	})(%s)`, string(nameJSON))
+
+	var ok bool
+	if err := chromedp.Run(s.ctx,
+		chromedp.Evaluate(script, &ok),
+		chromedp.Sleep(800*time.Millisecond),
+	); err != nil {
+		return fmt.Errorf("failed to select application: %w", err)
+	}
+	if !ok {
+		// Retry once after opening any visible enphase-monitor label.
+		openScript := `(function() {
+			const re = /enphase-monitor-\d+/;
+			for (const el of document.querySelectorAll('div, span, button')) {
+				const t = (el.textContent || '').trim();
+				if (!re.test(t)) continue;
+				const r = el.getBoundingClientRect();
+				if (r.width <= 0 || r.height <= 0) continue;
+				el.click();
+				return true;
+			}
+			return false;
+		})()`
+		_ = chromedp.Run(s.ctx, chromedp.Evaluate(openScript, &ok), chromedp.Sleep(500*time.Millisecond))
+		if err := chromedp.Run(s.ctx, chromedp.Evaluate(script, &ok)); err != nil {
+			return fmt.Errorf("failed to select application: %w", err)
+		}
+	}
+	if !ok {
+		return fmt.Errorf("could not find %q in the stats application dropdown — the portal UI may have changed", appName)
+	}
+	return nil
+}
+
+func (s *StatsScraper) setDateRange(fromDate, untilDate string) error {
+	fromJSON, _ := json.Marshal(fromDate)
+	untilJSON, _ := json.Marshal(untilDate)
+	script := fmt.Sprintf(`(function(from, until) {
+		const setInput = (input, value) => {
+			input.focus();
+			input.value = value;
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			input.dispatchEvent(new Event('change', { bubbles: true }));
+		};
+
+		const labels = [...document.querySelectorAll('label, span, div')];
+		let fromInput = null, untilInput = null;
+		for (const el of labels) {
+			const t = (el.textContent || '').toLowerCase();
+			if (!fromInput && t.trim() === 'from') {
+				const inp = el.parentElement && el.parentElement.querySelector('input');
+				if (inp) fromInput = inp;
+			}
+			if (!untilInput && t.trim() === 'until') {
+				const inp = el.parentElement && el.parentElement.querySelector('input');
+				if (inp) untilInput = inp;
+			}
+		}
+
+		const inputs = [...document.querySelectorAll('input')].filter(i => {
+			const type = (i.type || '').toLowerCase();
+			return type === 'text' || type === 'date' || type === '';
+		});
+		if (!fromInput && inputs.length >= 2) fromInput = inputs[0];
+		if (!untilInput && inputs.length >= 2) untilInput = inputs[1];
+
+		if (!fromInput || !untilInput) return false;
+		setInput(fromInput, from);
+		setInput(untilInput, until);
+		return true;
+	})(%s, %s)`, string(fromJSON), string(untilJSON))
+
+	var ok bool
+	if err := chromedp.Run(s.ctx,
+		chromedp.Evaluate(script, &ok),
+		chromedp.Sleep(1200*time.Millisecond),
+	); err != nil {
+		return fmt.Errorf("failed to set date range: %w", err)
+	}
+	if !ok {
+		return errors.New("could not find from/until date inputs on the stats page — the portal UI may have changed")
+	}
+	return nil
+}
+
+func (s *StatsScraper) waitForHits() (int, error) {
+	deadline := time.Now().Add(30 * time.Second)
+	var last int
+	stable := 0
+	for {
+		text, err := s.pageText()
+		if err != nil {
+			return 0, err
+		}
+		if hits, ok := parseHitsTotal(text); ok {
+			if hits == last {
+				stable++
+				if stable >= 2 {
+					return hits, nil
+				}
+			} else {
+				last = hits
+				stable = 0
+			}
+		}
+		if time.Now().After(deadline) {
+			if last > 0 || strings.Contains(strings.ToLower(text), "hits") {
+				return last, nil
+			}
+			return 0, errors.New("timed out waiting for hit total on stats page")
+		}
+		select {
+		case <-s.parent.Done():
+			return 0, s.parent.Err()
+		case <-time.After(750 * time.Millisecond):
+		}
+	}
+}
+
+func (s *StatsScraper) pageText() (string, error) {
+	var text string
+	err := chromedp.Run(s.ctx, chromedp.Evaluate(`(document.body && document.body.innerText) || ""`, &text))
+	return text, err
+}

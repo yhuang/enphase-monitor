@@ -193,7 +193,7 @@ func get(ctx context.Context, client *http.Client, url, sessionCookie string) (s
 	req.Header.Set("Accept", "text/html,application/json")
 	// The portal's 3scale/openresty front end can reject the default Go user
 	// agent; present a browser-like one.
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) enphase-monitor/seed-credentials")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) enphase-monitor")
 
 	resp, err := client.Do(req)
 	if err != nil {

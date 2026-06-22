@@ -185,9 +185,8 @@ func ListCacheEntries() ([]Entry, error) {
 			continue
 		}
 
-		// Skip metadata files like last_request.json and the sliding-window
-		// API-call log used by the API Budget counter.
-		if entry.Name() == "last_request.json" || entry.Name() == "last_request" || entry.Name() == apiCallsFilename {
+		// Skip metadata files and the per-credential quota ledger.
+		if entry.Name() == "last_request.json" || entry.Name() == "last_request" || entry.Name() == "monthly-quota.json" || entry.Name() == "quota.json" {
 			continue
 		}
 

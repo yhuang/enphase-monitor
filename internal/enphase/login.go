@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"enphase-monitor/internal/browser"
+
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/storage"
 	"github.com/chromedp/chromedp"
@@ -34,17 +36,17 @@ func LoginAndGetCookie(ctx context.Context, baseURL string, notify func(string))
 		return "", err
 	}
 
-	// Headed Chrome (override the default headless flag) with a throwaway profile.
-	opts := append(chromedp.DefaultExecAllocatorOptions[:], chromedp.Flag("headless", false))
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, opts...)
-	defer cancelAlloc()
-	browserCtx, cancelBrowser := chromedp.NewContext(allocCtx)
+	// Headed Chrome with a throwaway profile and an explicit binary path on macOS.
+	browserCtx, cancelBrowser, err := browser.LaunchHeaded(ctx)
+	if err != nil {
+		return "", err
+	}
 	defer cancelBrowser()
 
 	report(notify, "Opening Chrome — log in to Enphase (including any 2FA). I'll continue automatically once you're signed in…")
 
-	if err := chromedp.Run(browserCtx, network.Enable(), chromedp.Navigate(baseURL+"/admin/applications")); err != nil {
-		return "", fmt.Errorf("failed to open Chrome (is Google Chrome installed?): %w", err)
+	if err := chromedp.Run(browserCtx, chromedp.Navigate(baseURL+"/admin/applications")); err != nil {
+		return "", fmt.Errorf("failed to open portal applications page: %w", err)
 	}
 
 	// Poll the browser's cookies until the portal session cookie appears, which

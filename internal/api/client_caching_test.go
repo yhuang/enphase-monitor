@@ -220,9 +220,11 @@ func TestMakeCachedAPIRequest_NoCache_503_NoCache_Error(t *testing.T) {
 
 // --- Normal mode fallbacks ----------------------------------------------------
 
-// TestMakeCachedAPIRequest_429_FallsBackToExistingCache: a current-period query
-// that 429s falls back to the fresh cache populated by the prior call.
-func TestMakeCachedAPIRequest_429_FallsBackToExistingCache(t *testing.T) {
+// TestMakeCachedAPIRequest_429_PropagatesError: a current-period query that 429s
+// surfaces a rate-limit error even when a fresh cache exists — the live path no
+// longer serves stale cache on error, so the aggregator can fail over to a spare
+// credential instead.
+func TestMakeCachedAPIRequest_429_PropagatesError(t *testing.T) {
 	cache.ResetState()
 	defer cache.ResetState()
 
@@ -235,18 +237,14 @@ func TestMakeCachedAPIRequest_429_FallsBackToExistingCache(t *testing.T) {
 	}
 
 	srv.setStatus(http.StatusTooManyRequests)
-	got, err := fetchToday(client)
-	if err != nil {
-		t.Fatalf("429 with cache: unexpected error: %v", err)
-	}
-	if got != prodOKValueKWh {
-		t.Errorf("429 with cache: got %v kWh, want %v", got, prodOKValueKWh)
+	if _, err := fetchToday(client); err == nil || !constants.IsRateLimitError(err) {
+		t.Errorf("429 with cache present: error = %v, want rate-limit error", err)
 	}
 }
 
-// TestMakeCachedAPIRequest_503_FallsBackToExistingCache: a current-period query
-// that 503s falls back to the fresh cache.
-func TestMakeCachedAPIRequest_503_FallsBackToExistingCache(t *testing.T) {
+// TestMakeCachedAPIRequest_503_PropagatesError: a current-period query that 503s
+// surfaces an error even when a fresh cache exists (no stale-cache fallback).
+func TestMakeCachedAPIRequest_503_PropagatesError(t *testing.T) {
 	cache.ResetState()
 	defer cache.ResetState()
 
@@ -259,12 +257,8 @@ func TestMakeCachedAPIRequest_503_FallsBackToExistingCache(t *testing.T) {
 	}
 
 	srv.setStatus(http.StatusServiceUnavailable)
-	got, err := fetchToday(client)
-	if err != nil {
-		t.Fatalf("503 with cache: unexpected error: %v", err)
-	}
-	if got != prodOKValueKWh {
-		t.Errorf("503 with cache: got %v kWh, want %v", got, prodOKValueKWh)
+	if _, err := fetchToday(client); err == nil || !strings.Contains(err.Error(), "503") {
+		t.Errorf("503 with cache present: error = %v, want it to mention 503", err)
 	}
 }
 
@@ -288,9 +282,10 @@ func TestMakeCachedAPIRequest_503_NoCache_Error(t *testing.T) {
 	}
 }
 
-// TestMakeCachedAPIRequest_NetworkError_FallsBackToCache: when the live call
-// fails at the transport level (server closed), a fresh cache is served.
-func TestMakeCachedAPIRequest_NetworkError_FallsBackToCache(t *testing.T) {
+// TestMakeCachedAPIRequest_NetworkError_PropagatesError: when the live call fails
+// at the transport level (server closed), the error propagates even with a fresh
+// cache present — the live path no longer masks failures with stale cache.
+func TestMakeCachedAPIRequest_NetworkError_PropagatesError(t *testing.T) {
 	cache.ResetState()
 	defer cache.ResetState()
 
@@ -303,11 +298,7 @@ func TestMakeCachedAPIRequest_NetworkError_FallsBackToCache(t *testing.T) {
 
 	// Close the server so the next request fails at the transport level.
 	srv.Close()
-	got, err := fetchToday(client)
-	if err != nil {
-		t.Fatalf("network error with cache: unexpected error: %v", err)
-	}
-	if got != prodOKValueKWh {
-		t.Errorf("network error with cache: got %v kWh, want %v", got, prodOKValueKWh)
+	if _, err := fetchToday(client); err == nil {
+		t.Error("network error with cache present: want error, got nil")
 	}
 }

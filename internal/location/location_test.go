@@ -69,7 +69,7 @@ func newTestResolver(t *testing.T) (*Resolver, *int) {
 func TestSystemLocations_FetchAndGeocode(t *testing.T) {
 	r, hits := newTestResolver(t)
 
-	locs, err := r.SystemLocations(context.Background(), "test-key", "test-token")
+	locs, err := r.SystemLocations(context.Background(), "test-key", "test-token", nil, "")
 	if err != nil {
 		t.Fatalf("SystemLocations: %v", err)
 	}
@@ -97,11 +97,11 @@ func TestSystemLocations_FetchAndGeocode(t *testing.T) {
 func TestSystemLocations_WarmCacheSkipsNetwork(t *testing.T) {
 	r, hits := newTestResolver(t)
 
-	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token"); err != nil {
+	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token", nil, ""); err != nil {
 		t.Fatalf("first SystemLocations: %v", err)
 	}
 	// Second call should be served entirely from the disk cache.
-	locs, err := r.SystemLocations(context.Background(), "test-key", "test-token")
+	locs, err := r.SystemLocations(context.Background(), "test-key", "test-token", nil, "")
 	if err != nil {
 		t.Fatalf("second SystemLocations: %v", err)
 	}
@@ -117,10 +117,10 @@ func TestSystemLocations_ExpiredCacheRefetches(t *testing.T) {
 	r, hits := newTestResolver(t)
 	r.CacheTTL = -time.Second // force every cached entry to be considered stale
 
-	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token"); err != nil {
+	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token", nil, ""); err != nil {
 		t.Fatalf("first SystemLocations: %v", err)
 	}
-	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token"); err != nil {
+	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token", nil, ""); err != nil {
 		t.Fatalf("second SystemLocations: %v", err)
 	}
 	if *hits != 2 {
@@ -140,7 +140,7 @@ func TestCachedPrimaryCoordinates_HitAfterResolve(t *testing.T) {
 	r, _ := newTestResolver(t)
 
 	// Resolve once (populates the cache via the /systems fetch).
-	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token"); err != nil {
+	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token", nil, ""); err != nil {
 		t.Fatalf("SystemLocations: %v", err)
 	}
 	// The report path reads cache-only, with no network access.
@@ -157,18 +157,18 @@ func TestRefreshSystemLocations_BypassesCache(t *testing.T) {
 	r, hits := newTestResolver(t)
 
 	// Warm the cache.
-	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token"); err != nil {
+	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token", nil, ""); err != nil {
 		t.Fatalf("SystemLocations: %v", err)
 	}
 	// A normal call is served from cache (no second hit)...
-	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token"); err != nil {
+	if _, err := r.SystemLocations(context.Background(), "test-key", "test-token", nil, ""); err != nil {
 		t.Fatalf("cached SystemLocations: %v", err)
 	}
 	if *hits != 1 {
 		t.Fatalf("server hit %d times, want 1 before refresh", *hits)
 	}
 	// ...but a forced refresh ignores the cache and refetches.
-	if _, err := r.RefreshSystemLocations(context.Background(), "test-key", "test-token"); err != nil {
+	if _, err := r.RefreshSystemLocations(context.Background(), "test-key", "test-token", nil, ""); err != nil {
 		t.Fatalf("RefreshSystemLocations: %v", err)
 	}
 	if *hits != 2 {
@@ -189,7 +189,7 @@ func TestSystemLocations_HTTPError(t *testing.T) {
 		HTTPClient: server.Client(),
 		Geocode:    stubGeocoder,
 	}
-	if _, err := r.SystemLocations(context.Background(), "k", "t"); err == nil {
+	if _, err := r.SystemLocations(context.Background(), "k", "t", nil, ""); err == nil {
 		t.Fatal("expected error on 401, got nil")
 	}
 }

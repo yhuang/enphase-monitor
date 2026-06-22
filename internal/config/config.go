@@ -21,7 +21,7 @@
 //     - Credentials (credentials:): a list of one or more credential sets, each
 //     with a unique name plus OAuth fields (key, client_id, client_secret),
 //     OAuth settings (authorization_url, redirect_uri), and the refresh_token
-//     (obtained from --update-refresh-token). The app rotates across the pool to spread
+//     (obtained from --update-refresh-tokens). The app rotates across the pool to spread
 //     the per-key rate limit and to fail over when a key is throttled.
 //
 //  2. config.yaml — non-secret settings, loaded by LoadConfig():

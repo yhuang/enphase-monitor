@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"enphase-monitor/internal/api"
 	"enphase-monitor/internal/cache"
 	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/geocode"
@@ -90,21 +91,21 @@ func NewResolver() *Resolver {
 // SystemLocations returns the location of every configured Enphase system,
 // serving a fresh disk cache when available and otherwise fetching /systems
 // once and geocoding each postal code.
-func (r *Resolver) SystemLocations(ctx context.Context, apiKey, accessToken string) ([]SystemLocation, error) {
+func (r *Resolver) SystemLocations(ctx context.Context, apiKey, accessToken string, budget api.BudgetTracker, credentialName string) ([]SystemLocation, error) {
 	if cached, ok := r.loadCache(); ok {
 		return cached, nil
 	}
-	return r.resolve(ctx, apiKey, accessToken)
+	return r.resolve(ctx, apiKey, accessToken, budget, credentialName)
 }
 
 // RefreshSystemLocations always fetches /systems and re-geocodes, ignoring any
 // cached value, then overwrites the cache. Used by a forced --init.
-func (r *Resolver) RefreshSystemLocations(ctx context.Context, apiKey, accessToken string) ([]SystemLocation, error) {
-	return r.resolve(ctx, apiKey, accessToken)
+func (r *Resolver) RefreshSystemLocations(ctx context.Context, apiKey, accessToken string, budget api.BudgetTracker, credentialName string) ([]SystemLocation, error) {
+	return r.resolve(ctx, apiKey, accessToken, budget, credentialName)
 }
 
 // resolve fetches /systems, geocodes each postal code, and caches the result.
-func (r *Resolver) resolve(ctx context.Context, apiKey, accessToken string) ([]SystemLocation, error) {
+func (r *Resolver) resolve(ctx context.Context, apiKey, accessToken string, budget api.BudgetTracker, credentialName string) ([]SystemLocation, error) {
 	locs, err := r.fetchSystems(ctx, apiKey, accessToken)
 	if err != nil {
 		return nil, err
@@ -112,7 +113,9 @@ func (r *Resolver) resolve(ctx context.Context, apiKey, accessToken string) ([]S
 	// The /systems fetch is a single live Enphase call; record it so the API
 	// budget accounting stays accurate. Geocoding hits a separate service and
 	// is not part of the Enphase budget.
-	cache.RecordAPICall()
+	if budget != nil && credentialName != "" {
+		budget.RecordAPICall(credentialName)
+	}
 
 	if err := r.resolveCoordinates(ctx, locs); err != nil {
 		return nil, err

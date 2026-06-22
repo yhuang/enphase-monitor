@@ -15,9 +15,27 @@ import (
 
 	"enphase-monitor/internal/cache"
 	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/credentials"
+	"enphase-monitor/internal/types"
 )
 
-// uniqueSysID returns a system ID that is unique within this process run,
+// testPool returns a single-credential pool for budget tests.
+func testPool(t *testing.T) (*credentials.Pool, string) {
+	t.Helper()
+	p := credentials.NewPool([]*types.APIConfig{{Name: "test", Key: "k", ClientID: "c", ClientSecret: "s"}})
+	dir := t.TempDir()
+	t.Setenv("ENPHASE_CACHE_DIR", dir)
+	return p, "test"
+}
+
+// exhaustBudget records fake API calls until the credential's minute budget reaches zero.
+func exhaustBudget(t *testing.T, p *credentials.Pool, name string) {
+	t.Helper()
+	for p.RemainingMinuteBudget(name) > 0 {
+		p.RecordAPICall(name)
+	}
+}
+
 // preventing on-disk cache entries from a prior test execution from matching
 // the URLs constructed by this test (httptest reuses ports across runs).
 // Each call returns a different value even within the same test.
@@ -25,14 +43,16 @@ func uniqueSysID(tag string) string {
 	return fmt.Sprintf("%s_%d", tag, time.Now().UnixNano())
 }
 
-// exhaustBudget records fake API calls until RemainingBudget() reaches zero.
-func exhaustBudget() {
-	for cache.RemainingBudget() > 0 {
-		cache.RecordAPICall()
-	}
+// budgetClient returns a client wired to a fresh per-credential budget pool.
+func budgetClient(t *testing.T, srvURL, sysID string) (*EnlightenCloudClient, *credentials.Pool, string) {
+	t.Helper()
+	p, name := testPool(t)
+	tz := mustLoadLocation(t, "US/Pacific")
+	client := NewEnlightenCloudClientWithBaseURL(srvURL, sysID, "key", "token", tz).WithBudget(p, name)
+	return client, p, name
 }
 
-// intervalProductionServer returns a mock HTTP server that responds only to
+// uniqueSysID returns a system ID that is unique within this process run,
 // requests whose path contains "production_meter". It counts how many times it
 // was actually hit via the returned atomic counter.
 func intervalProductionServer(t *testing.T) (*httptest.Server, *atomic.Int32) {
@@ -92,8 +112,7 @@ func TestBudgetExhausted_CurrentDate(t *testing.T) {
 	defer cache.ResetState()
 
 	srv, hits := intervalProductionServer(t)
-	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("cur"), "key", "token", tz)
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("cur"))
 
 	ctx := context.Background()
 
@@ -106,7 +125,7 @@ func TestBudgetExhausted_CurrentDate(t *testing.T) {
 		t.Fatalf("prime: expected 1 server hit, got %d", hits.Load())
 	}
 
-	exhaustBudget()
+	exhaustBudget(t, p, credName)
 
 	// Probe: must use cache, not hit the server again.
 	_, err = client.GetProductionForDate(ctx, time.Time{}, constants.QueryModeDay)
@@ -126,8 +145,8 @@ func TestBudgetExhausted_SpecificDate(t *testing.T) {
 	defer cache.ResetState()
 
 	srv, hits := intervalProductionServer(t)
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("past"))
 	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("past"), "key", "token", tz)
 
 	// A day that is reliably in the past.
 	pastDay := time.Now().In(tz).AddDate(0, 0, -3)
@@ -142,7 +161,7 @@ func TestBudgetExhausted_SpecificDate(t *testing.T) {
 		t.Fatalf("prime: expected 1 server hit, got %d", hits.Load())
 	}
 
-	exhaustBudget()
+	exhaustBudget(t, p, credName)
 
 	// Probe: Past Period + cache exists → short-circuits to immutable cache,
 	// never reaches the budget check.
@@ -162,8 +181,8 @@ func TestBudgetExhausted_MonthToDate(t *testing.T) {
 	defer cache.ResetState()
 
 	srv, hits := lifetimeProductionServer(t)
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("mtd"))
 	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("mtd"), "key", "token", tz)
 
 	// Any date within the current month works; use today.
 	ctx := context.Background()
@@ -176,7 +195,7 @@ func TestBudgetExhausted_MonthToDate(t *testing.T) {
 		t.Fatalf("prime: expected 1 server hit, got %d", hits.Load())
 	}
 
-	exhaustBudget()
+	exhaustBudget(t, p, credName)
 
 	_, err = client.GetProductionForDate(ctx, time.Now().In(tz), constants.QueryModeMonth)
 	if err != nil {
@@ -194,8 +213,8 @@ func TestBudgetExhausted_SpecificMonth(t *testing.T) {
 	defer cache.ResetState()
 
 	srv, hits := lifetimeProductionServer(t)
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("smon"))
 	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("smon"), "key", "token", tz)
 
 	pastMonth := time.Now().In(tz).AddDate(0, -2, 0)
 	ctx := context.Background()
@@ -208,7 +227,7 @@ func TestBudgetExhausted_SpecificMonth(t *testing.T) {
 		t.Fatalf("prime: expected 1 server hit, got %d", hits.Load())
 	}
 
-	exhaustBudget()
+	exhaustBudget(t, p, credName)
 
 	_, err = client.GetProductionForDate(ctx, pastMonth, constants.QueryModeMonth)
 	if err != nil {
@@ -226,8 +245,8 @@ func TestBudgetExhausted_YearToDate(t *testing.T) {
 	defer cache.ResetState()
 
 	srv, hits := lifetimeProductionServer(t)
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("ytd"))
 	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("ytd"), "key", "token", tz)
 
 	ctx := context.Background()
 
@@ -239,7 +258,7 @@ func TestBudgetExhausted_YearToDate(t *testing.T) {
 		t.Fatalf("prime: expected 1 server hit, got %d", hits.Load())
 	}
 
-	exhaustBudget()
+	exhaustBudget(t, p, credName)
 
 	_, err = client.GetProductionForDate(ctx, time.Now().In(tz), constants.QueryModeYear)
 	if err != nil {
@@ -257,8 +276,8 @@ func TestBudgetExhausted_SpecificYear(t *testing.T) {
 	defer cache.ResetState()
 
 	srv, hits := lifetimeProductionServer(t)
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("syr"))
 	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("syr"), "key", "token", tz)
 
 	pastYear := time.Now().In(tz).AddDate(-2, 0, 0)
 	ctx := context.Background()
@@ -271,7 +290,7 @@ func TestBudgetExhausted_SpecificYear(t *testing.T) {
 		t.Fatalf("prime: expected 1 server hit, got %d", hits.Load())
 	}
 
-	exhaustBudget()
+	exhaustBudget(t, p, credName)
 
 	_, err = client.GetProductionForDate(ctx, pastYear, constants.QueryModeYear)
 	if err != nil {
@@ -291,8 +310,8 @@ func TestBudgetExhausted_CurrentTrueUp(t *testing.T) {
 	defer cache.ResetState()
 
 	srv, hits := lifetimeProductionServer(t)
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("ctu"))
 	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("ctu"), "key", "token", tz)
 
 	// A true-up that started 6 months ago is still active (end = 6 months from now).
 	activeTrueUpStart := time.Now().In(tz).AddDate(0, -6, 0)
@@ -306,7 +325,7 @@ func TestBudgetExhausted_CurrentTrueUp(t *testing.T) {
 		t.Fatalf("prime: expected 1 server hit, got %d", hits.Load())
 	}
 
-	exhaustBudget()
+	exhaustBudget(t, p, credName)
 
 	_, err = client.GetProductionForDate(ctx, activeTrueUpStart, constants.QueryModeTrueUp)
 	if err != nil {
@@ -326,8 +345,8 @@ func TestBudgetExhausted_PastTrueUp(t *testing.T) {
 	defer cache.ResetState()
 
 	srv, hits := lifetimeProductionServer(t)
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("ptu"))
 	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("ptu"), "key", "token", tz)
 
 	// A true-up that started 2 years ago ended 1 year ago → it is in the past.
 	pastTrueUpStart := time.Now().In(tz).AddDate(-2, 0, 0)
@@ -341,7 +360,7 @@ func TestBudgetExhausted_PastTrueUp(t *testing.T) {
 		t.Fatalf("prime: expected 1 server hit, got %d", hits.Load())
 	}
 
-	exhaustBudget()
+	exhaustBudget(t, p, credName)
 
 	_, err = client.GetProductionForDate(ctx, pastTrueUpStart, constants.QueryModeTrueUp)
 	if err != nil {
@@ -360,11 +379,10 @@ func TestBudgetExhausted_NoCache_ReturnsRateLimitError(t *testing.T) {
 	defer cache.ResetState()
 
 	srv, hits := intervalProductionServer(t)
-	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("nc"), "key", "token", tz)
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("nc"))
 
 	// Exhaust budget BEFORE any priming call so the cache is empty.
-	exhaustBudget()
+	exhaustBudget(t, p, credName)
 
 	ctx := context.Background()
 	_, err := client.GetProductionForDate(ctx, time.Time{}, constants.QueryModeDay)
@@ -411,8 +429,7 @@ func TestPreflightWarning_CurrentPeriod(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("warn"), "key", "token", tz)
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("warn"))
 	ctx := context.Background()
 
 	// Prime: populates cache for all five endpoints.
@@ -422,8 +439,8 @@ func TestPreflightWarning_CurrentPeriod(t *testing.T) {
 	}
 
 	// Leave exactly 1 call in the budget (< 5 needed for QueryModeDay+battery).
-	for cache.RemainingBudget() > 1 {
-		cache.RecordAPICall()
+	for p.RemainingMinuteBudget(credName) > 1 {
+		p.RecordAPICall(credName)
 	}
 
 	// Probe: preflight should warn because remaining (1) < needed (5).
@@ -463,8 +480,8 @@ func TestPreflightWarning_PastPeriod(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	client, p, credName := budgetClient(t, srv.URL, uniqueSysID("pwrn"))
 	tz := mustLoadLocation(t, "US/Pacific")
-	client := NewEnlightenCloudClientWithBaseURL(srv.URL, uniqueSysID("pwrn"), "key", "token", tz)
 	pastDay := time.Now().In(tz).AddDate(0, 0, -3)
 	ctx := context.Background()
 
@@ -475,7 +492,7 @@ func TestPreflightWarning_PastPeriod(t *testing.T) {
 	}
 
 	// Exhaust budget completely.
-	exhaustBudget()
+	exhaustBudget(t, p, credName)
 
 	// Probe: Past Period → no preflight warning expected.
 	output := captureStderr(func() {

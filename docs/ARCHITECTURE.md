@@ -186,7 +186,7 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │     └─► cli.ParseFlags() from internal/cli                          │
 │     └─► Handle cache commands (internal/cli) or continue            │
 │     └─► Build credentials.Pool from cfg.Credentials                 │
-│     └─► If --update-refresh-token: select credential (positional name),       │
+│     └─► If --update-refresh-tokens: select credential (positional name),       │
 │         signal context, oauth.Authorize(ctx, cred); Ctrl+C cancels it │
 └─────────────────────────────────────────────────────────────────────┘
                                     │

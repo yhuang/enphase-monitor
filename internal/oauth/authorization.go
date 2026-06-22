@@ -61,7 +61,7 @@ var openBrowser = func(url string) error {
 // Authorize runs the one-time OAuth authorization flow for a single credential
 // set and returns the obtained refresh token. ctx is used for cancellation
 // (e.g. Ctrl+C during token exchange). The caller selects which credential to
-// authorize (--update-refresh-token <name>) and is responsible for persisting
+// authorize (--update-refresh-tokens <name>) and is responsible for persisting
 // the returned token (config.UpdateRefreshToken).
 func Authorize(ctx context.Context, api *types.APIConfig) (string, error) {
 	if api == nil {

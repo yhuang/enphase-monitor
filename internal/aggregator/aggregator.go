@@ -45,11 +45,13 @@ var _ CloudClient = (*api.EnlightenCloudClient)(nil)
 
 // CloudClientFactory is a function type for creating cloud clients.
 // This allows dependency injection for testing purposes.
-type CloudClientFactory func(systemID, systemName, apiKey, accessToken string, timezone *time.Location) CloudClient
+type CloudClientFactory func(systemID, systemName, apiKey, accessToken, credName string, timezone *time.Location, budget api.BudgetTracker) CloudClient
 
 // defaultCloudClientFactory creates the default production cloud client.
-func defaultCloudClientFactory(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
-	return api.NewEnlightenCloudClient(systemID, apiKey, accessToken, tz).WithSystemName(systemName)
+func defaultCloudClientFactory(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) CloudClient {
+	return api.NewEnlightenCloudClient(systemID, apiKey, accessToken, tz).
+		WithSystemName(systemName).
+		WithBudget(budget, credName)
 }
 
 // DataAggregator handles combining data from multiple systems.
@@ -95,6 +97,10 @@ func (a *DataAggregator) GetAggregatedMetrics(
 	queryMode constants.QueryMode,
 	reportTimezone *time.Location,
 ) (*AggregatedMetrics, error) {
+	if pool != nil && pool.AllMonthlyExhausted() {
+		return nil, fmt.Errorf("%s (%s)", constants.PoolMonthlyQuotaExhaustedError, pool.QuotaSummary())
+	}
+
 	metrics := &AggregatedMetrics{
 		Timestamp: time.Now(),
 		QueryDate: testDate,
@@ -146,7 +152,7 @@ func (a *DataAggregator) GetAggregatedMetrics(
 				return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, sys.Name, err)
 			}
 
-			cloudClient := a.createCloudClient(sys.ID, sys.Name, cred.Key, accessToken, reportTimezone)
+			cloudClient := a.createCloudClient(sys.ID, sys.Name, cred.Key, accessToken, cred.Name, reportTimezone, pool)
 
 			lm, cu, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryMode)
 			if err != nil && constants.IsRateLimitError(err) {
