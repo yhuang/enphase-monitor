@@ -10,7 +10,6 @@
 // 1. State Management Tests
 //   - Test SetValidationMode/ValidationMode
 //   - Test SetCacheDisabled/CacheDisabled
-//   - Test SetBudgetWarningShown/BudgetWarningShown
 //   - Test ResetState clears all flags
 //
 // TESTING APPROACH
@@ -83,7 +82,6 @@ func TestResetState(t *testing.T) {
 	// We set all flags to true (the non-default value)
 	SetValidationMode(true)
 	SetCacheDisabled(true)
-	SetBudgetWarningShown(true)
 
 	// STEP 2: Sanity check - verify our setters worked
 	// This catches bugs where setters silently fail
@@ -92,9 +90,6 @@ func TestResetState(t *testing.T) {
 	}
 	if !CacheDisabled() {
 		t.Error("CacheDisabled should be true before reset")
-	}
-	if !BudgetWarningShown() {
-		t.Error("BudgetWarningShown should be true before reset")
 	}
 
 	// STEP 3: Call the function under test
@@ -107,9 +102,6 @@ func TestResetState(t *testing.T) {
 	}
 	if CacheDisabled() {
 		t.Error("CacheDisabled should be false after reset")
-	}
-	if BudgetWarningShown() {
-		t.Error("BudgetWarningShown should be false after reset")
 	}
 }
 
@@ -184,27 +176,5 @@ func TestCacheDisabledGetterSetter(t *testing.T) {
 	SetCacheDisabled(false)
 	if CacheDisabled() {
 		t.Error("CacheDisabled should be false after SetCacheDisabled(false)")
-	}
-}
-
-// TestBudgetWarningShownGetterSetter verifies BudgetWarningShown getter and setter.
-func TestBudgetWarningShownGetterSetter(t *testing.T) {
-	ResetState()
-
-	// Initial state should be false
-	if BudgetWarningShown() {
-		t.Error("BudgetWarningShown should be false initially")
-	}
-
-	// Set to true
-	SetBudgetWarningShown(true)
-	if !BudgetWarningShown() {
-		t.Error("BudgetWarningShown should be true after SetBudgetWarningShown(true)")
-	}
-
-	// Set back to false
-	SetBudgetWarningShown(false)
-	if BudgetWarningShown() {
-		t.Error("BudgetWarningShown should be false after SetBudgetWarningShown(false)")
 	}
 }

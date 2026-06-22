@@ -61,11 +61,11 @@ func RunBackfill(ctx context.Context, rc RunConfig, fromDate time.Time, force bo
 			end.Format(constants.DateFormat))
 	}
 
-	// Backfill is authoritative: always hit the live API, never the cache. Disable
-	// the cache fallback too, so a 429 propagates and the credential pool fails
-	// over to a spare key instead of silently serving (and persisting) stale cache.
+	// Backfill is authoritative: always hit the live API, never the cache. The
+	// no-cache path never serves stale cache on error (it propagates 429/503/
+	// network errors), so the pool fails over on a 429 and a genuine failure fails
+	// the day rather than persisting non-authoritative data.
 	cache.SetCacheDisabled(true)
-	cache.SetCacheFallbackDisabled(true)
 
 	// On a terminal, progress for written/skipped days redraws on a single line
 	// (carriage return + clear-to-end-of-line) so a long range scrolls in place.
@@ -163,9 +163,19 @@ func isTerminal(f *os.File) bool {
 // lets a plain re-run retry the day. Contrast with a live --date report, where
 // weather enrichment is purely best-effort.
 func backfillDay(ctx context.Context, rc RunConfig, day time.Time) error {
-	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, GetSystems(rc.Cfg), rc.Pool, day, constants.QueryModeDay, rc.ReportTZ)
+	systems := GetSystems(rc.Cfg)
+	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, systems, rc.Pool, day, constants.QueryModeDay, rc.ReportTZ)
 	if err != nil {
 		return err
+	}
+
+	// Integrity guard: a history record must cover every system. The aggregator
+	// skips a system whose fetch failed (e.g. a network blip) and returns a
+	// partial result without erroring; for an authoritative backfill that must be
+	// a hard failure so the day is retried, not written incomplete.
+	if len(metrics.Systems) != len(systems) {
+		return fmt.Errorf("incomplete day: %d of %d systems returned data (a fetch failed); re-run to retry",
+			len(metrics.Systems), len(systems))
 	}
 
 	enrichWithTemperature(ctx, rc, metrics)
