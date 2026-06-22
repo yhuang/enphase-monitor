@@ -43,9 +43,9 @@ const allowAccessSelector = `//input[@value='Allow Access'] | //button[contains(
 // call GetCode sequentially. Chrome launches lazily on first use and is torn down
 // by Close.
 type BrowserAuthorizer struct {
-	parent    context.Context
-	ctx       context.Context
-	cancel    func()
+	parent      context.Context
+	ctx         context.Context
+	cancel      func()
 	redirectURI string
 	codeCh      chan string
 	errCh       chan error

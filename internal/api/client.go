@@ -127,30 +127,32 @@
 // RATE LIMITING & API BUDGET
 // --------------------------
 // The Enphase Cloud API v4 enforces a per-API-key budget of
-// cache.MaxRequestsPerWindow requests per cache.MinRequestInterval (10 / 60s).
-// This client relies on internal/cache for caching responses and on a
-// sliding-window counter to stay under the limit:
+// constants.APIBudgetPerMinute requests per minute (10 / 60s) and
+// constants.MaxRequestsPerMonth per calendar month (1000). This client relies on
+// internal/cache for caching responses and on the credential pool's per-key
+// budget tracker to stay under the limits:
 //  1. Past Period serving: Past Period responses are always served from cache
 //     without consuming any API Budget — the data is immutable so a live call
 //     would return identical results. Detected via cacheMaxAge returning 0.
 //     Current Period queries (today / MTD / YTD / Current Period True-Up) are
 //     live-first: a real API call is made whenever budget allows, because data
-//     changes throughout the day. Cache is the fallback only when budget is
-//     exhausted.
+//     changes throughout the day. Cache is the fallback only when the
+//     credential's per-minute budget is already exhausted (serveBudgetExhausted).
 //  2. Per-credential sliding window: the credentials.Pool tracks live calls per
 //     API key. BudgetTracker.RemainingMinuteBudget() reports how many requests
 //     are still available for this credential in the current window. When budget
-//     is exhausted the client tries an exact-URL cache (any age) then a cross-
+//     is exhausted the client serves an exact-URL cache (any age), then a cross-
 //     endpoint match (same endpoint + system, any date) instead of a live call.
-//  3. 429/503 fallback: when the API responds with a rate-limit or
-//     service-unavailable status, cached responses are served as a best-
-//     effort fallback regardless of age.
+//  3. Errors propagate: on a transport error, 429, or 503 from a live call, the
+//     client returns the error — it never serves stale cache on failure. A 429
+//     reaches the aggregator, which fails over to a spare credential; Backfill
+//     Mode fails the day so it is retried rather than written from stale data.
 //
 // ERROR HANDLING
 // --------------
 // - 401 Unauthorized: Invalid or expired access token (oauth.go handles refresh)
-// - 429 Too Many Requests: Rate limit exceeded (internal/cache handles caching)
-// - 500 Server Error: Returned to caller (cache fallback if available)
+// - 429 Too Many Requests: Rate limit exceeded — returned so the pool fails over
+// - 500 Server Error: Returned to caller
 // - Network errors: Returned to caller for handling
 package api
 
@@ -821,15 +823,6 @@ func (f cacheFallback) serve() (*http.Response, bool, error) {
 	return f.cached.ToHTTPResponse(), true, nil
 }
 
-// reload re-reads the cache from disk for this URL, covering the case where the
-// initial load missed but an entry exists now. Returns (entry, true) on a hit.
-func (f cacheFallback) reload() (*cache.CachedResponse, bool) {
-	if retry, err := cache.LoadCachedResponse(f.url, f.c.timezone); err == nil {
-		return retry, true
-	}
-	return nil, false
-}
-
 // crossDate returns the most recent cache entry for the same endpoint+system as
 // this URL, regardless of date or age — the last-resort fallback when no
 // exact-URL cache exists. Returns (resp, true) on a hit.
@@ -935,9 +928,13 @@ func (c *EnlightenCloudClient) serveBudgetExhausted(fb cacheFallback) (*http.Res
 	return nil, false, errors.New(constants.RateLimitError)
 }
 
-// requestLiveMode handles the normal current-period path: make a live call with
-// budget available, falling back to cache on transport errors, 429, 503, and
-// other non-OK statuses. On success the response is cached and returned fresh.
+// requestLiveMode handles the normal current-period path: make a live call when
+// budget is available. Errors (transport, 429, 503, other non-OK) are propagated
+// rather than masked by serving stale cache — a 429 must reach the aggregator so
+// it can fail over to a spare credential, and surfacing an outage beats returning
+// stale data as if it were fresh. Proactive cache serving when a credential's
+// minute budget is spent is handled earlier by serveBudgetExhausted, before any
+// live call. On success the response is cached and returned fresh.
 func (c *EnlightenCloudClient) requestLiveMode(ctx context.Context, fb cacheFallback) (*http.Response, bool, error) {
 	remaining := c.budgetTracker().RemainingMinuteBudget(c.credentialName)
 	cache.Debugf("live API call (budget %d/%d): %s", remaining, constants.APIBudgetPerMinute, cache.RedactURLKey(fb.url))
@@ -948,61 +945,27 @@ func (c *EnlightenCloudClient) requestLiveMode(ctx context.Context, fb cacheFall
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		if !fb.has() {
-			return nil, false, fmt.Errorf("API request failed: %w", err)
-		}
-		return fb.serve() // Cache was used (error fallback)
+		return nil, false, fmt.Errorf("API request failed: %w", err)
 	}
 
-	// Handle rate limit (429): serve existing cache, then a reload, then any
-	// same-endpoint cache, before giving up with a rate-limit error.
 	if resp.StatusCode == http.StatusTooManyRequests {
 		resp.Body.Close()
 		cache.Debugf("server returned 429: %s", cache.RedactURLKey(fb.url))
-		if fb.has() {
-			cache.Debugf("429 fallback: serving existing cache (age %s)", time.Since(fb.cached.CachedAt).Round(time.Second))
-			return fb.serve() // Cache was used (429 fallback)
-		}
-		if retry, ok := fb.reload(); ok {
-			cache.Debugf("429 fallback: serving reloaded cache (age %s)", time.Since(retry.CachedAt).Round(time.Second))
-			return retry.ToHTTPResponse(), true, nil // Cache was used (429 retry)
-		}
-		if recent, ok := fb.crossDate(); ok {
-			cache.Debugf("429 fallback: serving cross-date cache (any age)")
-			return recent, true, nil // Cache was used (429 cross-date fallback)
-		}
-		cache.Debugf("429 fallback: no cache available — returning RateLimitError")
 		return nil, false, errors.New(constants.RateLimitError)
 	}
-
-	// Handle 503 Service Unavailable - Enphase server temporarily down, use cache if available (even stale)
 	if resp.StatusCode == http.StatusServiceUnavailable {
 		resp.Body.Close()
-		if fb.has() {
-			return fb.serve() // Cache was used (503 fallback)
-		}
-		if retry, ok := fb.reload(); ok {
-			return retry.ToHTTPResponse(), true, nil // Cache was used (503 retry)
-		}
 		return nil, false, errServiceUnavailable
 	}
 	c.budgetTracker().RecordAPICall(c.credentialName)
 	remaining = c.budgetTracker().RemainingMinuteBudget(c.credentialName)
 	cache.Debugf("live API call succeeded (budget now %d/%d)", remaining, constants.APIBudgetPerMinute)
 
-	// Handle other non-OK status codes: serve cache as a best-effort fallback
-	// when available, otherwise surface the error. Age is not gated here —
-	// when the API itself is failing, any cache we have is better than
-	// nothing, and the per-query-mode freshness policy was already applied
-	// before we attempted the live call.
 	if resp.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
 			return nil, false, fmt.Errorf("API request failed with status %d: failed to read body: %w", resp.StatusCode, err)
-		}
-		if fb.has() {
-			return fb.serve()
 		}
 		return nil, false, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}

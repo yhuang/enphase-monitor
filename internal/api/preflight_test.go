@@ -35,6 +35,7 @@ func exhaustBudget(t *testing.T, p *credentials.Pool, name string) {
 		p.RecordAPICall(name)
 	}
 }
+
 // preventing on-disk cache entries from a prior test execution from matching
 // the URLs constructed by this test (httptest reuses ports across runs).
 // Each call returns a different value even within the same test.

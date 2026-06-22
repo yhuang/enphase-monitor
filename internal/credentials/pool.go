@@ -28,12 +28,12 @@ import (
 
 // Pool holds an ordered set of credential sets plus cooldown and quota state.
 type Pool struct {
-	creds              []*types.APIConfig
-	cooldownUntil      map[string]time.Time // keyed by credential name
-	now                func() time.Time     // injectable clock for tests
-	rotation           int                  // round-robin base offset; advanced by Rotate
-	quota              quotaFile
-	quotaFileOverride  string // non-empty in tests
+	creds             []*types.APIConfig
+	cooldownUntil     map[string]time.Time // keyed by credential name
+	now               func() time.Time     // injectable clock for tests
+	rotation          int                  // round-robin base offset; advanced by Rotate
+	quota             quotaFile
+	quotaFileOverride string // non-empty in tests
 }
 
 // NewPool creates a pool over the given credential sets, in order.
