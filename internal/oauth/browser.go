@@ -206,6 +206,14 @@ func (b *BrowserAuthorizer) disarm() {
 	b.mu.Unlock()
 }
 
+// trySend delivers v on ch without blocking if the channel is already full.
+func trySend[T any](ch chan T, v T) {
+	select {
+	case ch <- v:
+	default:
+	}
+}
+
 // parseRedirect extracts the authorization code (or an OAuth error) from a
 // request URL when it is the redirect to redirectURI. matched is true once the
 // request is the redirect carrying a code or error.

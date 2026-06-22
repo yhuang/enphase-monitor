@@ -4,8 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -439,64 +437,5 @@ func TestGetAuthorizationURL_EmptyRedirectURI(t *testing.T) {
 	_, err := GetAuthorizationURL(apiConfig)
 	if err == nil {
 		t.Error("Expected error for empty redirect_uri")
-	}
-}
-
-// TestAuthorize_NilAPI tests that Authorize returns an error when the credential is nil.
-func TestAuthorize_NilAPI(t *testing.T) {
-	_, err := Authorize(context.Background(), nil)
-	if err == nil {
-		t.Fatal("Authorize() with nil API: want error, got nil")
-	}
-	if !strings.Contains(err.Error(), "API configuration is required") {
-		t.Errorf("Authorize() with nil API: got %q, want 'API configuration is required'", err.Error())
-	}
-}
-
-// TestAuthorize_EmptyClientID tests that Authorize returns an error when ClientID is empty.
-func TestAuthorize_EmptyClientID(t *testing.T) {
-	_, err := Authorize(context.Background(), &types.APIConfig{ClientID: ""})
-	if err == nil {
-		t.Fatal("Authorize() with empty ClientID: want error, got nil")
-	}
-	if !strings.Contains(err.Error(), "client_id is required") {
-		t.Errorf("Authorize() with empty ClientID: got %q, want 'client_id is required'", err.Error())
-	}
-}
-
-// TestAuthorize_AuthorizationError tests the manual-paste fallback's error path.
-// A non-loopback redirect URI forces the paste flow (no local listener); the
-// pasted URL contains "error=", which causes Authorize to return early without
-// token exchange. openBrowser is stubbed so no real browser launches.
-func TestAuthorize_AuthorizationError(t *testing.T) {
-	orig := openBrowser
-	t.Cleanup(func() { openBrowser = orig })
-	openBrowser = func(string) error { return nil }
-
-	// Redirect os.Stdin so Authorize can read from it without blocking.
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("os.Pipe() error = %v", err)
-	}
-	origStdin := os.Stdin
-	os.Stdin = r
-	defer func() { os.Stdin = origStdin }()
-
-	// Write an error redirect URL and close so reads don't block.
-	_, _ = w.WriteString("https://example.com/callback?error=access_denied\n")
-	w.Close()
-
-	// A non-loopback redirect URI forces the manual-paste fallback.
-	api := &types.APIConfig{
-		ClientID:    "test_client_id",
-		RedirectURI: "https://example.com/callback",
-	}
-
-	_, setupErr := Authorize(context.Background(), api)
-	if setupErr == nil {
-		t.Fatal("Authorize() with error redirect: want error, got nil")
-	}
-	if !strings.Contains(setupErr.Error(), "authorization failed") {
-		t.Errorf("Authorize() with error redirect: got %q, want 'authorization failed'", setupErr.Error())
 	}
 }

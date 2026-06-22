@@ -47,7 +47,7 @@
 //
 //	Authentication (internal/oauth):
 //	- oauth.go: OAuth 2.0 token acquisition and refresh (with in-memory caching)
-//	- authorization.go: Interactive OAuth authorization wizard that obtains a refresh token
+//	- browser.go: Browser-driven OAuth authorization that auto-approves consent and obtains refresh tokens
 //
 //	Data Aggregation (internal/aggregator):
 //	- aggregator.go: Multi-system data orchestration, metric aggregation, and the
