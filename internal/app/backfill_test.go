@@ -26,7 +26,7 @@ func TestBackfillDay_PartialSystemsFails(t *testing.T) {
 	// System "1" returns data; system "2" fails with a non-rate-limit error, which
 	// the aggregator warns about and skips.
 	agg := aggregator.NewDataAggregatorWithFactory(tokenGetter,
-		func(systemID, systemName, apiKey, accessToken string, tz *time.Location) aggregator.CloudClient {
+		func(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) aggregator.CloudClient {
 			if systemID == "2" {
 				return &mockCloudClient{err: errors.New("network blip")}
 			}

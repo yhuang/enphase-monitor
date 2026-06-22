@@ -70,7 +70,7 @@ func BenchmarkGetAggregatedMetrics_SingleSystem(b *testing.B) {
 		BatterySOC:             75,
 	}
 
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) CloudClient {
 		return &mockCloudClientBench{metrics: mockMetrics}
 	}
 
@@ -127,7 +127,7 @@ func BenchmarkGetAggregatedMetrics_MultiSystem(b *testing.B) {
 		BatterySOC:             75,
 	}
 
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) CloudClient {
 		return &mockCloudClientBench{metrics: mockMetrics}
 	}
 

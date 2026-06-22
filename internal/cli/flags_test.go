@@ -110,7 +110,7 @@ func TestParseFlags_UpdateRefreshToken(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--update-refresh-token"}
+	os.Args = []string{"cmd", "--update-refresh-tokens"}
 
 	flags := ParseFlags()
 
@@ -123,12 +123,25 @@ func TestParseFlags_UpdateRefreshTokenAll(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--update-refresh-token", "--all"}
+	os.Args = []string{"cmd", "--update-refresh-tokens", "--all"}
 
 	flags := ParseFlags()
 
 	if !flags.UpdateRefreshToken || !flags.All {
 		t.Errorf("UpdateRefreshToken=%v All=%v, want both true", flags.UpdateRefreshToken, flags.All)
+	}
+}
+
+func TestParseFlags_SeedCredentials(t *testing.T) {
+	resetFlags(t)
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"cmd", "--seed-credentials"}
+
+	flags := ParseFlags()
+
+	if !flags.SeedCredentials {
+		t.Error("SeedCredentials should be true")
 	}
 }
 

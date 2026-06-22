@@ -1,6 +1,6 @@
 // browser.go drives a single headed Chrome session to auto-approve the OAuth
 // consent ("Allow Access") for many credentials with only one login — used by
-// --update-refresh-token --all so the user never clicks Allow Access per app.
+// --update-refresh-tokens --all so the user never clicks Allow Access per app.
 //
 // For each credential it navigates to the authorization URL, waits for the
 // consent page's button (during which the user logs in on the first credential),
@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"enphase-monitor/internal/types"
+
+	"enphase-monitor/internal/browser"
 
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
@@ -41,10 +43,9 @@ const allowAccessSelector = `//input[@value='Allow Access'] | //button[contains(
 // call GetCode sequentially. Chrome launches lazily on first use and is torn down
 // by Close.
 type BrowserAuthorizer struct {
-	parent      context.Context
-	ctx         context.Context
-	cancelCtx   context.CancelFunc
-	cancelAlloc context.CancelFunc
+	parent    context.Context
+	ctx       context.Context
+	cancel    func()
 	redirectURI string
 	codeCh      chan string
 	errCh       chan error
@@ -66,11 +67,8 @@ func NewBrowserAuthorizer(parent context.Context) *BrowserAuthorizer {
 
 // Close shuts down the Chrome session.
 func (b *BrowserAuthorizer) Close() {
-	if b.cancelCtx != nil {
-		b.cancelCtx()
-	}
-	if b.cancelAlloc != nil {
-		b.cancelAlloc()
+	if b.cancel != nil {
+		b.cancel()
 	}
 }
 
@@ -157,13 +155,9 @@ func (b *BrowserAuthorizer) ensureStarted(redirectURI string) error {
 	}
 	b.redirectURI = redirectURI
 
-	opts := append(chromedp.DefaultExecAllocatorOptions[:], chromedp.Flag("headless", false))
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(b.parent, opts...)
-	ctx, cancelCtx := chromedp.NewContext(allocCtx)
-	if err := chromedp.Run(ctx, network.Enable()); err != nil {
-		cancelCtx()
-		cancelAlloc()
-		return fmt.Errorf("failed to launch Chrome (is Google Chrome installed?): %w", err)
+	ctx, cancel, err := browser.LaunchHeaded(b.parent)
+	if err != nil {
+		return err
 	}
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
@@ -185,7 +179,7 @@ func (b *BrowserAuthorizer) ensureStarted(redirectURI string) error {
 		}
 	})
 
-	b.ctx, b.cancelCtx, b.cancelAlloc, b.started = ctx, cancelCtx, cancelAlloc, true
+	b.ctx, b.cancel, b.started = ctx, cancel, true
 	return nil
 }
 

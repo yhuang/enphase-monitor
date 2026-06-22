@@ -340,11 +340,11 @@ This URL initiates the OAuth flow by redirecting the user to Enphase's authoriza
 
 **Run the setup wizard:**
 ```bash
-./enphase-monitor --update-refresh-token
+./enphase-monitor --update-refresh-tokens
 # With more than one credential set, name the one to set up:
-./enphase-monitor --update-refresh-token enphase-monitor-002
+./enphase-monitor --update-refresh-tokens enphase-monitor-002
 # Or re-authorize every credential in turn (e.g. after they all expired):
-./enphase-monitor --update-refresh-token --all
+./enphase-monitor --update-refresh-tokens --all
 ```
 
 The wizard opens the browser, and — when your `redirect_uri` is a localhost
@@ -468,7 +468,7 @@ Replace:
 
 ### Step 5: Add Refresh Token to Credentials
 
-> If you used the `--update-refresh-token` wizard, this is done for you — it writes the
+> If you used the `--update-refresh-tokens` wizard, this is done for you — it writes the
 > `refresh_token` straight into the matching credential entry in `credentials.yaml`.
 > The steps below apply only if you ran the OAuth flow manually (e.g. with `curl`).
 
@@ -610,7 +610,7 @@ Once you have completed the setup, here is what happens automatically when your 
 **Solution**:
 - Check that your `refresh_token` in credentials.yaml is correct
 - If the refresh_token was revoked or is invalid, you will need to go through the setup process again (Steps 2-5)
-- Run `./enphase-monitor --update-refresh-token` to regenerate your refresh token
+- Run `./enphase-monitor --update-refresh-tokens` to regenerate your refresh token
 
 ### Token refresh fails
 

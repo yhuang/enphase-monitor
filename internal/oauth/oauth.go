@@ -8,14 +8,14 @@
 // SETUP GUIDE
 // -----------
 // For step-by-step OAuth setup instructions, see docs/OAUTH_SETUP.md
-// To run the interactive setup wizard: ./enphase-monitor --update-refresh-token
+// To run the interactive setup wizard: ./enphase-monitor --update-refresh-tokens
 //
 // AUTHENTICATION FLOW
 // -------------------
 // The Enphase Cloud API uses OAuth 2.0 with two supported grant types:
 //
 //  1. Refresh Token Grant (Developer Plan - Free Tier):
-//     - One-time setup via --update-refresh-token wizard
+//     - One-time setup via --update-refresh-tokens wizard
 //     - Uses refresh_token to obtain access_token
 //     - Access tokens expire (typically 1 hour)
 //     - Refresh tokens are long-lived (do not expire)
@@ -46,7 +46,7 @@
 //   - Network errors: Returned to caller for handling
 //
 // The GetAccessToken() function provides helpful error messages suggesting
-// users run --update-refresh-token if refresh token is missing or invalid.
+// users run --update-refresh-tokens if refresh token is missing or invalid.
 package oauth
 
 import (
@@ -280,7 +280,7 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 		if resp.StatusCode == http.StatusUnauthorized && apiConfig.RefreshToken != "" {
 			return "", fmt.Errorf("token request failed with status %d: %s\n\n"+
 				"Your refresh token appears to be invalid or expired. Please regenerate it by running:\n"+
-				"  ./enphase-monitor --update-refresh-token\n\n"+
+				"  ./enphase-monitor --update-refresh-tokens\n\n"+
 				"Then update the refresh_token in your credentials.yaml file.", resp.StatusCode, errorMsg)
 		}
 		if resp.StatusCode == http.StatusUnauthorized {

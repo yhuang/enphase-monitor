@@ -123,7 +123,7 @@ func TestNewDataAggregatorWithFactory(t *testing.T) {
 	mockTokenGetter := func(ctx context.Context, apiConfig *APIConfig) (string, error) {
 		return "test-token", nil
 	}
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) CloudClient {
 		return &MockCloudClient{}
 	}
 
@@ -149,7 +149,7 @@ func TestGetAggregatedMetrics_SingleSystem(t *testing.T) {
 		CacheUsed: false,
 	}
 
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) CloudClient {
 		return mockClient
 	}
 
@@ -189,7 +189,7 @@ func TestGetAggregatedMetrics_SingleSystem(t *testing.T) {
 // TestGetAggregatedMetrics_MultipleSystems verifies aggregation for multiple systems.
 func TestGetAggregatedMetrics_MultipleSystems(t *testing.T) {
 	callCount := 0
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) CloudClient {
 		callCount++
 		// Return different metrics for each system
 		if systemID == "123" {
@@ -339,7 +339,7 @@ func TestGetAggregatedMetrics_FailoverOn429(t *testing.T) {
 		return "test-token", nil
 	}
 	// The first credential ("k1") is throttled; the spare ("k2") returns metrics.
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) CloudClient {
 		if apiKey == "k1" {
 			return &MockCloudClient{Err: errors.New(constants.RateLimitError)}
 		}
@@ -374,7 +374,7 @@ func TestGetAggregatedMetrics_TokenFailover(t *testing.T) {
 		}
 		return "test-token", nil
 	}
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) CloudClient {
 		return &MockCloudClient{Metrics: &api.LocalMetrics{ProductionToday: 7.0}}
 	}
 
@@ -402,7 +402,7 @@ func TestGetAggregatedMetrics_AllCredentialsTokenFail(t *testing.T) {
 	mockTokenGetter := func(ctx context.Context, apiConfig *APIConfig) (string, error) {
 		return "", errors.New("token request failed with status 500")
 	}
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) CloudClient {
 		return &MockCloudClient{Metrics: &api.LocalMetrics{}}
 	}
 
@@ -426,7 +426,7 @@ func TestGetAggregatedMetrics_AllCredentialsRateLimited(t *testing.T) {
 	mockTokenGetter := func(ctx context.Context, apiConfig *APIConfig) (string, error) {
 		return "test-token", nil
 	}
-	mockFactory := func(systemID, systemName, apiKey, accessToken string, tz *time.Location) CloudClient {
+	mockFactory := func(systemID, systemName, apiKey, accessToken, credName string, tz *time.Location, budget api.BudgetTracker) CloudClient {
 		return &MockCloudClient{Err: errors.New(constants.RateLimitError)}
 	}
 
@@ -442,6 +442,35 @@ func TestGetAggregatedMetrics_AllCredentialsRateLimited(t *testing.T) {
 	_, err := agg.GetAggregatedMetrics(context.Background(), systems, pool, time.Time{}, constants.QueryModeDay, tz)
 	if err == nil || !constants.IsRateLimitError(err) {
 		t.Errorf("err = %v, want a rate-limit error after all credentials exhausted", err)
+	}
+}
+
+// TestGetAggregatedMetrics_AllMonthlyExhausted verifies a clear error when every
+// credential has spent its monthly API budget.
+func TestGetAggregatedMetrics_AllMonthlyExhausted(t *testing.T) {
+	pool := poolOf(
+		&APIConfig{Name: "key1", Key: "k1", ClientID: "c1", ClientSecret: "s"},
+		&APIConfig{Name: "key2", Key: "k2", ClientID: "c2", ClientSecret: "s"},
+	)
+	dir := t.TempDir()
+	t.Setenv("ENPHASE_CACHE_DIR", dir)
+	pool = credentials.NewPool([]*APIConfig{
+		{Name: "key1", Key: "k1", ClientID: "c1", ClientSecret: "s"},
+		{Name: "key2", Key: "k2", ClientID: "c2", ClientSecret: "s"},
+	})
+	for _, name := range pool.Names() {
+		for i := 0; i < constants.MaxRequestsPerMonth; i++ {
+			pool.RecordAPICall(name)
+		}
+	}
+
+	agg := NewDataAggregator(func(context.Context, *APIConfig) (string, error) { return "token", nil })
+	systems := []SystemConfig{{Name: "Test System", ID: "123"}}
+	tz := mustLoadLocation(t, "US/Pacific")
+
+	_, err := agg.GetAggregatedMetrics(context.Background(), systems, pool, time.Time{}, constants.QueryModeDay, tz)
+	if err == nil || !constants.IsPoolMonthlyQuotaExhaustedError(err) {
+		t.Errorf("err = %v, want pool monthly quota exhausted", err)
 	}
 }
 

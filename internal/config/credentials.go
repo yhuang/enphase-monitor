@@ -138,7 +138,7 @@ func UpdateRefreshToken(filename, name, refreshToken string) error {
 
 // SeedCredential carries the identity fields of one Enphase application as read
 // from the developer portal: the values needed to seed a credentials.yaml entry
-// before its refresh token is obtained via --update-refresh-token.
+// before its refresh token is obtained via --update-refresh-tokens.
 type SeedCredential struct {
 	Name         string
 	Key          string
@@ -152,7 +152,7 @@ type SeedCredential struct {
 // client_id, and client_secret are updated in place (non-empty values only) while
 // refresh_token and any other fields are left untouched (a resync). For each seed
 // whose name is new, a fresh entry is appended with an empty refresh_token, ready
-// to be filled by --update-refresh-token. A missing file is created. It returns
+// to be filled by --update-refresh-tokens. A missing file is created. It returns
 // the number of entries updated and added.
 //
 // The edit is done on the YAML node tree, so this never clobbers the working
@@ -228,7 +228,7 @@ func documentRoot(doc *yaml.Node) *yaml.Node {
 // newCredentialNode builds a credentials.yaml entry mapping for a seeded
 // credential, in the canonical field order. The refresh_token is left as a bare
 // empty key (rendered `refresh_token:`, not `refresh_token: ""`) for
-// --update-refresh-token to fill in later.
+// --update-refresh-tokens to fill in later.
 func newCredentialNode(s SeedCredential) *yaml.Node {
 	scalar := func(v string) *yaml.Node {
 		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v}

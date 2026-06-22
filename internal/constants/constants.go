@@ -103,6 +103,8 @@ const (
 	APIBudgetPerMinute = 10
 	// APIBudgetWindowSeconds is the sliding-window duration for the API Budget counter
 	APIBudgetWindowSeconds = 60
+	// MaxRequestsPerMonth is the per-API-key monthly call limit (free developer plan).
+	MaxRequestsPerMonth = 1000
 	// APIMaxDateRangeDays is the maximum date range per API request (7 days)
 	// The Enphase API returns 422 errors for ranges exceeding this limit
 	APIMaxDateRangeDays = 7
@@ -114,6 +116,9 @@ const (
 	// RateLimitError is the identifier for rate limit (429) errors.
 	// Callers compare against this string via the IsRateLimitError helper below.
 	RateLimitError = "rate limit exceeded (429)"
+	// PoolMonthlyQuotaExhaustedError is returned when every credential in the pool
+	// has spent its monthly API budget.
+	PoolMonthlyQuotaExhaustedError = "pool monthly quota exhausted"
 	// ErrAPIConfigRequired is returned when API configuration is missing
 	ErrAPIConfigRequired = "api configuration required"
 	// ErrTokenRefreshFailed is returned when OAuth token refresh fails
@@ -204,4 +209,12 @@ func IsRateLimitError(err error) bool {
 		return false
 	}
 	return strings.Contains(err.Error(), RateLimitError)
+}
+
+// IsPoolMonthlyQuotaExhaustedError checks if err is a pool monthly quota error.
+func IsPoolMonthlyQuotaExhaustedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), PoolMonthlyQuotaExhaustedError)
 }

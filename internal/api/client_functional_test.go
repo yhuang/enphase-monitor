@@ -20,8 +20,7 @@ import (
 // (e.g. SetCacheDisabled before this helper) rely on it surviving.
 func mustLoadLocation(t *testing.T, name string) *time.Location {
 	t.Helper()
-	cache.ClearAPICalls()
-	t.Cleanup(cache.ClearAPICalls)
+	t.Cleanup(cache.ResetState)
 	loc, err := time.LoadLocation(name)
 	if err != nil {
 		t.Fatal(err)

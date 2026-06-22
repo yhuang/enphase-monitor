@@ -74,7 +74,7 @@ The reference `weather_codes.json` at the project root, written by `--init` (Ini
 _Avoid_: Condition map (that is the lossy display collapse, `conditionFromCode`), weather dictionary
 
 **Initialization**:
-The one-time `--init` step that resolves each System's location (one `/systems` call, geocoding the postal code), caches the coordinates for Weather Enrichment, and writes the Weather Code Legend to the project root. Required before any report mode: the program refuses to run a report until the location cache exists (the "init guard"), exempting only cache-management commands and `--update-refresh-token`. `--force` re-resolves even when a cached value exists. Location resolution is done out of band so it never competes with the per-minute telemetry budget on a live day.
+The one-time `--init` step that resolves each System's location (one `/systems` call, geocoding the postal code), caches the coordinates for Weather Enrichment, and writes the Weather Code Legend to the project root. Required before any report mode: the program refuses to run a report until the location cache exists (the "init guard"), exempting only cache-management commands and `--update-refresh-tokens`. `--force` re-resolves even when a cached value exists. Location resolution is done out of band so it never competes with the per-minute telemetry budget on a live day.
 _Avoid_: Setup mode, bootstrap, first-run
 
 ## Query Modes

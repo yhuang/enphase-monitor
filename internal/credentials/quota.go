@@ -1,0 +1,299 @@
+package credentials
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"enphase-monitor/internal/cache"
+	"enphase-monitor/internal/constants"
+	"enphase-monitor/internal/types"
+)
+
+const quotaFilename = "monthly-quota.json"
+
+// quotaFile persists per-credential minute and monthly call counts on disk.
+// Monthly values are seeded from the developer portal (--init / --refresh-quota)
+// and incremented on each live API call (RecordAPICall).
+type quotaFile struct {
+	Month   string              `json:"month"`
+	Monthly map[string]int      `json:"monthly"`
+	Minute  map[string][]string `json:"minute,omitempty"`
+}
+
+func (p *Pool) loadQuota() {
+	p.quota = quotaFile{
+		Month:   p.currentMonth(),
+		Monthly: make(map[string]int, len(p.creds)),
+		Minute:  make(map[string][]string, len(p.creds)),
+	}
+	data, err := os.ReadFile(p.quotaPath())
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return
+		}
+		// Legacy filename from before the monthly-quota.json rename.
+		legacy := filepath.Join(filepath.Dir(p.quotaPath()), "quota.json")
+		data, err = os.ReadFile(legacy)
+		if err != nil {
+			return
+		}
+	}
+	var loaded quotaFile
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		return
+	}
+	if loaded.Monthly == nil {
+		loaded.Monthly = make(map[string]int)
+	}
+	if loaded.Minute == nil {
+		loaded.Minute = make(map[string][]string)
+	}
+	if loaded.Month != p.currentMonth() {
+		// New calendar month: keep minute stamps but reset monthly counts.
+		loaded.Month = p.currentMonth()
+		loaded.Monthly = make(map[string]int, len(p.creds))
+	}
+	p.quota = loaded
+	for _, c := range p.creds {
+		p.pruneMinuteLocked(c.Name)
+	}
+}
+
+func (p *Pool) saveQuota() {
+	if err := os.MkdirAll(filepath.Dir(p.quotaPath()), 0o755); err != nil {
+		return
+	}
+	data, err := json.MarshalIndent(p.quota, "", "  ")
+	if err != nil {
+		return
+	}
+	data = append(data, '\n')
+	_ = os.WriteFile(p.quotaPath(), data, 0o644)
+}
+
+func (p *Pool) quotaPath() string {
+	if p.quotaFileOverride != "" {
+		return p.quotaFileOverride
+	}
+	return filepath.Join(cache.GetCacheDir(), quotaFilename)
+}
+
+func (p *Pool) currentMonth() string {
+	return p.now().Format("2006-01")
+}
+
+func (p *Pool) ensureMonthCurrent() {
+	if p.quota.Month == p.currentMonth() {
+		return
+	}
+	p.quota.Month = p.currentMonth()
+	p.quota.Monthly = make(map[string]int, len(p.creds))
+	p.saveQuota()
+}
+
+func (p *Pool) pruneMinuteLocked(name string) {
+	cutoff := p.now().Add(-time.Duration(constants.APIBudgetWindowSeconds) * time.Second)
+	stamps := p.quota.Minute[name]
+	kept := stamps[:0]
+	for _, raw := range stamps {
+		t, err := time.Parse(time.RFC3339Nano, raw)
+		if err != nil {
+			continue
+		}
+		if t.After(cutoff) {
+			kept = append(kept, raw)
+		}
+	}
+	if len(kept) == 0 {
+		delete(p.quota.Minute, name)
+		return
+	}
+	p.quota.Minute[name] = kept
+}
+
+func (p *Pool) minuteCount(name string) int {
+	p.ensureMonthCurrent()
+	p.pruneMinuteLocked(name)
+	return len(p.quota.Minute[name])
+}
+
+func (p *Pool) monthlyCount(name string) int {
+	p.ensureMonthCurrent()
+	return p.quota.Monthly[name]
+}
+
+// hasMinuteBudget reports whether the credential can make another live call
+// without exceeding the per-minute limit.
+func (p *Pool) hasMinuteBudget(c *types.APIConfig) bool {
+	if c == nil {
+		return false
+	}
+	return p.minuteCount(c.Name) < constants.APIBudgetPerMinute
+}
+
+// hasMonthlyBudget reports whether the credential still has monthly quota left.
+func (p *Pool) hasMonthlyBudget(c *types.APIConfig) bool {
+	if c == nil {
+		return false
+	}
+	return p.monthlyCount(c.Name) < constants.MaxRequestsPerMonth
+}
+
+// RemainingMinuteBudget implements api.BudgetTracker.
+func (p *Pool) RemainingMinuteBudget(credentialName string) int {
+	used := p.minuteCount(credentialName)
+	if used >= constants.APIBudgetPerMinute {
+		return 0
+	}
+	return constants.APIBudgetPerMinute - used
+}
+
+// RecordAPICall implements api.BudgetTracker.
+func (p *Pool) RecordAPICall(credentialName string) {
+	p.ensureMonthCurrent()
+	p.pruneMinuteLocked(credentialName)
+	stamp := p.now().Format(time.RFC3339Nano)
+	p.quota.Minute[credentialName] = append(p.quota.Minute[credentialName], stamp)
+	p.quota.Monthly[credentialName]++
+	p.saveQuota()
+}
+
+// AllMonthlyExhausted reports whether every credential in the pool has spent
+// its monthly API budget.
+func (p *Pool) AllMonthlyExhausted() bool {
+	if len(p.creds) == 0 {
+		return false
+	}
+	for _, c := range p.creds {
+		if p.hasMonthlyBudget(c) {
+			return false
+		}
+	}
+	return true
+}
+
+// MonthlyExhaustedCount returns how many credentials have no monthly budget left.
+func (p *Pool) MonthlyExhaustedCount() int {
+	n := 0
+	for _, c := range p.creds {
+		if !p.hasMonthlyBudget(c) {
+			n++
+		}
+	}
+	return n
+}
+
+// PoolMonthlyUsed returns total live API calls recorded this month across the pool.
+func (p *Pool) PoolMonthlyUsed() int {
+	total := 0
+	for _, c := range p.creds {
+		total += p.monthlyCount(c.Name)
+	}
+	return total
+}
+
+// PoolMonthlyCapacity returns the combined monthly budget (keys × 1000).
+func (p *Pool) PoolMonthlyCapacity() int {
+	return len(p.creds) * constants.MaxRequestsPerMonth
+}
+
+// QuotaSummary returns a human-readable pool quota line for logging.
+func (p *Pool) QuotaSummary() string {
+	used := p.PoolMonthlyUsed()
+	capacity := p.PoolMonthlyCapacity()
+	pct := 0
+	if capacity > 0 {
+		pct = used * 100 / capacity
+	}
+	exhausted := p.MonthlyExhaustedCount()
+	keyWord := "keys"
+	if exhausted == 1 {
+		keyWord = "key"
+	}
+	return fmt.Sprintf("Pool quota: %s / %s this month (%d%%); %d %s exhausted.",
+		formatWithCommas(used), formatWithCommas(capacity), pct, exhausted, keyWord)
+}
+
+// LastAPICallTime returns the most recent live API call across all credentials.
+func (p *Pool) LastAPICallTime() (time.Time, bool) {
+	var latest time.Time
+	found := false
+	for name := range p.quota.Minute {
+		p.pruneMinuteLocked(name)
+	}
+	for _, stamps := range p.quota.Minute {
+		for _, raw := range stamps {
+			t, err := time.Parse(time.RFC3339Nano, raw)
+			if err != nil {
+				continue
+			}
+			if !found || t.After(latest) {
+				latest = t
+				found = true
+			}
+		}
+	}
+	return latest, found
+}
+
+func formatWithCommas(n int) string {
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	var b strings.Builder
+	for i, r := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// ApplyPortalMonthlyUsage replaces per-credential monthly counts with values
+// scraped from the Enphase developer portal. Keys are credential names. Live
+// calls after this baseline continue to increment via RecordAPICall.
+func (p *Pool) ApplyPortalMonthlyUsage(usage map[string]int) {
+	p.ensureMonthCurrent()
+	for name, used := range usage {
+		if used < 0 {
+			continue
+		}
+		p.quota.Monthly[name] = used
+	}
+	p.saveQuota()
+}
+
+// NamesWithPrefix returns credential names in pool order matching prefix.
+func (p *Pool) NamesWithPrefix(prefix string) []string {
+	names := make([]string, 0, len(p.creds))
+	for _, c := range p.creds {
+		if prefix == "" || strings.HasPrefix(c.Name, prefix) {
+			names = append(names, c.Name)
+		}
+	}
+	return names
+}
+
+// HasMonthlyBaseline reports whether every credential matching namePrefix has a
+// monthly usage entry for the current calendar month (including zero usage).
+func (p *Pool) HasMonthlyBaseline(namePrefix string) bool {
+	p.ensureMonthCurrent()
+	matched := 0
+	for _, c := range p.creds {
+		if namePrefix != "" && !strings.HasPrefix(c.Name, namePrefix) {
+			continue
+		}
+		matched++
+		if _, ok := p.quota.Monthly[c.Name]; !ok {
+			return false
+		}
+	}
+	return matched > 0
+}

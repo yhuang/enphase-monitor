@@ -150,7 +150,7 @@ Configuration is split across two files:
 #### API Credentials
 
 These live in `credentials.yaml` (kept separate from `config.yaml` so secrets stay local) under a `credentials:` list of one or more credential sets. You will need the values from the [Enphase Developer Portal](https://developer-v4.enphase.com/). Each entry has:
-- `name`: A unique label for the credential set (names a credential for `--update-refresh-token <name>` and is the token-cache key)
+- `name`: A unique label for the credential set (names a credential for `--update-refresh-tokens <name>` and is the token-cache key)
 - `key`: Your API key
 - `client_id`: OAuth client ID
 - `client_secret`: OAuth client secret
@@ -204,7 +204,7 @@ This application uses OAuth 2.0 for authentication. You must complete a one-time
 ### Quick Setup
 
 ```bash
-./enphase-monitor --update-refresh-token
+./enphase-monitor --update-refresh-tokens
 ```
 Run the interactive setup wizard that will:
 1. Open your browser to the Enphase authorization page
@@ -220,13 +220,13 @@ to paste the redirect URL from your browser's address bar.
 With more than one credential set configured, name the one to set up:
 
 ```bash
-./enphase-monitor --update-refresh-token enphase-monitor-002
+./enphase-monitor --update-refresh-tokens enphase-monitor-002
 ```
 
 Or re-authorize every credential in turn (e.g. after they've all expired):
 
 ```bash
-./enphase-monitor --update-refresh-token --all
+./enphase-monitor --update-refresh-tokens --all
 ```
 
 ### Detailed Guide
@@ -306,7 +306,7 @@ Before running any report, initialize the systems' location once:
 ```
 enphase-monitor: not initialized — run `enphase-monitor --init` first.
 ```
-Cache-management commands (`--clear-cache`, etc.) and `--update-refresh-token` are exempt. Re-run `--init` if the cache is cleared; add `--force` to re-resolve even when a cached value exists.
+Cache-management commands (`--clear-cache`, etc.) and `--update-refresh-tokens` are exempt. Re-run `--init` if the cache is cleared; add `--force` to re-resolve even when a cached value exists.
 
 ### Run Once (Single Query, Default)
 
@@ -431,8 +431,8 @@ Serves the report entirely from cache (no live API calls) and compares each metr
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
 - `--backfill-from <YYYY-MM-DD>` - Backfill Mode: fetch each day from this date through `--date` (or yesterday) with live API calls, writing one JSON record per day into `history/`. Skips days already written unless `--force` is given. Cannot be combined with `--continuous`, `--true-up`, or `--init` (see [Historical Backfill](#historical-backfill))
 - `--true-up <YYYY-MM-DD>` - Activate True-Up Mode using this utility True-Up Start Date. Covers the 12-month True-Up Window (Current Period: through yesterday; Past True-Up Period: through last day of 12-month window). Takes precedence over `--date`
-- `--update-refresh-token [name]` - Run OAuth setup wizard (one-time for developer plan); pass a credential name when more than one is configured (e.g. `--update-refresh-token enphase-monitor-002`)
-- `--all` - With `--update-refresh-token`, re-authorize every configured credential in turn (e.g. `--update-refresh-token --all`)
+- `--update-refresh-tokens [name]` - Run OAuth setup wizard (one-time for developer plan); pass a credential name when more than one is configured (e.g. `--update-refresh-tokens enphase-monitor-002`)
+- `--all` - With `--update-refresh-tokens`, re-authorize every configured credential in turn (e.g. `--update-refresh-tokens --all`)
 - `--test` - Validation Mode: use cache only, no live API calls, validate against expected values
 - `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429)
 - `--cache` - Serve report from cache only; print diagnostic listing missing endpoints if cache is incomplete
@@ -612,11 +612,11 @@ colors:
 ### "no credentials configured"
 - Make sure you have copied `credentials.yaml.example` to `credentials.yaml`
 - Verify each entry under `credentials:` has a unique `name` plus `key`, `client_id`, and `client_secret`
-- For developer plan, complete OAuth setup with `--update-refresh-token` to get `refresh_token`
+- For developer plan, complete OAuth setup with `--update-refresh-tokens` to get `refresh_token`
 
 ### "API request failed with status 401"
 - Your refresh token may have expired or been revoked
-- Re-run OAuth setup: `./enphase-monitor --update-refresh-token`
+- Re-run OAuth setup: `./enphase-monitor --update-refresh-tokens`
 - Verify your API credentials are correct
 
 ### "API request failed with status 404"
