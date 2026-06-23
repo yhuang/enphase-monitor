@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/chromedp/cdproto/network"
@@ -20,13 +19,21 @@ const chromeStartupTimeout = 90 * time.Second
 // LaunchHeaded returns a chromedp context backed by a visible Chrome window.
 // The caller must invoke cancel when done (cancels context then allocator).
 func LaunchHeaded(parent context.Context) (ctx context.Context, cancel func(), err error) {
-	opts := headedAllocatorOptions()
+	// Each session gets its own throwaway profile so concurrent or repeated runs
+	// never share Chrome state; cleanup removes it so temp does not accumulate.
+	profileDir, err := os.MkdirTemp("", "enphase-monitor-chromedp-")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create Chrome profile directory: %w", err)
+	}
+
+	opts := headedAllocatorOptions(profileDir)
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(parent, opts...)
 	browserCtx, cancelBrowser := chromedp.NewContext(allocCtx)
 
 	cleanup := func() {
 		cancelBrowser()
 		cancelAlloc()
+		_ = os.RemoveAll(profileDir)
 	}
 
 	// Run startup on browserCtx, not a child timeout context. chromedp ties the
@@ -54,21 +61,17 @@ func LaunchHeaded(parent context.Context) (ctx context.Context, cancel func(), e
 	return browserCtx, cleanup, nil
 }
 
-func headedAllocatorOptions() []chromedp.ExecAllocatorOption {
+func headedAllocatorOptions(profileDir string) []chromedp.ExecAllocatorOption {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", false),
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
-		chromedp.UserDataDir(uniqueChromeProfileDir()),
+		chromedp.UserDataDir(profileDir),
 	)
 	if path := findChromeExecPath(); path != "" {
 		opts = append(opts, chromedp.ExecPath(path))
 	}
 	return opts
-}
-
-func uniqueChromeProfileDir() string {
-	return filepath.Join(os.TempDir(), "enphase-monitor-chromedp-"+strconv.FormatInt(time.Now().UnixNano(), 10))
 }
 
 func findChromeExecPath() string {

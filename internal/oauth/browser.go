@@ -160,7 +160,7 @@ func (b *BrowserAuthorizer) ensureStarted(redirectURI string) error {
 		return err
 	}
 
-	chromedp.ListenTarget(ctx, func(ev interface{}) {
+	chromedp.ListenTarget(ctx, func(ev any) {
 		e, ok := ev.(*network.EventRequestWillBeSent)
 		if !ok {
 			return

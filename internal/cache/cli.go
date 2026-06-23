@@ -4,6 +4,7 @@ package cache
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -115,7 +116,7 @@ func ClearTodayCache() error {
 // if any matching file could not be deleted.
 func ClearCacheForDate(targetDate string) error {
 	if targetDate == "" {
-		return fmt.Errorf("targetDate must not be empty")
+		return errors.New("targetDate must not be empty")
 	}
 
 	var matched, deleted int

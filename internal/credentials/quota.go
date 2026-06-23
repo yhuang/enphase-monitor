@@ -34,6 +34,7 @@ func (p *Pool) loadQuota() {
 	data, err := os.ReadFile(p.quotaPath())
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(os.Stderr, "WARNING: could not read quota file %s, starting with empty quota: %v\n", p.quotaPath(), err)
 			return
 		}
 		// Legacy filename from before the monthly-quota.json rename.
@@ -45,6 +46,7 @@ func (p *Pool) loadQuota() {
 	}
 	var loaded quotaFile
 	if err := json.Unmarshal(data, &loaded); err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: could not parse quota file %s, starting with empty quota: %v\n", p.quotaPath(), err)
 		return
 	}
 	if loaded.Monthly == nil {
@@ -60,20 +62,26 @@ func (p *Pool) loadQuota() {
 	}
 	p.quota = loaded
 	for _, c := range p.creds {
-		p.pruneMinuteLocked(c.Name)
+		p.pruneMinute(c.Name)
 	}
 }
 
 func (p *Pool) saveQuota() {
 	if err := os.MkdirAll(filepath.Dir(p.quotaPath()), 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: could not create quota directory: %v\n", err)
 		return
 	}
 	data, err := json.MarshalIndent(p.quota, "", "  ")
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: could not encode quota: %v\n", err)
 		return
 	}
 	data = append(data, '\n')
-	_ = os.WriteFile(p.quotaPath(), data, 0o644)
+	// Quota tracking guards the 1000/month cap; a silent save failure would let
+	// counts reset on restart and the cap be exceeded unnoticed, so warn loudly.
+	if err := os.WriteFile(p.quotaPath(), data, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: could not save quota to %s: %v\n", p.quotaPath(), err)
+	}
 }
 
 func (p *Pool) quotaPath() string {
@@ -96,7 +104,7 @@ func (p *Pool) ensureMonthCurrent() {
 	p.saveQuota()
 }
 
-func (p *Pool) pruneMinuteLocked(name string) {
+func (p *Pool) pruneMinute(name string) {
 	cutoff := p.now().Add(-time.Duration(constants.APIBudgetWindowSeconds) * time.Second)
 	stamps := p.quota.Minute[name]
 	kept := stamps[:0]
@@ -116,12 +124,17 @@ func (p *Pool) pruneMinuteLocked(name string) {
 	p.quota.Minute[name] = kept
 }
 
+// minuteCount returns live calls in the current sliding minute window. Despite
+// the read-only name it may write the quota file as a side effect, because
+// ensureMonthCurrent persists a reset when the calendar month has rolled over.
 func (p *Pool) minuteCount(name string) int {
 	p.ensureMonthCurrent()
-	p.pruneMinuteLocked(name)
+	p.pruneMinute(name)
 	return len(p.quota.Minute[name])
 }
 
+// monthlyCount returns calls recorded this calendar month. Like minuteCount it
+// may persist a month-rollover reset via ensureMonthCurrent.
 func (p *Pool) monthlyCount(name string) int {
 	p.ensureMonthCurrent()
 	return p.quota.Monthly[name]
@@ -153,10 +166,12 @@ func (p *Pool) RemainingMinuteBudget(credentialName string) int {
 	return constants.APIBudgetPerMinute - used
 }
 
-// RecordAPICall implements api.BudgetTracker.
+// RecordAPICall implements api.BudgetTracker. It rewrites the whole quota file
+// on every call to keep counts durable across restarts; the file is small and
+// runs make few calls, so the cost is negligible even during backfill.
 func (p *Pool) RecordAPICall(credentialName string) {
 	p.ensureMonthCurrent()
-	p.pruneMinuteLocked(credentialName)
+	p.pruneMinute(credentialName)
 	stamp := p.now().Format(time.RFC3339Nano)
 	p.quota.Minute[credentialName] = append(p.quota.Minute[credentialName], stamp)
 	p.quota.Monthly[credentialName]++
@@ -224,7 +239,7 @@ func (p *Pool) LastAPICallTime() (time.Time, bool) {
 	var latest time.Time
 	found := false
 	for name := range p.quota.Minute {
-		p.pruneMinuteLocked(name)
+		p.pruneMinute(name)
 	}
 	for _, stamps := range p.quota.Minute {
 		for _, raw := range stamps {

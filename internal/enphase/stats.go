@@ -7,6 +7,7 @@ package enphase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -39,7 +40,7 @@ type MonthlyHitStat struct {
 // is called as each application is processed (same contract as ProgressFunc).
 func FetchMonthlyHits(ctx context.Context, appNames []string, ref time.Time, notify func(string), progress ProgressFunc) ([]MonthlyHitStat, error) {
 	if len(appNames) == 0 {
-		return nil, fmt.Errorf("no application names to sync")
+		return nil, errors.New("no application names to sync")
 	}
 	scraper := NewStatsScraper(ctx)
 	defer scraper.Close()

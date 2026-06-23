@@ -856,6 +856,8 @@ func (c *EnlightenCloudClient) finalizeAndCache(url string, resp *http.Response)
 	resp.Body.Close()
 
 	tempResp := &http.Response{StatusCode: resp.StatusCode, Header: resp.Header}
+	// Best-effort: a failed cache write just means a future request re-fetches
+	// live; it must not fail the response we already have in hand.
 	_ = cache.SaveCachedResponseFromBytes(url, tempResp, bodyBytes, c.timezone)
 
 	return &http.Response{

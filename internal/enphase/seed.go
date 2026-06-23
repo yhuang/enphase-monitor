@@ -4,6 +4,7 @@ package enphase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"enphase-monitor/internal/config"
@@ -25,7 +26,7 @@ func SeedCredentials(ctx context.Context, credentialsPath, namePrefix string, st
 		return 0, 0, 0, err
 	}
 	if len(seeds) == 0 {
-		return 0, 0, 0, fmt.Errorf("no credentials found to seed")
+		return 0, 0, 0, errors.New("no credentials found to seed")
 	}
 
 	for _, s := range seeds {

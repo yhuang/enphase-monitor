@@ -576,6 +576,8 @@ func (c *Client) saveCache(coords geocode.Coordinates, dateStr string, w DailyWe
 	if err := os.MkdirAll(c.CacheDir, 0o755); err != nil {
 		return
 	}
+	// Best-effort: a failed cache write just means the next run re-fetches this
+	// day's weather, so it is intentionally not propagated.
 	_ = os.WriteFile(c.cachePath(coords, dateStr), append(data, '\n'), 0o644)
 }
 
