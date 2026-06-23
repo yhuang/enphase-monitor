@@ -17,6 +17,10 @@
 // developer portal during --init (or refreshed with --refresh-quota); each live
 // API call increments the running total via RecordAPICall. Cooldown state is
 // in-memory for the process lifetime.
+//
+// A Pool is not safe for concurrent use: its cooldown and quota maps are mutated
+// without synchronization. The aggregator drives it from a single goroutine
+// (systems are fetched sequentially); parallelizing that would require a mutex.
 package credentials
 
 import (

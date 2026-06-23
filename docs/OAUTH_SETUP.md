@@ -347,11 +347,13 @@ This URL initiates the OAuth flow by redirecting the user to Enphase's authoriza
 ./enphase-monitor --update-refresh-tokens --all
 ```
 
-The wizard opens the browser, and — when your `redirect_uri` is a localhost
-address — runs a temporary local listener on that port to capture the
-authorization code automatically, then saves the refresh token to
-`credentials.yaml`. You only authorize in the browser; the manual steps below are
-for the fallback (non-localhost redirect URI) or for doing the flow by hand.
+The wizard launches a headed Chrome window (via chromedp), drives the Enphase
+authorization/consent screen to completion — logging in and approving on your
+behalf where it can — captures the authorization code, exchanges it for tokens,
+and saves the refresh token to `credentials.yaml`. It performs the whole flow end
+to end; the manual URL construction and code-exchange steps below are retained only
+to explain what the wizard does under the hood (the older hand-paste / loopback-listener
+flow has been removed).
 
 **Or manually construct the authorization URL:**
 ```

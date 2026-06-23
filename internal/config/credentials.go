@@ -306,7 +306,7 @@ func writeFilePreservingMode(filename string, doc *yaml.Node) error {
 	}
 	out := []byte(buf.String())
 
-	mode := os.FileMode(0600)
+	mode := os.FileMode(0o600)
 	if info, err := os.Stat(filename); err == nil {
 		mode = info.Mode().Perm()
 	}

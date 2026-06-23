@@ -431,10 +431,14 @@ Serves the report entirely from cache (no live API calls) and compares each metr
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
 - `--backfill-from <YYYY-MM-DD>` - Backfill Mode: fetch each day from this date through `--date` (or yesterday) with live API calls, writing one JSON record per day into `history/`. Skips days already written unless `--force` is given. Cannot be combined with `--continuous`, `--true-up`, or `--init` (see [Historical Backfill](#historical-backfill))
 - `--true-up <YYYY-MM-DD>` - Activate True-Up Mode using this utility True-Up Start Date. Covers the 12-month True-Up Window (Current Period: through yesterday; Past True-Up Period: through last day of 12-month window). Takes precedence over `--date`
+- `--seed-credentials` - Seed `credentials.yaml` from the Enphase developer portal: opens Chrome to log in, then scrapes each application's `name`, `key`, `client_id`, and `client_secret`. New entries are appended with an empty `refresh_token` (fill it with `--update-refresh-tokens`); existing entries are resynced in place, preserving their refresh tokens. Filter with `--name-prefix`
 - `--update-refresh-tokens [name]` - Run OAuth setup wizard (one-time for developer plan); pass a credential name when more than one is configured (e.g. `--update-refresh-tokens enphase-monitor-002`)
 - `--all` - With `--update-refresh-tokens`, re-authorize every configured credential in turn (e.g. `--update-refresh-tokens --all`)
+- `--new-only` - With `--update-refresh-tokens --all`, authorize only credentials that have no `refresh_token` yet (skip already-authorized ones). Use this right after `--seed-credentials` to bring just the newly-seeded apps online
+- `--refresh-quota` - Out-of-band resync of each credential's monthly API-usage baseline from the developer portal stats page (opens Chrome to log in). Filter with `--name-prefix`. The same baseline is also seeded by `--init`
+- `--name-prefix <prefix>` - Application/credential name prefix filter (default `enphase-monitor-`). Scopes which applications `--seed-credentials` pulls and which credentials `--init`/`--refresh-quota` sync
 - `--test` - Validation Mode: use cache only, no live API calls, validate against expected values
-- `--no-cache` - Bypass cache and make live API calls (falls back to cache on 429)
+- `--no-cache` - Bypass cache and make live API calls. Propagates API errors (429/503/network) instead of serving stale cache. No effect in Backfill Mode, which is always live
 - `--cache` - Serve report from cache only; print diagnostic listing missing endpoints if cache is incomplete
 - `--clear-cache` - Clear cached API responses for today's date only
 - `--clear-cache-date YYYY-MM-DD` - Clear cached API responses for a specific past date (matches the query start date exactly)
@@ -658,6 +662,16 @@ The `refresh_interval` setting controls how often the application queries the AP
 - **Enforced floor**: Values below 60 seconds (e.g., `refresh_interval: 5`) are automatically clamped up to 60 seconds — one API Budget window — so they cannot exhaust the budget on every tick. In continuous mode a warning is printed when this clamping happens.
 - **Calculation**: If you have N Systems, each today's Day Mode query makes N×5 requests. With 2 Systems that is 10/cycle — at the clamped 60-second floor, that is 10 requests/minute, exactly the limit. (Without the floor, `refresh_interval: 5` would have attempted 10×12 = 120 requests/minute.)
 
+### Credential Pool & Monthly Quota
+
+Because each API key is capped at **10 requests/minute AND 1000 requests/month**, the app can hold a **pool** of credential sets (a `credentials:` list of more than one entry) and spread load across them:
+
+- **Spread.** Each System is assigned a credential round-robin, so a run's calls are distributed across keys instead of hammering one. Backfill advances the rotation one step per day so consecutive days draw on disjoint keys.
+- **Failover.** When a key returns 429 (per-minute) or has spent its monthly budget, it is put in cooldown and the System retries on a spare; the run only errors when every key is exhausted.
+- **Monthly quota tracking.** Each credential's calls-this-month are persisted in `cache/monthly-quota.json`. The baseline is seeded from the developer portal by `--init` (or resynced with `--refresh-quota`) and incremented on every live call, resetting on the month boundary. A key with no monthly budget left is skipped just like one in per-minute cooldown — so the pool rotates off a key approaching its 1000/month cap, not only on a 429.
+
+**Setting up a pool** (one-time): run `--seed-credentials` to scrape every portal application's `name`/`key`/`client_id`/`client_secret` into `credentials.yaml`, then `--update-refresh-tokens --all --new-only` to authorize the newly-seeded entries. Adding more apps later repeats the same two steps; `--new-only` skips the ones already authorized.
+
 ### Caching Strategy
 
 To respect these limits, the application combines disk caching with a sliding-window API Budget counter and a live-first serving policy:
@@ -838,8 +852,13 @@ enphase-monitor/
 │   │   ├── trueup.go                        # True-Up Mode: single-batch Lifetime Data query and report conversion
 │   │   ├── trueup_test.go                   # True-up logic tests
 │   │   ├── backfill.go                      # Backfill Mode: live per-day fetch over a date range into history/
+│   │   ├── backfill_test.go                 # Backfill range/skip/overwrite tests
 │   │   ├── weather.go                       # Best-effort weather enrichment for Day-Mode reports
+│   │   ├── weather_test.go                  # Weather enrichment tests
 │   │   └── cache_report.go                  # --cache mode: completeness check and diagnostic output
+│   ├── browser/                             # Headed Chrome launcher (chromedp) for portal automation
+│   │   ├── chrome.go                        # LaunchHeaded: disposable-profile Chrome session
+│   │   └── chrome_test.go                   # Chrome launcher tests
 │   ├── cache/                               # Disk-based response caching
 │   │   ├── cache.go                         # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                    # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
@@ -860,12 +879,24 @@ enphase-monitor/
 │   ├── constants/                           # Centralized constants
 │   │   ├── constants.go                     # Application-wide constants
 │   │   └── constants_test.go                # Constants tests
-│   ├── credentials/                         # Credential pool: spread + 429 failover
+│   ├── credentials/                         # Credential pool: spread + 429 failover + monthly quota
 │   │   ├── pool.go                          # Round-robin assignment, cooldown, failover
-│   │   └── pool_test.go                     # Pool selection/failover tests
+│   │   ├── pool_test.go                     # Pool selection/failover tests
+│   │   ├── quota.go                         # Per-credential minute + monthly API budget (monthly-quota.json)
+│   │   ├── quota_test.go                    # Quota counting, month-rollover, and budget tests
+│   │   └── quota_portal_test.go             # Portal-seeded monthly baseline (ApplyPortalMonthlyUsage) tests
 │   ├── display/                             # Terminal output formatting
 │   │   ├── display.go                       # Display with io.Writer injection
 │   │   └── display_test.go                  # Display output tests
+│   ├── enphase/                             # Developer-portal scraping (no management API)
+│   │   ├── login.go                         # Headed-Chrome portal login + session cookie capture
+│   │   ├── portal.go                        # Scrape app name/key/client_id/client_secret
+│   │   ├── seed.go                          # --seed-credentials: scrape + merge into credentials.yaml
+│   │   ├── stats.go                         # Monthly hit totals from the portal stats page
+│   │   ├── stats_browser.go                 # chromedp driver for the stats page UI
+│   │   ├── login_test.go                    # Login/cookie-capture tests
+│   │   ├── portal_test.go                   # Portal HTML/JSON scrape tests
+│   │   └── stats_test.go                    # Stats parsing/date-range tests
 │   ├── geocode/                             # ZIP/postal code → coordinates (Zippopotam.us)
 │   │   ├── geocode.go                       # ZIP lookup for weather geolocation
 │   │   └── geocode_test.go                  # Geocode tests
@@ -877,8 +908,9 @@ enphase-monitor/
 │   │   └── location_test.go                 # Location resolver tests
 │   ├── oauth/                               # OAuth 2.0 authentication
 │   │   ├── oauth.go                         # Token management & refresh
-│   │   ├── authorization.go                 # Interactive OAuth authorization wizard
+│   │   ├── browser.go                       # Browser-driven OAuth authorization (auto-approves consent)
 │   │   ├── oauth_test.go                    # Basic unit tests
+│   │   ├── browser_test.go                  # Browser-OAuth flow tests
 │   │   ├── oauth_functional_test.go         # Integration tests with mock servers
 │   │   └── oauth_edge_cases_test.go         # Edge case tests
 │   ├── parser/                              # JSON telemetry parsing
@@ -938,25 +970,27 @@ The project includes a comprehensive test suite with **70.6% code coverage** acr
 | Package | Coverage | Status |
 |---------|----------|--------|
 | urlbuilder | 100.0% | ✅ |
-| constants | 100.0% | ✅ |
 | display | 98.7% | ✅ |
 | validation | 95.5% | ✅ |
 | parser | 94.8% | ✅ |
-| credentials | 94.6% | ✅ |
 | timezone | 92.7% | ✅ |
-| cli | 91.4% | ✅ |
-| aggregator | 88.9% | ✅ |
-| weather | 87.5% | ✅ |
-| history | 83.3% | ✅ |
-| config | 82.1% | ✅ |
+| cli | 92.3% | ✅ |
+| aggregator | 89.2% | ✅ |
+| weather | 88.2% | ✅ |
+| config | 84.3% | ✅ |
+| history | 82.5% | ✅ |
 | geocode | 81.5% | ✅ |
-| location | 81.0% | ✅ |
-| oauth | 80.1% | ✅ |
-| api | 77.1% | ✅ |
-| cache | 71.6% | ✅ |
-| app | 40.1% | ⚠️ |
+| location | 79.7% | ✅ |
+| api | 78.6% | ✅ |
+| credentials | 78.4% | ✅ |
+| constants | 72.7% | ✅ |
+| cache | 68.9% | ✅ |
+| oauth | 61.7% | ✅ |
+| app | 40.3% | ⚠️ |
+| browser | 19.5% | ⚠️ |
+| enphase | 14.6% | ⚠️ |
 
-**Total: 70.4% coverage** (exceeds typical Go project standards of 50-60%; `app` covers orchestration glue — including `RunBackfill` — that is exercised more thoroughly via the api-package integration tests)
+**Total: 61.5% coverage** (exceeds typical Go project standards of 50-60%; the low-coverage packages are headed-Chrome/portal-scraping glue — `app` orchestration including `RunBackfill` is exercised via the api-package integration tests, while `browser` and `enphase` drive a real Chrome session against the developer portal and are verified manually)
 
 ### Running Tests
 
@@ -1119,8 +1153,8 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 
 This project follows Go best practices and coding standards:
 
-- **Test Coverage**: 70.4% overall, 100% for urlbuilder and constants, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and aggregator
-- **Test Suite**: 38 test files across 18 tested packages with comprehensive unit, integration, and edge case tests
+- **Test Coverage**: 61.5% overall, 100% for urlbuilder, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and aggregator (the headed-Chrome `browser`/`enphase` portal-scraping packages are verified manually and pull the average down)
+- **Test Suite**: 44 test files across 20 tested packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -1129,11 +1163,11 @@ This project follows Go best practices and coding standards:
 - **Performance**: Benchmarks included for hot paths
 
 **Code Metrics:**
-- Total Lines: ~7,600 (excluding tests)
-- Test Lines: ~11,600 (comprehensive test suite)
-- Packages: 19 internal packages (18 with tests; `types` is a pure type-definition package)
-- Test Files: 38 (unit, integration, functional, edge case, and benchmark tests)
-- External Dependencies: 1 (gopkg.in/yaml.v3)
+- Total Lines: ~9,200 (excluding tests)
+- Test Lines: ~11,900 (comprehensive test suite)
+- Packages: 21 internal packages (20 with tests; `types` is a pure type-definition package)
+- Test Files: 44 (unit, integration, functional, edge case, and benchmark tests)
+- External Dependencies: 3 (gopkg.in/yaml.v3 and github.com/chromedp/chromedp + cdproto for portal automation)
 
 ## License
 

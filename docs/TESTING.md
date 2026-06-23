@@ -23,30 +23,32 @@ The project follows a pragmatic approach to testing:
 | Package | Coverage | Status |
 |---------|----------|--------|
 | urlbuilder | 100.0% | ✅ Full coverage - URL construction |
-| constants | 100.0% | ✅ Full coverage - pure constants |
 | display | 98.7% | ✅ Near-full - output formatting |
 | validation | 95.5% | ✅ Near-full - metrics validation |
 | parser | 94.8% | ✅ Near-full - JSON parsing |
-| credentials | 94.6% | ✅ Near-full - credential pool |
 | timezone | 92.7% | ✅ High - timezone handling |
-| cli | 91.4% | ✅ High - CLI interface |
-| aggregator | 88.9% | ✅ High - data aggregation |
-| weather | 87.5% | ✅ High - Open-Meteo client |
-| history | 83.3% | ✅ High - per-day record schema/write |
-| config | 82.1% | ✅ High - YAML parsing |
+| cli | 92.3% | ✅ High - CLI interface |
+| aggregator | 89.2% | ✅ High - data aggregation |
+| weather | 88.2% | ✅ High - Open-Meteo client |
+| config | 84.3% | ✅ High - YAML parsing |
+| history | 82.5% | ✅ High - per-day record schema/write |
 | geocode | 81.5% | ✅ High - ZIP geolocation |
-| location | 81.0% | ✅ High - location resolver/cache |
-| oauth | 80.1% | ✅ High - OAuth flows |
-| api | 77.1% | ✅ Adequate - HTTP client |
-| cache | 71.6% | ✅ Adequate - file caching (budget counter also tested directly in api_budget_test.go) |
-| app | 40.1% | ⚠️ Moderate - application glue incl. RunBackfill (exercised end-to-end via api/preflight) |
+| location | 79.7% | ✅ High - location resolver/cache |
+| api | 78.6% | ✅ Adequate - HTTP client |
+| credentials | 78.4% | ✅ Adequate - credential pool + monthly quota |
+| constants | 72.7% | ✅ Adequate - pure constants (some portal/quota constants untested) |
+| cache | 68.9% | ✅ Adequate - file caching (budget counter also tested directly in api_budget_test.go) |
+| oauth | 61.7% | ✅ Adequate - OAuth flows (browser-driven path verified manually) |
+| app | 40.3% | ⚠️ Moderate - application glue incl. RunBackfill (exercised end-to-end via api/preflight) |
+| browser | 19.5% | ⚠️ Low - headed-Chrome launcher, verified manually |
+| enphase | 14.6% | ⚠️ Low - developer-portal scraping, verified manually |
 | main.go | 0.0% | ✅ **Acceptable** - entry point |
 
-**Overall**: 70.4% coverage (exceeds typical Go project standards of 50-60%; `app` orchestration paths — including `RunBackfill` — are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests)
+**Overall**: 61.5% coverage (exceeds typical Go project standards of 50-60%; `app` orchestration paths — including `RunBackfill` — are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests, while the `browser` and `enphase` packages drive a real Chrome session against the developer portal and are verified manually rather than in CI)
 
 ### Why main.go Has 0% Coverage
 
-The `main.go` file is pure orchestration (~560 lines) and has 0% coverage by design. This is an **industry standard** because:
+The `main.go` file is pure orchestration (~720 lines) and has 0% coverage by design. This is an **industry standard** because:
 
 1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
 2. **All logic tested**: All functions `main.go` calls are tested in internal packages
@@ -94,11 +96,12 @@ For packages with extensive functionality or different test concerns, tests are 
 
 The sliding-window budget surface is unit-tested directly in `api_budget_test.go`. It is also exercised end-to-end through [`internal/api/preflight_test.go`](#integration-test-files), which primes the cache, drains the budget, and verifies the fallback path.
 
-**OAuth Package** (3 test files):
-- `oauth.go` → 3 test files:
-  - `oauth_test.go` - Basic unit tests (316 lines)
-  - `oauth_functional_test.go` - Integration tests with mock HTTP servers (652 lines)
-  - `oauth_edge_cases_test.go` - Edge case and error path tests (560 lines)
+**OAuth Package** (4 test files):
+- `oauth.go` / `browser.go` → 4 test files:
+  - `oauth_test.go` - Basic unit tests (272 lines)
+  - `oauth_functional_test.go` - Integration tests with mock HTTP servers (679 lines)
+  - `oauth_edge_cases_test.go` - Edge case and error path tests (441 lines)
+  - `browser_test.go` - Browser-driven OAuth authorization flow tests (39 lines)
 
 **Benefits of 1:Many Pattern**:
 - ✅ **Clarity**: Test file name indicates test category

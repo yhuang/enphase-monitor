@@ -20,6 +20,7 @@ package enphase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -74,7 +75,7 @@ type ProgressFunc func(done, total int, name string)
 // returns name, key, client_id, and client_secret.
 func FetchAllAppCredentials(ctx context.Context, baseURL, sessionCookie, namePrefix string, progress ProgressFunc) ([]config.SeedCredential, error) {
 	if strings.TrimSpace(sessionCookie) == "" {
-		return nil, fmt.Errorf("a portal session cookie is required")
+		return nil, errors.New("a portal session cookie is required")
 	}
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
@@ -166,7 +167,7 @@ func fetchClientApp(ctx context.Context, client *http.Client, key, email string)
 		return "", "", fmt.Errorf("client-app endpoint returned: %s", r.Message)
 	}
 	if r.ClientID == "" || r.ClientSecret == "" {
-		return "", "", fmt.Errorf("client-app response missing client_id/client_secret")
+		return "", "", errors.New("client-app response missing client_id/client_secret")
 	}
 	return r.ClientID, r.ClientSecret, nil
 }
@@ -182,8 +183,8 @@ func firstSubmatch(re *regexp.Regexp, s string) string {
 // get performs a GET and returns the body. sessionCookie, when non-empty, is sent
 // as the Cookie header (omitted for the cookie-less client-app endpoint so the
 // portal session is never leaked cross-host).
-func get(ctx context.Context, client *http.Client, url, sessionCookie string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func get(ctx context.Context, client *http.Client, rawURL, sessionCookie string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -206,7 +207,7 @@ func get(ctx context.Context, client *http.Client, url, sessionCookie string) (s
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("request to %s returned status %d (session cookie may be invalid or expired)", url, resp.StatusCode)
+		return "", fmt.Errorf("request to %s returned status %d (session cookie may be invalid or expired)", rawURL, resp.StatusCode)
 	}
 	return string(body), nil
 }

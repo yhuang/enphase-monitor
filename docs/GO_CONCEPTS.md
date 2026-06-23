@@ -29,12 +29,12 @@ This document explains all the intermediate Go concepts that are used throughout
 
 ### Error Handling Pattern
 
-**Location**: `internal/aggregator/aggregator.go:113-116`
+**Location**: `internal/aggregator/aggregator.go:136-144`
 
 Standard Go pattern: function returns `(result, error)`. We check `err` immediately and return early if non-nil. This is idiomatic Go - errors are values, not exceptions.
 
 ```go
-accessToken, err := a.getAccessToken(ctx, apiConfig)
+accessToken, err := a.getAccessToken(ctx, cred)
 if err != nil {
     return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, sys.Name, err)
 }
@@ -54,7 +54,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Error Wrapping with %w
 
-**Location**: `internal/aggregator/aggregator.go:115`
+**Location**: `internal/aggregator/aggregator.go:144`
 
 `fmt.Errorf` with `%w` verb wraps the original error, preserving the error chain. This allows callers to use `errors.Is()` or `errors.Unwrap()` to inspect the chain. We add context ("failed to refresh token for system X") while preserving the original error for debugging.
 
@@ -64,23 +64,29 @@ return nil, fmt.Errorf("%s for system %s: %w", constants.ErrTokenRefreshFailed, 
 
 ### Error Inspection
 
-**Location**: `internal/aggregator/aggregator.go:121-133`
+**Location**: `internal/aggregator/aggregator.go:157-175`
 
-We check the error type to determine how to handle it. For rate limit errors, we collect them and continue (do not fail immediately). This allows us to query other systems even if one hits rate limit. For context cancellation errors (Ctrl+C or deadline exceeded), we return immediately to abort all systems. For other errors, we warn and continue.
+We check the error type to determine how to handle it. For rate-limit (429) errors we cool the throttled credential down and fail over to a spare from the pool, retrying the same system; only when every credential is exhausted is the system recorded as rate-limited (after the loop) and skipped. For context cancellation errors (Ctrl+C or deadline exceeded), we return immediately to abort all systems. For other errors, we warn and skip the system.
 
 ```go
+lm, cu, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryMode)
 if err != nil && constants.IsRateLimitError(err) {
-    rateLimitErrors = append(rateLimitErrors, sys.Name)
-    allFromCache = false
-    continue
+    // Throttled: cool this credential down and fail over to a spare.
+    pool.MarkUnavailable(cred)
+    if next, ok := pool.Failover(tried); ok {
+        cred = next
+        continue
+    }
+    rateLimited = true
+    break
 }
 if err != nil {
-    if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+    if isContextError(ctx, err) {
         return nil, fmt.Errorf("failed to get metrics from Cloud API for system %s: %w", sys.Name, err)
     }
     fmt.Fprintf(os.Stderr, "WARNING: [%s] Failed to get metrics, skipping: %v\n", sys.Name, err)
     allFromCache = false
-    continue
+    break // localMetrics stays nil → skipped below
 }
 ```
 
@@ -90,7 +96,7 @@ if err != nil {
 
 ### Constructor Function Pattern
 
-**Location**: `internal/api/client.go:205-216`
+**Location**: `internal/api/client.go:233-244`
 
 Functions starting with "New" are constructors - they create and initialize structs. This is a Go naming convention, not a language feature. We return a pointer `(*EnlightenCloudClient)` because:
 1. the return type specifies a pointer type;
@@ -106,7 +112,7 @@ func NewEnlightenCloudClient(...) *EnlightenCloudClient {
 
 ### Struct Literal with Pointer
 
-**Location**: `internal/api/client.go:206-215`
+**Location**: `internal/api/client.go:234-243`
 
 `&EnlightenCloudClient{...}` creates a struct and returns a pointer to it. This is idiomatic Go - create struct, take address, return pointer.
 
@@ -119,7 +125,7 @@ return &EnlightenCloudClient{
 
 ### Struct Initialization with Pointer Return
 
-**Location**: `internal/aggregator/aggregator.go:91-96`
+**Location**: `internal/aggregator/aggregator.go:104-109`
 
 We use `&AggregatedMetrics{}` to create a pointer to a new struct. This is more efficient than returning by value (avoids copying large struct).
 
@@ -132,7 +138,7 @@ metrics := &AggregatedMetrics{
 
 ### Nested Struct Initialization
 
-**Location**: `internal/api/client.go:212-214`
+**Location**: `internal/api/client.go:240-242`
 
 We initialize `httpClient` field with a struct literal. `http.Client` is from standard library - we set Timeout for safety.
 
@@ -144,7 +150,7 @@ httpClient: &http.Client{
 
 ### Pointer Receiver Method
 
-**Location**: `internal/config/config.go:139`
+**Location**: `internal/config/config.go:152`
 
 `(c *ColorConfig)` means this is a method on `ColorConfig` with a pointer receiver. We use a pointer receiver because:
 1. We modify the struct (set ANSI codes in place)
@@ -177,7 +183,7 @@ func (c *ColorConfig) convertHexFields() {
 
 ### Struct Definition
 
-**Location**: `internal/oauth/oauth.go:84-88`
+**Location**: `internal/oauth/oauth.go:85-91`
 
 Structs group related data together. This struct holds token information. Fields are exported (PascalCase) so they can be accessed from other packages.
 
@@ -223,7 +229,7 @@ allIntervals := make([]TelemetryInterval, 0, total)
 
 ### Slice Capacity Hint
 
-**Location**: `internal/aggregator/aggregator.go:95`
+**Location**: `internal/aggregator/aggregator.go:108`
 
 `make([]Type, length, capacity)` pre-allocates capacity to avoid reallocation. We know we will have `len(systems)` elements, so we pre-allocate that capacity. This is more efficient than letting the slice grow dynamically.
 
@@ -247,7 +253,7 @@ allIntervals = append(allIntervals, intervalArray...)
 
 ### Slice Append
 
-**Location**: `internal/aggregator/aggregator.go:122`
+**Location**: `internal/aggregator/aggregator.go:182`
 
 `append()` adds elements to a slice, automatically growing if needed. Since we pre-allocated capacity, this should be efficient.
 
@@ -257,7 +263,7 @@ rateLimitErrors = append(rateLimitErrors, sys.Name)
 
 ### Array to Slice Conversion
 
-**Location**: `internal/cache/cache.go:225-226`
+**Location**: `internal/cache/cache.go:180-181`
 
 `hash[:]` converts the `[32]byte` array to a `[]byte` slice. This is necessary because `hex.EncodeToString` expects `[]byte`, not `[32]byte`. The `[:]` syntax creates a slice that views the entire array.
 
@@ -315,12 +321,12 @@ case constants.FieldWhExported:
 
 ### Continue Statement
 
-**Location**: `internal/aggregator/aggregator.go:121-125`
+**Location**: `internal/aggregator/aggregator.go:181-185`
 
-`continue` skips to next iteration of the loop. We use it here to skip this system and try the next one when a rate limit error occurs.
+`continue` skips to next iteration of the loop. We use it here to skip this system and move on to the next once a system has been recorded as rate-limited (every credential for it was exhausted).
 
 ```go
-if err != nil && constants.IsRateLimitError(err) {
+if rateLimited {
     rateLimitErrors = append(rateLimitErrors, sys.Name)
     allFromCache = false
     continue
@@ -525,7 +531,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Duration Literals
 
-**Location**: `internal/api/client.go:212-214`
+**Location**: `internal/api/client.go:240-242`
 
 `time.Second` is a typed constant (`time.Duration`). Multiplying an integer by `time.Second` — e.g. `30 * time.Second` — is idiomatic Go for expressing durations. In this codebase the value is extracted to `constants.APIRequestTimeout` for clarity.
 
@@ -537,7 +543,7 @@ httpClient: &http.Client{
 
 ### Time Ticker
 
-**Location**: `internal/app/runner.go:75-76`
+**Location**: `internal/app/runner.go:82-83`
 
 `time.NewTicker` creates a ticker that sends a value on its channel at regular intervals. `time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second` converts seconds to Duration. We use `defer` to ensure the ticker is stopped when the function returns.
 
@@ -954,7 +960,7 @@ for {
 
 ### Defer Statement
 
-**Location**: `internal/app/runner.go:76`
+**Location**: `internal/app/runner.go:83`
 
 `defer` schedules a function call to execute when the surrounding function returns. This ensures cleanup happens even if the function returns early or panics. Here we ensure the ticker is stopped to prevent resource leaks.
 
@@ -968,12 +974,12 @@ defer ticker.Stop()
 
 ### Package-Level Variable
 
-**Location**: `internal/oauth/oauth.go:90`
+**Location**: `internal/oauth/oauth.go:102`
 
-Variables declared outside functions are package-level (shared across all functions). We use `*TokenCache` (pointer) so it can be `nil` (meaning "no cache yet"). This is a singleton pattern - one cache for the entire application.
+Variables declared outside functions are package-level (shared across all functions). The token cache is a `map[string]*TokenCache` keyed by client ID, so each credential set in the pool keeps its own cached access token; `make(...)` initializes it once at package load.
 
 ```go
-var tokenCache *TokenCache
+var tokenCache = make(map[string]*TokenCache)
 ```
 
 ---
@@ -982,7 +988,7 @@ var tokenCache *TokenCache
 
 ### Hash Functions and Array Slices
 
-**Location**: `internal/cache/cache.go:225-226`
+**Location**: `internal/cache/cache.go:180-181`
 
 `sha256.Sum256()` computes a SHA-256 hash and returns a `[32]byte` array (fixed size). We convert it to a string using hex encoding for a readable cache key.
 
@@ -1003,7 +1009,7 @@ return hex.EncodeToString(hash[:])
 
 ### Variable Declaration with Type
 
-**Location**: `internal/aggregator/aggregator.go:99`
+**Location**: `internal/aggregator/aggregator.go:112`
 
 `var name []Type` declares a variable with zero value (nil slice for slices). We could use `:= []string{}` but `var` is clearer when we are not initializing.
 
@@ -1017,12 +1023,12 @@ var rateLimitErrors []string
 
 ### Multiple Return Values
 
-**Location**: `internal/aggregator/aggregator.go:120`
+**Location**: `internal/aggregator/aggregator.go:157`
 
-Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, `cacheUsed` flag, and error. The `cacheUsed` flag tells us if cached data was used (important for API Budget tracking).
+Functions can return multiple values: `(result1, result2, error)`. Here we get: metrics, a cache-used flag, and error. The `cu` flag tells us if cached data was used (important for API Budget tracking).
 
 ```go
-localMetrics, cacheUsed, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryMode)
+lm, cu, err := cloudClient.GetMetricsFromCloud(ctx, testDate, queryMode)
 ```
 
 ---
@@ -1071,7 +1077,7 @@ internal/
 │   └── display_test.go          # Display tests
 ├── oauth/                       # OAuth 2.0 authentication
 │   ├── oauth.go                 # Token acquisition/refresh
-│   ├── authorization.go         # Interactive OAuth authorization wizard
+│   ├── browser.go               # Browser-driven OAuth authorization (auto-approves consent)
 │   └── *_test.go                # Unit, functional, and edge case tests
 ├── parser/                      # JSON response parsing
 │   ├── parser.go                # API response data parsing

@@ -25,9 +25,17 @@ API responses from the `energy_*_lifetime` endpoints. Returns cumulative daily t
 _Avoid_: Lifetime endpoint, historical data
 
 **API Budget**:
-The number of live API requests available in the current 60-second sliding window. The Enphase Cloud API enforces a limit of 10 requests per minute per API key. With 2 Systems × 5 metrics = 10 calls per run, one full run consumes the entire budget. The application tracks the budget locally; when exhausted, it falls back to cache rather than issuing a guaranteed-failed live call.
+The number of live API requests available to a credential, tracked in two windows: a 60-second sliding window and the current calendar month. The Enphase Cloud API enforces 10 requests per minute **and** 1000 requests per month, per API key. With 2 Systems × 5 metrics = 10 calls per run, one full run consumes a single key's entire per-minute budget. The application tracks both windows locally per credential; when a credential is exhausted it falls back to cache — or, when a Credential Pool is configured, to another credential — rather than issuing a guaranteed-failed live call.
 _Avoid_: Rate limit, API quota, request quota
 _Why_: "Rate limit" describes the HTTP-layer enforcement mechanism (HTTP 429 from Enphase). "API Budget" describes the application-level concept — how many requests the app has available to spend in the current window. The distinction matters in code: constants and functions that deal with the HTTP 429 response correctly use "rate limit" (e.g. `RateLimitError`, `IsRateLimitError`), while functions that track the app's remaining capacity use "budget" (e.g. `RemainingBudget`, `BudgetWarningShown`).
+
+**Credential Pool**:
+The ordered set of API credential sets (each `{name, key, client_id, client_secret, refresh_token}`) the app rotates among to scale past a single key's limits. It spreads load round-robin across Systems (`ForSystem`), fails over to a spare when a credential hits a 429 or runs out of monthly budget (`Failover`/`MarkUnavailable`), and is built once at startup so cooldown state survives Continuous Mode ticks. Seeded from the developer portal with `--seed-credentials` and authorized with `--update-refresh-tokens`. Lives in `internal/credentials`.
+_Avoid_: Key ring, account pool
+
+**Monthly Quota Baseline**:
+The per-credential count of API calls already spent this calendar month, persisted to `cache/monthly-quota.json`. Seeded from the developer portal stats page by `--init` (or resynced out-of-band by `--refresh-quota`) and incremented on every live call (`RecordAPICall`); it resets on the month boundary. Drives monthly rotation: a credential with no monthly budget left is skipped just like one in per-minute cooldown.
+_Avoid_: Monthly rate limit
 
 ## Cache
 

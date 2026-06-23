@@ -368,7 +368,7 @@ func LoadCachedResponse(url string, tz *time.Location) (*CachedResponse, error) 
 // SaveCachedResponseFromBytes saves a response to the cache using pre-read body bytes
 func SaveCachedResponseFromBytes(url string, resp *http.Response, bodyBytes []byte, tz *time.Location) error {
 	// Create cache directory if it does not exist
-	if err := os.MkdirAll(getCacheDir(), 0755); err != nil {
+	if err := os.MkdirAll(getCacheDir(), 0o755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
@@ -402,7 +402,7 @@ func SaveCachedResponseFromBytes(url string, resp *http.Response, bodyBytes []by
 
 	// Write to file
 	cachePath := GetCachePath(url, tz)
-	if err := os.WriteFile(cachePath, data, 0644); err != nil {
+	if err := os.WriteFile(cachePath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write cache file: %w", err)
 	}
 

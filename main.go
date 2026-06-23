@@ -60,10 +60,13 @@
 //	- cache_check.go: Preflight per-system/endpoint cache-availability probe
 //
 //	Supporting Services:
+//	- internal/browser: Headed Chrome launcher (chromedp) with a disposable profile, for portal automation
 //	- internal/cache: Disk-based response caching with URL normalization and the sliding-window API Budget counter
 //	- internal/config: YAML configuration loading, validation, color conversion
 //	- internal/constants: Application-wide constants (ANSI codes, error messages, QueryMode enum, etc.)
+//	- internal/credentials: Credential pool — round-robin spread, 429 failover, and per-key minute/monthly API budget (--seed-credentials, --refresh-quota)
 //	- internal/display: Terminal output formatting with customizable colors
+//	- internal/enphase: Developer-portal scraping (login, credential seeding, monthly stats) — the portal exposes no management API
 //	- internal/geocode: Postal-code-to-coordinates lookup (Zippopotam.us) for weather geolocation
 //	- internal/history: Per-day energy+weather History Record schema and JSON writer (history/)
 //	- internal/location: Resolves and caches the systems' coordinates for weather (populated by --init)
@@ -210,8 +213,9 @@ func main() {
 	}
 
 	// Load API credentials from the separate credentials file. A missing file is
-	// not fatal: ApplyCredentials falls back to a legacy api: block in config.yaml
-	// for backward compatibility, and errors out if neither source has credentials.
+	// not a load error here; ApplyCredentials below does the validation, requiring
+	// at least one credential set and filling each set's non-secret OAuth settings
+	// (authorization_url, redirect_uri) from the shared api: block in config.yaml.
 	creds, err := config.LoadCredentials(flags.CredentialsFile)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		fmt.Fprintf(os.Stderr, "Failed to load credentials: %v\n", err)

@@ -13,7 +13,23 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+// Timing constants for the portal stats UI. The portal updates totals a beat
+// after the date range or selected application changes, so each interaction is
+// followed by a short settle, and the hit total is read until it stops moving.
+const (
+	hitsStableReads      = 2                       // identical reads before a total is "settled"
+	hitsPollTimeout      = 30 * time.Second        // overall wait for the total to settle
+	hitsPollInterval     = 750 * time.Millisecond  // delay between hit-total reads
+	appSelectSettle      = 800 * time.Millisecond  // re-render after selecting an application
+	appSelectRetrySettle = 500 * time.Millisecond  // dropdown-open delay before retrying selection
+	dateRangeSettle      = 1200 * time.Millisecond // results reload after changing the date range
+	readyPollInterval    = 2 * time.Second         // delay between stats-page readiness checks
+)
+
 // StatsScraper drives a headed Chrome session on the developer portal stats page.
+// It holds the chromedp session contexts (parent governs the session lifetime,
+// ctx is the active browser context) — storing them is the accepted pattern for
+// a session wrapper, since chromedp itself ties a session to a context.
 type StatsScraper struct {
 	parent  context.Context
 	ctx     context.Context
@@ -71,7 +87,7 @@ func (s *StatsScraper) waitForStatsReady() error {
 		select {
 		case <-s.parent.Done():
 			return s.parent.Err()
-		case <-time.After(2 * time.Second):
+		case <-time.After(readyPollInterval):
 		}
 	}
 }
@@ -144,7 +160,7 @@ func (s *StatsScraper) selectApp(appName string) error {
 	var ok bool
 	if err := chromedp.Run(s.ctx,
 		chromedp.Evaluate(script, &ok),
-		chromedp.Sleep(800*time.Millisecond),
+		chromedp.Sleep(appSelectSettle),
 	); err != nil {
 		return fmt.Errorf("failed to select application: %w", err)
 	}
@@ -162,7 +178,7 @@ func (s *StatsScraper) selectApp(appName string) error {
 			}
 			return false;
 		})()`
-		_ = chromedp.Run(s.ctx, chromedp.Evaluate(openScript, &ok), chromedp.Sleep(500*time.Millisecond))
+		_ = chromedp.Run(s.ctx, chromedp.Evaluate(openScript, &ok), chromedp.Sleep(appSelectRetrySettle))
 		if err := chromedp.Run(s.ctx, chromedp.Evaluate(script, &ok)); err != nil {
 			return fmt.Errorf("failed to select application: %w", err)
 		}
@@ -174,8 +190,14 @@ func (s *StatsScraper) selectApp(appName string) error {
 }
 
 func (s *StatsScraper) setDateRange(fromDate, untilDate string) error {
-	fromJSON, _ := json.Marshal(fromDate)
-	untilJSON, _ := json.Marshal(untilDate)
+	fromJSON, err := json.Marshal(fromDate)
+	if err != nil {
+		return err
+	}
+	untilJSON, err := json.Marshal(untilDate)
+	if err != nil {
+		return err
+	}
 	script := fmt.Sprintf(`(function(from, until) {
 		const setInput = (input, value) => {
 			input.focus();
@@ -214,7 +236,7 @@ func (s *StatsScraper) setDateRange(fromDate, untilDate string) error {
 	var ok bool
 	if err := chromedp.Run(s.ctx,
 		chromedp.Evaluate(script, &ok),
-		chromedp.Sleep(1200*time.Millisecond),
+		chromedp.Sleep(dateRangeSettle),
 	); err != nil {
 		return fmt.Errorf("failed to set date range: %w", err)
 	}
@@ -225,7 +247,7 @@ func (s *StatsScraper) setDateRange(fromDate, untilDate string) error {
 }
 
 func (s *StatsScraper) waitForHits() (int, error) {
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(hitsPollTimeout)
 	var last int
 	stable := 0
 	for {
@@ -236,7 +258,7 @@ func (s *StatsScraper) waitForHits() (int, error) {
 		if hits, ok := parseHitsTotal(text); ok {
 			if hits == last {
 				stable++
-				if stable >= 2 {
+				if stable >= hitsStableReads {
 					return hits, nil
 				}
 			} else {
@@ -253,7 +275,7 @@ func (s *StatsScraper) waitForHits() (int, error) {
 		select {
 		case <-s.parent.Done():
 			return 0, s.parent.Err()
-		case <-time.After(750 * time.Millisecond):
+		case <-time.After(hitsPollInterval):
 		}
 	}
 }

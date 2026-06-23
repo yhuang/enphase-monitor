@@ -250,5 +250,7 @@ func (r *Resolver) saveCache(locs []SystemLocation) {
 	if err := os.MkdirAll(filepath.Dir(r.CachePath), 0o755); err != nil {
 		return
 	}
+	// Best-effort: a failed cache write just means the next run re-resolves the
+	// location, so it is intentionally not propagated.
 	_ = os.WriteFile(r.CachePath, append(data, '\n'), 0o644)
 }

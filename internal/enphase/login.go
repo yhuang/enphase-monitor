@@ -21,6 +21,9 @@ import (
 // loginTimeout bounds how long we wait for the user to finish logging in.
 const loginTimeout = 5 * time.Minute
 
+// loginPollInterval is the delay between checks for the portal session cookie.
+const loginPollInterval = 2 * time.Second
+
 // LoginAndGetCookie opens a visible Chrome window at the portal's applications
 // page, waits for the user to authenticate, and returns the session as a Cookie
 // header string scoped to baseURL's host (suitable for FetchAllAppCredentials).
@@ -73,7 +76,7 @@ func LoginAndGetCookie(ctx context.Context, baseURL string, notify func(string))
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
-		case <-time.After(2 * time.Second):
+		case <-time.After(loginPollInterval):
 		}
 	}
 }
