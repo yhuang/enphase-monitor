@@ -52,7 +52,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go                                # Entry point (~307 lines) - orchestration only
+├── main.go                                # Entry point (~720 lines) - orchestration only
 ├── internal/
 │   ├── aggregator/                        # Multi-system data aggregation
 │   │   ├── types.go                       # Metric data structures (AggregatedMetrics, SystemMetrics)
@@ -78,8 +78,13 @@ enphase-monitor/
 │   │   ├── trueup.go                      # True-Up Mode: single-batch Lifetime Data query, True-Up Window end-date logic, report conversion
 │   │   ├── trueup_test.go                 # True-up Window end-date logic (trueUpWindowEnd) and report conversion tests
 │   │   ├── backfill.go                    # Backfill Mode: live per-day fetch over a date range into history/
+│   │   ├── backfill_test.go               # Backfill range/skip/overwrite tests
 │   │   ├── weather.go                     # Best-effort weather enrichment for Day-Mode reports
+│   │   ├── weather_test.go                # Weather enrichment tests
 │   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
+│   ├── browser/                           # Headed Chrome launcher (chromedp) for portal automation
+│   │   ├── chrome.go                      # LaunchHeaded: disposable-profile Chrome session
+│   │   └── chrome_test.go                 # Chrome launcher tests
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                  # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
@@ -94,13 +99,30 @@ enphase-monitor/
 │   │   └── cache_commands_test.go         # Cache commands tests
 │   ├── config/                            # Configuration types
 │   │   ├── config.go                      # YAML loading & validation (uses type aliases)
-│   │   └── config_test.go                 # Configuration tests
+│   │   ├── config_test.go                 # Configuration tests
+│   │   ├── credentials.go                 # Loads/validates the credentials: pool; seeds & rewrites credentials.yaml
+│   │   └── credentials_test.go            # Credentials loading/validation/merge tests
 │   ├── constants/                         # Centralized constants
 │   │   ├── constants.go                   # Application-wide constants
 │   │   └── constants_test.go              # Constants tests
+│   ├── credentials/                       # Credential pool: spread + 429 failover + monthly quota
+│   │   ├── pool.go                        # Round-robin assignment, cooldown, failover
+│   │   ├── pool_test.go                   # Pool selection/failover tests
+│   │   ├── quota.go                       # Per-credential minute + monthly API budget (monthly-quota.json)
+│   │   ├── quota_test.go                  # Quota counting, month-rollover, and budget tests
+│   │   └── quota_portal_test.go           # Portal-seeded monthly baseline tests
 │   ├── display/                           # Terminal output formatting
 │   │   ├── display.go                     # Display with io.Writer injection for testability
 │   │   └── display_test.go                # Display output tests
+│   ├── enphase/                           # Developer-portal scraping (no management API)
+│   │   ├── login.go                       # Headed-Chrome portal login + session cookie capture
+│   │   ├── portal.go                      # Scrape app name/key/client_id/client_secret
+│   │   ├── seed.go                        # --seed-credentials: scrape + merge into credentials.yaml
+│   │   ├── stats.go                       # Monthly hit totals from the portal stats page
+│   │   ├── stats_browser.go               # chromedp driver for the stats page UI
+│   │   ├── login_test.go                  # Login/cookie-capture tests
+│   │   ├── portal_test.go                 # Portal HTML/JSON scrape tests
+│   │   └── stats_test.go                  # Stats parsing/date-range tests
 │   ├── geocode/                           # ZIP/postal code → coordinates (Zippopotam.us)
 │   │   ├── geocode.go                     # ZIP lookup for weather geolocation
 │   │   └── geocode_test.go                # Geocode tests
@@ -112,8 +134,9 @@ enphase-monitor/
 │   │   └── location_test.go               # Location resolver tests
 │   ├── oauth/                             # OAuth 2.0 authentication
 │   │   ├── oauth.go                       # Token management & refresh
-│   │   ├── authorization.go               # Interactive OAuth authorization wizard
+│   │   ├── browser.go                     # Browser-driven OAuth authorization (auto-approves consent)
 │   │   ├── oauth_test.go                  # Basic unit tests
+│   │   ├── browser_test.go                # Browser-OAuth flow tests
 │   │   ├── oauth_functional_test.go       # Integration tests with mock servers
 │   │   └── oauth_edge_cases_test.go       # Edge case and error path tests
 │   ├── parser/                            # JSON telemetry parsing
@@ -690,7 +713,7 @@ when possible to improve testability.
 | Package/File | Responsibility |
 |--------------|----------------|
 | [internal/oauth/oauth.go](../internal/oauth/oauth.go) | OAuth token management & refresh |
-| [internal/oauth/authorization.go](../internal/oauth/authorization.go) | Interactive OAuth authorization wizard |
+| [internal/oauth/browser.go](../internal/oauth/browser.go) | Browser-driven OAuth authorization (auto-approves consent) |
 | [internal/oauth/oauth_test.go](../internal/oauth/oauth_test.go) | OAuth tests |
 
 ### Internal Packages - Business Logic

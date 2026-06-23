@@ -49,7 +49,7 @@ func ParseFlags() *Flags {
 	flag.StringVar(&flags.BackfillFrom, "backfill-from", "", "Backfill Mode: fetch each day from this date (YYYY-MM-DD) through --date (or yesterday) with live API calls, writing one JSON record per day into history/. Skips days already written unless --force is given. Cannot be combined with --continuous, --true-up, or --init.")
 	flag.StringVar(&flags.TrueUp, "true-up", "", "Activate True-Up Mode. Provide your utility True-Up Start Date in YYYY-MM-DD format (e.g. 2025-01-15). Covers the 12-month True-Up Window: full calendar months from that month through yesterday (Current Period) or the last day of the 12-month window (Past True-Up Period). Takes precedence over --date.")
 	flag.BoolVar(&flags.Validation, "test", false, "Validation Mode: use cache only, no live API calls, validate against expected values")
-	flag.BoolVar(&flags.NoCache, "no-cache", false, "Bypass cache and always make live API calls")
+	flag.BoolVar(&flags.NoCache, "no-cache", false, "Bypass cache and always make live API calls. No effect in Backfill Mode, which is always live.")
 	flag.BoolVar(&flags.CachedMode, "cache", false, "Serve report from cache only; list missing endpoints if cache is incomplete")
 	flag.BoolVar(&flags.Debug, "debug", false, "Print debug information: last run time, API budget, and cache/API decisions")
 	flag.BoolVar(&flags.RefreshQuota, "refresh-quota", false, "Out-of-band refresh: read each application's monthly API hit total from the Enphase developer portal and update cache/monthly-quota.json")
