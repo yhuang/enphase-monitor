@@ -95,7 +95,7 @@ func RunBackfill(ctx context.Context, rc RunConfig, fromDate time.Time, force bo
 	runErrors := make(map[string]string) // date -> error, for the manifest
 	for day := from; !day.After(end); day = day.AddDate(0, 0, 1) {
 		dateStr := day.Format(constants.DateFormat)
-		path := filepath.Join(HistoryDir, dateStr+".json")
+		path := history.Enphase.RecordPath(HistoryDir, dateStr)
 
 		if !force {
 			if _, err := os.Stat(path); err == nil {
@@ -131,14 +131,14 @@ func RunBackfill(ctx context.Context, rc RunConfig, fromDate time.Time, force bo
 
 	// Refresh the manifest from disk so it reflects the whole dataset (this run
 	// plus any prior runs), not just this run's counters.
-	if err := history.WriteIndex(HistoryDir, from, end, rc.ReportTZ, runErrors); err != nil {
+	if err := history.WriteIndex(HistoryDir, history.Enphase, from, end, rc.ReportTZ, runErrors); err != nil {
 		fmt.Fprintf(os.Stderr, "WARNING: could not write history index: %v\n", err)
 	}
 
 	fmt.Printf("Backfill complete: %d written, %d skipped, %d errors\n", written, skipped, errored)
 	if errored > 0 {
 		fmt.Printf("%d day(s) missing — re-run the same command to retry just those (see %s).\n",
-			errored, filepath.Join(HistoryDir, history.IndexFileName))
+			errored, filepath.Join(HistoryDir, history.Enphase.IndexFileName()))
 	}
 	return nil
 }
@@ -187,7 +187,7 @@ func backfillDay(ctx context.Context, rc RunConfig, day time.Time) error {
 	if record.Weather == nil {
 		return errors.New("weather unavailable for this day")
 	}
-	return history.WriteRecord(HistoryDir, record)
+	return history.WriteRecord(HistoryDir, history.Enphase, record.Date, record)
 }
 
 // dayStart returns midnight of t's calendar day in tz.

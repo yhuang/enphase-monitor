@@ -83,13 +83,12 @@ enphase-monitor/
 │   │   ├── weather_test.go                # Weather enrichment tests
 │   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
 │   ├── browser/                           # Headed Chrome launcher (chromedp) for portal automation
-│   │   ├── chrome.go                      # LaunchHeaded: disposable-profile Chrome session
+│   │   ├── chrome.go                      # LaunchHeaded (disposable profile) + LaunchHeadedWithProfile (persistent profile)
 │   │   └── chrome_test.go                 # Chrome launcher tests
 │   ├── cache/                             # Disk-based response caching
 │   │   ├── cache.go                       # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                  # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
 │   │   ├── cache_functions_test.go        # Core caching tests (URL normalization, save/load, HasCacheForDate)
-│   │   ├── api_budget_test.go             # Sliding-window API Budget counter tests (RecordAPICall, RemainingBudget, pruning)
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
@@ -126,19 +125,37 @@ enphase-monitor/
 │   ├── geocode/                           # ZIP/postal code → coordinates (Zippopotam.us)
 │   │   ├── geocode.go                     # ZIP lookup for weather geolocation
 │   │   └── geocode_test.go                # Geocode tests
-│   ├── history/                           # Per-day energy+weather JSON records (history/)
-│   │   ├── history.go                     # DayRecord schema, FromMetrics, WriteRecord
-│   │   └── history_test.go                # History mapping and write tests
+│   ├── history/                           # Per-day energy+weather and utility-meter JSON records (history/)
+│   │   ├── history.go                     # Dataset type (Enphase/PGE sentinels), DayRecord schema, FromMetrics, WriteRecord, WriteIndex
+│   │   └── history_test.go                # History mapping, write, index, and Dataset tests
 │   ├── location/                          # Resolve & cache systems' coordinates (--init)
 │   │   ├── location.go                    # Location resolver with disk cache
 │   │   └── location_test.go               # Location resolver tests
-│   ├── oauth/                             # OAuth 2.0 authentication
+│   ├── oauth/                             # OAuth 2.0 authentication (Enphase developer-plan)
 │   │   ├── oauth.go                       # Token management & refresh
 │   │   ├── browser.go                     # Browser-driven OAuth authorization (auto-approves consent)
 │   │   ├── oauth_test.go                  # Basic unit tests
 │   │   ├── browser_test.go                # Browser-OAuth flow tests
 │   │   ├── oauth_functional_test.go       # Integration tests with mock servers
 │   │   └── oauth_edge_cases_test.go       # Edge case and error path tests
+│   ├── pge/                               # PG&E Share My Data (Green Button) integration
+│   │   ├── config.go                      # LoadConfig: compose from config.yaml + credentials.yaml pge: blocks
+│   │   ├── auth.go                        # OAuth2 authorize + token exchange (mTLS, Share My Data API)
+│   │   ├── pull.go                        # Pull: date-range fetch against Share My Data API (requires client cert)
+│   │   ├── browserpull.go                 # BrowserPull: Green Button download via headed Chrome session
+│   │   ├── espi.go                        # ParseReadings: ESPI XML → DayUsage intervals
+│   │   ├── history.go                     # WriteHistory: aggregate DayUsage → pge-YYYY-MM-DD.json records
+│   │   ├── download.go                    # Download: HTTP helper for the Green Button XML file
+│   │   ├── login.go                       # PGE portal login via headed Chrome
+│   │   ├── autoform.go                    # Auto-fill date-range form on the PGE download page
+│   │   ├── cert.go                        # CertRenew: certbot DNS-01 via Enom API (no sudo)
+│   │   ├── dns.go                         # SetHostRecord: update Enom DNS TXT record for ACME challenge
+│   │   ├── enom.go                        # Enom reseller API client (SetHosts replaces whole zone)
+│   │   ├── autoform_test.go               # Autoform field-fill tests
+│   │   ├── cert_test.go                   # CertRenew / certbot integration tests
+│   │   ├── download_test.go               # Download HTTP helper tests
+│   │   ├── enom_test.go                   # Enom API client tests
+│   │   └── espi_test.go                   # ESPI XML parser tests
 │   ├── parser/                            # JSON telemetry parsing
 │   │   ├── parser.go                      # Response parsing utilities
 │   │   ├── parser_test.go                 # Parser tests
@@ -174,7 +191,13 @@ enphase-monitor/
 ├── config.yaml.example                    # Configuration template
 ├── credentials.yaml                       # API secrets: credentials: pool (not in git)
 ├── credentials.yaml.example               # Credentials template
-└── cache/                                 # Cached API responses (created at runtime)
+├── cache/                                 # Cached API responses (created at runtime)
+├── history/                               # Per-day energy+weather and utility-meter JSON records (created at runtime)
+├── scripts/                               # Utility scripts
+│   ├── run-tests.sh                       # Test runner script
+│   ├── migrate-history-layout.sh          # One-time migration: renames <date>.json records to enphase-<date>.json
+│   └── history.py                         # Git history inspection helper
+└── certs/                                 # PG&E mTLS client certificate (gitignored)
 ```
 
 ### Package Dependency Graph

@@ -112,6 +112,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -128,9 +129,14 @@ import (
 	"enphase-monitor/internal/enphase"
 	"enphase-monitor/internal/location"
 	"enphase-monitor/internal/oauth"
+	"enphase-monitor/internal/pge"
 	"enphase-monitor/internal/timezone"
 	"enphase-monitor/internal/weather"
 )
+
+// tmpDir is the working directory for files that are transient and should not
+// be committed (downloaded PG&E XML, etc.). Excluded from version control via .gitignore.
+const tmpDir = "tmp"
 
 func main() {
 	// Parse command-line flags
@@ -153,18 +159,35 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Backfill Mode is a standalone report mode; reject combinations that would
-	// otherwise be silently ignored by mode-dispatch order.
-	if flags.BackfillFrom != "" {
+	// Source-flag mutual exclusivity.
+	if flags.PGEWebOnly && flags.EnphaseAPIOnly {
+		fmt.Fprintln(os.Stderr, "Error: --pge-web-only and --enphase-api-only are mutually exclusive")
+		os.Exit(1)
+	}
+
+	// Source flags require --start-date.
+	if (flags.PGEWebOnly || flags.EnphaseAPIOnly) && flags.StartDate == "" {
+		fmt.Fprintln(os.Stderr, "Error: --pge-web-only and --enphase-api-only require --start-date")
+		os.Exit(1)
+	}
+
+	// --end-date is only meaningful with --start-date.
+	if flags.EndDate != "" && flags.StartDate == "" {
+		fmt.Fprintln(os.Stderr, "Error: --end-date requires --start-date")
+		os.Exit(1)
+	}
+
+	// Range mode is incompatible with continuous/true-up/init.
+	if flags.StartDate != "" {
 		switch {
 		case flags.Continuous:
-			fmt.Fprintln(os.Stderr, "Error: --backfill-from cannot be combined with --continuous")
+			fmt.Fprintln(os.Stderr, "Error: --start-date cannot be combined with --continuous")
 			os.Exit(1)
 		case flags.TrueUp != "":
-			fmt.Fprintln(os.Stderr, "Error: --backfill-from cannot be combined with --true-up")
+			fmt.Fprintln(os.Stderr, "Error: --start-date cannot be combined with --true-up")
 			os.Exit(1)
 		case flags.Initialize:
-			fmt.Fprintln(os.Stderr, "Error: --backfill-from cannot be combined with --init")
+			fmt.Fprintln(os.Stderr, "Error: --start-date cannot be combined with --init")
 			os.Exit(1)
 		}
 	}
@@ -202,6 +225,36 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Credential seeding failed: %v\n", err)
 			os.Exit(1)
 		}
+		return
+	}
+
+	// --pge-web-only: standalone Green Button browser pull — needs no Enphase
+	// config or credentials, so dispatch before config load.
+	if flags.PGEWebOnly {
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+		tz := pgeTimezone(flags.ConfigFile)
+		from, err := time.ParseInLocation(constants.DateFormat, flags.StartDate, tz)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid --start-date %q: use YYYY-MM-DD\n", flags.StartDate)
+			os.Exit(1)
+		}
+		var to time.Time
+		if flags.EndDate != "" {
+			to, err = time.ParseInLocation(constants.DateFormat, flags.EndDate, tz)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: invalid --end-date %q: use YYYY-MM-DD\n", flags.EndDate)
+				os.Exit(1)
+			}
+		}
+		res, err := runPgePull(ctx, tz, from, to)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: PG&E pull failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("PG&E pull complete: %d day(s) written to %s for %s..%s\n",
+			res.DaysWritten, app.HistoryDir,
+			res.From.Format(constants.DateFormat), res.To.Format(constants.DateFormat))
 		return
 	}
 
@@ -309,28 +362,45 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Backfill Mode: fetch a range of past days into history/ and exit.
-	if flags.BackfillFrom != "" {
-		fromDate, err := time.ParseInLocation(constants.DateFormat, flags.BackfillFrom, reportTZ)
+	// Range pull: --start-date with an optional source flag.
+	// --pge-web-only was already dispatched early; here we handle:
+	//   (no source flag)     → PG&E web pull, then Enphase API backfill
+	//   --enphase-api-only   → Enphase API backfill only
+	if flags.StartDate != "" {
+		fromDate, err := time.ParseInLocation(constants.DateFormat, flags.StartDate, reportTZ)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: invalid --backfill-from date %q: use YYYY-MM-DD\n", flags.BackfillFrom)
+			fmt.Fprintf(os.Stderr, "Error: invalid --start-date %q: use YYYY-MM-DD\n", flags.StartDate)
 			os.Exit(1)
 		}
-		// An explicit --date bounds the backfill end; otherwise RunBackfill
-		// defaults to yesterday. Only the day format is meaningful here.
 		var endDate time.Time
-		if flags.TestDate != "" {
-			endDate, err = time.ParseInLocation(constants.DateFormat, flags.TestDate, reportTZ)
+		if flags.EndDate != "" {
+			endDate, err = time.ParseInLocation(constants.DateFormat, flags.EndDate, reportTZ)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: invalid --date %q: use YYYY-MM-DD for backfill\n", flags.TestDate)
+				fmt.Fprintf(os.Stderr, "Error: invalid --end-date %q: use YYYY-MM-DD\n", flags.EndDate)
 				os.Exit(1)
 			}
 		}
-		// noCache stays false here: RunBackfill disables the cache itself, so we
-		// avoid the redundant "LIVE MODE" notice (backfill is always live).
+
+		// PG&E web pull (skipped when --enphase-api-only). When both sources are
+		// active, use PG&E's most recent available day as the Enphase end date so
+		// both datasets stay aligned — PG&E data often lags Enphase by a day or two.
+		if !flags.EnphaseAPIOnly {
+			pgeRes, err := runPgePull(ctx, reportTZ, fromDate, endDate)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: PG&E pull failed: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("PG&E pull complete: %d day(s) written to %s for %s..%s\n",
+				pgeRes.DaysWritten, app.HistoryDir,
+				pgeRes.From.Format(constants.DateFormat), pgeRes.To.Format(constants.DateFormat))
+			if !pgeRes.LastDay.IsZero() {
+				endDate = pgeRes.LastDay
+			}
+		}
+
+		// Enphase API backfill. noCache stays false: RunBackfill always runs live.
 		app.ConfigureModes(false /* validationMode */, false /* noCache */, flags.Debug)
 		printDebugStartup(flags.Debug, pool, reportTZ)
-
 		rc := app.RunConfig{
 			Agg:      agg,
 			Pool:     pool,
@@ -492,6 +562,49 @@ func runSeedCredentials(ctx context.Context, credentialsFile, namePrefix string)
 		fmt.Println("  ./enphase-monitor --update-refresh-tokens --all --new-only")
 	}
 	return nil
+}
+
+// pgeProfileDir is where the persistent Chrome profile for the PG&E browser pull
+// lives, so a sign-in (including MFA) is reused across runs. It is kept under the
+// user's home; falls back to a working-directory dotdir if home is unavailable.
+func pgeProfileDir() string {
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".enphase-monitor", "pge-chrome")
+	}
+	return ".pge-chrome-profile"
+}
+
+// pgeTimezone loads the app timezone from config, falling back to
+// America/Los_Angeles (PG&E serves California) if the config is absent or
+// the timezone string is invalid, or UTC if the zone database is unavailable.
+func pgeTimezone(configFile string) *time.Location {
+	if cfg, err := config.LoadConfig(configFile); err == nil {
+		if loc, err := timezone.LoadTimezone(cfg.Timezone); err == nil {
+			return loc
+		}
+	}
+	if loc, err := time.LoadLocation("America/Los_Angeles"); err == nil {
+		return loc
+	}
+	return time.UTC
+}
+
+// runPgePull drives the PG&E browser pull for [from, to]: sign in,
+// auto-download the Green Button XML, and write one history record per day.
+// Zero from/to values are filled with defaults by BrowserPull (end = yesterday,
+// start = 30 days prior). It returns the pull result so the caller can read
+// LastDay when aligning the Enphase backfill end date to PG&E's most recent
+// available data.
+func runPgePull(ctx context.Context, tz *time.Location, from, to time.Time) (*pge.BrowserPullResult, error) {
+	return pge.BrowserPull(ctx, pge.BrowserPullOptions{
+		ProfileDir: pgeProfileDir(),
+		HistoryDir: app.HistoryDir,
+		RawDir:     tmpDir,
+		From:       from,
+		To:         to,
+		TZ:         tz,
+		Notify:     func(msg string) { fmt.Fprintln(os.Stderr, msg) },
+	})
 }
 
 // refreshPortalQuota reads each application's monthly hit total from the Enphase

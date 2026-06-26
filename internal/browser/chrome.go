@@ -16,14 +16,31 @@ import (
 // chromeStartupTimeout bounds how long we wait for Chrome to open its DevTools port.
 const chromeStartupTimeout = 90 * time.Second
 
-// LaunchHeaded returns a chromedp context backed by a visible Chrome window.
-// The caller must invoke cancel when done (cancels context then allocator).
-func LaunchHeaded(parent context.Context) (ctx context.Context, cancel func(), err error) {
-	// Each session gets its own throwaway profile so concurrent or repeated runs
-	// never share Chrome state; cleanup removes it so temp does not accumulate.
-	profileDir, err := os.MkdirTemp("", "enphase-monitor-chromedp-")
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create Chrome profile directory: %w", err)
+// LaunchHeaded returns a chromedp context backed by a visible Chrome window with
+// a throwaway profile that is deleted on cleanup, so concurrent or repeated runs
+// never share Chrome state. Suitable for one-shot scrapes that re-authenticate
+// every time. The caller must invoke cancel when done.
+func LaunchHeaded(parent context.Context) (context.Context, func(), error) {
+	return LaunchHeadedWithProfile(parent, "")
+}
+
+// LaunchHeadedWithProfile is LaunchHeaded with control over the Chrome profile
+// directory. When profileDir is empty, a throwaway temp profile is created and
+// removed on cleanup (the LaunchHeaded behavior). When profileDir is non-empty,
+// that directory is used and left in place on cleanup, so a session logged in
+// once (including MFA) persists across runs and later runs skip the login.
+func LaunchHeadedWithProfile(parent context.Context, profileDir string) (context.Context, func(), error) {
+	persistent := profileDir != ""
+	if persistent {
+		if err := os.MkdirAll(profileDir, 0o700); err != nil {
+			return nil, nil, fmt.Errorf("failed to create Chrome profile directory %q: %w", profileDir, err)
+		}
+	} else {
+		var err error
+		profileDir, err = os.MkdirTemp("", "enphase-monitor-chromedp-")
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create Chrome profile directory: %w", err)
+		}
 	}
 
 	opts := headedAllocatorOptions(profileDir)
@@ -33,7 +50,9 @@ func LaunchHeaded(parent context.Context) (ctx context.Context, cancel func(), e
 	cleanup := func() {
 		cancelBrowser()
 		cancelAlloc()
-		_ = os.RemoveAll(profileDir)
+		if !persistent {
+			_ = os.RemoveAll(profileDir)
+		}
 	}
 
 	// Run startup on browserCtx, not a child timeout context. chromedp ties the
@@ -62,7 +81,8 @@ func LaunchHeaded(parent context.Context) (ctx context.Context, cancel func(), e
 }
 
 func headedAllocatorOptions(profileDir string) []chromedp.ExecAllocatorOption {
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+	opts := append(
+		append([]chromedp.ExecAllocatorOption{}, chromedp.DefaultExecAllocatorOptions[:]...),
 		chromedp.Flag("headless", false),
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,

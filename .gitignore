@@ -14,8 +14,9 @@
 .docs/
 
 /cache/
-test-data/cache/
 history/*
+tmp/*
+certs/
 weather_codes.json
 
 *bak

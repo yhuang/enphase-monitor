@@ -183,7 +183,7 @@ func (c *ColorConfig) convertHexFields() {
 
 ### Struct Definition
 
-**Location**: `internal/oauth/oauth.go:85-91`
+**Location**: `internal/oauth/oauth.go:94-98`
 
 Structs group related data together. This struct holds token information. Fields are exported (PascalCase) so they can be accessed from other packages.
 
