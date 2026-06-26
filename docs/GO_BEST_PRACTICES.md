@@ -188,10 +188,10 @@ case <-ctx.Done():
 When you spawn a goroutine, make it clear **when or whether it exits**. Every goroutine should have a predictable stop mechanism and a way to wait for it to finish.
 
 - **Don't fire-and-forget** — Use a done channel or `sync.WaitGroup` so callers can wait for the goroutine to exit.
-- **Prefer synchronous code** — Keep concurrency at the caller: use synchronous functions (e.g. a `for`/`select` loop) and let the caller add goroutines if needed. In this codebase, `RunContinuous` is a synchronous loop that uses `select` on `ticker.C` and `ctx.Done()`; it does not spawn goroutines.
+- **Prefer synchronous code** — Keep concurrency at the caller: use synchronous functions and let the caller add goroutines if needed.
 - **No goroutines in init()** — Don't start background goroutines in `init()`. Use an object with an explicit `Close`/`Stop`/`Shutdown` method if you need a long-lived worker.
 
-**In this codebase:** The only spawned goroutine is in tests (e.g. a goroutine that cancels the context after a delay). That goroutine uses a `done` channel and the test waits on `<-done` before ending. Production code uses a synchronous `select` loop in `RunContinuous` for periodic refresh and shutdown.
+**In this codebase:** The only spawned goroutine is in tests (e.g. a goroutine that cancels the context after a delay). That goroutine uses a `done` channel and the test waits on `<-done` before ending. Production code is fully synchronous.
 
 ---
 
@@ -589,8 +589,8 @@ Call `os.Exit` or `log.Fatal` **only in `main()`**. All other code should return
 
 **In this codebase:**
 
-- **main.go** is the only file that calls `os.Exit(1)`. It handles errors from config, OAuth, cache commands, `RunOnce`, and `RunContinuous` by printing to stderr and exiting.
-- **internal/app/runner.go** – `RunOnce` and `RunContinuous` return `error` instead of exiting. `fetchAndDisplay` returns `error` so the continuous loop can stop on fatal errors (e.g. 429).
+- **main.go** is the only file that calls `os.Exit(1)`. It handles errors from config, OAuth, cache commands, and `RunOnce` by printing to stderr and exiting.
+- **internal/app/runner.go** – `RunOnce` returns `error` instead of exiting.
 - **internal/app/setup.go** – No `ExitWithError`; main performs the fprintf and exit.
 
 **Benefits:** Testable code (no exit in tests), predictable control flow, `defer` in helpers always runs.
@@ -890,7 +890,7 @@ oauth.Authorize(ctx, cred)
 
 - **First parameter** — All context-using functions take `ctx context.Context` as the first parameter (`RunOnce`, `GetAccessToken`, `ExchangeAuthorizationCode`, `GetMetricsFromCloud`, etc.).
 - **No context in structs** — `EnlightenCloudClient`, `DataAggregator`, and `Display` do not store context; it is passed into methods.
-- **Propagation** — `main` creates a signal context and passes it to `RunOnce`/`RunContinuous` and to `oauth.Authorize` so shutdown and Ctrl+C cancel in-flight work.
+- **Propagation** — `main` creates a signal context and passes it to `RunOnce` and to `oauth.Authorize` so shutdown and Ctrl+C cancel in-flight work.
 
 ---
 

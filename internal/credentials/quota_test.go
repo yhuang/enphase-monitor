@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/types"
@@ -16,62 +15,6 @@ func useTempQuotaFile(t *testing.T, p *Pool) {
 	t.Setenv("ENPHASE_CACHE_DIR", dir)
 	p.quotaFileOverride = filepath.Join(dir, quotaFilename)
 	p.loadQuota()
-}
-
-func TestRemainingMinuteBudget_FreshState(t *testing.T) {
-	p := makePool("a")
-	useTempQuotaFile(t, p)
-
-	got := p.RemainingMinuteBudget("a")
-	if got != constants.APIBudgetPerMinute {
-		t.Errorf("RemainingMinuteBudget() = %d, want %d", got, constants.APIBudgetPerMinute)
-	}
-}
-
-func TestRemainingMinuteBudget_AfterCalls(t *testing.T) {
-	p := makePool("a")
-	useTempQuotaFile(t, p)
-
-	for i := 1; i <= constants.APIBudgetPerMinute; i++ {
-		p.RecordAPICall("a")
-		want := constants.APIBudgetPerMinute - i
-		got := p.RemainingMinuteBudget("a")
-		if got != want {
-			t.Errorf("after %d RecordAPICall(): RemainingMinuteBudget() = %d, want %d", i, got, want)
-		}
-	}
-}
-
-func TestRemainingMinuteBudget_OldEntriesPruned(t *testing.T) {
-	p := makePool("a")
-	useTempQuotaFile(t, p)
-
-	old := p.now().Add(-(time.Duration(constants.APIBudgetWindowSeconds)*time.Second + 5*time.Second))
-	fresh1 := p.now().Add(-10 * time.Second)
-	fresh2 := p.now().Add(-5 * time.Second)
-	p.quota.Minute["a"] = []string{
-		old.Format(time.RFC3339Nano),
-		fresh1.Format(time.RFC3339Nano),
-		fresh2.Format(time.RFC3339Nano),
-	}
-
-	want := constants.APIBudgetPerMinute - 2
-	got := p.RemainingMinuteBudget("a")
-	if got != want {
-		t.Errorf("RemainingMinuteBudget() = %d, want %d (old entries should be pruned)", got, want)
-	}
-}
-
-func TestForSystemSkipsMinuteExhausted(t *testing.T) {
-	p := makePool("a", "b")
-	useTempQuotaFile(t, p)
-
-	for i := 0; i < constants.APIBudgetPerMinute; i++ {
-		p.RecordAPICall("a")
-	}
-	if got := p.ForSystem(0).Name; got != "b" {
-		t.Errorf("ForSystem(0) with a minute-exhausted = %q, want b", got)
-	}
 }
 
 func TestForSystemSkipsMonthlyExhausted(t *testing.T) {
@@ -125,9 +68,6 @@ func TestQuotaPersistsToDisk(t *testing.T) {
 
 	if p2.monthlyCount("a") != 1 {
 		t.Errorf("reloaded monthly count = %d, want 1", p2.monthlyCount("a"))
-	}
-	if p2.minuteCount("a") != 1 {
-		t.Errorf("reloaded minute count = %d, want 1", p2.minuteCount("a"))
 	}
 	_ = os.Remove(path)
 }

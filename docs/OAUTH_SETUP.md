@@ -322,7 +322,7 @@ Your secrets stay in `credentials.yaml`:
 ```yaml
 # credentials.yaml
 credentials:
-  - name: enphase-monitor-001
+  - name: enphase-monitor-01
     key: YOUR_API_KEY
     client_id: YOUR_CLIENT_ID
     client_secret: YOUR_CLIENT_SECRET
@@ -342,7 +342,7 @@ This URL initiates the OAuth flow by redirecting the user to Enphase's authoriza
 ```bash
 ./enphase-monitor --update-refresh-tokens
 # With more than one credential set, name the one to set up:
-./enphase-monitor --update-refresh-tokens enphase-monitor-002
+./enphase-monitor --update-refresh-tokens enphase-monitor-02
 # Or re-authorize every credential in turn (e.g. after they all expired):
 ./enphase-monitor --update-refresh-tokens --all
 ```
@@ -478,7 +478,7 @@ Add the `refresh_token` from the response to the matching credential entry in yo
 
 ```yaml
 credentials:
-  - name: enphase-monitor-001
+  - name: enphase-monitor-01
     key: YOUR_API_KEY
     client_id: YOUR_CLIENT_ID
     client_secret: YOUR_CLIENT_SECRET

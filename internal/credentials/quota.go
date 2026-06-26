@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"enphase-monitor/internal/cache"
 	"enphase-monitor/internal/constants"
@@ -16,20 +15,18 @@ import (
 
 const quotaFilename = "monthly-quota.json"
 
-// quotaFile persists per-credential minute and monthly call counts on disk.
+// quotaFile persists per-credential monthly call counts on disk.
 // Monthly values are seeded from the developer portal (--init / --refresh-quota)
 // and incremented on each live API call (RecordAPICall).
 type quotaFile struct {
-	Month   string              `json:"month"`
-	Monthly map[string]int      `json:"monthly"`
-	Minute  map[string][]string `json:"minute,omitempty"`
+	Month   string         `json:"month"`
+	Monthly map[string]int `json:"monthly"`
 }
 
 func (p *Pool) loadQuota() {
 	p.quota = quotaFile{
 		Month:   p.currentMonth(),
 		Monthly: make(map[string]int, len(p.creds)),
-		Minute:  make(map[string][]string, len(p.creds)),
 	}
 	data, err := os.ReadFile(p.quotaPath())
 	if err != nil {
@@ -52,18 +49,11 @@ func (p *Pool) loadQuota() {
 	if loaded.Monthly == nil {
 		loaded.Monthly = make(map[string]int)
 	}
-	if loaded.Minute == nil {
-		loaded.Minute = make(map[string][]string)
-	}
 	if loaded.Month != p.currentMonth() {
-		// New calendar month: keep minute stamps but reset monthly counts.
 		loaded.Month = p.currentMonth()
 		loaded.Monthly = make(map[string]int, len(p.creds))
 	}
 	p.quota = loaded
-	for _, c := range p.creds {
-		p.pruneMinute(c.Name)
-	}
 }
 
 func (p *Pool) saveQuota() {
@@ -104,49 +94,10 @@ func (p *Pool) ensureMonthCurrent() {
 	p.saveQuota()
 }
 
-func (p *Pool) pruneMinute(name string) {
-	cutoff := p.now().Add(-time.Duration(constants.APIBudgetWindowSeconds) * time.Second)
-	stamps := p.quota.Minute[name]
-	kept := stamps[:0]
-	for _, raw := range stamps {
-		t, err := time.Parse(time.RFC3339Nano, raw)
-		if err != nil {
-			continue
-		}
-		if t.After(cutoff) {
-			kept = append(kept, raw)
-		}
-	}
-	if len(kept) == 0 {
-		delete(p.quota.Minute, name)
-		return
-	}
-	p.quota.Minute[name] = kept
-}
-
-// minuteCount returns live calls in the current sliding minute window. Despite
-// the read-only name it may write the quota file as a side effect, because
-// ensureMonthCurrent persists a reset when the calendar month has rolled over.
-func (p *Pool) minuteCount(name string) int {
-	p.ensureMonthCurrent()
-	p.pruneMinute(name)
-	return len(p.quota.Minute[name])
-}
-
-// monthlyCount returns calls recorded this calendar month. Like minuteCount it
-// may persist a month-rollover reset via ensureMonthCurrent.
+// monthlyCount returns calls recorded this calendar month.
 func (p *Pool) monthlyCount(name string) int {
 	p.ensureMonthCurrent()
 	return p.quota.Monthly[name]
-}
-
-// hasMinuteBudget reports whether the credential can make another live call
-// without exceeding the per-minute limit.
-func (p *Pool) hasMinuteBudget(c *types.APIConfig) bool {
-	if c == nil {
-		return false
-	}
-	return p.minuteCount(c.Name) < constants.APIBudgetPerMinute
 }
 
 // hasMonthlyBudget reports whether the credential still has monthly quota left.
@@ -157,23 +108,11 @@ func (p *Pool) hasMonthlyBudget(c *types.APIConfig) bool {
 	return p.monthlyCount(c.Name) < constants.MaxRequestsPerMonth
 }
 
-// RemainingMinuteBudget implements api.BudgetTracker.
-func (p *Pool) RemainingMinuteBudget(credentialName string) int {
-	used := p.minuteCount(credentialName)
-	if used >= constants.APIBudgetPerMinute {
-		return 0
-	}
-	return constants.APIBudgetPerMinute - used
-}
-
 // RecordAPICall implements api.BudgetTracker. It rewrites the whole quota file
 // on every call to keep counts durable across restarts; the file is small and
 // runs make few calls, so the cost is negligible even during backfill.
 func (p *Pool) RecordAPICall(credentialName string) {
 	p.ensureMonthCurrent()
-	p.pruneMinute(credentialName)
-	stamp := p.now().Format(time.RFC3339Nano)
-	p.quota.Minute[credentialName] = append(p.quota.Minute[credentialName], stamp)
 	p.quota.Monthly[credentialName]++
 	p.saveQuota()
 }
@@ -232,28 +171,6 @@ func (p *Pool) QuotaSummary() string {
 	}
 	return fmt.Sprintf("Pool quota: %s / %s this month (%d%%); %d %s exhausted.",
 		formatWithCommas(used), formatWithCommas(capacity), pct, exhausted, keyWord)
-}
-
-// LastAPICallTime returns the most recent live API call across all credentials.
-func (p *Pool) LastAPICallTime() (time.Time, bool) {
-	var latest time.Time
-	found := false
-	for name := range p.quota.Minute {
-		p.pruneMinute(name)
-	}
-	for _, stamps := range p.quota.Minute {
-		for _, raw := range stamps {
-			t, err := time.Parse(time.RFC3339Nano, raw)
-			if err != nil {
-				continue
-			}
-			if !found || t.After(latest) {
-				latest = t
-				found = true
-			}
-		}
-	}
-	return latest, found
 }
 
 func formatWithCommas(n int) string {

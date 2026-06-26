@@ -126,27 +126,17 @@
 //
 // RATE LIMITING & API BUDGET
 // --------------------------
-// The Enphase Cloud API v4 enforces a per-API-key budget of
-// constants.APIBudgetPerMinute requests per minute (10 / 60s) and
-// constants.MaxRequestsPerMonth per calendar month (1000). This client relies on
-// internal/cache for caching responses and on the credential pool's per-key
-// budget tracker to stay under the limits:
+// The Enphase Cloud API v4 enforces 10 requests/minute and
+// constants.MaxRequestsPerMonth per calendar month (1000) per API key.
 //  1. Past Period serving: Past Period responses are always served from cache
-//     without consuming any API Budget — the data is immutable so a live call
-//     would return identical results. Detected via cacheMaxAge returning 0.
-//     Current Period queries (today / MTD / YTD / Current Period True-Up) are
-//     live-first: a real API call is made whenever budget allows, because data
-//     changes throughout the day. Cache is the fallback only when the
-//     credential's per-minute budget is already exhausted (serveBudgetExhausted).
-//  2. Per-credential sliding window: the credentials.Pool tracks live calls per
-//     API key. BudgetTracker.RemainingMinuteBudget() reports how many requests
-//     are still available for this credential in the current window. When budget
-//     is exhausted the client serves an exact-URL cache (any age), then a cross-
-//     endpoint match (same endpoint + system, any date) instead of a live call.
-//  3. Errors propagate: on a transport error, 429, or 503 from a live call, the
-//     client returns the error — it never serves stale cache on failure. A 429
-//     reaches the aggregator, which fails over to a spare credential; Backfill
-//     Mode fails the day so it is retried rather than written from stale data.
+//     without making a live call — the data is immutable. Detected via
+//     cacheMaxAge returning 0. Current Period queries are live-first.
+//  2. Monthly tracking: RecordAPICall increments the per-credential monthly
+//     counter in credentials.Pool on every successful live call.
+//  3. Errors propagate: on a transport error, 429, or 503, the client returns
+//     the error. A 429 reaches the aggregator, which fails over to a spare
+//     credential; Backfill Mode fails the day so it is retried rather than
+//     written from stale data.
 //
 // ERROR HANDLING
 // --------------
@@ -177,17 +167,15 @@ import (
 	"enphase-monitor/internal/urlbuilder"
 )
 
-// BudgetTracker reports and records per-credential API budget. Implemented by
+// BudgetTracker records per-credential monthly API usage. Implemented by
 // credentials.Pool in production; tests may inject a stub.
 type BudgetTracker interface {
-	RemainingMinuteBudget(credentialName string) int
 	RecordAPICall(credentialName string)
 }
 
 type unlimitedBudget struct{}
 
-func (unlimitedBudget) RemainingMinuteBudget(string) int { return constants.APIBudgetPerMinute }
-func (unlimitedBudget) RecordAPICall(string)             {}
+func (unlimitedBudget) RecordAPICall(string) {}
 
 // EnlightenCloudClient handles communication with Enphase Enlighten Cloud API v4.
 // It manages authentication, request formatting, and response parsing for
@@ -474,28 +462,6 @@ func (c *EnlightenCloudClient) GetBatteryDataForDate(ctx context.Context, testDa
 	return chargeWh / constants.WhToKWh, dischargeWh / constants.WhToKWh, socPercent, nil // Convert Wh to kWh
 }
 
-// QueryCost returns the number of live API calls GetMetricsFromCloud will make
-// for a single system with the given query mode. Callers can compare this value
-// against the credential's remaining minute budget before starting a fetch to
-// decide whether a fully live run is possible or whether cached data will be
-// needed.
-//
-// hasBattery should be true when the system is known to have a battery device.
-// For QueryModeDay with hasBattery=true this returns 5 (worst-case estimate):
-// GetMetricsFromCloud only calls the battery endpoint when testDate is zero
-// (today's live report), but QueryCost is used as a conservative preflight
-// check before we know the target date.
-// For QueryModeMonth / QueryModeYear / QueryModeTrueUp the battery endpoint is
-// never called regardless of hasBattery.
-func QueryCost(queryMode constants.QueryMode, hasBattery bool) int {
-	// Fixed set per system: grid import, grid export, production, consumption.
-	const baseCalls = 4
-	if queryMode == constants.QueryModeDay && hasBattery {
-		return baseCalls + 1
-	}
-	return baseCalls
-}
-
 // GetMetricsFromCloud fetches all metrics from the Cloud API for the specified period.
 // If testDate is provided, uses that date instead of today.
 // queryMode selects Day, Month, Year, or True-Up Mode.
@@ -522,21 +488,6 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	sysPrefix := ""
 	if c.systemName != "" {
 		sysPrefix = "[" + c.systemName + "] "
-	}
-
-	// Preflight: warn when the remaining budget is smaller than what this query
-	// needs. For Past Periods every endpoint is served from immutable cache so
-	// budget consumption is zero — skip the check. For Current Periods the client
-	// will still make whatever live calls it can and fall back to cache for the
-	// rest, but alerting early helps the caller understand why results may be stale.
-	// Day queries always attempt battery (hasBattery=true for the conservative count).
-	if cache.DebugMode() && !timezone.IsPastPeriod(testDate, queryMode, c.timezone) {
-		needed := QueryCost(queryMode, queryMode == constants.QueryModeDay)
-		remaining := c.budgetTracker().RemainingMinuteBudget(c.credentialName)
-		if remaining < needed {
-			fmt.Fprintf(os.Stderr, "WARNING: %sInsufficient API budget: need %d call(s), %d/%d remaining — results may use cached data\n",
-				sysPrefix, needed, remaining, constants.APIBudgetPerMinute)
-		}
 	}
 
 	// Helper to check context cancellation
@@ -617,13 +568,6 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	cacheUsed = cacheUsed || c.cacheUsed
 
 	return metrics, cacheUsed, nil
-}
-
-// budgetExhausted reports whether this credential's per-minute API Budget for
-// the current window has been used up. When true, the client prefers cache
-// over a live API call for any URL that has one.
-func (c *EnlightenCloudClient) budgetExhausted() bool {
-	return c.budgetTracker().RemainingMinuteBudget(c.credentialName) <= 0
 }
 
 // cacheMaxAge returns the maximum age at which a cached response for a given
@@ -794,9 +738,6 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 		// would waste budget and return identical results.
 		cache.Debugf("serving cache (Past Period, age %s): %s", time.Since(fb.cached.CachedAt).Round(time.Second), cache.RedactURLKey(url))
 		return fb.serve()
-	case c.budgetExhausted():
-		// Current period, no budget left: cache is the fallback, not the default.
-		return c.serveBudgetExhausted(fb)
 	default:
 		// Current period with budget available: prefer a live call — data changes
 		// throughout the day — with cache as the failure fallback.
@@ -913,33 +854,12 @@ func (c *EnlightenCloudClient) requestNoCacheMode(ctx context.Context, fb cacheF
 	return c.finalizeAndCache(fb.url, resp)
 }
 
-// serveBudgetExhausted handles current-period queries when the API Budget is
-// spent: serve the exact-URL cache, else any same-endpoint cache, else fail.
-func (c *EnlightenCloudClient) serveBudgetExhausted(fb cacheFallback) (*http.Response, bool, error) {
-	remaining := c.budgetTracker().RemainingMinuteBudget(c.credentialName)
-	cache.Debugf("budget exhausted (%d/%d), falling back to cache: %s", remaining, constants.APIBudgetPerMinute, cache.RedactURLKey(fb.url))
-	if fb.has() {
-		cache.Debugf("serving cache (budget exhausted, age %s)", time.Since(fb.cached.CachedAt).Round(time.Second))
-		return fb.serve()
-	}
-	if recent, ok := fb.crossDate(); ok {
-		cache.Debugf("cross-date cache hit (budget exhausted, any age)")
-		return recent, true, nil
-	}
-	cache.Debugf("budget exhausted, no cache available — returning RateLimitError")
-	return nil, false, errors.New(constants.RateLimitError)
-}
-
-// requestLiveMode handles the normal current-period path: make a live call when
-// budget is available. Errors (transport, 429, 503, other non-OK) are propagated
-// rather than masked by serving stale cache — a 429 must reach the aggregator so
-// it can fail over to a spare credential, and surfacing an outage beats returning
-// stale data as if it were fresh. Proactive cache serving when a credential's
-// minute budget is spent is handled earlier by serveBudgetExhausted, before any
-// live call. On success the response is cached and returned fresh.
+// requestLiveMode handles the normal current-period path: make a live call.
+// Errors (transport, 429, 503, other non-OK) are propagated rather than masked
+// by serving stale cache — a 429 must reach the aggregator so it can fail over
+// to a spare credential. On success the response is cached and returned fresh.
 func (c *EnlightenCloudClient) requestLiveMode(ctx context.Context, fb cacheFallback) (*http.Response, bool, error) {
-	remaining := c.budgetTracker().RemainingMinuteBudget(c.credentialName)
-	cache.Debugf("live API call (budget %d/%d): %s", remaining, constants.APIBudgetPerMinute, cache.RedactURLKey(fb.url))
+	cache.Debugf("live API call: %s", cache.RedactURLKey(fb.url))
 	req, err := c.newAPIRequest(ctx, fb.url)
 	if err != nil {
 		return nil, false, err
@@ -960,8 +880,7 @@ func (c *EnlightenCloudClient) requestLiveMode(ctx context.Context, fb cacheFall
 		return nil, false, errServiceUnavailable
 	}
 	c.budgetTracker().RecordAPICall(c.credentialName)
-	remaining = c.budgetTracker().RemainingMinuteBudget(c.credentialName)
-	cache.Debugf("live API call succeeded (budget now %d/%d)", remaining, constants.APIBudgetPerMinute)
+	cache.Debugf("live API call succeeded: %s", cache.RedactURLKey(fb.url))
 
 	if resp.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(resp.Body)

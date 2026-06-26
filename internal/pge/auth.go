@@ -195,11 +195,11 @@ func (c *client) exchangeAuthCode(ctx context.Context, code, redirectURI string)
 // userToken returns a valid User Access Token, refreshing it if needed. PG&E
 // rotates the refresh token on each refresh, so the rotated pair is persisted.
 func (c *client) userToken(ctx context.Context) (string, error) {
-	if c.store.UserToken.valid() {
-		return c.store.UserToken.AccessToken, nil
-	}
 	if c.store.UserToken == nil || c.store.UserToken.RefreshToken == "" {
 		return "", fmt.Errorf("no PG&E user token — run: --pge-authorize --pge-code <CODE> --pge-redirect-uri <URI>")
+	}
+	if c.store.UserToken.valid() {
+		return c.store.UserToken.AccessToken, nil
 	}
 	pair, err := c.postToken(ctx, url.Values{
 		"grant_type":    {"refresh_token"},

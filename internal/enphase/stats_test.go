@@ -26,14 +26,11 @@ func TestParseHitsTotal(t *testing.T) {
 	}
 }
 
-func TestCalendarMonthRange(t *testing.T) {
+func TestFirstOfMonth(t *testing.T) {
 	ref := time.Date(2026, 6, 21, 15, 0, 0, 0, time.Local)
-	from, until := calendarMonthRange(ref)
+	from := firstOfMonth(ref)
 	if from != "06/01/2026" {
-		t.Errorf("from = %q, want 06/01/2026", from)
-	}
-	if until != "06/21/2026" {
-		t.Errorf("until = %q, want 06/21/2026", until)
+		t.Errorf("firstOfMonth = %q, want 06/01/2026", from)
 	}
 }
 

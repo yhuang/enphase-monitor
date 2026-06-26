@@ -24,50 +24,18 @@ func TestParseFlags_Defaults(t *testing.T) {
 	if flags.ConfigFile != "config.yaml" {
 		t.Errorf("ParseFlags() ConfigFile = %v, want config.yaml", flags.ConfigFile)
 	}
-	if flags.Continuous {
-		t.Errorf("ParseFlags() Continuous = %v, want false", flags.Continuous)
-	}
-	if flags.Validation {
-		t.Errorf("ParseFlags() Validation = %v, want false", flags.Validation)
-	}
 }
 
 func TestParseFlags_ConfigFile(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--config", "custom.yaml"}
+	os.Args = []string{"cmd", "--config-file", "custom.yaml"}
 
 	flags := ParseFlags()
 
 	if flags.ConfigFile != "custom.yaml" {
 		t.Errorf("ParseFlags() ConfigFile = %v, want custom.yaml", flags.ConfigFile)
-	}
-}
-
-func TestParseFlags_Continuous(t *testing.T) {
-	resetFlags(t)
-	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--continuous"}
-
-	flags := ParseFlags()
-
-	if !flags.Continuous {
-		t.Error("Continuous should be true")
-	}
-}
-
-func TestParseFlags_Validation(t *testing.T) {
-	resetFlags(t)
-	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--test"}
-
-	flags := ParseFlags()
-
-	if !flags.Validation {
-		t.Error("Validation should be true")
 	}
 }
 
@@ -79,8 +47,8 @@ func TestParseFlags_TestDate(t *testing.T) {
 
 	flags := ParseFlags()
 
-	if flags.TestDate != "2026-01-15" {
-		t.Errorf("TestDate = %v, want 2026-01-15", flags.TestDate)
+	if flags.Date != "2026-01-15" {
+		t.Errorf("TestDate = %v, want 2026-01-15", flags.Date)
 	}
 }
 
@@ -88,21 +56,15 @@ func TestParseFlags_MultipleFlags(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--config", "test.yaml", "--continuous", "--test", "--date", "2026-01-20"}
+	os.Args = []string{"cmd", "--config-file", "test.yaml", "--date", "2026-01-20"}
 
 	flags := ParseFlags()
 
 	if flags.ConfigFile != "test.yaml" {
 		t.Errorf("ConfigFile = %v, want test.yaml", flags.ConfigFile)
 	}
-	if !flags.Continuous {
-		t.Error("Continuous should be true")
-	}
-	if !flags.Validation {
-		t.Error("Validation should be true")
-	}
-	if flags.TestDate != "2026-01-20" {
-		t.Errorf("TestDate = %v, want 2026-01-20", flags.TestDate)
+	if flags.Date != "2026-01-20" {
+		t.Errorf("TestDate = %v, want 2026-01-20", flags.Date)
 	}
 }
 
@@ -114,7 +76,7 @@ func TestParseFlags_UpdateRefreshToken(t *testing.T) {
 
 	flags := ParseFlags()
 
-	if !flags.UpdateRefreshToken {
+	if !flags.UpdateRefreshTokens {
 		t.Error("UpdateRefreshToken should be true")
 	}
 }
@@ -127,8 +89,8 @@ func TestParseFlags_UpdateRefreshTokenAll(t *testing.T) {
 
 	flags := ParseFlags()
 
-	if !flags.UpdateRefreshToken || !flags.All {
-		t.Errorf("UpdateRefreshToken=%v All=%v, want both true", flags.UpdateRefreshToken, flags.All)
+	if !flags.UpdateRefreshTokens || !flags.All {
+		t.Errorf("UpdateRefreshTokens=%v All=%v, want both true", flags.UpdateRefreshTokens, flags.All)
 	}
 }
 
@@ -219,10 +181,8 @@ func TestParseFlags_ComplexCombination(t *testing.T) {
 	defer func() { os.Args = oldArgs }()
 	os.Args = []string{
 		"cmd",
-		"--config", "production.yaml",
-		"--continuous",
+		"--config-file", "production.yaml",
 		"--date", "2026-01-20",
-		"--test",
 		"--no-cache",
 	}
 
@@ -231,14 +191,8 @@ func TestParseFlags_ComplexCombination(t *testing.T) {
 	if flags.ConfigFile != "production.yaml" {
 		t.Errorf("ConfigFile = %v, want production.yaml", flags.ConfigFile)
 	}
-	if !flags.Continuous {
-		t.Error("Continuous should be true")
-	}
-	if flags.TestDate != "2026-01-20" {
-		t.Errorf("TestDate = %v, want 2026-01-20", flags.TestDate)
-	}
-	if !flags.Validation {
-		t.Error("Validation should be true")
+	if flags.Date != "2026-01-20" {
+		t.Errorf("TestDate = %v, want 2026-01-20", flags.Date)
 	}
 	if !flags.NoCache {
 		t.Error("NoCache should be true")

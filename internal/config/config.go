@@ -196,9 +196,10 @@ type Config struct {
 	// ApplyCredentials from credentials.yaml (not parsed from config.yaml).
 	Credentials            []*APIConfig   `yaml:"-"`
 	Systems                []SystemConfig `yaml:"systems"`
-	RefreshIntervalSeconds int            `yaml:"refresh_interval"`   // How often to query API (seconds)
-	Colors                 *ColorConfig   `yaml:"colors,omitempty"`   // Color customization
-	Timezone               string         `yaml:"timezone,omitempty"` // Timezone for reporting/display (e.g., "US/Pacific"). If not set, uses system timezone.
+	CredentialsFile        string         `yaml:"credentials_file,omitempty"` // Path to credentials file (default: credentials.yaml)
+	RefreshIntervalSeconds int            `yaml:"refresh_interval"`           // How often to query API (seconds)
+	Colors                 *ColorConfig   `yaml:"colors,omitempty"`           // Color customization
+	Timezone               string         `yaml:"timezone,omitempty"`         // Timezone for reporting/display (e.g., "US/Pacific"). If not set, uses system timezone.
 
 	// RefreshIntervalClampedFromSeconds records the originally-requested
 	// refresh_interval when it was clamped up to the API Budget window floor; it
@@ -230,6 +231,11 @@ func LoadConfig(filename string) (*Config, error) {
 		if sys.ID == "" {
 			return nil, fmt.Errorf("%s (system %d: %s) for Cloud API", constants.ErrInvalidSystemID, i, sys.Name)
 		}
+	}
+
+	// Default credentials file path.
+	if config.CredentialsFile == "" {
+		config.CredentialsFile = "credentials.yaml"
 	}
 
 	// Default refresh interval to 1 hour if not specified or invalid.

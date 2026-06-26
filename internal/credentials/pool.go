@@ -1,22 +1,21 @@
 // Package credentials manages a pool of Enphase Cloud API credential sets.
 //
-// Each Enphase API key is rate-limited to 10 requests/minute and 1000/month. To
-// scale beyond a single key the app holds a pool of credential sets and uses
-// them two ways:
+// Each Enphase API key is rate-limited to 1000/month. To scale beyond a single
+// key the app holds a pool of credential sets and uses them two ways:
 //
-//   - Spread: ForSystem assigns credentials round-robin across systems so each
-//     key handles a fraction of a run's calls, keeping every key under its
-//     per-minute ceiling. Keys at either limit are skipped proactively.
+//   - Spread: ForSystem assigns credentials by ascending monthly usage so the
+//     least-used key is always preferred. This naturally equalizes the monthly
+//     hit count across the pool without a persisted rotation counter.
 //   - Failover: when a credential is rate-limited (429) or its token acquisition
 //     fails, the caller marks it (MarkUnavailable) and asks for a spare
 //     (Failover); the credential stays in a cooldown for one API Budget window so
 //     subsequent assignments skip it.
 //
-// Per-credential quota state (minute and monthly windows) lives in the pool and
-// is persisted to cache/monthly-quota.json. Monthly counts are seeded from the Enphase
-// developer portal during --init (or refreshed with --refresh-quota); each live
-// API call increments the running total via RecordAPICall. Cooldown state is
-// in-memory for the process lifetime.
+// Per-credential monthly quota state lives in the pool and is persisted to
+// cache/monthly-quota.json. Monthly counts are seeded from the Enphase developer
+// portal during --init (or refreshed with --refresh-quota); each live API call
+// increments the running total via RecordAPICall. Cooldown state is in-memory
+// for the process lifetime.
 //
 // A Pool is not safe for concurrent use: its cooldown and quota maps are mutated
 // without synchronization. The aggregator drives it from a single goroutine
@@ -24,6 +23,7 @@
 package credentials
 
 import (
+	"sort"
 	"time"
 
 	"enphase-monitor/internal/constants"
@@ -35,7 +35,6 @@ type Pool struct {
 	creds             []*types.APIConfig
 	cooldownUntil     map[string]time.Time // keyed by credential name
 	now               func() time.Time     // injectable clock for tests
-	rotation          int                  // round-robin base offset; advanced by Rotate
 	quota             quotaFile
 	quotaFileOverride string // non-empty in tests
 }
@@ -82,51 +81,43 @@ func (p *Pool) ByName(name string) (*types.APIConfig, bool) {
 	return nil, false
 }
 
-// Rotate advances the round-robin base by step credentials, so the next batch of
-// ForSystem calls starts at a fresh credential. Backfill calls this once per
-// fetched day (step = number of systems) to spread load proactively across the
-// pool: consecutive days use disjoint credentials, keeping each key under its
-// per-minute limit instead of reusing the same few keys until they 429. A
-// non-positive step or an empty pool is a no-op. (Continuous Mode never rotates,
-// so each system keeps a stable credential and its cached token across ticks.)
-func (p *Pool) Rotate(step int) {
-	if step <= 0 || len(p.creds) == 0 {
-		return
-	}
-	p.rotation = (p.rotation + step) % len(p.creds)
-}
-
 // ForSystem returns the credential to use for the system at the given index.
-// The base assignment is round-robin (creds[(rotation+index) % len]) to spread
-// load; if the assigned credential is unavailable (cooldown or quota), ForSystem
-// returns the next selectable one instead. When every credential is minute- or
-// cooldown-limited but at least one still has monthly budget, it falls back to
-// the round-robin pick so the client can serve cache without a live call.
+// Credentials are sorted by ascending monthly usage so the least-used key is
+// always preferred. System 0 gets the least-used selectable credential, system 1
+// gets the second least-used, and so on. This spreads monthly hits evenly across
+// the pool without requiring a persisted rotation counter — the monthly counts in
+// the quota file are the authoritative state. When no selectable credential
+// covers the requested index it falls back to the least-used credential with any
+// remaining monthly budget.
 func (p *Pool) ForSystem(index int) *types.APIConfig {
-	n := len(p.creds)
-	if n == 0 {
+	if len(p.creds) == 0 {
 		return nil
 	}
-	base := (p.rotation + index) % n
-	if p.selectable(p.creds[base]) {
-		return p.creds[base]
-	}
-	for offset := 1; offset < n; offset++ {
-		c := p.creds[(base+offset)%n]
+
+	sorted := make([]*types.APIConfig, len(p.creds))
+	copy(sorted, p.creds)
+	sort.Slice(sorted, func(i, j int) bool {
+		return p.monthlyCount(sorted[i].Name) < p.monthlyCount(sorted[j].Name)
+	})
+
+	// Primary: collect selectable credentials in usage order and pick by index.
+	selectable := sorted[:0:0]
+	for _, c := range sorted {
 		if p.selectable(c) {
-			return c
+			selectable = append(selectable, c)
 		}
 	}
-	if p.hasMonthlyBudget(p.creds[base]) {
-		return p.creds[base]
+	if index < len(selectable) {
+		return selectable[index]
 	}
-	for offset := 1; offset < n; offset++ {
-		c := p.creds[(base+offset)%n]
+
+	// Fallback: any credential with monthly budget remaining (sorted by usage).
+	for _, c := range sorted {
 		if p.hasMonthlyBudget(c) {
 			return c
 		}
 	}
-	return p.creds[base]
+	return sorted[0]
 }
 
 // MarkUnavailable puts a credential into cooldown for one API Budget window,
@@ -141,7 +132,7 @@ func (p *Pool) MarkUnavailable(c *types.APIConfig) {
 }
 
 // Failover returns the next credential that is both selectable (not in cooldown
-// and with minute + monthly budget) and not already in tried, for retrying a
+// and with monthly budget remaining) and not already in tried, for retrying a
 // system whose credential was just rate-limited. It returns false when no
 // untried, selectable credential remains.
 func (p *Pool) Failover(tried map[string]bool) (*types.APIConfig, bool) {
@@ -158,7 +149,7 @@ func (p *Pool) Failover(tried map[string]bool) (*types.APIConfig, bool) {
 
 // selectable reports whether a credential may make a live API call now.
 func (p *Pool) selectable(c *types.APIConfig) bool {
-	return p.pastCooldown(c) && p.hasMinuteBudget(c) && p.hasMonthlyBudget(c)
+	return p.pastCooldown(c) && p.hasMonthlyBudget(c)
 }
 
 // pastCooldown reports whether a credential is past its reactive cooldown window.

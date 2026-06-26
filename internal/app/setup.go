@@ -6,7 +6,7 @@
 // These functions extract common initialization logic from main() to improve readability:
 //   - CreateOAuthAdapter: Creates OAuth token adapter for aggregator
 //   - SetupDisplay: Configures display with colors from config
-//   - ConfigureModes: Sets up Validation Mode and cache mode flags
+//   - ConfigureModes: Sets up cache mode and debug flags
 //   - ParseTestDate: Parses and validates test date parameter
 package app
 
@@ -31,11 +31,8 @@ type ParseDateInput struct {
 }
 
 // CreateOAuthAdapter creates an adapter function for OAuth token retrieval.
-// Since config.APIConfig and aggregator.APIConfig are now type aliases to
-// the same underlying types.APIConfig, no conversion is needed.
 func CreateOAuthAdapter() aggregator.OAuthTokenGetter {
 	return func(ctx context.Context, apiConfig *aggregator.APIConfig) (string, error) {
-		// No conversion needed - both are aliases to types.APIConfig
 		return oauth.GetAccessToken(ctx, apiConfig)
 	}
 }
@@ -63,13 +60,8 @@ func SetupDisplay(cfg *config.Config, reportTZ *time.Location) *display.Display 
 	return display.NewDisplayWithColorsAndTimezone(colors, reportTZ)
 }
 
-// ConfigureModes sets up Validation Mode, cache mode, and debug mode based on flags.
-func ConfigureModes(validationMode, noCache, debug bool) {
-	if validationMode {
-		cache.SetValidationMode(true)
-		fmt.Println("VALIDATION MODE: Using cache only, no live API calls")
-	}
-
+// ConfigureModes sets up cache mode and debug mode based on flags.
+func ConfigureModes(noCache, debug bool) {
 	if noCache {
 		cache.SetCacheDisabled(true)
 		fmt.Println("LIVE MODE: Bypassing cache, making live API calls")
@@ -116,9 +108,7 @@ func FormatDateForQueryMode(date time.Time, queryMode constants.QueryMode) strin
 }
 
 // GetSystems returns a copy of the configured systems so callers cannot mutate
-// the config. The credential pool is built once in main and passed via
-// RunConfig.Pool rather than re-derived per call (so cooldown state survives
-// across Continuous Mode ticks).
+// the config. The credential pool is built once in main and passed via RunConfig.Pool.
 func GetSystems(cfg *config.Config) []aggregator.SystemConfig {
 	if len(cfg.Systems) == 0 {
 		return nil
@@ -126,36 +116,4 @@ func GetSystems(cfg *config.Config) []aggregator.SystemConfig {
 	systems := make([]aggregator.SystemConfig, len(cfg.Systems))
 	copy(systems, cfg.Systems)
 	return systems
-}
-
-// ValidateValidationModeCache checks if cache exists for the target date when in Validation Mode.
-// Returns an error with a helpful message if no cache exists for the date.
-// This prevents confusing errors when running --test without populated cache.
-func ValidateValidationModeCache(targetDate time.Time, reportTZ *time.Location) error {
-	// Determine the date string to check: default to specified date, override for today if none
-	dateStr := targetDate.Format(constants.DateFormat)
-	if targetDate.IsZero() {
-		dateStr = time.Now().In(reportTZ).Format(constants.DateFormat)
-	}
-
-	// Check if cache exists for this date
-	hasCache, err := cache.HasCacheForDate(dateStr)
-	if err != nil {
-		return fmt.Errorf("failed to check cache for %s: %w\n\n"+
-			"To populate the cache, run:\n"+
-			"  ./enphase-monitor\n\n"+
-			"Then retry with --test", dateStr, err)
-	}
-
-	if !hasCache {
-		return fmt.Errorf("--test flag requires cached data, but no cache exists for %s\n\n"+
-			"To populate the cache, run:\n"+
-			"  ./enphase-monitor\n\n"+
-			"Then retry with --test\n\n"+
-			"For past dates with expected values, use:\n"+
-			"  ./enphase-monitor --date %s\n"+
-			"  ./enphase-monitor --test --date %s", dateStr, dateStr, dateStr)
-	}
-
-	return nil
 }

@@ -21,10 +21,9 @@
 //   - Cloud API Integration: Uses Enphase Enlighten Cloud API v4 exclusively
 //   - OAuth 2.0 Authentication: Secure token-based authentication with automatic refresh
 //   - Multi-System Aggregation: Combines metrics from multiple independent systems
-//   - Intelligent Caching: Disk-based caching to stay within the API Budget (10 calls/minute)
+//   - Intelligent Caching: Disk-based caching to stay within the API Budget (1000 calls/month per key)
 //   - Past Period Queries: Query any past date with --date flag
 //   - Color Customization: Customize terminal output colors via config.yaml
-//   - Validation Mode: Test against expected values without making API calls
 //
 // ARCHITECTURE
 // ------------
@@ -35,11 +34,10 @@
 //
 //	Application Layer (internal/app):
 //	- setup.go: Application initialization, OAuth adapter, display setup, mode configuration
-//	- runner.go: Execution modes (once/continuous), metric fetching and display
+//	- runner.go: RunOnce execution mode, metric fetching and display
 //	- trueup.go: True-Up Mode report via single-batch Lifetime Data query and report conversion
 //	- backfill.go: Backfill Mode — live per-day fetch over a date range, writing History Records into history/
 //	- weather.go: Best-effort weather enrichment for Day-Mode reports
-//	- cache_report.go: --cache mode — checks per-System endpoint coverage and runs a fully-cached report
 //
 //	CLI Layer (internal/cli):
 //	- flags.go: Command-line flag parsing and definitions
@@ -64,22 +62,23 @@
 //	- internal/cache: Disk-based response caching with URL normalization and the sliding-window API Budget counter
 //	- internal/config: YAML configuration loading, validation, color conversion
 //	- internal/constants: Application-wide constants (ANSI codes, error messages, QueryMode enum, etc.)
-//	- internal/credentials: Credential pool — round-robin spread, 429 failover, and per-key minute/monthly API budget (--seed-credentials, --refresh-quota)
+//	- internal/credentials: Credential pool — least-used-first spread, 429 failover, and per-key monthly API budget (--seed-credentials, --refresh-quota)
 //	- internal/display: Terminal output formatting with customizable colors
 //	- internal/enphase: Developer-portal scraping (login, credential seeding, monthly stats) — the portal exposes no management API
 //	- internal/geocode: Postal-code-to-coordinates lookup (Zippopotam.us) for weather geolocation
-//	- internal/history: Per-day energy+weather History Record schema and JSON writer (history/)
+//	- internal/history: Per-day energy+weather History Record schema and JSON writer (history/); Dataset type governs prefixed filenames (enphase-<date>.json, pge-<date>.json)
 //	- internal/location: Resolves and caches the systems' coordinates for weather (populated by --init)
 //	- internal/parser: JSON telemetry response parsing (Interval Data and Lifetime Data shapes)
+//	- internal/pge: PG&E Share My Data (Green Button) integration — OAuth mTLS pull (pull.go), headed-Chrome browser download (browserpull.go), ESPI XML parsing (espi.go), cert renewal via Enom DNS-01 (cert.go, dns.go, enom.go), history writer (history.go)
 //	- internal/timezone: Timezone handling, Past Period detection, and date boundary calculations
 //	- internal/types: Shared type definitions (SystemConfig, APIConfig) that break circular dependencies
 //	- internal/urlbuilder: API URL construction with proper date ranges
-//	- internal/validation: Validation Mode (--test flag) with tolerance-based comparison
+//	- internal/validation: Metric validation helpers (tolerance-based comparison)
 //	- internal/weather: Open-Meteo daily/current weather client with WMO code mapping
 //
 // EXECUTION FLOW
 // --------------
-//  1. Parse CLI flags via internal/cli (--continuous, --date, --test, etc.)
+//  1. Parse CLI flags via internal/cli (--date, --no-cache, --debug, etc.)
 //  2. Handle cache commands via internal/cli if requested
 //  3. Load and validate config.yaml via internal/config
 //  4. Handle OAuth setup via internal/oauth if requested
@@ -87,23 +86,17 @@
 //  6. Setup display with colors from internal/app
 //  7. Enforce the init guard: every report mode requires a prior --init (cached
 //     location); cache-management and --update-refresh-tokens are exempt.
-//  8. Configure modes (Validation Mode, Cache Mode) via internal/app
-//  9. Dispatch to one of four run paths and exit:
-//     a. If --backfill-from: call app.RunBackfill (live per-day fetch over a date range into history/) and exit.
-//     b. Else if --cache: call app.RunCacheReport (cache-only run; lists missing endpoints if incomplete) and exit.
-//     c. Else if --true-up: call app.RunTrueUp (single-batch lifetime query, no battery) and exit.
-//     d. Otherwise, run the standard execution mode:
+//  8. Configure cache/debug modes via internal/app
+//  9. Dispatch to one of three run paths and exit:
+//     a. If --start-date: call app.RunBackfill (live per-day fetch over a date range into history/) and exit.
+//     b. Else if --true-up: call app.RunTrueUp (single-batch lifetime query, no battery) and exit.
+//     c. Otherwise, run the standard execution mode:
 //     - For each system in config:
 //     i.   Get OAuth access token via internal/oauth (cached or refreshed)
 //     ii.  Create API client via internal/api for the system
 //     iii. Fetch metrics via Cloud API (with caching from internal/cache)
 //     - Aggregate metrics via internal/aggregator
-//     - Validate if in Validation Mode via internal/validation
 //     - Display formatted report via internal/display
-//
-// For continuous mode, step 8c repeats at the configured refresh interval. Continuous mode
-// is restricted to today's Day Mode query — Month, Year, Past Period, and True-Up Mode
-// queries are silently downgraded to run once and exit.
 package main
 
 import (
@@ -177,16 +170,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Range mode is incompatible with continuous/true-up/init.
+	// Range mode is incompatible with true-up/init.
 	if flags.StartDate != "" {
 		switch {
-		case flags.Continuous:
-			fmt.Fprintln(os.Stderr, "Error: --start-date cannot be combined with --continuous")
-			os.Exit(1)
 		case flags.TrueUp != "":
 			fmt.Fprintln(os.Stderr, "Error: --start-date cannot be combined with --true-up")
 			os.Exit(1)
-		case flags.Initialize:
+		case flags.Init:
 			fmt.Fprintln(os.Stderr, "Error: --start-date cannot be combined with --init")
 			os.Exit(1)
 		}
@@ -212,17 +202,6 @@ func main() {
 	if flags.ClearAllCache {
 		if err := cli.HandleClearAllCache(); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	// Handle --seed-credentials before config load (credentials.yaml may not exist yet).
-	if flags.SeedCredentials {
-		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-		defer stop()
-		if err := runSeedCredentials(ctx, flags.CredentialsFile, flags.QuotaNamePrefix); err != nil {
-			fmt.Fprintf(os.Stderr, "Credential seeding failed: %v\n", err)
 			os.Exit(1)
 		}
 		return
@@ -265,11 +244,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// --seed-credentials writes credentials.yaml (path from cfg), so run after config load.
+	if flags.SeedCredentials {
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+		if err := runSeedCredentials(ctx, cfg.CredentialsFile, flags.QuotaPrefix); err != nil {
+			fmt.Fprintf(os.Stderr, "Credential seeding failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Load API credentials from the separate credentials file. A missing file is
 	// not a load error here; ApplyCredentials below does the validation, requiring
 	// at least one credential set and filling each set's non-secret OAuth settings
 	// (authorization_url, redirect_uri) from the shared api: block in config.yaml.
-	creds, err := config.LoadCredentials(flags.CredentialsFile)
+	creds, err := config.LoadCredentials(cfg.CredentialsFile)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		fmt.Fprintf(os.Stderr, "Failed to load credentials: %v\n", err)
 		os.Exit(1)
@@ -287,7 +277,7 @@ func main() {
 	if flags.RefreshQuota {
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		if err := refreshPortalQuota(ctx, pool, flags.QuotaNamePrefix); err != nil {
+		if err := refreshPortalQuota(ctx, pool, flags.QuotaPrefix); err != nil {
 			fmt.Fprintf(os.Stderr, "Quota refresh failed: %v\n", err)
 			os.Exit(1)
 		}
@@ -295,13 +285,13 @@ func main() {
 	}
 
 	// Handle --update-refresh-tokens (use signal context so Ctrl+C cancels token exchange)
-	if flags.UpdateRefreshToken {
+	if flags.UpdateRefreshTokens {
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
 
 		// --all re-authorizes every configured credential in turn.
 		if flags.All {
-			if err := updateAllRefreshTokens(ctx, pool, flags.CredentialsFile, flags.NewOnly); err != nil {
+			if err := updateAllRefreshTokens(ctx, pool, cfg.CredentialsFile); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -313,7 +303,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
 		}
-		if err := updateOneRefreshToken(ctx, cred, flags.CredentialsFile); err != nil {
+		if err := updateOneRefreshToken(ctx, cred, cfg.CredentialsFile); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
 		}
@@ -321,10 +311,10 @@ func main() {
 	}
 
 	// Handle --init: location cache, monthly quota baseline, and weather legend.
-	if flags.Initialize {
+	if flags.Init {
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		if err := runInitialize(ctx, pool, flags.Force, flags.QuotaNamePrefix); err != nil {
+		if err := runInitialize(ctx, pool, flags.Force, flags.QuotaPrefix); err != nil {
 			fmt.Fprintf(os.Stderr, "Initialization failed: %v\n", err)
 			os.Exit(1)
 		}
@@ -357,7 +347,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "enphase-monitor: not initialized — run `enphase-monitor --init` first.")
 		os.Exit(1)
 	}
-	if !pool.HasMonthlyBaseline(flags.QuotaNamePrefix) {
+	if !pool.HasMonthlyBaseline(flags.QuotaPrefix) {
 		fmt.Fprintln(os.Stderr, "enphase-monitor: monthly API quota not initialized — run `enphase-monitor --init` or `enphase-monitor --refresh-quota`.")
 		os.Exit(1)
 	}
@@ -399,7 +389,7 @@ func main() {
 		}
 
 		// Enphase API backfill. noCache stays false: RunBackfill always runs live.
-		app.ConfigureModes(false /* validationMode */, false /* noCache */, flags.Debug)
+		app.ConfigureModes(false /* noCache */, flags.Debug)
 		printDebugStartup(flags.Debug, pool, reportTZ)
 		rc := app.RunConfig{
 			Agg:      agg,
@@ -419,38 +409,9 @@ func main() {
 		return
 	}
 
-	// --cache: serve report from cache only; diagnose missing endpoints if incomplete.
-	// Handles --cache alone, --cache --date, and --cache --true-up.
-	if flags.CachedMode {
-		app.ConfigureModes(false /* validationMode */, false /* noCache */, flags.Debug)
-		printDebugStartup(flags.Debug, pool, reportTZ)
-		parsedInput, err := app.ParseTestDate(flags.TestDate, reportTZ)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-			os.Exit(1)
-		}
-		rc := app.RunConfig{
-			Agg:       agg,
-			Pool:      pool,
-			Disp:      disp,
-			Cfg:       cfg,
-			TestDate:  parsedInput.Date,
-			QueryMode: parsedInput.QueryMode,
-			ReportTZ:  reportTZ,
-			Debug:     flags.Debug,
-		}
-		if err := app.RunCacheReport(ctx, rc, flags.TrueUp); err != nil {
-			if !errors.Is(err, app.ErrCacheIncomplete) {
-				disp.ShowError(err)
-			}
-			os.Exit(1)
-		}
-		return
-	}
-
 	// --true-up takes precedence over --date; handle it early and exit.
 	if flags.TrueUp != "" {
-		app.ConfigureModes(flags.Validation, flags.NoCache, flags.Debug)
+		app.ConfigureModes(flags.NoCache, flags.Debug)
 		printDebugStartup(flags.Debug, pool, reportTZ)
 		rc := app.RunConfig{
 			Agg:      agg,
@@ -468,7 +429,7 @@ func main() {
 	}
 
 	// Parse test date (returns date and query mode)
-	parsedInput, err := app.ParseTestDate(flags.TestDate, reportTZ)
+	parsedInput, err := app.ParseTestDate(flags.Date, reportTZ)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(1)
@@ -476,26 +437,8 @@ func main() {
 	testDateParsed := parsedInput.Date
 	queryMode := parsedInput.QueryMode
 
-	// Validate cache exists when in Validation Mode (before configuring modes)
-	if flags.Validation {
-		if err := app.ValidateValidationModeCache(testDateParsed, reportTZ); err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
-	// Configure Validation Mode and cache mode
-	app.ConfigureModes(flags.Validation, flags.NoCache, flags.Debug)
+	app.ConfigureModes(flags.NoCache, flags.Debug)
 	printDebugStartup(flags.Debug, pool, reportTZ)
-
-	// Default is run-once; --continuous enables periodic refresh.
-	// Month, Year, and Past Period queries always run once regardless of --continuous.
-	runContinuous := flags.Continuous
-	if queryMode == constants.QueryModeMonth || queryMode == constants.QueryModeYear {
-		runContinuous = false
-	} else if !testDateParsed.IsZero() && timezone.IsPastPeriod(testDateParsed, queryMode, reportTZ) {
-		runContinuous = false
-	}
 
 	rc := app.RunConfig{
 		Agg:       agg,
@@ -512,16 +455,8 @@ func main() {
 		Weather:  weather.NewClient(cache.GetCacheDir()),
 	}
 
-	// Default: run once and exit. With --continuous, loop with periodic refresh.
-	if !runContinuous {
-		if err := app.RunOnce(ctx, rc, flags.Validation); err != nil {
-			showRunError(disp, err)
-			os.Exit(1)
-		}
-		return
-	}
-	if err := app.RunContinuous(ctx, rc); err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+	if err := app.RunOnce(ctx, rc); err != nil {
+		showRunError(disp, err)
 		os.Exit(1)
 	}
 }
@@ -559,7 +494,7 @@ func runSeedCredentials(ctx context.Context, credentialsFile, namePrefix string)
 	fmt.Printf("Seeded %s: %d updated, %d added (%d apps scanned).\n", credentialsFile, updated, added, scanned)
 	if added > 0 {
 		fmt.Println("Next: obtain refresh tokens for the new entries with")
-		fmt.Println("  ./enphase-monitor --update-refresh-tokens --all --new-only")
+		fmt.Println("  ./enphase-monitor --update-refresh-tokens --all")
 	}
 	return nil
 }
@@ -654,7 +589,7 @@ func showRunError(disp *display.Display, err error) {
 	disp.ShowError(err)
 }
 
-// printDebugStartup prints the API Budget status when debug mode is on.
+// printDebugStartup prints the monthly quota status when debug mode is on.
 func printDebugStartup(debug bool, pool *credentials.Pool, reportTZ *time.Location) {
 	if !debug || pool == nil {
 		return
@@ -662,36 +597,13 @@ func printDebugStartup(debug bool, pool *credentials.Pool, reportTZ *time.Locati
 	now := time.Now().In(reportTZ)
 	fmt.Fprintf(os.Stderr, "[DEBUG] --- startup ---\n")
 	fmt.Fprintf(os.Stderr, "[DEBUG] current time : %s\n", now.Format("2006-01-02 15:04:05 MST"))
-	if last, ok := pool.LastAPICallTime(); ok {
-		last = last.In(reportTZ)
-		age := time.Since(last).Round(time.Second)
-		windowReset := cache.MinRequestInterval - time.Since(last)
-		if windowReset < 0 {
-			windowReset = 0
-		}
-		fmt.Fprintf(os.Stderr, "[DEBUG] last API call: %s (%s ago)\n", last.Format("15:04:05 MST"), age)
-		if windowReset > 0 {
-			fmt.Fprintf(os.Stderr, "[DEBUG] rate window resets in: %s\n", windowReset.Round(time.Second))
-		} else {
-			fmt.Fprintf(os.Stderr, "[DEBUG] rate window: clear (no calls in last 60s)\n")
-		}
-	} else {
-		fmt.Fprintf(os.Stderr, "[DEBUG] last API call: none (no calls recorded in last 60s)\n")
-	}
-	minRemaining := constants.APIBudgetPerMinute
-	for _, name := range pool.Names() {
-		if r := pool.RemainingMinuteBudget(name); r < minRemaining {
-			minRemaining = r
-		}
-	}
-	fmt.Fprintf(os.Stderr, "[DEBUG] minute budget : %d/%d calls remaining (worst key)\n", minRemaining, constants.APIBudgetPerMinute)
 	fmt.Fprintf(os.Stderr, "[DEBUG] %s\n", pool.QuotaSummary())
 	fmt.Fprintf(os.Stderr, "[DEBUG] ---\n")
 }
 
 // initializeLocation resolves the systems' coordinates (one /systems call) and
 // caches them for weather reporting. Run by --init, out of band from reports,
-// so it never competes with the per-minute telemetry budget. Returns an error
+// so it never competes with the API Budget on a live reporting run. Returns an error
 // (unlike the report path's best-effort enrichment) so the user knows whether
 // initialization succeeded.
 func initializeLocation(ctx context.Context, cred *config.APIConfig, pool *credentials.Pool, force bool) error {
@@ -771,10 +683,8 @@ func updateOneRefreshToken(ctx context.Context, cred *config.APIConfig, credenti
 // driving one browser session that approves each app's consent automatically —
 // the user logs in once and never clicks "Allow Access". It attempts each
 // credential even if an earlier one failed, then reports which failed; a Ctrl+C
-// (context cancellation) aborts the rest. When newOnly is set, credentials that
-// already have a refresh_token are skipped, so a freshly-seeded batch can be
-// authorized without re-doing the working ones.
-func updateAllRefreshTokens(ctx context.Context, pool *credentials.Pool, credentialsFile string, newOnly bool) error {
+// (context cancellation) aborts the rest.
+func updateAllRefreshTokens(ctx context.Context, pool *credentials.Pool, credentialsFile string) error {
 	names := pool.Names()
 
 	authorizer := oauth.NewBrowserAuthorizer(ctx)
@@ -787,17 +697,13 @@ func updateAllRefreshTokens(ctx context.Context, pool *credentials.Pool, credent
 		fmt.Fprintf(os.Stderr, "\r\033[K"+format, a...)
 	}
 
-	var failed, skipped []string
+	var failed []string
 	for i, name := range names {
 		if ctx.Err() != nil {
 			fmt.Fprintln(os.Stderr)
 			return ctx.Err()
 		}
 		cred, _ := pool.ByName(name)
-		if newOnly && cred.RefreshToken != "" {
-			skipped = append(skipped, name)
-			continue
-		}
 		status("[%d/%d] %s — authorizing…", i+1, len(names), name)
 		token, err := oauth.AuthorizeViaBrowser(ctx, authorizer, cred)
 		if err != nil {
@@ -819,13 +725,9 @@ func updateAllRefreshTokens(ctx context.Context, pool *credentials.Pool, credent
 	}
 	fmt.Fprint(os.Stderr, "\r\033[K") // clear the last status line before the summary
 
-	if len(skipped) > 0 {
-		fmt.Printf("Skipped %d already-authorized credential(s) (--new-only).\n", len(skipped))
-	}
 	if len(failed) > 0 {
 		return fmt.Errorf("authorization failed for %d of %d credential(s): %s", len(failed), len(names), strings.Join(failed, ", "))
 	}
-	authorized := len(names) - len(skipped)
-	fmt.Printf("Done: authorized %d credential(s).\n", authorized)
+	fmt.Printf("Done: authorized %d credential(s).\n", len(names))
 	return nil
 }

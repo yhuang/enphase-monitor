@@ -27,25 +27,25 @@ The project follows a pragmatic approach to testing:
 | validation | 95.5% | ✅ Near-full - metrics validation |
 | parser | 94.8% | ✅ Near-full - JSON parsing |
 | timezone | 92.7% | ✅ High - timezone handling |
-| cli | 92.9% | ✅ High - CLI interface |
+| cli | 91.9% | ✅ High - CLI interface |
 | aggregator | 89.2% | ✅ High - data aggregation |
 | weather | 88.2% | ✅ High - Open-Meteo client |
-| config | 84.3% | ✅ High - YAML parsing |
+| credentials | 85.0% | ✅ High - credential pool + monthly quota |
+| config | 84.5% | ✅ High - YAML parsing |
 | history | 82.6% | ✅ High - per-day record schema/write/index |
 | geocode | 81.5% | ✅ High - ZIP geolocation |
 | location | 79.7% | ✅ High - location resolver/cache |
-| api | 78.6% | ✅ Adequate - HTTP client |
-| credentials | 78.4% | ✅ Adequate - credential pool + monthly quota |
 | constants | 72.7% | ✅ Adequate - pure constants (some portal/quota constants untested) |
+| api | 72.2% | ✅ Adequate - HTTP client |
 | cache | 68.9% | ✅ Adequate - file caching |
 | oauth | 61.7% | ✅ Adequate - OAuth flows (browser-driven path verified manually) |
-| app | 40.3% | ⚠️ Moderate - application glue incl. range-pull orchestration (exercised end-to-end via api/preflight) |
-| browser | 16.7% | ⚠️ Low - headed-Chrome launcher, verified manually |
-| enphase | 14.6% | ⚠️ Low - developer-portal scraping, verified manually |
+| app | 49.4% | ⚠️ Moderate - application glue incl. range-pull orchestration (exercised end-to-end via api/preflight) |
+| browser | 16.3% | ⚠️ Low - headed-Chrome launcher, verified manually |
+| enphase | 14.3% | ⚠️ Low - developer-portal scraping, verified manually |
 | pge | 9.8% | ⚠️ Low - ESPI parser and config tested; browser-pull path verified manually |
 | main.go | 0.0% | ✅ **Acceptable** - entry point |
 
-**Overall**: 48.6% coverage (`app` orchestration paths are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests; the `browser`, `enphase`, and `pge` browser-pull packages drive a real Chrome session against live portals and are verified manually rather than in CI; the new `pge` package accounts for much of the overall coverage drop)
+**Overall**: 49.2% coverage (`app` orchestration paths are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests; the `browser`, `enphase`, and `pge` browser-pull packages drive a real Chrome session against live portals and are verified manually rather than in CI; the new `pge` package accounts for much of the overall coverage drop)
 
 ### Why main.go Has 0% Coverage
 
@@ -673,8 +673,8 @@ These files test individual functions and methods in isolation. Per-package cove
 | `parser_test.go` | `parser.go` | JSON parsing, interval summing |
 | `flags_test.go` | `flags.go` | CLI flag parsing and defaults |
 | `cache_commands_test.go` | `cache_commands.go` | Cache management command handlers (clear today, clear all) |
-| `runner_test.go` | `runner.go` | Execution modes (once/continuous), fetchAndDisplay |
-| `setup_test.go` | `setup.go` | `FormatDateForQueryMode`, `CreateOAuthAdapter`, `SetupDisplay`, `ParseTestDate`, `ConfigureModes`, `ValidateValidationModeCache`, `GetAggregatorTypes`, plus `RunOnce` context-cancellation guard |
+| `runner_test.go` | `runner.go` | RunOnce execution mode |
+| `setup_test.go` | `setup.go` | `FormatDateForQueryMode`, `CreateOAuthAdapter`, `SetupDisplay`, `ParseTestDate`, `ConfigureModes`, `GetAggregatorTypes`, plus `RunOnce` context-cancellation guard |
 | `trueup_test.go` | `trueup.go` | `buildTrueUpReport` field mapping, net flow, per-system entries |
 | `aggregator_test.go` | `aggregator.go` | Multi-system aggregation with mock clients |
 
@@ -751,69 +751,8 @@ make test
 go test -v ./internal/cache/
 
 # Run a specific test
-go test -v ./internal/app/ -run TestValidateValidationModeCache
+go test -v ./internal/app/ -run TestRunOnce
 ```
-
-### Integration Testing with --test Flag
-
-The `--test` flag enables Validation Mode (cache only, with validation against expected values). This requires:
-
-1. **Cached API responses** - Run `./enphase-monitor` first to populate the cache
-2. **Expected values file** - Create `test-data/enphase_api_YYYY-MM-DD.json`
-
-#### Early Cache Validation
-
-The application validates cache existence before running in Validation Mode:
-
-```bash
-# If cache doesn't exist for today:
-$ ./enphase-monitor --test
-ERROR: --test flag requires cached data, but no cache exists for 2026-01-30.
-
-To populate the cache, run:
-  ./enphase-monitor
-
-Then retry with --test.
-```
-
-#### Missing Expected Values File
-
-If cache exists but expected values file is missing, a helpful error is displayed:
-
-```bash
-$ ./enphase-monitor --test --date 2026-01-01
-Validation failed: no expected values file found for 2026-01-01.
-
-To run validation, create the file:
-  test-data/enphase_api_2026-01-01.json
-
-Example format:
-  {
-    "date": "2026-01-01",
-    "systems": [
-      {
-        "id": "SYSTEM_ID",
-        "name": "System Name",
-        "expected": {
-          "grid_import": 10.0,
-          "grid_export": 5.0,
-          "production": 20.0,
-          ...
-        }
-      }
-    ]
-  }
-```
-
-#### Testing Validation Mode Itself
-
-The Validation Mode behavior is tested in:
-
-| Test File | Test Functions | Purpose |
-|-----------|----------------|---------|
-| `cache_functions_test.go` | `TestHasCacheForDate` | Cache existence check |
-| `setup_test.go` | `TestValidateValidationModeCache` | Early validation with helpful errors |
-| `validation_test.go` | `TestValidateMetrics_MissingFile_HelpfulError` | Improved error messages |
 
 #### Testing Refactor Helpers
 

@@ -15,41 +15,42 @@ func makePool(names ...string) *Pool {
 	return NewPool(creds)
 }
 
-// TestForSystemSpread verifies round-robin assignment across systems.
+// TestForSystemSpread verifies that with equal monthly usage, ForSystem assigns
+// credentials in pool order (stable sort) and gives each system a distinct key.
 func TestForSystemSpread(t *testing.T) {
 	p := makePool("a", "b")
-	want := []string{"a", "b", "a", "b"}
-	for i, w := range want {
-		if got := p.ForSystem(i).Name; got != w {
-			t.Errorf("ForSystem(%d) = %q, want %q", i, got, w)
-		}
+	useTempQuotaFile(t, p)
+
+	if got := p.ForSystem(0).Name; got != "a" {
+		t.Errorf("ForSystem(0) = %q, want a", got)
+	}
+	if got := p.ForSystem(1).Name; got != "b" {
+		t.Errorf("ForSystem(1) = %q, want b", got)
 	}
 }
 
-// TestRotateAdvancesBase verifies Rotate moves the round-robin base so successive
-// batches draw on disjoint credentials, wrapping around the pool.
-func TestRotateAdvancesBase(t *testing.T) {
-	p := makePool("a", "b", "c", "d")
-	const systems = 2
+// TestForSystemPrefersLeastUsed verifies that the credential with fewer monthly
+// hits is always preferred, so usage equalizes across the pool over time.
+func TestForSystemPrefersLeastUsed(t *testing.T) {
+	p := makePool("a", "b", "c")
+	useTempQuotaFile(t, p)
 
-	// Batch 1 (rotation 0): a, b. Batch 2 (after Rotate(2)): c, d. Batch 3 wraps
-	// back to a, b.
-	wantBatches := [][]string{{"a", "b"}, {"c", "d"}, {"a", "b"}}
-	for b, batch := range wantBatches {
-		for i, w := range batch {
-			if got := p.ForSystem(i).Name; got != w {
-				t.Errorf("batch %d ForSystem(%d) = %q, want %q", b, i, got, w)
-			}
-		}
-		p.Rotate(systems)
+	// Give "a" more calls than "b", "c".
+	for i := 0; i < 5; i++ {
+		p.RecordAPICall("a")
 	}
-
-	// A non-positive step is a no-op: the assignment is unchanged afterward.
-	before := p.ForSystem(0).Name
-	p.Rotate(0)
-	p.Rotate(-3)
-	if after := p.ForSystem(0).Name; after != before {
-		t.Errorf("Rotate(<=0) changed assignment: before=%q after=%q", before, after)
+	for i := 0; i < 2; i++ {
+		p.RecordAPICall("b")
+	}
+	// Sorted by usage: c(0) < b(2) < a(5)
+	if got := p.ForSystem(0).Name; got != "c" {
+		t.Errorf("ForSystem(0) = %q, want c (least used)", got)
+	}
+	if got := p.ForSystem(1).Name; got != "b" {
+		t.Errorf("ForSystem(1) = %q, want b (second least)", got)
+	}
+	if got := p.ForSystem(2).Name; got != "a" {
+		t.Errorf("ForSystem(2) = %q, want a (most used)", got)
 	}
 }
 
@@ -57,6 +58,7 @@ func TestRotateAdvancesBase(t *testing.T) {
 // in cooldown and re-used once the window passes.
 func TestForSystemSkipsCooldown(t *testing.T) {
 	p := makePool("a", "b")
+	useTempQuotaFile(t, p)
 	now := time.Now()
 	p.now = func() time.Time { return now }
 
@@ -73,17 +75,19 @@ func TestForSystemSkipsCooldown(t *testing.T) {
 	}
 }
 
-// TestForSystemAllCoolingDownFallsBack verifies ForSystem still returns the
-// round-robin pick when every credential is in cooldown.
+// TestForSystemAllCoolingDownFallsBack verifies ForSystem returns the least-used
+// credential with monthly budget when every credential is in cooldown.
 func TestForSystemAllCoolingDown(t *testing.T) {
 	p := makePool("a", "b")
+	useTempQuotaFile(t, p)
 	now := time.Now()
 	p.now = func() time.Time { return now }
 	p.MarkUnavailable(p.creds[0])
 	p.MarkUnavailable(p.creds[1])
 
-	if got := p.ForSystem(1).Name; got != "b" {
-		t.Errorf("ForSystem(1) all cooling = %q, want b (round-robin fallback)", got)
+	// Both cooling: fallback returns least-used (equal usage → pool order → "a").
+	if got := p.ForSystem(0).Name; got != "a" {
+		t.Errorf("ForSystem(0) all cooling = %q, want a (least-used fallback)", got)
 	}
 }
 

@@ -81,8 +81,8 @@ func LaunchHeadedWithProfile(parent context.Context, profileDir string) (context
 }
 
 func headedAllocatorOptions(profileDir string) []chromedp.ExecAllocatorOption {
-	opts := append(
-		append([]chromedp.ExecAllocatorOption{}, chromedp.DefaultExecAllocatorOptions[:]...),
+	base := append([]chromedp.ExecAllocatorOption{}, chromedp.DefaultExecAllocatorOptions[:]...)
+	opts := append(base,
 		chromedp.Flag("headless", false),
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
