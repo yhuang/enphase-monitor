@@ -142,11 +142,11 @@ func TestWriteRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromMetrics: %v", err)
 	}
-	if err := WriteRecord(dir, rec); err != nil {
+	if err := WriteRecord(dir, Enphase, rec.Date, rec); err != nil {
 		t.Fatalf("WriteRecord: %v", err)
 	}
 
-	path := filepath.Join(dir, "2026-01-15.json")
+	path := filepath.Join(dir, "enphase-2026-01-15.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("reading written record: %v", err)
@@ -164,16 +164,19 @@ func TestWriteRecord(t *testing.T) {
 // TestWriteRecord_Overwrites confirms a second write replaces the file.
 func TestWriteRecord_Overwrites(t *testing.T) {
 	dir := t.TempDir()
-	rec, _ := FromMetrics(sampleMetrics(time.UTC), time.UTC)
-	if err := WriteRecord(dir, rec); err != nil {
+	rec, err := FromMetrics(sampleMetrics(time.UTC), time.UTC)
+	if err != nil {
+		t.Fatalf("FromMetrics: %v", err)
+	}
+	if err := WriteRecord(dir, Enphase, rec.Date, rec); err != nil {
 		t.Fatalf("first WriteRecord: %v", err)
 	}
 	rec.Totals.ProductionKWh = 99.9
-	if err := WriteRecord(dir, rec); err != nil {
+	if err := WriteRecord(dir, Enphase, rec.Date, rec); err != nil {
 		t.Fatalf("second WriteRecord: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, "2026-01-15.json"))
+	data, err := os.ReadFile(filepath.Join(dir, "enphase-2026-01-15.json"))
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -189,7 +192,7 @@ func TestWriteRecord_Overwrites(t *testing.T) {
 // writeDayFile drops a minimal day record so index scanning has something to find.
 func writeDayFile(t *testing.T, dir, date string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, date+".json"), []byte("{}"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, Enphase.recordName(date)), []byte("{}"), 0o644); err != nil {
 		t.Fatalf("writing %s: %v", date, err)
 	}
 }
@@ -197,7 +200,7 @@ func writeDayFile(t *testing.T, dir, date string) {
 // readIndex reads and decodes the manifest written to dir.
 func readIndex(t *testing.T, dir string) Index {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(dir, IndexFileName))
+	data, err := os.ReadFile(filepath.Join(dir, Enphase.IndexFileName()))
 	if err != nil {
 		t.Fatalf("reading index: %v", err)
 	}
@@ -219,7 +222,7 @@ func TestWriteIndex(t *testing.T) {
 	to := time.Date(2026, 1, 16, 0, 0, 0, 0, time.UTC)
 	runErrors := map[string]string{"2026-01-14": "API request failed with status 503"}
 
-	if err := WriteIndex(dir, from, to, time.UTC, runErrors); err != nil {
+	if err := WriteIndex(dir, Enphase, from, to, time.UTC, runErrors); err != nil {
 		t.Fatalf("WriteIndex: %v", err)
 	}
 
@@ -249,7 +252,7 @@ func TestWriteIndex_ExpandsRangeForPriorRecords(t *testing.T) {
 
 	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	if err := WriteIndex(dir, from, to, time.UTC, nil); err != nil {
+	if err := WriteIndex(dir, Enphase, from, to, time.UTC, nil); err != nil {
 		t.Fatalf("WriteIndex: %v", err)
 	}
 
@@ -262,17 +265,17 @@ func TestWriteIndex_ExpandsRangeForPriorRecords(t *testing.T) {
 	}
 }
 
-// TestWriteIndex_IgnoredByDatasetGlob confirms the manifest is a dotfile and is
-// not itself parsed as a day record on a later scan.
+// TestWriteIndex_DotfileNotCountedAsRecord confirms the manifest is a dotfile
+// and is not itself parsed as a day record on a later scan.
 func TestWriteIndex_DotfileNotCountedAsRecord(t *testing.T) {
 	dir := t.TempDir()
 	writeDayFile(t, dir, "2026-01-15")
 	from := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
-	if err := WriteIndex(dir, from, from, time.UTC, nil); err != nil {
+	if err := WriteIndex(dir, Enphase, from, from, time.UTC, nil); err != nil {
 		t.Fatalf("WriteIndex: %v", err)
 	}
-	// Second write must still count exactly one record, not two (ignoring .index.json).
-	if err := WriteIndex(dir, from, from, time.UTC, nil); err != nil {
+	// Second write must still count exactly one record, not two (ignoring .enphase-index.json).
+	if err := WriteIndex(dir, Enphase, from, from, time.UTC, nil); err != nil {
 		t.Fatalf("WriteIndex 2: %v", err)
 	}
 	idx := readIndex(t, dir)

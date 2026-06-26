@@ -34,7 +34,7 @@ A Go application for monitoring and aggregating data from one or more Enphase so
 - **Comprehensive Metrics**: Track Production, Consumption, battery charge/discharge, Grid Import/Export, and Net Flow
 - **Flexible Querying**: Query past dates or monitor real-time with auto-refresh
 - **Weather Enrichment**: Day-Mode reports annotated with temperature, conditions, cloud cover, precipitation, and solar radiation (Open-Meteo; requires one-time `--init`)
-- **Historical Backfill**: Build a per-day energy + weather dataset over a date range as JSON records for offline analysis (`--backfill-from`)
+- **Historical Backfill**: Build a per-day energy + weather dataset over a date range as JSON records for offline analysis (`--start-date`); pull PG&E utility-meter records from the web portal alongside Enphase data (`--pge-web-only`)
 - **True-Up Report**: Energy metrics across a full utility True-Up Period (`--true-up`)
 - **Clean Display**: Formatted terminal output with customizable colors
 - **API Caching**: Automatic caching of API responses to reduce API calls and enable offline validation
@@ -302,7 +302,7 @@ Before running any report, initialize the systems' location once:
 
 `--init` also writes `weather_codes.json` to the project root — the authoritative WMO legend decoding the `weather_code` field carried by reports and History Records (each of the codes Open-Meteo emits, defined individually so intensities are preserved). It is a general reference rather than a dataset artifact, regenerated on each `--init`.
 
-**Initialization is required.** Every report mode (`--date`, `--continuous`, `--true-up`, `--backfill-from`, and the default today query) refuses to run until `--init` has populated the location cache, exiting with:
+**Initialization is required.** Every report mode (`--date`, `--continuous`, `--true-up`, `--start-date`, and the default today query) refuses to run until `--init` has populated the location cache, exiting with:
 ```
 enphase-monitor: not initialized — run `enphase-monitor --init` first.
 ```
@@ -368,25 +368,31 @@ Press `Ctrl+C` to stop.
 Build a local dataset of per-day energy + weather records for offline analysis (e.g. correlating production/consumption with weather):
 ```bash
 # Fetch every day from this date through yesterday into history/
-./enphase-monitor --backfill-from 2025-06-19
+./enphase-monitor --start-date 2025-06-19
 
 # Bound the range with an explicit end date
-./enphase-monitor --backfill-from 2025-06-19 --date 2026-01-15
+./enphase-monitor --start-date 2025-06-19 --end-date 2026-01-15
 
 # Re-fetch and overwrite days already on disk
-./enphase-monitor --backfill-from 2025-06-19 --force
+./enphase-monitor --start-date 2025-06-19 --force
+
+# Pull only PG&E utility-meter records (no Enphase credentials needed)
+./enphase-monitor --start-date 2025-06-19 --pge-web-only
+
+# Pull only Enphase records (skip PG&E sources)
+./enphase-monitor --start-date 2025-06-19 --enphase-api-only
 ```
 
-Backfill walks the date range one calendar day at a time and writes one JSON file per day to `history/<YYYY-MM-DD>.json`. Key behaviors:
+By default, `--start-date` fetches from **both** Enphase (live API) and PG&E (browser download). Use `--pge-web-only` or `--enphase-api-only` to restrict to one source. The range runs from `--start-date` through `--end-date` (or yesterday when `--end-date` is omitted). Key behaviors:
 
-- **Always live.** Backfill disables the cache for the run and pulls fresh from the API, so the records are authoritative. With the credential pool's combined budget, a full year of daily queries is comfortably within limits.
-- **Idempotent.** Days that already have a `history/` file are skipped (no API calls) unless `--force` is given.
+- **Always live.** Range pulls disable the cache and pull fresh from the API, so records are authoritative. With the credential pool's combined budget, a full year of daily Enphase queries is comfortably within limits.
+- **Idempotent.** Days that already have a record in `history/` are skipped (no API calls) unless `--force` is given. PG&E records are always overwritten regardless of `--force`.
 - **Resilient.** A failure on one day is reported and skipped; the range continues.
 - **Progress** redraws in place on a terminal (one advancing line), or falls back to plain lines when output is redirected.
 
-Backfill is the **only** writer of History Records — a plain `./enphase-monitor --date 2026-01-15` stays a read-only terminal report and writes nothing. To capture a single day to `history/`, run `./enphase-monitor --backfill-from 2026-01-15 --date 2026-01-15`. This keeps every record authoritative (live-sourced) and avoids a casual cache-served `--date` view silently shadowing a date that backfill would then skip.
+Range pull is the **only** writer of History Records — a plain `./enphase-monitor --date 2026-01-15` stays a read-only terminal report and writes nothing. To capture a single day to `history/`, run `./enphase-monitor --start-date 2026-01-15 --end-date 2026-01-15`. This keeps every record authoritative (live-sourced) and avoids a casual cache-served `--date` view silently shadowing a date that a range pull would then skip.
 
-Each backfill also (re)writes a manifest, `history/.index.json`, by **scanning the directory** — so it reflects the whole dataset (this run plus prior runs), not just the latest run. It lists the covered date range, present/missing counts, and every missing day with its reason (the API error for days the run attempted, or "not attempted in last run" otherwise) so gaps in the dataset are visible without diffing the directory:
+Each run also (re)writes a manifest, `history/.index.json`, by **scanning the directory** — so it reflects the whole dataset (this run plus prior runs), not just the latest run. It lists the covered date range, present/missing counts, and every missing day with its reason (the API error for days the run attempted, or "not attempted in last run" otherwise) so gaps in the dataset are visible without diffing the directory:
 ```json
 {
   "updated_at": "2026-06-20T14:03:00-07:00",
@@ -395,7 +401,7 @@ Each backfill also (re)writes a manifest, `history/.index.json`, by **scanning t
   "missing": [ { "date": "2025-12-03", "error": "API request failed with status 503" } ]
 }
 ```
-The manifest is a dotfile so it stays out of a `history/*.json` glob when you feed the dataset to your analysis tool. It is best-effort as of the last backfill — hand-deleting a record afterward won't update it until the next run.
+The manifest is a dotfile so it stays out of a `history/*.json` glob when you feed the dataset to your analysis tool. It is best-effort as of the last run — hand-deleting a record afterward won't update it until the next run.
 
 Each record's `weather_code` is the precise WMO interpretation code — the stable categorical feature for modeling, which (unlike the human `condition` label) distinguishes intensities (e.g. 61/63/65 = slight/moderate/heavy rain) and never drifts on rewording. Decode it with `weather_codes.json`, written at the project root by `--init` (see [Initialization & Weather](#initialization--weather)).
 
@@ -410,7 +416,7 @@ Each record's `weather_code` is the precise WMO interpretation code — the stab
   "weather": { "temp_high": 58.2, "temp_low": 42.1, "temp_unit": "°F", "weather_code": 2, "condition": "Partly Cloudy", "cloud_cover_pct": 34, "precipitation_mm": 0, "solar_radiation_kwh_m2": 2.4 }
 }
 ```
-Battery charge/discharge/SOC are intentionally omitted: they are unavailable for historical dates (the lifetime endpoints that serve past days carry no battery data). Every backfilled record carries a `weather` object — a day whose weather is unavailable is treated as a failure and is not written (it appears in the manifest's `missing` and is retried on a plain re-run), so the dataset stays usable for correlation. (The field is `omitempty` at the schema level, but Backfill Mode never emits a weatherless record.)
+Battery charge/discharge/SOC are intentionally omitted from Enphase records: they are unavailable for historical dates (the lifetime endpoints that serve past days carry no battery data). Every Enphase record carries a `weather` object — a day whose weather is unavailable is treated as a failure and is not written (it appears in the manifest's `missing` and is retried on a plain re-run), so the dataset stays usable for correlation. (The field is `omitempty` at the schema level, but range pull never emits a weatherless Enphase record.) PG&E records have a different schema and are stored as `history/pge-<date>.json`; they do not carry weather data.
 
 ### Validation Mode
 
@@ -426,10 +432,13 @@ Serves the report entirely from cache (no live API calls) and compares each metr
 - `--config <path>` - Path to configuration file (default: `config.yaml`)
 - `--credentials <path>` - Path to credentials file (default: `credentials.yaml`)
 - `--init` - Resolve and cache the systems' location for weather reporting. Run once before normal use; re-run if the cache is cleared. Required before any report mode (see [Initialization & Weather](#initialization--weather))
-- `--force` - With `--init`, re-resolve the location from the API even if a cached value already exists. With `--backfill-from`, re-fetch and overwrite history records that already exist instead of skipping them
+- `--force` - With `--init`, re-resolve the location from the API even if a cached value already exists. With `--start-date`, re-fetch and overwrite Enphase history records that already exist instead of skipping them; has no effect on PG&E records, which are always overwritten
 - `--continuous` - Run continuously with periodic refresh (default is run once and exit)
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
-- `--backfill-from <YYYY-MM-DD>` - Backfill Mode: fetch each day from this date through `--date` (or yesterday) with live API calls, writing one JSON record per day into `history/`. Skips days already written unless `--force` is given. Cannot be combined with `--continuous`, `--true-up`, or `--init` (see [Historical Backfill](#historical-backfill))
+- `--start-date <YYYY-MM-DD>` - Start a range pull from this date through `--end-date` (or yesterday) with live API calls, writing one JSON record per day into `history/`. Fetches from both Enphase API and PG&E web by default; use `--enphase-api-only` or `--pge-web-only` to restrict the source. Skips Enphase days already written unless `--force` is given. Cannot be combined with `--continuous`, `--true-up`, or `--init` (see [Historical Backfill](#historical-backfill))
+- `--end-date <YYYY-MM-DD>` - End date (inclusive) for `--start-date` range pulls. Defaults to yesterday
+- `--pge-web-only` - With `--start-date`, pull only from the PG&E website (Green Button browser download). Does not require Enphase credentials
+- `--enphase-api-only` - With `--start-date`, pull only from the Enphase API. Skips all PG&E data sources
 - `--true-up <YYYY-MM-DD>` - Activate True-Up Mode using this utility True-Up Start Date. Covers the 12-month True-Up Window (Current Period: through yesterday; Past True-Up Period: through last day of 12-month window). Takes precedence over `--date`
 - `--seed-credentials` - Seed `credentials.yaml` from the Enphase developer portal: opens Chrome to log in, then scrapes each application's `name`, `key`, `client_id`, and `client_secret`. New entries are appended with an empty `refresh_token` (fill it with `--update-refresh-tokens`); existing entries are resynced in place, preserving their refresh tokens. Filter with `--name-prefix`
 - `--update-refresh-tokens [name]` - Run OAuth setup wizard (one-time for developer plan); pass a credential name when more than one is configured (e.g. `--update-refresh-tokens enphase-monitor-002`)
@@ -438,7 +447,7 @@ Serves the report entirely from cache (no live API calls) and compares each metr
 - `--refresh-quota` - Out-of-band resync of each credential's monthly API-usage baseline from the developer portal stats page (opens Chrome to log in). Filter with `--name-prefix`. The same baseline is also seeded by `--init`
 - `--name-prefix <prefix>` - Application/credential name prefix filter (default `enphase-monitor-`). Scopes which applications `--seed-credentials` pulls and which credentials `--init`/`--refresh-quota` sync
 - `--test` - Validation Mode: use cache only, no live API calls, validate against expected values
-- `--no-cache` - Bypass cache and make live API calls. Propagates API errors (429/503/network) instead of serving stale cache. No effect in Backfill Mode, which is always live
+- `--no-cache` - Bypass cache and make live API calls. Propagates API errors (429/503/network) instead of serving stale cache. No effect with `--start-date`, which is always live
 - `--cache` - Serve report from cache only; print diagnostic listing missing endpoints if cache is incomplete
 - `--clear-cache` - Clear cached API responses for today's date only
 - `--clear-cache-date YYYY-MM-DD` - Clear cached API responses for a specific past date (matches the query start date exactly)
@@ -857,13 +866,12 @@ enphase-monitor/
 │   │   ├── weather_test.go                  # Weather enrichment tests
 │   │   └── cache_report.go                  # --cache mode: completeness check and diagnostic output
 │   ├── browser/                             # Headed Chrome launcher (chromedp) for portal automation
-│   │   ├── chrome.go                        # LaunchHeaded: disposable-profile Chrome session
+│   │   ├── chrome.go                        # LaunchHeaded (disposable profile) + LaunchHeadedWithProfile (persistent profile)
 │   │   └── chrome_test.go                   # Chrome launcher tests
 │   ├── cache/                               # Disk-based response caching
 │   │   ├── cache.go                         # Cache implementation + sliding-window budget
 │   │   ├── cache_test.go                    # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
 │   │   ├── cache_functions_test.go          # Core caching tests (URL normalization, key generation, save/load, HasCacheForDate)
-│   │   ├── api_budget_test.go               # Sliding-window API Budget counter tests (RecordAPICall, RemainingBudget, pruning)
 │   │   ├── cli.go                           # Cache inspection utilities
 │   │   └── cli_test.go                      # CLI utilities tests
 │   ├── cli/                                 # Command-line interface
@@ -900,19 +908,37 @@ enphase-monitor/
 │   ├── geocode/                             # ZIP/postal code → coordinates (Zippopotam.us)
 │   │   ├── geocode.go                       # ZIP lookup for weather geolocation
 │   │   └── geocode_test.go                  # Geocode tests
-│   ├── history/                             # Per-day energy+weather JSON records (history/)
-│   │   ├── history.go                       # DayRecord schema, FromMetrics, WriteRecord
-│   │   └── history_test.go                  # History mapping and write tests
+│   ├── history/                             # Per-day energy+weather and utility-meter JSON records (history/)
+│   │   ├── history.go                       # Dataset type (Enphase/PGE sentinels), DayRecord schema, FromMetrics, WriteRecord, WriteIndex
+│   │   └── history_test.go                  # History mapping, write, index, and Dataset tests
 │   ├── location/                            # Resolve & cache systems' coordinates (--init)
 │   │   ├── location.go                      # Location resolver with disk cache
 │   │   └── location_test.go                 # Location resolver tests
-│   ├── oauth/                               # OAuth 2.0 authentication
+│   ├── oauth/                               # OAuth 2.0 authentication (Enphase developer-plan)
 │   │   ├── oauth.go                         # Token management & refresh
 │   │   ├── browser.go                       # Browser-driven OAuth authorization (auto-approves consent)
 │   │   ├── oauth_test.go                    # Basic unit tests
 │   │   ├── browser_test.go                  # Browser-OAuth flow tests
 │   │   ├── oauth_functional_test.go         # Integration tests with mock servers
 │   │   └── oauth_edge_cases_test.go         # Edge case tests
+│   ├── pge/                                 # PG&E Share My Data (Green Button) integration
+│   │   ├── config.go                        # LoadConfig: compose from config.yaml + credentials.yaml pge: blocks
+│   │   ├── auth.go                          # OAuth2 authorize + token exchange (mTLS, Share My Data API)
+│   │   ├── pull.go                          # Pull: date-range fetch against Share My Data API (requires client cert)
+│   │   ├── browserpull.go                   # BrowserPull: Green Button download via headed Chrome session
+│   │   ├── espi.go                          # ParseReadings: ESPI XML → DayUsage intervals
+│   │   ├── history.go                       # WriteHistory: aggregate DayUsage → pge-YYYY-MM-DD.json records
+│   │   ├── download.go                      # Download: HTTP helper for the Green Button XML file
+│   │   ├── login.go                         # PGE portal login via headed Chrome
+│   │   ├── autoform.go                      # Auto-fill date-range form on the PGE download page
+│   │   ├── cert.go                          # CertRenew: certbot DNS-01 via Enom API (no sudo)
+│   │   ├── dns.go                           # SetHostRecord: update Enom DNS TXT record for ACME challenge
+│   │   ├── enom.go                          # Enom reseller API client (SetHosts replaces whole zone)
+│   │   ├── autoform_test.go                 # Autoform field-fill tests
+│   │   ├── cert_test.go                     # CertRenew / certbot integration tests
+│   │   ├── download_test.go                 # Download HTTP helper tests
+│   │   ├── enom_test.go                     # Enom API client tests
+│   │   └── espi_test.go                     # ESPI XML parser tests
 │   ├── parser/                              # JSON telemetry parsing
 │   │   ├── parser.go                        # Response parsing utilities
 │   │   ├── parser_test.go                   # Parser tests
@@ -948,12 +974,13 @@ enphase-monitor/
 ├── credentials.yaml.example                 # Example credentials (credentials: list)
 ├── credentials.yaml                         # Your actual API secrets (create from example; gitignored)
 ├── cache/                                   # Cached API responses (created at runtime)
-├── history/                                 # Per-day energy+weather JSON records (created by Backfill Mode)
+├── history/                                 # Per-day energy+weather and utility-meter JSON records (created by range pull and PG&E pull)
 ├── weather_codes.json                       # WMO weather-code legend (written by --init)
 ├── go.mod                                   # Go module definition
 ├── go.sum                                   # Go module checksums
 ├── scripts/                                 # Utility scripts
 │   ├── run-tests.sh                         # Test runner script
+│   ├── migrate-history-layout.sh            # One-time migration: renames plain <date>.json records to enphase-<date>.json
 │   └── history.py                           # Git history inspection helper
 ├── Makefile                                 # Build automation
 ├── CONTEXT.md                               # Domain glossary (project terminology, "avoid" terms)
@@ -963,7 +990,7 @@ enphase-monitor/
 
 ## Testing
 
-The project includes a comprehensive test suite with **70.6% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
+The project includes a comprehensive test suite with **48.6% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
 
 ### Test Coverage by Package
 
@@ -974,11 +1001,11 @@ The project includes a comprehensive test suite with **70.6% code coverage** acr
 | validation | 95.5% | ✅ |
 | parser | 94.8% | ✅ |
 | timezone | 92.7% | ✅ |
-| cli | 92.3% | ✅ |
+| cli | 92.9% | ✅ |
 | aggregator | 89.2% | ✅ |
 | weather | 88.2% | ✅ |
 | config | 84.3% | ✅ |
-| history | 82.5% | ✅ |
+| history | 82.6% | ✅ |
 | geocode | 81.5% | ✅ |
 | location | 79.7% | ✅ |
 | api | 78.6% | ✅ |
@@ -987,10 +1014,11 @@ The project includes a comprehensive test suite with **70.6% code coverage** acr
 | cache | 68.9% | ✅ |
 | oauth | 61.7% | ✅ |
 | app | 40.3% | ⚠️ |
-| browser | 19.5% | ⚠️ |
+| browser | 16.7% | ⚠️ |
 | enphase | 14.6% | ⚠️ |
+| pge | 9.8% | ⚠️ |
 
-**Total: 61.5% coverage** (exceeds typical Go project standards of 50-60%; the low-coverage packages are headed-Chrome/portal-scraping glue — `app` orchestration including `RunBackfill` is exercised via the api-package integration tests, while `browser` and `enphase` drive a real Chrome session against the developer portal and are verified manually)
+**Total: 48.6% coverage** (the low-coverage packages are headed-Chrome/portal-scraping glue and the new `pge` package — `app` orchestration is exercised via the api-package integration tests, while `browser`, `enphase`, and the `pge` browser-pull path drive a real Chrome session and are verified manually)
 
 ### Running Tests
 
@@ -1153,8 +1181,8 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 
 This project follows Go best practices and coding standards:
 
-- **Test Coverage**: 61.5% overall, 100% for urlbuilder, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and aggregator (the headed-Chrome `browser`/`enphase` portal-scraping packages are verified manually and pull the average down)
-- **Test Suite**: 44 test files across 20 tested packages with comprehensive unit, integration, and edge case tests
+- **Test Coverage**: 48.6% overall, 100% for urlbuilder, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and aggregator (the headed-Chrome `browser`/`enphase` portal-scraping packages and the new `pge` browser-pull path are verified manually and pull the average down)
+- **Test Suite**: 49 test files across 21 tested packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -1165,8 +1193,8 @@ This project follows Go best practices and coding standards:
 **Code Metrics:**
 - Total Lines: ~9,200 (excluding tests)
 - Test Lines: ~11,900 (comprehensive test suite)
-- Packages: 21 internal packages (20 with tests; `types` is a pure type-definition package)
-- Test Files: 44 (unit, integration, functional, edge case, and benchmark tests)
+- Packages: 22 internal packages (21 with tests; `types` is a pure type-definition package)
+- Test Files: 49 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 3 (gopkg.in/yaml.v3 and github.com/chromedp/chromedp + cdproto for portal automation)
 
 ## License

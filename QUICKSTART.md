@@ -156,7 +156,7 @@ Once it is working:
 
 - Query a Past Period: `./enphase-monitor --date 2026-01-15`
 - View your True-Up Period balance: `./enphase-monitor --true-up 2025-01-15` (use the True-Up Start Date from your utility account)
-- Build a historical dataset: `./enphase-monitor --backfill-from 2025-06-19` (writes one JSON record per day into `history/`)
+- Build a historical dataset: `./enphase-monitor --start-date 2025-06-19` (writes one JSON record per day into `history/`)
 - Run on startup: Add to cron or systemd
 - Build a dashboard: Parse the output or extend the code
 - Set up alerts: Monitor grid dependence and trigger notifications

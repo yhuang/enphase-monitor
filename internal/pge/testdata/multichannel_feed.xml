@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Compact reproduction of the GreenButtonAlliance sandbox ESPI feed shape: four
+  channels under one feed, exercising the parser's energy-only and signed-value
+  handling. Values use powerOfTenMultiplier 0 and uom 72 (Wh) so 250 Wh -> 0.25
+  kWh, and intervals are 899 s like the sandbox (not exactly 900).
+
+  Channel A — import, energy (uom 72, kind 12, flowDirection 1): two readings.
+  Channel B — demand, power (uom 38, kind 8, flowDirection 0): MUST be excluded;
+              1500 W is not energy and would corrupt the series.
+  Channel C — net import, energy (flowDirection 1) carrying a negative reading,
+              representing an interval where export exceeded import.
+  Channel D — received/export, energy (flowDirection 19): positive magnitude,
+              normalised to negative by the parser.
+-->
+<feed xmlns="http://naesb.org/espi">
+  <entry><content>
+    <ReadingType>
+      <flowDirection>1</flowDirection>
+      <powerOfTenMultiplier>0</powerOfTenMultiplier>
+      <uom>72</uom>
+      <kind>12</kind>
+      <intervalLength>899</intervalLength>
+    </ReadingType>
+  </content></entry>
+  <entry><content>
+    <IntervalBlock>
+      <interval><duration>1798</duration><start>1700000000</start></interval>
+      <IntervalReading>
+        <timePeriod><duration>899</duration><start>1700000000</start></timePeriod>
+        <value>250</value>
+      </IntervalReading>
+      <IntervalReading>
+        <timePeriod><duration>899</duration><start>1700000899</start></timePeriod>
+        <value>100</value>
+      </IntervalReading>
+    </IntervalBlock>
+  </content></entry>
+
+  <entry><content>
+    <ReadingType>
+      <flowDirection>0</flowDirection>
+      <powerOfTenMultiplier>0</powerOfTenMultiplier>
+      <uom>38</uom>
+      <kind>8</kind>
+      <intervalLength>899</intervalLength>
+    </ReadingType>
+  </content></entry>
+  <entry><content>
+    <IntervalBlock>
+      <interval><duration>899</duration><start>1700000000</start></interval>
+      <IntervalReading>
+        <timePeriod><duration>899</duration><start>1700000000</start></timePeriod>
+        <value>1500</value>
+      </IntervalReading>
+    </IntervalBlock>
+  </content></entry>
+
+  <entry><content>
+    <ReadingType>
+      <flowDirection>1</flowDirection>
+      <powerOfTenMultiplier>0</powerOfTenMultiplier>
+      <uom>72</uom>
+      <kind>12</kind>
+      <intervalLength>899</intervalLength>
+    </ReadingType>
+  </content></entry>
+  <entry><content>
+    <IntervalBlock>
+      <interval><duration>1798</duration><start>1700000000</start></interval>
+      <IntervalReading>
+        <timePeriod><duration>899</duration><start>1700000000</start></timePeriod>
+        <value>-200</value>
+      </IntervalReading>
+      <IntervalReading>
+        <timePeriod><duration>899</duration><start>1700000899</start></timePeriod>
+        <value>300</value>
+      </IntervalReading>
+    </IntervalBlock>
+  </content></entry>
+
+  <entry><content>
+    <ReadingType>
+      <flowDirection>19</flowDirection>
+      <powerOfTenMultiplier>0</powerOfTenMultiplier>
+      <uom>72</uom>
+      <kind>12</kind>
+      <intervalLength>899</intervalLength>
+    </ReadingType>
+  </content></entry>
+  <entry><content>
+    <IntervalBlock>
+      <interval><duration>899</duration><start>1700000000</start></interval>
+      <IntervalReading>
+        <timePeriod><duration>899</duration><start>1700000000</start></timePeriod>
+        <value>400</value>
+      </IntervalReading>
+    </IntervalBlock>
+  </content></entry>
+</feed>
