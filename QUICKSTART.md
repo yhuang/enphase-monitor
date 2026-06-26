@@ -44,7 +44,7 @@ spread the rate limit across systems.
 
 ```yaml
 credentials:
-  - name: enphase-monitor-001                       # Unique label for this credential set
+  - name: enphase-monitor-01                       # Unique label for this credential set
     key: "YOUR_API_KEY"              # From Developer Portal
     client_id: "YOUR_CLIENT_ID"       # From Developer Portal
     client_secret: "YOUR_CLIENT_SECRET"  # From Developer Portal
@@ -89,7 +89,7 @@ This interactive wizard will:
 
 No copy-paste needed — just authorize in the browser and the credential is ready to use. (If your `redirect_uri` isn't a localhost address, the wizard falls back to asking you to paste the redirect URL.)
 
-> With more than one credential set, name the one to set up: `./enphase-monitor --update-refresh-tokens enphase-monitor-002`.
+> With more than one credential set, name the one to set up: `./enphase-monitor --update-refresh-tokens enphase-monitor-02`.
 
 > **📖 Want to understand OAuth better?** See **[OAUTH_SETUP.md](docs/OAUTH_SETUP.md)** for a detailed explanation of how OAuth works, what each component does, and how authentication is performed.
 
@@ -125,13 +125,11 @@ You should see output showing your combined system metrics!
 
 ## Step 8: Start Monitoring
 
-Start continuous monitoring (refreshes every hour by default):
+Run the monitor:
 
 ```bash
 make run
 ```
-
-Press `Ctrl+C` to stop.
 
 ## Common First-Time Issues
 

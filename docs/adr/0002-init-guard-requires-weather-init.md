@@ -1,6 +1,6 @@
 # Every report mode requires a prior `--init` (weather location), gating the core on an enrichment
 
-All report-generating modes (`--date`, `--continuous`, `--true-up`, `--start-date`, and the default today query) refuse to run until `--init` has cached the systems' location, exiting with `not initialized — run --init first`. Only cache-management commands and `--update-refresh-tokens` are exempt. `--init`'s primary job is resolving location for Weather Enrichment (it also writes the static WMO weather-code legend), so this makes the weather subsystem a hard prerequisite for energy reporting — even though energy reporting needs no coordinates.
+All report-generating modes (`--date`, `--true-up`, `--start-date`, and the default today query) refuse to run until `--init` has cached the systems' location, exiting with `not initialized — run --init first`. Only cache-management commands and `--update-refresh-tokens` are exempt. `--init`'s primary job is resolving location for Weather Enrichment (it also writes the static WMO weather-code legend), so this makes the weather subsystem a hard prerequisite for energy reporting — even though energy reporting needs no coordinates.
 
 ## Considered Options
 

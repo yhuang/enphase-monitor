@@ -55,7 +55,7 @@ func FetchMonthlyHits(ctx context.Context, appNames []string, ref time.Time, not
 	}
 	report(notify, "Signed in — reading monthly stats for each application…")
 
-	from, until := calendarMonthRange(ref)
+	from := firstOfMonth(ref)
 	stats := make([]MonthlyHitStat, 0, len(appNames))
 	for i, name := range appNames {
 		if ctx.Err() != nil {
@@ -64,7 +64,7 @@ func FetchMonthlyHits(ctx context.Context, appNames []string, ref time.Time, not
 		if progress != nil {
 			progress(i+1, len(appNames), name)
 		}
-		used, err := scraper.readAppMonthlyHits(name, from, until)
+		used, err := scraper.readAppMonthlyHits(name, from)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
@@ -91,13 +91,13 @@ func parseHitsTotal(text string) (int, bool) {
 	return n, true
 }
 
-// calendarMonthRange returns the portal date strings (MM/DD/YYYY) for the first
-// day of ref's calendar month through ref itself (inclusive).
-func calendarMonthRange(ref time.Time) (from, until string) {
+// firstOfMonth returns the portal date string (MM/DD/YYYY) for the first day
+// of ref's calendar month. Only the FROM date is needed; the portal's UNTIL
+// defaults to today and is left at that value by the calendar interaction.
+func firstOfMonth(ref time.Time) string {
 	ref = ref.In(time.Local)
 	start := time.Date(ref.Year(), ref.Month(), 1, 0, 0, 0, 0, ref.Location())
-	const portalDate = "01/02/2006"
-	return start.Format(portalDate), ref.Format(portalDate)
+	return start.Format("01/02/2006")
 }
 
 func remainingMonthly(used int) int {

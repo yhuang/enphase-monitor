@@ -26,10 +26,7 @@ func (c *Config) Authorize(ctx context.Context, code, redirectURI string) error 
 	if err != nil {
 		return err
 	}
-	if err := cl.exchangeAuthCode(ctx, code, redirectURI); err != nil {
-		return err
-	}
-	return nil
+	return cl.exchangeAuthCode(ctx, code, redirectURI)
 }
 
 // PullResult reports the outcome of a Pull.

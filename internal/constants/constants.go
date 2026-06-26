@@ -99,9 +99,7 @@ func (qt QueryMode) String() string {
 const (
 	// APIRequestTimeout is the timeout for API HTTP requests
 	APIRequestTimeout = 30 * time.Second
-	// APIBudgetPerMinute is the API Budget window size (10 requests/minute)
-	APIBudgetPerMinute = 10
-	// APIBudgetWindowSeconds is the sliding-window duration for the API Budget counter
+	// APIBudgetWindowSeconds is the cooldown duration after a 429 (seconds)
 	APIBudgetWindowSeconds = 60
 	// MaxRequestsPerMonth is the per-API-key monthly call limit (free developer plan).
 	MaxRequestsPerMonth = 1000

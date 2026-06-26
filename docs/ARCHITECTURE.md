@@ -34,9 +34,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 - **Intelligent Caching**: Disk-based response caching to stay within the API Budget (10 calls/minute)
 - **Past Period Queries**: Query any past date with `--date` flag (auto-runs once since Past Period data is immutable)
 - **True-Up Report**: Energy metrics across a full utility True-Up Period with `--true-up`
-- **Real-time Monitoring**: Continuous mode with configurable refresh interval (default: 1 hour)
 - **Color Customization**: Customize terminal output colors via YAML configuration
-- **Validation Mode**: Test against expected values without making API calls
 
 ### Tech Stack
 
@@ -62,7 +60,7 @@ enphase-monitor/
 │   ├── api/                               # HTTP client for Cloud API v4
 │   │   ├── client.go                      # Enlighten Cloud API client
 │   │   ├── types.go                       # API request/response types
-│   │   ├── cache_check.go                 # Per-system/endpoint cache availability check (--cache mode)
+│   │   ├── cache_check.go                 # Per-system/endpoint cache availability check
 │   │   ├── client_test.go                 # API client unit tests
 │   │   ├── client_caching_test.go         # Characterization tests for makeCachedAPIRequest fallback branches (validation/no-cache modes, 429/503/network-error cache fallbacks)
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
@@ -73,15 +71,14 @@ enphase-monitor/
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
 │   │   ├── setup_test.go                  # Setup tests
-│   │   ├── runner.go                      # Execution modes (once/continuous)
+│   │   ├── runner.go                      # RunOnce execution mode
 │   │   ├── runner_test.go                 # Runner tests
 │   │   ├── trueup.go                      # True-Up Mode: single-batch Lifetime Data query, True-Up Window end-date logic, report conversion
 │   │   ├── trueup_test.go                 # True-up Window end-date logic (trueUpWindowEnd) and report conversion tests
 │   │   ├── backfill.go                    # Backfill Mode: live per-day fetch over a date range into history/
 │   │   ├── backfill_test.go               # Backfill range/skip/overwrite tests
 │   │   ├── weather.go                     # Best-effort weather enrichment for Day-Mode reports
-│   │   ├── weather_test.go                # Weather enrichment tests
-│   │   └── cache_report.go                # --cache mode: completeness check and diagnostic output
+│   │   └── weather_test.go                # Weather enrichment tests
 │   ├── browser/                           # Headed Chrome launcher (chromedp) for portal automation
 │   │   ├── chrome.go                      # LaunchHeaded (disposable profile) + LaunchHeadedWithProfile (persistent profile)
 │   │   └── chrome_test.go                 # Chrome launcher tests
@@ -107,7 +104,7 @@ enphase-monitor/
 │   ├── credentials/                       # Credential pool: spread + 429 failover + monthly quota
 │   │   ├── pool.go                        # Round-robin assignment, cooldown, failover
 │   │   ├── pool_test.go                   # Pool selection/failover tests
-│   │   ├── quota.go                       # Per-credential minute + monthly API budget (monthly-quota.json)
+│   │   ├── quota.go                       # Per-credential monthly API budget (monthly-quota.json)
 │   │   ├── quota_test.go                  # Quota counting, month-rollover, and budget tests
 │   │   └── quota_portal_test.go           # Portal-seeded monthly baseline tests
 │   ├── display/                           # Terminal output formatting
@@ -168,7 +165,7 @@ enphase-monitor/
 │   ├── urlbuilder/                        # API URL construction
 │   │   ├── urlbuilder.go                  # URL building helpers
 │   │   └── urlbuilder_test.go             # URL builder tests
-│   ├── validation/                        # Validation Mode (--test flag)
+│   ├── validation/                        # Metrics validation logic (tolerance-based checks)
 │   │   ├── validation.go                  # Metrics validation logic (uses io.Writer for testability)
 │   │   ├── validation_test.go             # Unit tests (tolerance calculations, edge cases)
 │   │   └── validation_integration_test.go # Integration tests (real expected values)
@@ -252,11 +249,11 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ┌──────────────────────────────┐  ┌────────────────────────────────────────────────────────────────────┐
 │  3a. TRUE-UP (internal/app)  │  │  3b. EXECUTION (internal/app)                                      │
 │  app.RunTrueUp(ctx, ...)     │  │     └─► main creates signal context (SIGINT/SIGTERM), passes ctx   │
-│  ├─► Parse start date        │  │     └─► app.RunOnce(ctx, ...) or app.RunContinuous(ctx, ...)       │
-│  ├─► Normalize to month-1    │  │     └─► RunContinuous: synchronous for/select (ticker.C, ctx.Done) │
-│  ├─► GetAggregatedMetrics    │  │         (no goroutines spawned)                                    │
-│  │   (QueryModeTrueUp,       │  │     └─► fetchAndDisplay(ctx, ...) calls aggregator                 │
-│  │   4 metrics/system,       │  └────────────────────────────────────────────────────────────────────┘
+│  ├─► Parse start date        │  │     └─► app.RunOnce(ctx, ...) calls aggregator and displays report │
+│  ├─► Normalize to month-1    │  └────────────────────────────────────────────────────────────────────┘
+│  ├─► GetAggregatedMetrics    │
+│  │   (QueryModeTrueUp,       │
+│  │   4 metrics/system,       │
 │  ├─► buildTrueUpReport()     │
 │  └─► ShowTrueUpReport()      │
 └──────────────────────────────┘
@@ -442,10 +439,9 @@ When run with `--debug`, the application emits structured logs to stderr that ex
 
 - **Startup banner** (`printDebugStartup` in [main.go](../main.go)) shows the current time, the most recent recorded API call (`cache.LastAPICallTime()`), how long until the 60-second window resets, and the remaining budget. This is the single best diagnostic for "why am I getting 429s?" because it answers "is the window still active?" before any work begins.
 - **Preflight warning** (Layer 2, in `GetMetricsFromCloud`) prints `WARNING: … Insufficient API budget …` to stderr when the remaining budget is smaller than the query cost for a current-period run. Only emitted in debug mode to avoid cluttering normal report output.
-- **Cached mode banner** (`RunCacheReport`) prints `CACHE MODE: Serving report from cache, no live API calls` when `--cache` finds a complete cache. Only emitted in debug mode for the same reason.
 - **Per-request trace** (`cache.Debugf` from `makeCachedAPIRequest` in [internal/api/client.go](../internal/api/client.go)) emits one line per URL describing the decision taken: serving Past Period immutable cache, falling back due to budget exhaustion, making a live call, or hitting the 429/503 fallback paths. Each line includes the redacted URL and the cache age so traces are reproducible without leaking the API key.
 
-Debug mode also suppresses the terminal-clearing escape sequence in `fetchAndDisplay` so the trace remains visible after the report is printed. The `cache.Debugf` helper is a no-op when debug mode is off — callers do not need to guard the call sites.
+Debug mode also suppresses the terminal-clearing escape sequence in `RunOnce` so the trace remains visible after the report is printed. The `cache.Debugf` helper is a no-op when debug mode is off — callers do not need to guard the call sites.
 
 ### Tests
 
@@ -596,74 +592,17 @@ defer resp.Body.Close()  // Always executes when function returns
 
 ### 6. Channels and Signal Handling (Interruptible Waiting)
 
-This pattern is used **only in continuous monitoring mode** (with `--continuous`). It is not about parallelism—the work is completely serial. It solves a specific problem: **how to wait for a timer but respond instantly to Ctrl+C**.
+`main.go` creates a signal context so that Ctrl+C (SIGINT) and SIGTERM cancel in-flight work:
 
 ```go
 // main.go - Signal context for graceful shutdown
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
-
-// internal/app/runner.go (RunContinuous) - Ticker and interruptible wait loop
-ticker := time.NewTicker(time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second)
-defer ticker.Stop()
-
-for {
-    select {
-    case <-ticker.C:
-        // Timer fired - do periodic work
-        fetchAndDisplay(ctx, rc)
-    case <-ctx.Done():
-        // Signal received - exit gracefully
-        rc.Disp.ShowInfo("Shutting down gracefully...")
-        return nil  // defer ticker.Stop() runs here
-    }
-}
 ```
 
-#### Why Not Just Use `time.Sleep()`?
+This context is passed to `RunOnce` (and to `oauth.Authorize`) so any in-flight HTTP request is cancelled when the process receives a signal.
 
-```go
-// ❌ Simple but unresponsive
-for {
-    fetchAndDisplay(...)
-    time.Sleep(1 * time.Hour)  // Blocked here - Ctrl+C kills process abruptly
-}
-```
-
-With `time.Sleep()`:
-- Ctrl+C during sleep terminates the process immediately
-- `defer` statements do not run (no cleanup)
-- No graceful shutdown message
-
-#### What `select` Actually Does
-
-`select` blocks until ONE of its cases is ready, then executes that case. It is **multiplexed waiting**—the program sleeps (zero CPU) but listens for multiple wake-up events:
-
-```
-time.Sleep() approach:
-    [work] [====== BLOCKED, DEAF TO SIGNALS ======] [work] ...
-                     ↑ Ctrl+C here = abrupt death
-
-select {} approach:
-    [work] [====== BLOCKED BUT LISTENING ======] [work] ...
-                     ↑ Ctrl+C here = instant graceful exit
-```
-
-#### No Goroutines Spawned
-
-This code does not create any goroutines. The signal handler runs in a Go runtime goroutine (created by `signal.NotifyContext`), but that is invisible to us. Our code remains single-threaded—`select` just provides interruptible waiting.
-
-> **📖 For a comprehensive explanation of channels, signals, and the `select` statement, including detailed flow diagrams, code walkthroughs, and real-world examples, see [GO_CONCEPTS.md](GO_CONCEPTS.md#channels-and-signals)**.
-
-#### When You Need This Pattern
-
-| Requirement | `time.Sleep()` | `select` with channels |
-|-------------|----------------|------------------------|
-| Wait for fixed duration | ✅ | ✅ |
-| Respond instantly to signals | ❌ | ✅ |
-| Graceful shutdown | ❌ | ✅ |
-| `defer` cleanup guaranteed | ❌ | ✅ |
-| Zero CPU while waiting | ✅ | ✅ |
+> **Note:** The `for`/`select` ticker loop that drove periodic re-fetches (`RunContinuous`) has been removed. The channel/select/ticker pattern it used is documented in [GO_CONCEPTS.md](GO_CONCEPTS.md#channels-and-signals) as a Go reference — the pattern itself is valid Go; it is simply no longer exercised by production code.
 
 ### 7. JSON Struct Tags
 
@@ -720,9 +659,8 @@ when possible to improve testability.
 | Package/File | Responsibility |
 |--------------|----------------|
 | [internal/app/setup.go](../internal/app/setup.go) | Application initialization & configuration |
-| [internal/app/runner.go](../internal/app/runner.go) | Execution modes (once/continuous) |
-| [internal/app/trueup.go](../internal/app/trueup.go) | True-Up Mode: single-batch Lifetime Data query (QueryModeTrueUp) and report conversion | 
-| [internal/app/cache_report.go](../internal/app/cache_report.go) | --cache mode: per-system endpoint check, diagnostic output, and cached run |
+| [internal/app/runner.go](../internal/app/runner.go) | RunOnce execution mode |
+| [internal/app/trueup.go](../internal/app/trueup.go) | True-Up Mode: single-batch Lifetime Data query (QueryModeTrueUp) and report conversion |
 
 ### Internal Packages - CLI Layer
 
@@ -747,7 +685,7 @@ when possible to improve testability.
 | [internal/aggregator/aggregator.go](../internal/aggregator/aggregator.go) | Multi-system aggregation with DI |
 | [internal/display/display.go](../internal/display/display.go) | Terminal output formatting with colors |
 | [internal/api/client.go](../internal/api/client.go) | HTTP client for Enphase Cloud API v4 |
-| [internal/api/cache_check.go](../internal/api/cache_check.go) | Per-system/endpoint cache availability probe (used by --cache mode) |
+| [internal/api/cache_check.go](../internal/api/cache_check.go) | Per-system/endpoint cache availability probe |
 | [internal/cache/*](../internal/cache/) | Disk-based response caching |
 | [internal/parser/*](../internal/parser/) | JSON telemetry response parsing |
 | [internal/config/*](../internal/config/) | Configuration types and utilities |
@@ -785,9 +723,8 @@ when possible to improve testability.
    - Review `internal/display/display.go` - See terminal formatting techniques
    - Study `internal/oauth/oauth.go` - Understand token management and refresh patterns
 
-5. **Deep Dive into Concurrency**
-   - Read **[GO_CONCEPTS.md](GO_CONCEPTS.md#channels-and-signals)** for detailed explanation of channels and signal handling
-   - See how `select` statement enables graceful shutdown
+5. **Go Concepts Reference**
+   - Read **[GO_CONCEPTS.md](GO_CONCEPTS.md#channels-and-signals)** for a reference explanation of channels, signals, and the `select` statement (the pattern was used in the now-removed continuous-mode loop; the concepts are general Go)
 
 ### Key Files for Learning Go Patterns
 

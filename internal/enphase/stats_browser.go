@@ -22,7 +22,8 @@ const (
 	hitsPollInterval     = 750 * time.Millisecond  // delay between hit-total reads
 	appSelectSettle      = 800 * time.Millisecond  // re-render after selecting an application
 	appSelectRetrySettle = 500 * time.Millisecond  // dropdown-open delay before retrying selection
-	dateRangeSettle      = 1200 * time.Millisecond // results reload after changing the date range
+	calendarOpenSettle   = 600 * time.Millisecond  // calendar popup render delay after clicking the input
+	dateRangeSettle      = 1200 * time.Millisecond // results reload after the date selection is complete
 	readyPollInterval    = 2 * time.Second         // delay between stats-page readiness checks
 )
 
@@ -101,11 +102,11 @@ func (s *StatsScraper) statsPageReady() (bool, error) {
 	return ready, err
 }
 
-func (s *StatsScraper) readAppMonthlyHits(appName, fromDate, untilDate string) (int, error) {
+func (s *StatsScraper) readAppMonthlyHits(appName, fromDate string) (int, error) {
 	if err := s.selectApp(appName); err != nil {
 		return 0, err
 	}
-	if err := s.setDateRange(fromDate, untilDate); err != nil {
+	if err := s.setFromDate(fromDate); err != nil {
 		return 0, err
 	}
 	return s.waitForHits()
@@ -189,59 +190,72 @@ func (s *StatsScraper) selectApp(appName string) error {
 	return nil
 }
 
-func (s *StatsScraper) setDateRange(fromDate, untilDate string) error {
-	fromJSON, err := json.Marshal(fromDate)
-	if err != nil {
-		return err
-	}
-	untilJSON, err := json.Marshal(untilDate)
-	if err != nil {
-		return err
-	}
-	script := fmt.Sprintf(`(function(from, until) {
-		const setInput = (input, value) => {
-			input.focus();
-			input.value = value;
-			input.dispatchEvent(new Event('input', { bubbles: true }));
-			input.dispatchEvent(new Event('change', { bubbles: true }));
-		};
-
-		const labels = [...document.querySelectorAll('label, span, div')];
-		let fromInput = null, untilInput = null;
-		for (const el of labels) {
-			const t = (el.textContent || '').toLowerCase();
-			if (!fromInput && t.trim() === 'from') {
-				const inp = el.parentElement && el.parentElement.querySelector('input');
-				if (inp) fromInput = inp;
-			}
-			if (!untilInput && t.trim() === 'until') {
-				const inp = el.parentElement && el.parentElement.querySelector('input');
-				if (inp) untilInput = inp;
-			}
-		}
-
-		const inputs = [...document.querySelectorAll('input')].filter(i => {
-			const type = (i.type || '').toLowerCase();
-			return type === 'text' || type === 'date' || type === '';
-		});
-		if (!fromInput && inputs.length >= 2) fromInput = inputs[0];
-		if (!untilInput && inputs.length >= 2) untilInput = inputs[1];
-
-		if (!fromInput || !untilInput) return false;
-		setInput(fromInput, from);
-		setInput(untilInput, until);
-		return true;
-	})(%s, %s)`, string(fromJSON), string(untilJSON))
+// setFromDate selects the first of the current month via the portal's jQuery UI
+// datepicker and leaves the UNTIL date at its default (today).
+//
+// Portal HTML structure (StatsMenu-custom):
+//
+//	<span> from
+//	  <input class="StatsMenu-customInput hasDatepicker" type="text">  ← zero-width backing input
+//	  <a class="StatsMenu-customLink--since">06/01/2026</a>            ← visible click trigger
+//	</span>
+//	<span> until
+//	  <input class="StatsMenu-customInput hasDatepicker" type="text">
+//	  <a class="StatsMenu-customLink--until">06/25/2026</a>
+//	</span>
+//
+// Sequence:
+//  1. Click <a class="StatsMenu-customLink--since"> to open the jQuery UI datepicker.
+//  2. Click day "1" in #ui-datepicker-div (skipping other-month cells).
+//  3. Leave UNTIL alone; it already shows today.
+func (s *StatsScraper) setFromDate(fromDate string) error {
+	// Step 1: click the FROM date link to open the jQuery UI datepicker popup.
+	// The backing <input class="hasDatepicker"> is zero-width; the visible trigger
+	// is the <a class="StatsMenu-customLink--since"> anchor. Fall back to the input
+	// if the anchor is somehow absent.
+	openScript := `(function() {
+		const link = document.querySelector('a.StatsMenu-customLink--since');
+		if (link) { link.click(); return true; }
+		const inp = document.querySelector('input.StatsMenu-customInput');
+		if (inp) { inp.click(); inp.focus(); return true; }
+		return false;
+	})()`
 
 	var ok bool
 	if err := chromedp.Run(s.ctx,
-		chromedp.Evaluate(script, &ok),
-		chromedp.Sleep(dateRangeSettle),
+		chromedp.Evaluate(openScript, &ok),
+		chromedp.Sleep(calendarOpenSettle),
 	); err != nil {
-		return fmt.Errorf("failed to set date range: %w", err)
+		return fmt.Errorf("failed to open from-date datepicker: %w", err)
 	}
 	if !ok {
-		return errors.New("could not find from/until date inputs on the stats page — the portal UI may have changed")
+		return errors.New("could not find from date link on the stats page — the portal UI may have changed")
+	}
+
+	// Step 2: click day "1" in the jQuery UI datepicker calendar.
+	// #ui-datepicker-div contains <td> elements; days from adjacent months carry
+	// class "ui-datepicker-other-month". The clickable day is an <a> inside the td.
+	clickDay1Script := `(function() {
+		const picker = document.querySelector('#ui-datepicker-div, .ui-datepicker');
+		if (!picker) return false;
+		for (const td of picker.querySelectorAll('td')) {
+			if (td.classList.contains('ui-datepicker-other-month') ||
+				td.classList.contains('ui-datepicker-unselectable') ||
+				td.classList.contains('ui-state-disabled')) continue;
+			const a = td.querySelector('a');
+			if (a && a.textContent.trim() === '1') { a.click(); return true; }
+		}
+		return false;
+	})()`
+
+	if err := chromedp.Run(s.ctx,
+		chromedp.Evaluate(clickDay1Script, &ok),
+		chromedp.Sleep(dateRangeSettle),
+	); err != nil {
+		return fmt.Errorf("failed to click day 1 in datepicker: %w", err)
+	}
+	if !ok {
+		return fmt.Errorf("could not find day 1 in the datepicker for %s — the portal UI may have changed", fromDate)
 	}
 	return nil
 }

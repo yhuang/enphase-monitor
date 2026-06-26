@@ -25,16 +25,16 @@ API responses from the `energy_*_lifetime` endpoints. Returns cumulative daily t
 _Avoid_: Lifetime endpoint, historical data
 
 **API Budget**:
-The number of live API requests available to a credential, tracked in two windows: a 60-second sliding window and the current calendar month. The Enphase Cloud API enforces 10 requests per minute **and** 1000 requests per month, per API key. With 2 Systems × 5 metrics = 10 calls per run, one full run consumes a single key's entire per-minute budget. The application tracks both windows locally per credential; when a credential is exhausted it falls back to cache — or, when a Credential Pool is configured, to another credential — rather than issuing a guaranteed-failed live call.
+The number of live API requests available to a credential. The Enphase Cloud API enforces 10 requests per minute **and** 1000 requests per month, per API key. With 2 Systems × 5 metrics = 10 calls per run, one full run consumes a single key's entire per-minute budget. The application tracks the 60-second sliding window in `cache/api_calls` (the `internal/cache` layer) and the monthly count in `cache/monthly-quota.json` (the `internal/credentials` pool); when a credential is exhausted it falls back to cache — or, when a Credential Pool is configured, to another credential — rather than issuing a guaranteed-failed live call.
 _Avoid_: Rate limit, API quota, request quota
 _Why_: "Rate limit" describes the HTTP-layer enforcement mechanism (HTTP 429 from Enphase). "API Budget" describes the application-level concept — how many requests the app has available to spend in the current window. The distinction matters in code: constants and functions that deal with the HTTP 429 response correctly use "rate limit" (e.g. `RateLimitError`, `IsRateLimitError`), while functions that track the app's remaining capacity use "budget" (e.g. `RemainingBudget`, `BudgetWarningShown`).
 
 **Credential Pool**:
-The ordered set of API credential sets (each `{name, key, client_id, client_secret, refresh_token}`) the app rotates among to scale past a single key's limits. It spreads load round-robin across Systems (`ForSystem`), fails over to a spare when a credential hits a 429 or runs out of monthly budget (`Failover`/`MarkUnavailable`), and is built once at startup so cooldown state survives Continuous Mode ticks. Seeded from the developer portal with `--seed-credentials` and authorized with `--update-refresh-tokens`. Lives in `internal/credentials`.
+The ordered set of API credential sets (each `{name, key, client_id, client_secret, refresh_token}`) the app rotates among to scale past a single key's limits. It assigns credentials least-used-first across Systems (`ForSystem` sorts by ascending monthly usage), fails over to a spare when a credential hits a 429 or runs out of monthly budget (`Failover`/`MarkUnavailable`), and is built once at startup so cooldown state is preserved across runs. Seeded from the developer portal with `--seed-credentials` and authorized with `--update-refresh-tokens`. Lives in `internal/credentials`.
 _Avoid_: Key ring, account pool
 
 **Monthly Quota Baseline**:
-The per-credential count of API calls already spent this calendar month, persisted to `cache/monthly-quota.json`. Seeded from the developer portal stats page by `--init` (or resynced out-of-band by `--refresh-quota`) and incremented on every live call (`RecordAPICall`); it resets on the month boundary. Drives monthly rotation: a credential with no monthly budget left is skipped just like one in per-minute cooldown.
+The per-credential count of API calls already spent this calendar month, persisted to `cache/monthly-quota.json`. Seeded from the developer portal stats page by `--init` (or resynced out-of-band by `--refresh-quota`) and incremented on every live call (`RecordAPICall`); it resets on the month boundary. Drives monthly rotation: a credential with no monthly budget left is skipped just like one in per-minute cooldown (HTTP 429 from Enphase).
 _Avoid_: Monthly rate limit
 
 ## Cache
@@ -44,33 +44,23 @@ A disk store of raw API responses, keyed by URL and date. Used to avoid redundan
 _Avoid_: API cache, response store, local cache
 
 **Cache Mode**:
-The user-selected cache behavior for a run. Three modes:
+The user-selected cache behavior for a run. Two modes:
 - **Auto** (default): use Cache when available, fall back to live API calls.
-- **Cached** (`--cache`): serve the report entirely from Cache; list missing endpoints if incomplete. No live API calls.
 - **Live** (`--no-cache`): bypass Cache entirely; always make live API calls.
 _Avoid_: Cache-only mode, no-cache mode, cache flag
 
 ## Run Modes
 
-**Validation Mode**:
-A run mode activated by `--test --date <date>` that serves the report entirely from cache (no live API calls) and then compares each metric against a pre-recorded set of expected values stored in `test-data/`. Exits non-zero if any metric diverges. Used for regression testing after code changes to confirm that calculation logic has not drifted.
-_Avoid_: Test mode, cache-validation mode, regression mode
-_Why_: The CLI flag is `--test`, which makes "test mode" a natural derivation. But the codebase also has `_test.go` files throughout, and calling a run mode "test mode" creates ambiguity — a reader cannot tell whether "test mode" refers to this run mode or to unit testing. "Validation Mode" names what the mode actually does: it validates that metrics match recorded expected values. Code identifiers follow suit: `ValidationMode()`, `SetValidationMode()`, `ValidateValidationModeCache()`.
-
 **Run-Once Mode**:
 The default behavior — execute one query, display the report, and exit. Works with all Query Modes and Cache Modes.
 _Avoid_: Single run, one-shot mode
 
-**Continuous Mode**:
-A run mode activated by `--continuous` that re-fetches and re-displays today's Day report on every Refresh Interval. Restricted to today's Day query — Month, Year, Past Period, and True-Up Mode queries are silently downgraded to Run-Once Mode (Month / Year / Past Period via the run-mode gate in `main`; True-Up Mode via its dedicated early-return branch). Intended for use with Auto Cache Mode: when the API Budget is temporarily exhausted at a refresh tick, the program gracefully serves the most recent cached data rather than terminating. Using `--no-cache` with Continuous Mode is not recommended — it bypasses the pre-call budget short-circuit, so exhaustion triggers live calls that are likely to 429; on a 429 the program falls back to cache if available (with a warning), or exits with an error if no cache exists.
-_Avoid_: Loop mode, polling mode, watch mode
-
 **Refresh Interval**:
-The user-configured number of seconds between re-fetches in Continuous Mode. Set via `refresh_interval` in `config.yaml`; defaults to 3600 (1 hour). Values below 60 seconds are clamped up to a 60-second floor (one API Budget window) to avoid exhausting the API Budget on every tick; the clamp is silent at load time and warns only when Continuous Mode actually starts (the only consumer of `refresh_interval`).
+The `refresh_interval` field in `config.yaml` (default: 3600 seconds = 1 hour). Present in the configuration schema but currently unused — continuous mode was removed.
 _Avoid_: Polling interval, refresh rate, refresh period
 
 **Backfill Mode**:
-A run mode activated by `--start-date <YYYY-MM-DD>` (with optional `--end-date <YYYY-MM-DD>`) that fetches each calendar day from the start date through the end date (or yesterday when `--end-date` is omitted), one day at a time, and writes a History Record per day into `history/`. By default pulls from both Enphase API and PG&E web; use `--enphase-api-only` or `--pge-web-only` to restrict the source. Always makes live API calls (cache disabled) so records are authoritative. Weather is an invariant for Enphase records: a day whose Weather Enrichment is unavailable is treated as a per-day failure (no record written) rather than persisting a weatherless record — so every Enphase History Record is usable for correlation, and the day is retried on a plain re-run. Idempotent for Enphase records — days already on disk are skipped unless `--force` overwrites them; PG&E records are always overwritten. Per-day failures are reported and skipped rather than aborting the range. At the end it refreshes the Backfill Index. Cannot be combined with `--continuous`, `--true-up`, or `--init`.
+A run mode activated by `--start-date <YYYY-MM-DD>` (with optional `--end-date <YYYY-MM-DD>`) that fetches each calendar day from the start date through the end date (or yesterday when `--end-date` is omitted), one day at a time, and writes a History Record per day into `history/`. By default pulls from both Enphase API and PG&E web; use `--enphase-api-only` or `--pge-web-only` to restrict the source. Always makes live API calls (cache disabled) so records are authoritative. Weather is an invariant for Enphase records: a day whose Weather Enrichment is unavailable is treated as a per-day failure (no record written) rather than persisting a weatherless record — so every Enphase History Record is usable for correlation, and the day is retried on a plain re-run. Idempotent for Enphase records — days already on disk are skipped unless `--force` overwrites them; PG&E records are always overwritten. Per-day failures are reported and skipped rather than aborting the range. At the end it refreshes the Backfill Index. Cannot be combined with `--true-up` or `--init`.
 _Avoid_: Bulk fetch, history dump, sync mode
 
 **Backfill Index**:
@@ -82,7 +72,7 @@ The reference `weather_codes.json` at the project root, written by `--init` (Ini
 _Avoid_: Condition map (that is the lossy display collapse, `conditionFromCode`), weather dictionary
 
 **Initialization**:
-The one-time `--init` step that resolves each System's location (one `/systems` call, geocoding the postal code), caches the coordinates for Weather Enrichment, and writes the Weather Code Legend to the project root. Required before any report mode: the program refuses to run a report until the location cache exists (the "init guard"), exempting only cache-management commands and `--update-refresh-tokens`. `--force` re-resolves even when a cached value exists. Location resolution is done out of band so it never competes with the per-minute telemetry budget on a live day.
+The one-time `--init` step that resolves each System's location (one `/systems` call, geocoding the postal code), caches the coordinates for Weather Enrichment, and writes the Weather Code Legend to the project root. Required before any report mode: the program refuses to run a report until the location cache exists (the "init guard"), exempting only cache-management commands and `--update-refresh-tokens`. `--force` re-resolves even when a cached value exists. Location resolution is done out of band so it never competes with the per-minute API Budget on a live day.
 _Avoid_: Setup mode, bootstrap, first-run
 
 ## Query Modes
@@ -100,7 +90,7 @@ A distinct Query Mode activated by the `--true-up` flag with a `YYYY-MM-DD` date
 _Avoid_: True-up query, annual query
 
 **Current Period**:
-A query date that includes today — today's Day query, the current calendar month, or the current calendar year. Data is still accumulating, so cache entries expire (1 hour for today's Day query; 24 hours for the current month or year) and re-fetches are meaningful. SOC is only available for today's Day query (a Current Period Day query). Continuous Mode is restricted to Current Period Day queries.
+A query date that includes today — today's Day query, the current calendar month, or the current calendar year. Data is still accumulating, so cache entries expire (1 hour for today's Day query; 24 hours for the current month or year) and re-fetches are meaningful. SOC is only available for today's Day query (a Current Period Day query).
 _Avoid_: Active period, open period, in-progress period
 
 **Past Period**:
@@ -160,7 +150,7 @@ The best-effort annotation of a Day-Mode report with the day's weather (temperat
 _Avoid_: Temperature lookup, forecast (the daily values are observed/aggregated, not a forecast)
 
 **History Record**:
-The per-day JSON document written to `history/<YYYY-MM-DD>.json`, holding the day's Site totals, per-System energy values, and Weather Enrichment for offline analysis. Written only by Backfill Mode, which is its sole producer — a plain `--date` report never writes one (it stays a read-only terminal report). This single-writer rule keeps every record authoritative (live-sourced) and avoids a cache-sourced record silently shadowing a date that backfill would then skip. Deliberately excludes Battery Charge/Discharge/SOC — they are unavailable for historical dates. Code identifiers: `history.DayRecord`, `history.FromMetrics`, `history.WriteRecord`.
+The per-day JSON document written to `history/<prefix>-<YYYY-MM-DD>.json` (e.g. `history/enphase-2026-01-15.json`; see `Dataset`), holding the day's Site totals, per-System energy values, and Weather Enrichment for offline analysis. Written only by Backfill Mode, which is its sole producer — a plain `--date` report never writes one (it stays a read-only terminal report). This single-writer rule keeps every record authoritative (live-sourced) and avoids a cache-sourced record silently shadowing a date that backfill would then skip. Deliberately excludes Battery Charge/Discharge/SOC — they are unavailable for historical dates. Code identifiers: `history.DayRecord`, `history.FromMetrics`, `history.WriteRecord`.
 _Avoid_: Export, dump, snapshot
 
 ## Example Dialogue

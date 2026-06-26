@@ -81,11 +81,6 @@ func RedactURLKey(rawURL string) string {
 	return parsed.String()
 }
 
-// MinRequestInterval is the width of the sliding-window API Budget counter.
-// Per-query-mode cache staleness is a separate concern handled by
-// MaxCurrentDayCacheAge and MaxCurrentPeriodCacheAge.
-const MinRequestInterval = 1 * time.Minute
-
 // Package-level state for cache configuration.
 // These flags are set once at startup before any concurrent operations begin,
 // so no mutex protection is needed.
@@ -266,11 +261,6 @@ func ExtractEndpointAndSystemID(rawURL string) (endpoint, systemID string) {
 	}
 	return "", ""
 }
-
-// MaxRequestsPerWindow is the per-API-key rate limit (calls per
-// MinRequestInterval). The Enphase Cloud API v4 allows 10 requests per minute
-// per API key shared across all systems. Budget tracking is in credentials.Pool.
-const MaxRequestsPerWindow = 10
 
 // MaxCurrentDayCacheAge bounds how stale a today's-day-query cache may be
 // before we treat it as expired. Today's numbers change throughout the day,

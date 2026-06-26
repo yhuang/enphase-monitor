@@ -41,8 +41,6 @@ A Go application for monitoring and aggregating data from one or more Enphase so
 - **Color Customization**: Customize terminal colors using hex codes or ANSI escape codes
 - **Cloud API v4**: Uses Enphase Enlighten Cloud API v4 for reliable data access
 - **OAuth Support**: Full OAuth 2.0 support for developer plan authentication
-- **Validation Mode**: Validate metrics against expected values without making API calls (`--test` flag)
-
 ## Prerequisites
 
 - Go 1.21 or higher
@@ -97,7 +95,7 @@ Configuration is split across two files:
 
    ```yaml
    credentials:
-     - name: enphase-monitor-001
+     - name: enphase-monitor-01
        key: "YOUR_API_KEY"  # API Key from Enphase Developer Portal
        client_id: "YOUR_CLIENT_ID"  # OAuth Client ID
        client_secret: "YOUR_CLIENT_SECRET"  # OAuth Client Secret
@@ -158,7 +156,7 @@ These live in `credentials.yaml` (kept separate from `config.yaml` so secrets st
 
 The non-secret `authorization_url` and `redirect_uri` are **not** repeated per credential — they are configured once in `config.yaml` under `api:` and shared by every credential set (a credential may override them by setting its own). `authorization_url` defaults to the Enphase token endpoint if omitted.
 
-Listing more than one credential set lets the app spread the per-key rate limit (10 requests/minute, 1000/month) round-robin across systems and fail over to a spare key when one is throttled (429).
+Listing more than one credential set lets the app spread the per-key rate limit (10 requests/minute, 1000/month) across systems — assigning the least-used key first — and fail over to a spare key when one is throttled (429).
 
 #### System Configuration
 
@@ -168,11 +166,7 @@ Each system requires:
 
 #### Optional Settings
 
-- `refresh_interval`: How often to query the API in continuous mode (default: 3600 seconds = 1 hour)
-  - **⚠️ Important**: Only applies when running in continuous mode (with `--continuous` flag)
-  - **Recommended**: Use 3600 seconds (1 hour) to stay within the API Budget
-  - **API Budget Consideration**: The API Budget is 10 calls per minute. For 2 systems that is 10 API calls per cycle (2 systems × 5 metrics) — exactly the limit. Values below 60 seconds are automatically clamped up to a 60-second floor (one API Budget window), so a configured `refresh_interval: 5` actually runs at 60 seconds; in continuous mode a warning is printed when this clamping happens. This prevents a low value from exhausting the budget on every tick.
-  - **Best Practice**: Use 3600 seconds (1 hour) or higher to stay well within the API Budget
+- `refresh_interval`: Present in the config schema (default: 3600 seconds = 1 hour). Currently unused — continuous mode was removed.
 - `timezone`: Timezone for reporting and display (optional)
   - **Default**: Uses your OS system timezone, or US/Pacific if OS timezone is UTC
   - **Format**: IANA timezone identifier (e.g., `"US/Pacific"`, `"America/New_York"`, `"Europe/London"`)
@@ -220,7 +214,7 @@ to paste the redirect URL from your browser's address bar.
 With more than one credential set configured, name the one to set up:
 
 ```bash
-./enphase-monitor --update-refresh-tokens enphase-monitor-002
+./enphase-monitor --update-refresh-tokens enphase-monitor-02
 ```
 
 Or re-authorize every credential in turn (e.g. after they've all expired):
@@ -298,11 +292,11 @@ Before running any report, initialize the systems' location once:
 ./enphase-monitor --init
 ```
 
-`--init` makes a single `/systems` call, geocodes each system's postal code to coordinates, and caches the result. This enables **weather enrichment**: Day-Mode reports are annotated with the day's temperature high/low, conditions, cloud cover, precipitation, and solar radiation (from the [Open-Meteo](https://open-meteo.com/) API). Resolving the location out of band keeps it off the per-minute telemetry budget on a live day.
+`--init` makes a single `/systems` call, geocodes each system's postal code to coordinates, and caches the result. This enables **weather enrichment**: Day-Mode reports are annotated with the day's temperature high/low, conditions, cloud cover, precipitation, and solar radiation (from the [Open-Meteo](https://open-meteo.com/) API). Resolving the location out of band keeps it off the API Budget on a live reporting run.
 
 `--init` also writes `weather_codes.json` to the project root — the authoritative WMO legend decoding the `weather_code` field carried by reports and History Records (each of the codes Open-Meteo emits, defined individually so intensities are preserved). It is a general reference rather than a dataset artifact, regenerated on each `--init`.
 
-**Initialization is required.** Every report mode (`--date`, `--continuous`, `--true-up`, `--start-date`, and the default today query) refuses to run until `--init` has populated the location cache, exiting with:
+**Initialization is required.** Every report mode (`--date`, `--true-up`, `--start-date`, and the default today query) refuses to run until `--init` has populated the location cache, exiting with:
 ```
 enphase-monitor: not initialized — run `enphase-monitor --init` first.
 ```
@@ -347,21 +341,6 @@ This covers the **True-Up Window**: full calendar months from the first day of t
 A single API batch of 8 calls (2 Systems × 4 metrics: Grid Import, Grid Export, Production, Consumption) is made against the `_lifetime` endpoints (Lifetime Data) with `start_date` set to the first day of the True-Up Start Date's month. Battery data is not fetched in True-Up Mode. The API returns all daily values from that date onward; the application sums only the values within the True-Up Window client-side. No inter-batch waits are needed. Subsequent runs are instant because the response is served from the Cache.
 
 **The `--true-up` flag takes precedence over `--date`** — if both are provided, `--date` is ignored.
-
-### Continuous Monitoring
-
-Monitor with auto-refresh (uses `refresh_interval` from config):
-```bash
-./enphase-monitor --continuous
-```
-
-The application will query all systems at the configured `refresh_interval` (default: 3600 seconds = 1 hour) and display updated metrics.
-
-**Restrictions**: `--continuous` only applies to today's Day query. Month, Year, Past Period, and True-Up Mode queries are silently downgraded to run once and exit — Past Period data is immutable, and True-Up Mode uses a dedicated single-batch path that always runs once.
-
-**Cache Mode recommendation**: Use the default Auto Cache Mode (no `--cache` or `--no-cache` flag). When the API Budget is temporarily exhausted at a refresh tick, Auto mode gracefully serves the most recent cached data. With `--no-cache`, budget exhaustion triggers a live call that is likely to 429; on a 429, the program falls back to cache if available (with a warning), or exits with an error if no cache exists.
-
-Press `Ctrl+C` to stop.
 
 ### Historical Backfill
 
@@ -418,37 +397,24 @@ Each record's `weather_code` is the precise WMO interpretation code — the stab
 ```
 Battery charge/discharge/SOC are intentionally omitted from Enphase records: they are unavailable for historical dates (the lifetime endpoints that serve past days carry no battery data). Every Enphase record carries a `weather` object — a day whose weather is unavailable is treated as a failure and is not written (it appears in the manifest's `missing` and is retried on a plain re-run), so the dataset stays usable for correlation. (The field is `omitempty` at the schema level, but range pull never emits a weatherless Enphase record.) PG&E records have a different schema and are stored as `history/pge-<date>.json`; they do not carry weather data.
 
-### Validation Mode
-
-Validate cached metrics against a pre-recorded set of expected values:
-```bash
-./enphase-monitor --test --date 2026-01-19
-```
-
-Serves the report entirely from cache (no live API calls) and compares each metric against expected values stored in `test-data/`. Exits non-zero if any metric diverges. Requires `--date` to identify which expected-values file to load. Use this after code changes to confirm calculation logic has not drifted.
-
 ### Command-Line Options
 
 - `--config <path>` - Path to configuration file (default: `config.yaml`)
 - `--credentials <path>` - Path to credentials file (default: `credentials.yaml`)
 - `--init` - Resolve and cache the systems' location for weather reporting. Run once before normal use; re-run if the cache is cleared. Required before any report mode (see [Initialization & Weather](#initialization--weather))
 - `--force` - With `--init`, re-resolve the location from the API even if a cached value already exists. With `--start-date`, re-fetch and overwrite Enphase history records that already exist instead of skipping them; has no effect on PG&E records, which are always overwritten
-- `--continuous` - Run continuously with periodic refresh (default is run once and exit)
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
-- `--start-date <YYYY-MM-DD>` - Start a range pull from this date through `--end-date` (or yesterday) with live API calls, writing one JSON record per day into `history/`. Fetches from both Enphase API and PG&E web by default; use `--enphase-api-only` or `--pge-web-only` to restrict the source. Skips Enphase days already written unless `--force` is given. Cannot be combined with `--continuous`, `--true-up`, or `--init` (see [Historical Backfill](#historical-backfill))
+- `--start-date <YYYY-MM-DD>` - Start a range pull from this date through `--end-date` (or yesterday) with live API calls, writing one JSON record per day into `history/`. Fetches from both Enphase API and PG&E web by default; use `--enphase-api-only` or `--pge-web-only` to restrict the source. Skips Enphase days already written unless `--force` is given. Cannot be combined with `--true-up` or `--init` (see [Historical Backfill](#historical-backfill))
 - `--end-date <YYYY-MM-DD>` - End date (inclusive) for `--start-date` range pulls. Defaults to yesterday
 - `--pge-web-only` - With `--start-date`, pull only from the PG&E website (Green Button browser download). Does not require Enphase credentials
 - `--enphase-api-only` - With `--start-date`, pull only from the Enphase API. Skips all PG&E data sources
 - `--true-up <YYYY-MM-DD>` - Activate True-Up Mode using this utility True-Up Start Date. Covers the 12-month True-Up Window (Current Period: through yesterday; Past True-Up Period: through last day of 12-month window). Takes precedence over `--date`
-- `--seed-credentials` - Seed `credentials.yaml` from the Enphase developer portal: opens Chrome to log in, then scrapes each application's `name`, `key`, `client_id`, and `client_secret`. New entries are appended with an empty `refresh_token` (fill it with `--update-refresh-tokens`); existing entries are resynced in place, preserving their refresh tokens. Filter with `--name-prefix`
-- `--update-refresh-tokens [name]` - Run OAuth setup wizard (one-time for developer plan); pass a credential name when more than one is configured (e.g. `--update-refresh-tokens enphase-monitor-002`)
+- `--seed-credentials` - Seed `credentials.yaml` from the Enphase developer portal: opens Chrome to log in, then scrapes each application's `name`, `key`, `client_id`, and `client_secret`. New entries are appended with an empty `refresh_token` (fill it with `--update-refresh-tokens`); existing entries are resynced in place, preserving their refresh tokens. Filter with `--quota-prefix`
+- `--update-refresh-tokens [name]` - Run OAuth setup wizard (one-time for developer plan); pass a credential name when more than one is configured (e.g. `--update-refresh-tokens enphase-monitor-02`)
 - `--all` - With `--update-refresh-tokens`, re-authorize every configured credential in turn (e.g. `--update-refresh-tokens --all`)
-- `--new-only` - With `--update-refresh-tokens --all`, authorize only credentials that have no `refresh_token` yet (skip already-authorized ones). Use this right after `--seed-credentials` to bring just the newly-seeded apps online
-- `--refresh-quota` - Out-of-band resync of each credential's monthly API-usage baseline from the developer portal stats page (opens Chrome to log in). Filter with `--name-prefix`. The same baseline is also seeded by `--init`
-- `--name-prefix <prefix>` - Application/credential name prefix filter (default `enphase-monitor-`). Scopes which applications `--seed-credentials` pulls and which credentials `--init`/`--refresh-quota` sync
-- `--test` - Validation Mode: use cache only, no live API calls, validate against expected values
+- `--refresh-quota` - Out-of-band resync of each credential's monthly API-usage baseline from the developer portal stats page (opens Chrome to log in). Filter with `--quota-prefix`. The same baseline is also seeded by `--init`
+- `--quota-prefix <prefix>` - Application/credential name prefix filter (default `enphase-monitor-`). Scopes which applications `--seed-credentials` pulls and which credentials `--init`/`--refresh-quota` sync
 - `--no-cache` - Bypass cache and make live API calls. Propagates API errors (429/503/network) instead of serving stale cache. No effect with `--start-date`, which is always live
-- `--cache` - Serve report from cache only; print diagnostic listing missing endpoints if cache is incomplete
 - `--clear-cache` - Clear cached API responses for today's date only
 - `--clear-cache-date YYYY-MM-DD` - Clear cached API responses for a specific past date (matches the query start date exactly)
 - `--clear-all-cache` - Clear all cached API responses (all dates)
@@ -462,9 +428,6 @@ Serves the report entirely from cache (no live API calls) and compares each metr
 
 # Query last week's data
 ./enphase-monitor --date 2026-01-12
-
-# Continuous monitoring with periodic refresh
-./enphase-monitor --continuous
 
 # True-Up report starting January 15, 2025
 ./enphase-monitor --true-up 2025-01-15
@@ -640,8 +603,6 @@ colors:
 ### "rate limit exceeded (429)"
 - The API Budget is 10 calls per minute
 - The program will display how many seconds to wait before retrying
-- Consider increasing `refresh_interval` in your config
-- Use `--test` mode to validate against cached data without making API calls
 - Run with `--debug` to see when the 60-second window resets and how much budget remains
 
 ### "API request failed with status 422"
@@ -652,7 +613,6 @@ colors:
 ### No Interval Data returned
 - Some data may not be available for very recent time periods (try querying yesterday's data)
 - Ensure your systems are actively reporting to Enlighten
-- Use `--cache` to check what data is available in the cache without making API calls
 
 ## Caching and API Budget
 
@@ -662,24 +622,15 @@ The Enphase Enlighten Cloud API v4 enforces a strict API Budget:
 - **10 requests per minute** per API key
 - **1000 requests per month** total (free developer plan)
 
-**⚠️ Refresh Interval Recommendation**: 
-
-The `refresh_interval` setting controls how often the application queries the API in continuous mode. To stay within the API Budget:
-
-- **Recommended**: `refresh_interval: 3600` (1 hour)
-- **Why**: Each today's Day Mode query fetches 5 metrics per System (Production, Consumption, Grid Import, Grid Export, battery). With 2 Systems that is exactly 10 requests per cycle — right at the limit. At 3600 seconds, that is ~10 requests per hour, well within limits. (Past Period Day, Month, Year, and True-Up Mode queries omit battery and use 4 calls per System.)
-- **Enforced floor**: Values below 60 seconds (e.g., `refresh_interval: 5`) are automatically clamped up to 60 seconds — one API Budget window — so they cannot exhaust the budget on every tick. In continuous mode a warning is printed when this clamping happens.
-- **Calculation**: If you have N Systems, each today's Day Mode query makes N×5 requests. With 2 Systems that is 10/cycle — at the clamped 60-second floor, that is 10 requests/minute, exactly the limit. (Without the floor, `refresh_interval: 5` would have attempted 10×12 = 120 requests/minute.)
-
 ### Credential Pool & Monthly Quota
 
 Because each API key is capped at **10 requests/minute AND 1000 requests/month**, the app can hold a **pool** of credential sets (a `credentials:` list of more than one entry) and spread load across them:
 
-- **Spread.** Each System is assigned a credential round-robin, so a run's calls are distributed across keys instead of hammering one. Backfill advances the rotation one step per day so consecutive days draw on disjoint keys.
+- **Spread.** Each System is assigned the credential with the lowest monthly usage (least-used-first), so a run's calls are distributed across keys without a persisted rotation counter. The monthly counts in `cache/monthly-quota.json` are the authoritative state.
 - **Failover.** When a key returns 429 (per-minute) or has spent its monthly budget, it is put in cooldown and the System retries on a spare; the run only errors when every key is exhausted.
 - **Monthly quota tracking.** Each credential's calls-this-month are persisted in `cache/monthly-quota.json`. The baseline is seeded from the developer portal by `--init` (or resynced with `--refresh-quota`) and incremented on every live call, resetting on the month boundary. A key with no monthly budget left is skipped just like one in per-minute cooldown — so the pool rotates off a key approaching its 1000/month cap, not only on a 429.
 
-**Setting up a pool** (one-time): run `--seed-credentials` to scrape every portal application's `name`/`key`/`client_id`/`client_secret` into `credentials.yaml`, then `--update-refresh-tokens --all --new-only` to authorize the newly-seeded entries. Adding more apps later repeats the same two steps; `--new-only` skips the ones already authorized.
+**Setting up a pool** (one-time): run `--seed-credentials` to scrape every portal application's `name`/`key`/`client_id`/`client_secret` into `credentials.yaml`, then `--update-refresh-tokens --all` to authorize the newly-seeded entries. Adding more apps later repeats the same two steps.
 
 ### Caching Strategy
 
@@ -690,7 +641,7 @@ To respect these limits, the application combines disk caching with a sliding-wi
   - **Past Period Day / Month / Year / True-Up** — always served from Cache. The data is immutable; a live call would waste budget and return identical results.
   - **Current Period queries** (today's Day Mode query, month-to-date, year-to-date, Current Period True-Up) — a live API call is made whenever budget allows. Cache is the fallback only when the budget is exhausted.
 - **Sliding-Window API Budget Counter**: Every live API response appends its timestamp to `cache/api_calls`. The available budget at any moment is `10 − count_of_timestamps_in_last_60s`. When budget reaches 0 the client falls back to cache (exact-URL match, then cross-endpoint same-system match at any age); if no cache exists, it short-circuits to the 429 "wait 60 seconds" message instead of issuing a guaranteed-failed call.
-- **Default Refresh Interval**: 1 hour (3600 seconds) — queries each system once per hour in continuous mode.
+- **Default Refresh Interval**: 1 hour (3600 seconds) — the default value for the `refresh_interval` config field (currently unused).
 - **429 / 503 Fallback**: If the API returns a rate-limit or service-unavailable error, any cached data is served — first an exact-URL match, then any prior cache for the same endpoint and system regardless of age. If no cache exists at all, the program surfaces the error to the user.
 
 ### Cache File Format and Naming
@@ -740,9 +691,6 @@ The cache directory also contains an `api_calls` file (no JSON extension) holdin
 
 # Disable caching (always make live API calls)
 ./enphase-monitor --no-cache
-
-# Validation Mode (use cache only, no live API calls)
-./enphase-monitor --test --date 2026-01-15
 ```
 
 ### Debug Mode
@@ -767,46 +715,12 @@ Sample output:
 [DEBUG] serving cache (budget exhausted, age 14m3s)
 ```
 
-Use it when you want to understand *why* a query returned cached vs live data, *when* the API Budget window will reset, or *how much* of the 10 calls/60s budget remains. Debug mode also: prints a `CACHE MODE` banner when `--cache` is used; prints a `WARNING: Insufficient API budget` preflight message when the budget is low; and suppresses the screen-clearing escape sequence so the trace stays visible on subsequent runs.
-
-### Cached Mode
-
-The `--cache` flag serves a report entirely from on-disk Cache without making any live API calls. If the Cache is complete it runs the report; if any required endpoint is missing it prints a per-System diagnostic and exits non-zero:
-
-```bash
-./enphase-monitor --cache
-./enphase-monitor --cache --date 2026-05
-./enphase-monitor --cache --true-up 2025-01-15
-```
-
-**When cache is complete**, the report runs normally. Adding `--debug` also prints a `CACHE MODE: Serving report from cache, no live API calls` banner.
-
-**When cache is incomplete**, the diagnostic lists each endpoint per system with its status and age:
-
-```
-CACHE INCOMPLETE for today:
-
-  System "Left Subpanel" (5392556):
-    ✓  energy_import_telemetry              cached 3h12m ago
-    ✓  energy_export_telemetry              cached 3h12m ago
-    ✗  telemetry/production_meter           not cached
-    ✓  telemetry/consumption_meter          cached 3h12m ago
-    -  telemetry/battery                    not cached (optional)
-
-To populate the cache, run:
-  ./enphase-monitor
-```
-
-`✓` = cached (age shown), `✗` = required but missing, `-` = optional and missing.
-
-Use `--cache` when you want to verify what data is available locally before making API calls, or when you are offline and want to review data for past dates.
+Use it when you want to understand *why* a query returned cached vs live data, *when* the API Budget window will reset, or *how much* of the 10 calls/60s budget remains. Debug mode also: prints a `WARNING: Insufficient API budget` preflight message when the budget is low; and suppresses the screen-clearing escape sequence so the trace stays visible on subsequent runs.
 
 ### Best Practices
 
-1. **Use Default Refresh Interval**: Use 1 hour to stay well within the API Budget
-2. **Leverage Caching**: Query past dates frequently - they use cached data (no API calls)
-3. **Validation Mode**: Use `--test` flag for validation against cached data without hitting the API
-4. **Monitor Cache**: Use `--cache` to check what's available before querying
+1. **Leverage Caching**: Query past dates frequently - they use cached data (no API calls)
+2. **Use `--debug`**: Run with `--debug` to see cache/live decisions and API Budget state
 
 ## Documentation
 
@@ -845,7 +759,7 @@ enphase-monitor/
 │   ├── api/                                 # HTTP client for Cloud API v4
 │   │   ├── client.go                        # Enlighten Cloud API client
 │   │   ├── types.go                         # API request/response types
-│   │   ├── cache_check.go                   # Per-system/endpoint cache availability check (--cache mode)
+│   │   ├── cache_check.go                   # Per-system/endpoint cache availability check
 │   │   ├── client_test.go                   # API client unit tests
 │   │   ├── client_caching_test.go           # Characterization tests for makeCachedAPIRequest fallback branches (validation/no-cache modes, 429/503/network-error cache fallbacks)
 │   │   ├── client_functional_test.go        # Functional tests with mock HTTP servers
@@ -856,15 +770,14 @@ enphase-monitor/
 │   ├── app/                                 # Application execution logic
 │   │   ├── setup.go                         # App initialization & configuration
 │   │   ├── setup_test.go                    # Setup tests
-│   │   ├── runner.go                        # Execution modes (once/continuous)
+│   │   ├── runner.go                        # RunOnce execution mode
 │   │   ├── runner_test.go                   # Runner tests
 │   │   ├── trueup.go                        # True-Up Mode: single-batch Lifetime Data query and report conversion
 │   │   ├── trueup_test.go                   # True-up logic tests
 │   │   ├── backfill.go                      # Backfill Mode: live per-day fetch over a date range into history/
 │   │   ├── backfill_test.go                 # Backfill range/skip/overwrite tests
 │   │   ├── weather.go                       # Best-effort weather enrichment for Day-Mode reports
-│   │   ├── weather_test.go                  # Weather enrichment tests
-│   │   └── cache_report.go                  # --cache mode: completeness check and diagnostic output
+│   │   └── weather_test.go                  # Weather enrichment tests
 │   ├── browser/                             # Headed Chrome launcher (chromedp) for portal automation
 │   │   ├── chrome.go                        # LaunchHeaded (disposable profile) + LaunchHeadedWithProfile (persistent profile)
 │   │   └── chrome_test.go                   # Chrome launcher tests
@@ -890,7 +803,7 @@ enphase-monitor/
 │   ├── credentials/                         # Credential pool: spread + 429 failover + monthly quota
 │   │   ├── pool.go                          # Round-robin assignment, cooldown, failover
 │   │   ├── pool_test.go                     # Pool selection/failover tests
-│   │   ├── quota.go                         # Per-credential minute + monthly API budget (monthly-quota.json)
+│   │   ├── quota.go                         # Per-credential monthly API budget (monthly-quota.json)
 │   │   ├── quota_test.go                    # Quota counting, month-rollover, and budget tests
 │   │   └── quota_portal_test.go             # Portal-seeded monthly baseline (ApplyPortalMonthlyUsage) tests
 │   ├── display/                             # Terminal output formatting
@@ -951,7 +864,7 @@ enphase-monitor/
 │   ├── urlbuilder/                          # API URL construction
 │   │   ├── urlbuilder.go                    # URL building helpers
 │   │   └── urlbuilder_test.go               # URL builder tests
-│   ├── validation/                          # Validation Mode (--test flag)
+│   ├── validation/                          # Metrics validation logic (tolerance-based checks)
 │   │   ├── validation.go                    # Metrics validation logic (uses io.Writer for testability)
 │   │   ├── validation_test.go               # Unit tests (tolerance calculations, edge cases)
 │   │   └── validation_integration_test.go   # Integration tests (real expected values)
@@ -990,7 +903,7 @@ enphase-monitor/
 
 ## Testing
 
-The project includes a comprehensive test suite with **48.6% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
+The project includes a comprehensive test suite with **49.2% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
 
 ### Test Coverage by Package
 
@@ -1001,24 +914,24 @@ The project includes a comprehensive test suite with **48.6% code coverage** acr
 | validation | 95.5% | ✅ |
 | parser | 94.8% | ✅ |
 | timezone | 92.7% | ✅ |
-| cli | 92.9% | ✅ |
+| cli | 91.9% | ✅ |
 | aggregator | 89.2% | ✅ |
 | weather | 88.2% | ✅ |
-| config | 84.3% | ✅ |
+| credentials | 85.0% | ✅ |
+| config | 84.5% | ✅ |
 | history | 82.6% | ✅ |
 | geocode | 81.5% | ✅ |
 | location | 79.7% | ✅ |
-| api | 78.6% | ✅ |
-| credentials | 78.4% | ✅ |
+| api | 72.2% | ✅ |
 | constants | 72.7% | ✅ |
 | cache | 68.9% | ✅ |
 | oauth | 61.7% | ✅ |
-| app | 40.3% | ⚠️ |
-| browser | 16.7% | ⚠️ |
-| enphase | 14.6% | ⚠️ |
+| app | 49.4% | ⚠️ |
+| browser | 16.3% | ⚠️ |
+| enphase | 14.3% | ⚠️ |
 | pge | 9.8% | ⚠️ |
 
-**Total: 48.6% coverage** (the low-coverage packages are headed-Chrome/portal-scraping glue and the new `pge` package — `app` orchestration is exercised via the api-package integration tests, while `browser`, `enphase`, and the `pge` browser-pull path drive a real Chrome session and are verified manually)
+**Total: 49.2% coverage** (the low-coverage packages are headed-Chrome/portal-scraping glue and the `pge` package — `app` orchestration is exercised via the api-package integration tests, while `browser`, `enphase`, and the `pge` browser-pull path drive a real Chrome session and are verified manually)
 
 ### Running Tests
 
@@ -1047,76 +960,6 @@ make lint
 ```
 
 CI is not yet configured. Run `make lint` and `go test ./...` locally before committing.
-
-### Validation Mode
-
-Run in Validation Mode using only cached responses (no live API calls):
-
-```bash
-./enphase-monitor --test --date 2026-01-20
-```
-
-This will:
-1. Use only cached API responses (no live calls)
-2. Validate results against expected values
-3. Show a detailed comparison report
-
-#### Early Validation
-
-The `--test` flag includes early validation to prevent confusing errors:
-
-**Missing cache:**
-```
-ERROR: --test flag requires cached data, but no cache exists for 2026-01-30.
-
-To populate the cache, run:
-  ./enphase-monitor
-
-Then retry with --test.
-```
-
-**Missing expected values file:**
-```
-Validation failed: no expected values file found for 2026-01-01.
-
-To run validation, create the file:
-  test-data/enphase_api_2026-01-01.json
-
-Example format:
-  { "date": "2026-01-01", "systems": [...] }
-
-To run without validation, omit the --test flag:
-  ./enphase-monitor --date 2026-01-01
-```
-
-### Setting Up Test Data
-
-**IMPORTANT:** The cache must contain data for the specific test date. Old cache files from different dates will cause incorrect results.
-
-1. **Run all tests** (recommended):
-   ```bash
-   ./scripts/run-tests.sh
-   ```
-   This script will:
-   - Check which test dates have cached responses
-   - Generate missing cache by making live API calls (waiting 60 seconds between calls to respect the API Budget)
-   - Run validation tests for all dates (2026-01-14 through 2026-01-20)
-   - Display a summary of all test results
-
-2. **Or manually generate cache for a specific date**:
-   ```bash
-   ./enphase-monitor --date 2026-01-20
-   ```
-   This will make live API calls and cache the responses in `cache/`
-
-3. **Update `enphase_api_YYYY-MM-DD.json`** with the correct values from the Enphase app
-
-4. **Now you can iterate rapidly using Validation Mode** (uses cache only, no API calls):
-   ```bash
-   ./enphase-monitor --test --date 2026-01-20
-   ```
-
-**Note:** Validation Mode uses the cache from `cache/`. The `scripts/run-tests.sh` script ensures all test dates have cached responses available.
 
 ### Expected Values Format
 
@@ -1181,8 +1024,8 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 
 This project follows Go best practices and coding standards:
 
-- **Test Coverage**: 48.6% overall, 100% for urlbuilder, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and aggregator (the headed-Chrome `browser`/`enphase` portal-scraping packages and the new `pge` browser-pull path are verified manually and pull the average down)
-- **Test Suite**: 49 test files across 21 tested packages with comprehensive unit, integration, and edge case tests
+- **Test Coverage**: 49.2% overall, 100% for urlbuilder, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and aggregator (the headed-Chrome `browser`/`enphase` portal-scraping packages and the `pge` browser-pull path are verified manually and pull the average down)
+- **Test Suite**: 47 test files across 21 tested packages with comprehensive unit, integration, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -1191,10 +1034,10 @@ This project follows Go best practices and coding standards:
 - **Performance**: Benchmarks included for hot paths
 
 **Code Metrics:**
-- Total Lines: ~9,200 (excluding tests)
-- Test Lines: ~11,900 (comprehensive test suite)
+- Total Lines: ~11,900 (excluding tests)
+- Test Lines: ~12,200 (comprehensive test suite)
 - Packages: 22 internal packages (21 with tests; `types` is a pure type-definition package)
-- Test Files: 49 (unit, integration, functional, edge case, and benchmark tests)
+- Test Files: 47 (unit, integration, functional, edge case, and benchmark tests)
 - External Dependencies: 3 (gopkg.in/yaml.v3 and github.com/chromedp/chromedp + cdproto for portal automation)
 
 ## License

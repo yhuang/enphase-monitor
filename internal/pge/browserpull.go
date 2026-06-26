@@ -17,10 +17,12 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"enphase-monitor/internal/constants"
 )
 
 // dateFormat is the ISO 8601 calendar-day layout used throughout this package.
-const dateFormat = "2006-01-02"
+const dateFormat = constants.DateFormat
 
 // BrowserPullOptions configures a Green Button browser pull.
 type BrowserPullOptions struct {

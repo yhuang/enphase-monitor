@@ -6,6 +6,10 @@
 # in. Keeping secrets out of config.yaml lets you share/commit these non-secret
 # settings while the credentials file stays local (it is gitignored).
 
+# Path to the credentials file (default: credentials.yaml).
+# Override only if you keep your secrets file in a non-standard location.
+credentials_file: credentials.yaml
+
 # Your Enphase Systems
 # Each system requires a system ID from Enlighten (get from Enlighten URL)
 

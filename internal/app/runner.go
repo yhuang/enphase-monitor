@@ -1,20 +1,15 @@
-// Package app provides application setup and execution modes (once or continuous) for the enphase-monitor application.
+// Package app provides application setup and execution for the enphase-monitor application.
 //
 // EXECUTION MODES
 // ---------------
-// The application supports two primary execution modes:
+// The application supports a single execution mode:
 //   - RunOnce: Single query and exit (default behavior)
-//   - RunContinuous: Continuous monitoring with refresh interval
 //
-// Both modes use fetchAndDisplay for the actual metric retrieval and display logic.
 // Setup functions (CreateOAuthAdapter, SetupDisplay, ConfigureModes, ParseTestDate, etc.) live in setup.go.
 package app
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"os"
 	"time"
 
 	"enphase-monitor/internal/aggregator"
@@ -22,10 +17,9 @@ import (
 	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/credentials"
 	"enphase-monitor/internal/display"
-	"enphase-monitor/internal/validation"
 )
 
-// RunConfig groups the parameters shared across RunOnce, RunContinuous, and fetchAndDisplay.
+// RunConfig groups the parameters for RunOnce and related helpers.
 type RunConfig struct {
 	Agg       *aggregator.DataAggregator
 	Pool      *credentials.Pool
@@ -37,91 +31,17 @@ type RunConfig struct {
 	Debug     bool
 
 	// Location and Weather drive best-effort weather enrichment for Day-Mode
-	// reports. Both nil (e.g. cache-only and true-up paths) disables it.
-	// See weather.go.
+	// reports. Both nil (e.g. true-up path) disables it. See weather.go.
 	Location CoordinateProvider
 	Weather  WeatherProvider
 }
 
 // RunOnce executes a single query, displays results, and returns an error on failure.
 // The caller (main) is responsible for exiting with a non-zero code.
-func RunOnce(ctx context.Context, rc RunConfig, validationMode bool) error {
+func RunOnce(ctx context.Context, rc RunConfig) error {
 	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, GetSystems(rc.Cfg), rc.Pool, rc.TestDate, rc.QueryMode, rc.ReportTZ)
 	if err != nil {
 		return err
-	}
-
-	enrichWithTemperature(ctx, rc, metrics)
-	rc.Disp.ShowMetrics(metrics)
-
-	// If in Validation Mode and test date is provided, validate against expected values
-	if validationMode {
-		if rc.TestDate.IsZero() {
-			return errors.New("--test flag requires --date flag to specify which date to validate")
-		}
-		testDateStr := FormatDateForQueryMode(rc.TestDate, rc.QueryMode)
-		if err := validation.ValidateMetrics(os.Stdout, metrics, testDateStr); err != nil {
-			return fmt.Errorf("validation failed: %w", err)
-		}
-	}
-	return nil
-}
-
-// RunContinuous executes continuous monitoring with periodic refresh.
-// It returns an error only on fatal failures (e.g. 429); normal shutdown returns nil.
-func RunContinuous(ctx context.Context, rc RunConfig) error {
-	// refresh_interval is only consumed here, so the API Budget floor warning is
-	// emitted here (to stderr, keeping reports clean) rather than on every run.
-	if rc.Cfg.RefreshIntervalClampedFromSeconds > 0 {
-		fmt.Fprintf(os.Stderr, "WARNING: refresh_interval of %ds is below the %ds minimum (one API Budget window); using %ds instead\n",
-			rc.Cfg.RefreshIntervalClampedFromSeconds, constants.APIBudgetWindowSeconds, rc.Cfg.RefreshIntervalSeconds)
-	}
-	rc.Disp.ShowInfo(fmt.Sprintf("Starting continuous monitoring (refresh every %d seconds)", rc.Cfg.RefreshIntervalSeconds))
-	rc.Disp.ShowInfo("Press Ctrl+C to stop")
-
-	ticker := time.NewTicker(time.Duration(rc.Cfg.RefreshIntervalSeconds) * time.Second)
-	defer ticker.Stop()
-
-	// Run immediately on start
-	if err := fetchAndDisplay(ctx, rc); err != nil {
-		return err
-	}
-
-	for {
-		select {
-		case <-ticker.C:
-			if err := fetchAndDisplay(ctx, rc); err != nil {
-				return err
-			}
-
-		case <-ctx.Done():
-			rc.Disp.ShowInfo("Shutting down gracefully...")
-			return nil
-		}
-	}
-}
-
-// fetchAndDisplay fetches metrics and displays them to the terminal.
-// Returns a non-nil error only on fatal failures (e.g. 429); caller may exit.
-// On non-fatal errors it shows the error and returns nil so the loop can continue.
-func fetchAndDisplay(ctx context.Context, rc RunConfig) error {
-	metrics, err := rc.Agg.GetAggregatedMetrics(ctx, GetSystems(rc.Cfg), rc.Pool, rc.TestDate, rc.QueryMode, rc.ReportTZ)
-	if err != nil {
-		// If context was cancelled (shutdown in progress), exit silently
-		if ctx.Err() != nil {
-			return nil
-		}
-		// 429 is fatal: return so caller can exit
-		if constants.IsRateLimitError(err) {
-			return err
-		}
-		rc.Disp.ShowError(err)
-		return nil
-	}
-
-	// Clear screen for cleaner output (skipped in debug mode to preserve debug output)
-	if !rc.Debug {
-		rc.Disp.ClearScreen()
 	}
 
 	enrichWithTemperature(ctx, rc, metrics)
