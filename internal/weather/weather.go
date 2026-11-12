@@ -1,6 +1,7 @@
 // Package weather fetches daily weather (temperature range, condition, cloud
-// cover, precipitation, and solar radiation) from the free Open-Meteo API, for
-// correlating Enphase energy reports with the weather.
+// cover, relative humidity mean/max/min, precipitation, and solar radiation)
+// from the free Open-Meteo API, for correlating Enphase energy reports with the
+// weather.
 //
 // ENDPOINT SELECTION
 // ------------------
@@ -13,11 +14,31 @@
 //
 // CACHING
 // -------
-// Past days never change, so their results are cached on disk indefinitely.
-// Today's values are still evolving, so they are cached briefly (todayCacheTTL)
-// to avoid refetching on every continuous-mode tick. Open-Meteo's free tier is
-// generous and unrelated to the Enphase API budget, but caching keeps usage
-// polite and reports fast.
+// Past days are cached on disk indefinitely, as parsed fields only (not the raw
+// payload). Today's values are still evolving, so they are cached briefly
+// (todayCacheTTL) to avoid refetching on every continuous-mode tick. Open-Meteo's
+// free tier is generous and unrelated to the Enphase API budget, but caching keeps
+// usage polite and reports fast. A cache entry written before a field was added to
+// the daily variables (e.g. the relative-humidity fields) is treated as a miss and
+// re-fetched once.
+//
+// A cached past day is NOT guaranteed final: Open-Meteo revises recent history as
+// preliminary data is replaced by reanalysis, so a value cached at backfill time
+// can later differ (a re-fetch of a year of history changed 92 days' temperatures or
+// weather code, by up to several degrees in recent weeks), and records written
+// before a field was fetched can hold zeros for it. That is why every live fetch
+// also archives the raw payload (see RAW ARCHIVE) and why Client.BypassCache exists:
+// --raw-refetch-weather re-fetches past days with the cache bypassed to archive them
+// and report drift, and --raw-apply-weather rebuilds history records from the
+// archived payloads through ParseDailyPayload.
+//
+// RAW ARCHIVE
+// -----------
+// DailyWeather saves each live response body untouched under raw/weather/ via
+// internal/rawstore (when the archive is enabled, as it is in the real binary) and
+// then parses it with ParseDailyPayload — the same parser used to rebuild records
+// from archived payloads offline, so a live fetch and a reprocess always agree. A
+// cache hit makes no request and so archives nothing.
 //
 // COMMERCIAL USE
 // --------------
@@ -30,6 +51,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -39,6 +61,7 @@ import (
 	"time"
 
 	"enphase-monitor/internal/geocode"
+	"enphase-monitor/internal/rawstore"
 )
 
 // Default Open-Meteo endpoints. Vars (not consts) so callers/tests can swap them.
@@ -50,7 +73,7 @@ var (
 // dailyVariables are the Open-Meteo daily fields requested in a single call.
 // daily weather_code is kept as a fallback for the displayed condition; the
 // primary source is the hourly array (see hourlyVariables / mostPrevalentCondition).
-const dailyVariables = "weather_code,temperature_2m_max,temperature_2m_min,cloud_cover_mean,precipitation_sum,shortwave_radiation_sum"
+const dailyVariables = "weather_code,temperature_2m_max,temperature_2m_min,cloud_cover_mean,relative_humidity_2m_mean,relative_humidity_2m_max,relative_humidity_2m_min,precipitation_sum,shortwave_radiation_sum"
 
 // hourlyVariables are the Open-Meteo hourly fields requested alongside the daily
 // block (same call). The hourly weather codes drive the most-prevalent condition
@@ -79,6 +102,9 @@ type DailyWeather struct {
 	WeatherCode     int     // WMO interpretation code representative of Condition
 	Condition       string  // most prevalent label across the day's hourly codes (falls back to the daily aggregate when hourly data is unavailable)
 	CloudCoverPct   float64 // mean cloud cover, %
+	HumidityPct     float64 // mean relative humidity at 2 m, %
+	HumidityMaxPct  float64 // daily maximum relative humidity at 2 m, %
+	HumidityMinPct  float64 // daily minimum relative humidity at 2 m, %
 	PrecipitationMM float64 // total precipitation, mm
 	SolarRadiation  float64 // daily shortwave radiation, kWh/m²
 }
@@ -92,6 +118,9 @@ type Client struct {
 	Unit        string // Open-Meteo temperature_unit value: "fahrenheit" or "celsius"
 	HTTPClient  *http.Client
 	CacheDir    string
+	// BypassCache makes DailyWeather always fetch and never read or write the
+	// on-disk cache (used to re-fetch past days purely to archive the raw payload).
+	BypassCache bool
 	now         func() time.Time
 }
 
@@ -122,8 +151,10 @@ func (c *Client) DailyWeather(ctx context.Context, coords geocode.Coordinates, d
 	dateStr := date.Format("2006-01-02")
 	symbol := c.unitSymbol()
 
-	if cached, ok := c.loadCache(coords, dateStr, symbol); ok {
-		return cached, nil
+	if !c.BypassCache {
+		if cached, ok := c.loadCache(coords, dateStr, symbol); ok {
+			return cached, nil
+		}
 	}
 
 	w, err := c.fetch(ctx, coords, date, dateStr, symbol)
@@ -131,7 +162,9 @@ func (c *Client) DailyWeather(ctx context.Context, coords geocode.Coordinates, d
 		return DailyWeather{}, err
 	}
 
-	c.saveCache(coords, dateStr, w)
+	if !c.BypassCache {
+		c.saveCache(coords, dateStr, w)
+	}
 	return w, nil
 }
 
@@ -211,6 +244,9 @@ type openMeteoResponse struct {
 		Min           []*float64 `json:"temperature_2m_min"`
 		WeatherCode   []*int     `json:"weather_code"`
 		CloudCover    []*float64 `json:"cloud_cover_mean"`
+		Humidity      []*float64 `json:"relative_humidity_2m_mean"`
+		HumidityMax   []*float64 `json:"relative_humidity_2m_max"`
+		HumidityMin   []*float64 `json:"relative_humidity_2m_min"`
 		Precipitation []*float64 `json:"precipitation_sum"`
 		Shortwave     []*float64 `json:"shortwave_radiation_sum"`
 	} `json:"daily"`
@@ -271,8 +307,24 @@ func (c *Client) fetchFrom(ctx context.Context, base string, coords geocode.Coor
 		return DailyWeather{}, fmt.Errorf("weather request for %s failed with status %d", dateStr, resp.StatusCode)
 	}
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return DailyWeather{}, fmt.Errorf("failed to read weather response for %s: %w", dateStr, err)
+	}
+	// Untouched copy for later integrity checks; best effort.
+	_, _ = rawstore.Save("weather", "daily_"+dateStr, ".json", body, rawstore.RedactURL(base+"?"+params.Encode()))
+
+	return ParseDailyPayload(body, date, symbol)
+}
+
+// ParseDailyPayload converts a raw Open-Meteo daily response for date into a
+// DailyWeather, with temperatures labelled by symbol (e.g. "°F"). It is the single
+// parser behind live fetches and offline reprocessing of archived payloads
+// (raw/weather), so both always agree.
+func ParseDailyPayload(body []byte, date time.Time, symbol string) (DailyWeather, error) {
+	dateStr := date.Format("2006-01-02")
 	var parsed openMeteoResponse
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+	if err := json.Unmarshal(body, &parsed); err != nil {
 		return DailyWeather{}, fmt.Errorf("failed to decode weather response for %s: %w", dateStr, err)
 	}
 
@@ -302,6 +354,15 @@ func (c *Client) fetchFrom(ctx context.Context, base string, coords geocode.Coor
 	}
 	if v := firstFloat(parsed.Daily.CloudCover); v != nil {
 		w.CloudCoverPct = *v
+	}
+	if v := firstFloat(parsed.Daily.Humidity); v != nil {
+		w.HumidityPct = *v
+	}
+	if v := firstFloat(parsed.Daily.HumidityMax); v != nil {
+		w.HumidityMaxPct = *v
+	}
+	if v := firstFloat(parsed.Daily.HumidityMin); v != nil {
+		w.HumidityMinPct = *v
 	}
 	if v := firstFloat(parsed.Daily.Precipitation); v != nil {
 		w.PrecipitationMM = *v
@@ -504,6 +565,9 @@ type cacheEntry struct {
 	WeatherCode     int       `json:"weather_code"`
 	Condition       string    `json:"condition"`
 	CloudCoverPct   float64   `json:"cloud_cover_pct"`
+	HumidityPct     *float64  `json:"humidity_pct,omitempty"` // nil in entries cached before humidity was added → treated as a miss
+	HumidityMaxPct  *float64  `json:"humidity_max_pct,omitempty"`
+	HumidityMinPct  *float64  `json:"humidity_min_pct,omitempty"`
 	PrecipitationMM float64   `json:"precipitation_mm"`
 	SolarRadiation  float64   `json:"solar_radiation"`
 }
@@ -528,7 +592,8 @@ func (c *Client) loadCache(coords geocode.Coordinates, dateStr, symbol string) (
 	if err := json.Unmarshal(data, &e); err != nil {
 		return DailyWeather{}, false
 	}
-	if e.Date != dateStr || e.TempUnit != symbol {
+	if e.Date != dateStr || e.TempUnit != symbol ||
+		e.HumidityPct == nil || e.HumidityMaxPct == nil || e.HumidityMinPct == nil {
 		return DailyWeather{}, false
 	}
 	if c.isToday(dateStr) && c.now().Sub(e.FetchedAt) > todayCacheTTL {
@@ -547,6 +612,9 @@ func (c *Client) loadCache(coords geocode.Coordinates, dateStr, symbol string) (
 		WeatherCode:     e.WeatherCode,
 		Condition:       e.Condition,
 		CloudCoverPct:   e.CloudCoverPct,
+		HumidityPct:     *e.HumidityPct,
+		HumidityMaxPct:  *e.HumidityMaxPct,
+		HumidityMinPct:  *e.HumidityMinPct,
 		PrecipitationMM: e.PrecipitationMM,
 		SolarRadiation:  e.SolarRadiation,
 	}, true
@@ -566,6 +634,9 @@ func (c *Client) saveCache(coords geocode.Coordinates, dateStr string, w DailyWe
 		WeatherCode:     w.WeatherCode,
 		Condition:       w.Condition,
 		CloudCoverPct:   w.CloudCoverPct,
+		HumidityPct:     &w.HumidityPct,
+		HumidityMaxPct:  &w.HumidityMaxPct,
+		HumidityMinPct:  &w.HumidityMinPct,
 		PrecipitationMM: w.PrecipitationMM,
 		SolarRadiation:  w.SolarRadiation,
 	}

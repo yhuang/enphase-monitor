@@ -700,21 +700,16 @@ func TestNewEnlightenCloudClientWithBaseURL(t *testing.T) {
 // TestCacheUsedTracking tests that cacheUsed flag is properly tracked
 func TestCacheUsedTracking(t *testing.T) {
 	// Save original cache state
-	originalValidationMode := cache.ValidationMode()
 	originalCacheDisabled := cache.CacheDisabled()
 	defer func() {
 		cache.ResetState()
-		if originalValidationMode {
-			cache.SetValidationMode(true)
-		}
 		if originalCacheDisabled {
 			cache.SetCacheDisabled(true)
 		}
 	}()
 
-	// Disable cache and Validation Mode for this test
+	// Disable the cache for this test
 	cache.SetCacheDisabled(true)
-	cache.SetValidationMode(false)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

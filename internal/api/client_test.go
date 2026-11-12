@@ -149,3 +149,23 @@ func TestTryLoadPastDateCache_NoMatch(t *testing.T) {
 		t.Errorf("tryLoadPastDateCache() cached = %v, want nil", cached)
 	}
 }
+
+func TestRawMetaAndName(t *testing.T) {
+	tz := time.UTC
+	sys, ep, date := rawMeta("https://api.enphaseenergy.com/api/v4/systems/55/telemetry/production_meter?key=K&start_at=1762560000&granularity=day", tz)
+	if sys != "55" || ep != "telemetry/production_meter" || date != "2025-11-08" {
+		t.Errorf("rawMeta = %q %q %q", sys, ep, date)
+	}
+	if got := rawName(sys, ep, date); got != "55_telemetry_production_meter_2025-11-08" {
+		t.Errorf("rawName = %q", got)
+	}
+	if got := rawName("55", "energy_import_telemetry", ""); got != "55_energy_import_telemetry" {
+		t.Errorf("rawName without date = %q", got)
+	}
+}
+
+func TestDayKWh_UnknownEndpoint(t *testing.T) {
+	if _, ok, _ := DayKWh("energy_import_lifetime", []byte("{}")); ok {
+		t.Error("lifetime endpoints are not day endpoints")
+	}
+}

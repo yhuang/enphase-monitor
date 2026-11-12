@@ -612,6 +612,12 @@ func (fd *formDriver) dumpFormElements(ctx context.Context, frameID cdp.FrameID)
 		return
 	}
 	fd.debug("elements in Green Button frame:\n%s", string(result.Value))
+
+	// The visible text usually names the problem when the date form never
+	// appears (e.g. an error dialog with only a Close button).
+	if text, err := evalInFrame(ctx, frameID, `(document.body ? document.body.innerText : "").trim().substring(0, 600)`); err == nil {
+		fd.debug("visible text in Green Button frame:\n%s", string(text.Value))
+	}
 }
 
 // dumpFramesAndTargets appends the page's frame tree and all browser targets to
@@ -725,25 +731,6 @@ func waitForFrameByURLWithScroll(ctx context.Context, urlSubstr string, timeout 
 			return "", ctx.Err()
 		case <-time.After(time.Second):
 			_ = chromedp.Run(ctx, chromedp.Evaluate(sfScrollScript, nil))
-		}
-	}
-}
-
-// waitForFrameByURL polls the CDP frame tree until a frame whose URL contains
-// urlSubstr appears or the timeout elapses.
-func waitForFrameByURL(ctx context.Context, urlSubstr string, timeout time.Duration) (cdp.FrameID, error) {
-	deadline := time.Now().Add(timeout)
-	for {
-		if id, err := findFrameByURL(ctx, urlSubstr); err == nil {
-			return id, nil
-		}
-		if time.Now().After(deadline) {
-			return "", fmt.Errorf("no frame with URL containing %q appeared within %s", urlSubstr, timeout)
-		}
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-time.After(time.Second):
 		}
 	}
 }

@@ -15,10 +15,12 @@
 // The Enphase Cloud API uses OAuth 2.0 with two supported grant types:
 //
 //  1. Refresh Token Grant (Developer Plan - Free Tier):
-//     - One-time setup via --update-refresh-tokens wizard
+//     - Setup via the --update-refresh-tokens wizard (repeat it when Enphase rejects the token)
 //     - Uses refresh_token to obtain access_token
 //     - Access tokens expire (typically 1 hour)
-//     - Refresh tokens are long-lived (do not expire)
+//     - Refresh tokens expire after 30 days (Enphase developer release notes, 2023-10-16)
+//     - They also rotate: a refresh response may carry a replacement refresh_token
+//     - A replacement is kept in memory for the process only, never saved to credentials.yaml
 //
 //  2. Password Grant (Partner/Installer Plans):
 //     - Uses username/password directly
@@ -93,7 +95,7 @@ type TokenResponse struct {
 // TokenCache stores a cached access token and refresh token.
 type TokenCache struct {
 	Token        string    // OAuth access token (short-lived, ~1 hour)
-	RefreshToken string    // OAuth refresh token (long-lived, does not expire)
+	RefreshToken string    // OAuth refresh token (expires after 30 days; a rotated one is held in memory only)
 	ExpiresAt    time.Time // When the access token expires
 }
 
@@ -106,7 +108,7 @@ var oauthHTTPClient = &http.Client{
 	Timeout: oauthRequestTimeout,
 }
 
-// GetAuthorizationURL generates the authorization URL for the user to visit (one-time setup).
+// GetAuthorizationURL generates the authorization URL for the user to visit during OAuth setup.
 func GetAuthorizationURL(apiConfig *types.APIConfig) (string, error) {
 	if apiConfig == nil {
 		return "", errors.New("API configuration is required")
@@ -223,7 +225,7 @@ func GetAccessToken(ctx context.Context, apiConfig *types.APIConfig) (string, er
 		formData.Set("password", apiConfig.Password)
 	}
 	if formData == nil {
-		return "", errors.New("no valid authentication method available: for developer plan run one-time authorization to get a refresh_token (see README)")
+		return "", errors.New("no valid authentication method available: for developer plan run --update-refresh-tokens to get a refresh_token (see README)")
 	}
 
 	// Send the token request, retrying transient failures (network errors and 5xx

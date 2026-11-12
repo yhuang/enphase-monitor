@@ -144,7 +144,7 @@ func testProjectRoot(t *testing.T) string {
 }
 
 // forwardFixture names the recorded Zippopotam response for a ZIP. The geocode_
-// prefix groups it within test-data/ alongside the enphase_api_*.json files.
+// prefix groups it within test-data/ alongside the other recorded fixtures.
 func forwardFixture(zip string) string { return "zippopotam_api_" + zip + ".json" }
 
 func readFixture(t *testing.T, name string) []byte {

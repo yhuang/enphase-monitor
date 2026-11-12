@@ -8,7 +8,6 @@
 // TEST PLAN
 // ---------
 // 1. State Management Tests
-//   - Test SetValidationMode/ValidationMode
 //   - Test SetCacheDisabled/CacheDisabled
 //   - Test ResetState clears all flags
 //
@@ -79,15 +78,11 @@ import (
 // 4. Verify ALL flags are back to defaults (false)
 func TestResetState(t *testing.T) {
 	// STEP 1: Dirty the state intentionally
-	// We set all flags to true (the non-default value)
-	SetValidationMode(true)
+	// We set every flag to true (the non-default value)
 	SetCacheDisabled(true)
 
 	// STEP 2: Sanity check - verify our setters worked
 	// This catches bugs where setters silently fail
-	if !ValidationMode() {
-		t.Error("ValidationMode should be true before reset")
-	}
 	if !CacheDisabled() {
 		t.Error("CacheDisabled should be true before reset")
 	}
@@ -97,9 +92,6 @@ func TestResetState(t *testing.T) {
 
 	// STEP 4: Verify all flags are back to false (default)
 	// Each assertion checks one piece of state
-	if ValidationMode() {
-		t.Error("ValidationMode should be false after reset")
-	}
 	if CacheDisabled() {
 		t.Error("CacheDisabled should be false after reset")
 	}
@@ -122,42 +114,12 @@ func TestResetState(t *testing.T) {
 // WHY TEST BOTH DIRECTIONS?
 // -------------------------
 // A buggy setter might only work one way. For example:
-//   func SetValidationMode(enabled bool) { validationMode = true }  // Bug: ignores parameter
+//   func SetCacheDisabled(disabled bool) { cacheDisabled = true }  // Bug: ignores parameter
 // This would pass "set to true" but fail "set to false".
 //
 // =============================================================================
 
-// TestValidationModeGetterSetter verifies ValidationMode getter and setter.
-func TestValidationModeGetterSetter(t *testing.T) {
-	// PATTERN 9: Always reset at the start of each test
-	// This ensures previous tests don't affect this one
-	ResetState()
-
-	// STEP 1: Verify initial state (after reset)
-	// The default for all boolean flags should be false
-	if ValidationMode() {
-		t.Error("ValidationMode should be false initially")
-	}
-
-	// STEP 2: Test setting to true
-	SetValidationMode(true)
-	if !ValidationMode() {
-		t.Error("ValidationMode should be true after SetValidationMode(true)")
-	}
-
-	// STEP 3: Test setting back to false
-	// This catches bugs where the setter ignores the parameter
-	SetValidationMode(false)
-	if ValidationMode() {
-		t.Error("ValidationMode should be false after SetValidationMode(false)")
-	}
-}
-
 // TestCacheDisabledGetterSetter verifies CacheDisabled getter and setter.
-//
-// Note: This test is structurally identical to TestValidationModeGetterSetter.
-// In a larger codebase, you might use a table-driven test to reduce
-// duplication. Here, explicit tests are clearer for a small number of flags.
 func TestCacheDisabledGetterSetter(t *testing.T) {
 	ResetState()
 

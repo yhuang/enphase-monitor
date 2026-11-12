@@ -26,7 +26,7 @@ func fixedClock(s string) func() time.Time {
 
 // dailyJSON builds an Open-Meteo daily response body.
 func dailyJSON(date string, code int, max, min, cloud, precip, shortwave float64) string {
-	return fmt.Sprintf(`{"daily":{"time":["%s"],"weather_code":[%d],"temperature_2m_max":[%g],"temperature_2m_min":[%g],"cloud_cover_mean":[%g],"precipitation_sum":[%g],"shortwave_radiation_sum":[%g]}}`,
+	return fmt.Sprintf(`{"daily":{"time":["%s"],"weather_code":[%d],"temperature_2m_max":[%g],"temperature_2m_min":[%g],"cloud_cover_mean":[%g],"relative_humidity_2m_mean":[57],"relative_humidity_2m_max":[88],"relative_humidity_2m_min":[33],"precipitation_sum":[%g],"shortwave_radiation_sum":[%g]}}`,
 		date, code, max, min, cloud, precip, shortwave)
 }
 
@@ -80,6 +80,12 @@ func TestDailyWeather_TodayUsesForecast(t *testing.T) {
 	}
 	if w.Condition != "Partly cloudy" {
 		t.Errorf("condition = %q, want Partly cloudy", w.Condition)
+	}
+	if w.HumidityPct != 57 {
+		t.Errorf("humidity = %v, want 57", w.HumidityPct)
+	}
+	if w.HumidityMaxPct != 88 || w.HumidityMinPct != 33 {
+		t.Errorf("humidity max/min = %v/%v, want 88/33", w.HumidityMaxPct, w.HumidityMinPct)
 	}
 	if w.CloudCoverPct != 41 {
 		t.Errorf("cloud = %v, want 41", w.CloudCoverPct)

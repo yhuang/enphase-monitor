@@ -112,14 +112,6 @@ func TestConstants(t *testing.T) {
 		t.Errorf("WhToKWh = %f, want 1000.0", WhToKWh)
 	}
 
-	// Validation constants
-	if ValidationTolerancePercent != 0.10 {
-		t.Errorf("ValidationTolerancePercent = %f, want 0.10", ValidationTolerancePercent)
-	}
-	if ValidationMinToleranceKWh != 0.1 {
-		t.Errorf("ValidationMinToleranceKWh = %f, want 0.1", ValidationMinToleranceKWh)
-	}
-
 	// Color conversion constants
 	if ANSIColorCubeBase != 16 {
 		t.Errorf("ANSIColorCubeBase = %d, want 16", ANSIColorCubeBase)

@@ -1,6 +1,14 @@
 // history.go writes the aggregated PG&E daily usage into the shared history/
 // directory as per-day records, alongside the Enphase records, using the "pge"
 // dataset prefix (history/pge-YYYY-MM-DD.json + history/.pge-index.json).
+//
+// Units and clock: every energy field is true kWh. import_kwh is gross energy
+// delivered from the grid and export_kwh is gross energy received back (both
+// non-negative; net_kwh = import - export, so a net exporter is negative).
+// Interval start/end are real local instants with the UTC offset in force then
+// (-08:00 / -07:00), and a day is local midnight to midnight, so a spring-forward
+// day has 92 intervals and a fall-back day 96 of its 100 real slots (PG&E omits
+// the repeated hour). See espi.go for how the feed is decoded into these values.
 package pge
 
 import (
@@ -14,8 +22,8 @@ import (
 // export channels are merged into a single record per time slot so a consumer
 // can compute net flow at interval granularity.
 type IntervalRecord struct {
-	Start     string  `json:"start"`      // RFC3339 in Pacific time
-	End       string  `json:"end"`        // RFC3339 in Pacific time
+	Start     string  `json:"start"`      // RFC3339 in the report timezone (Pacific), real local instant
+	End       string  `json:"end"`        // RFC3339 in the report timezone; PG&E intervals run 899 s, so e.g. 00:14:59
 	ImportKWh float64 `json:"import_kwh"` // energy drawn from the grid this interval
 	ExportKWh float64 `json:"export_kwh"` // energy pushed to the grid this interval
 }

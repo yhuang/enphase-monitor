@@ -1,6 +1,6 @@
 // browser.go drives a single headed Chrome session to auto-approve the OAuth
 // consent ("Allow Access") for many credentials with only one login — used by
-// --update-refresh-tokens --all so the user never clicks Allow Access per app.
+// --update-refresh-tokens so the user never clicks Allow Access per app.
 //
 // For each credential it navigates to the authorization URL, waits for the
 // consent page's button (during which the user logs in on the first credential),

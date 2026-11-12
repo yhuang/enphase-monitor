@@ -1,5 +1,6 @@
 // cli.go implements cache management commands (--clear-cache, --clear-cache-date,
-// --clear-all-cache) and cache entry listing used by the --cache diagnostic path.
+// --clear-all-cache) and cache entry listing (ListCacheEntries) used by the API client
+// to find the most recent cache entry for an endpoint and system.
 package cache
 
 import (

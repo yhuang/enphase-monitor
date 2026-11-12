@@ -123,12 +123,12 @@ This separation allows Enphase to:
 - **Security**: Short-lived, scoped to specific permissions
 
 #### 7. **Refresh Token** (`refresh_token`)
-- **What it is**: A long-lived token that can obtain new access tokens
+- **What it is**: A token that can obtain new access tokens. It lasts much longer than an access token but not forever: Enphase refresh tokens expire after 30 days (Enphase developer release notes, 2023-10-16) and may be replaced by a new one when used
 - **Why it exists**: Allows your application to get new access tokens without asking the user to authorize again. This is what you store in your config
 - **Where it is used**: 
-  - Stored in your `credentials.yaml` (this is the one-time setup step)
+  - Stored in your `credentials.yaml` (written by the `--update-refresh-tokens` wizard)
   - Used to get new access tokens when they expire
-- **Security**: Long-lived but should be kept secure. If compromised, regenerate it
+- **Security**: Keep it secure. If it is compromised, expires, or Enphase rejects it, re-run `--update-refresh-tokens` to get a new one
 
 ### How Authentication Works: What the API Server Expects
 
@@ -219,7 +219,7 @@ Here is what happens behind the scenes:
 
 5. **Token Response**: Enphase's server validates everything and returns:
    - `access_token`: Short-lived token for API access
-   - `refresh_token`: Long-lived token for getting new access tokens
+   - `refresh_token`: Token for getting new access tokens (expires after 30 days; a later refresh may return a replacement)
    - `expires_in`: How long the access token is valid (typically 3600 seconds)
 
 #### Phase 2: Making API Requests (Ongoing)
@@ -341,19 +341,19 @@ This URL initiates the OAuth flow by redirecting the user to Enphase's authoriza
 **Run the setup wizard:**
 ```bash
 ./enphase-monitor --update-refresh-tokens
-# With more than one credential set, name the one to set up:
-./enphase-monitor --update-refresh-tokens enphase-monitor-02
-# Or re-authorize every credential in turn (e.g. after they all expired):
-./enphase-monitor --update-refresh-tokens --all
+# Re-authorizes every credential in credentials.yaml. To target another file:
+./enphase-monitor --update-refresh-tokens --credentials-file credentials-mobile.yaml
 ```
 
-The wizard launches a headed Chrome window (via chromedp), drives the Enphase
-authorization/consent screen to completion — logging in and approving on your
-behalf where it can — captures the authorization code, exchanges it for tokens,
-and saves the refresh token to `credentials.yaml`. It performs the whole flow end
-to end; the manual URL construction and code-exchange steps below are retained only
-to explain what the wizard does under the hood (the older hand-paste / loopback-listener
-flow has been removed).
+The wizard launches one headed Chrome window (via chromedp) and, for each credential
+in the file, opens that credential's authorization URL. **You log in to Enlighten
+yourself, once** — on the first credential, and the window waits for you — and the
+wizard clicks "Allow Access" on every consent screen. It reads the authorization code
+from the redirect through the browser's DevTools protocol, so your `redirect_uri` does
+**not** need to be reachable or served by anything local, exchanges the code for tokens,
+and saves each refresh token into its credential entry in `credentials.yaml`. You never
+copy a code. The manual URL construction and code-exchange steps below are retained
+only to explain what the wizard does under the hood.
 
 **Or manually construct the authorization URL:**
 ```
@@ -383,7 +383,7 @@ This step is where the user grants permission to your application.
    - Enphase verifies your identity
    - This ensures only you can authorize access to your systems
 
-3. **Click "Authorize"** to grant access
+3. **Click "Allow Access"** to grant access (the wizard clicks this for you)
    - You are granting permission for your application to access your Enphase data
    - This creates an authorization code on Enphase's server
 
@@ -401,7 +401,7 @@ This step is where the user grants permission to your application.
 
 ### Step 4: Exchange Code for Tokens
 
-This step converts the temporary authorization code into long-lived tokens that your application can use.
+This step converts the temporary authorization code into tokens that your application can use.
 
 **What the API server expects:**
 When you exchange the code, the Enphase token endpoint requires:
@@ -426,7 +426,7 @@ When you exchange the code, the Enphase token endpoint requires:
 
 #### Option A: Use the Setup Wizard
 
-The setup wizard will prompt you for the code and exchange it automatically. It handles all the authentication details for you.
+`./enphase-monitor --update-refresh-tokens` captures the code from the browser redirect and exchanges it for you — there is no code to copy and nothing to paste. It handles all the authentication details and writes the refresh token into `credentials.yaml`.
 
 #### Option B: Manual Exchange (using curl)
 
@@ -464,7 +464,7 @@ Replace:
 
 **What you get:**
 - `access_token`: Short-lived token (1 hour) for making API requests
-- `refresh_token`: Long-lived token (does not expire) for getting new access tokens
+- `refresh_token`: Token for getting new access tokens (expires after 30 days)
 - `token_type`: Always "Bearer" (indicates how to use the token)
 - `expires_in`: Seconds until access_token expires (3600 = 1 hour)
 
@@ -487,9 +487,9 @@ credentials:
 
 **Why this is the only token you store:**
 - The `access_token` expires in 1 hour, so storing it does not help
-- The `refresh_token` is long-lived and can get new access tokens whenever needed
+- The `refresh_token` can get new access tokens whenever needed, for as long as Enphase accepts it (30-day expiry)
 - Your application will automatically use the refresh_token to get new access tokens when needed
-- This is a **one-time setup** - you will not need to do this again unless the refresh token is revoked
+- This is a setup step, not a permanent one: the application keeps any replacement token Enphase issues only in memory for that run and never writes it back to `credentials.yaml`, so when Enphase rejects the stored token (it expired, was revoked, or was replaced) you run `./enphase-monitor --update-refresh-tokens` again
 
 **Security note**: The refresh_token is sensitive. Keep your `credentials.yaml` secure and never commit it to version control (it is gitignored by default).
 
@@ -510,7 +510,7 @@ systems:
 
 ## Finding Your System IDs
 
-For detailed instructions on finding your System IDs, see [Finding Your System IDs](README.md#finding-your-system-ids) in the README.
+For detailed instructions on finding your System IDs, see [Finding Your System IDs](../README.md#finding-your-system-ids) in the README.
 
 ## How Your Application Uses Tokens (After Setup)
 
@@ -611,7 +611,7 @@ Once you have completed the setup, here is what happens automatically when your 
 
 **Solution**:
 - Check that your `refresh_token` in credentials.yaml is correct
-- If the refresh_token was revoked or is invalid, you will need to go through the setup process again (Steps 2-5)
+- If the refresh_token expired, was revoked, or is otherwise invalid, run `./enphase-monitor --update-refresh-tokens` again (or follow Steps 2-5 manually)
 - Run `./enphase-monitor --update-refresh-tokens` to regenerate your refresh token
 
 ### Token refresh fails
@@ -621,9 +621,9 @@ Once you have completed the setup, here is what happens automatically when your 
 **Why this happens**: Refresh tokens can be revoked if:
 - The user revokes access in their Enphase account
 - The application credentials change
-- The token is very old and has been rotated
+- The token has expired (refresh tokens last 30 days) or Enphase has replaced it with a newer one
 
 **Solution**:
-- Go through the OAuth setup process again (Steps 2-5) to get a new refresh_token
+- Run `./enphase-monitor --update-refresh-tokens` (or go through Steps 2-5 manually) to get a new refresh_token
 - Ensure your `client_id` and `client_secret` are still valid
 - Check that your Enphase Developer account is still active

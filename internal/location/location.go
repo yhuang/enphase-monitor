@@ -125,15 +125,6 @@ func (r *Resolver) resolve(ctx context.Context, apiKey, accessToken string, budg
 	return locs, nil
 }
 
-// CachedSystemLocations returns the resolved system locations from the disk
-// cache without any network access, reporting ok=false when the cache is
-// missing or expired (i.e. --init has not been run, or the cache was cleared).
-// Report paths use this so location resolution never makes a /systems call that
-// would compete with the per-minute telemetry budget.
-func (r *Resolver) CachedSystemLocations() ([]SystemLocation, bool) {
-	return r.loadCache()
-}
-
 // CachedPrimaryCoordinates returns the first configured system's coordinates
 // from the cache only (the common case where all systems share a site). ok is
 // false when the location cache is unavailable.

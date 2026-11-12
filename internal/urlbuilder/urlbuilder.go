@@ -5,8 +5,8 @@
 // Centralizes URL building so that every caller produces identically formatted
 // URLs — consistent parameter ordering, Unix-timestamp date ranges, and injected
 // API keys — which in turn ensures cache hits are not missed due to URL variance.
-// The api package (live requests) and api/cache_check.go (preflight cache probe)
-// both build their URLs here so the two can never drift apart.
+// The api package builds every request URL here, and the cache keys derive from the
+// same normalized URLs, so a live request and its cache entry can never drift apart.
 //
 // KEY FEATURES
 // ------------

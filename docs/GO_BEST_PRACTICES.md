@@ -428,10 +428,8 @@ var (
 
 // internal/cache/cache.go - configuration flags
 var (
-    validationMode     bool  // When true, only use cached responses (no live API calls)
-    cacheDisabled      bool  // When true, always make live API calls
-    debugMode          bool  // When true, emit per-request cache/live trace via cache.Debugf
-    budgetWarningShown bool  // Latch so the budget-warning is shown at most once per run
+    cacheDisabled bool  // When true, always make live API calls (never read the cache)
+    debugMode     bool  // When true, emit per-request cache/live trace via cache.Debugf
 )
 ```
 
@@ -824,7 +822,7 @@ This section summarizes defensive programming patterns from the go-defensive ski
 - **Defer** — HTTP response bodies and the runner ticker use `defer` for cleanup.
 - **Time** — Config uses `RefreshIntervalSeconds`; runner uses `time.Duration(...) * time.Second` for the ticker.
 - **No math/rand for keys** — No key generation; no crypto/rand vs math/rand concern.
-- **Field tags** — Marshaled structs (config, API types, validation) use explicit `json`/`yaml` tags.
+- **Field tags** — Marshaled structs (config, API types, history records) use explicit `json`/`yaml` tags.
 
 ---
 
@@ -864,7 +862,7 @@ Functions that take a context should accept it as the **first parameter**:
 
 ```go
 // Good: ctx is first
-func RunOnce(ctx context.Context, rc RunConfig, validationMode bool) error { ... }
+func RunOnce(ctx context.Context, rc RunConfig) error { ... }
 func GetAccessToken(ctx context.Context, apiConfig *APIConfig) (string, error) { ... }
 ```
 
@@ -880,17 +878,17 @@ Use `context.Background()` only for code that is not tied to a request or operat
 // Good: main creates signal context for run loop
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 defer stop()
-app.RunOnce(ctx, rc, validationMode)
+app.RunOnce(ctx, rc)
 
 // Good: OAuth authorization receives ctx so Ctrl+C cancels token exchange
-oauth.Authorize(ctx, cred)
+oauth.AuthorizeViaBrowser(ctx, authorizer, cred)
 ```
 
 ### In this codebase
 
 - **First parameter** — All context-using functions take `ctx context.Context` as the first parameter (`RunOnce`, `GetAccessToken`, `ExchangeAuthorizationCode`, `GetMetricsFromCloud`, etc.).
 - **No context in structs** — `EnlightenCloudClient`, `DataAggregator`, and `Display` do not store context; it is passed into methods.
-- **Propagation** — `main` creates a signal context and passes it to `RunOnce` and to `oauth.Authorize` so shutdown and Ctrl+C cancel in-flight work.
+- **Propagation** — `main` creates a signal context and passes it to `RunOnce` and to `oauth.AuthorizeViaBrowser` so shutdown and Ctrl+C cancel in-flight work.
 
 ---
 
@@ -907,8 +905,8 @@ This section summarizes the coding conventions and best practices followed throu
 
 ### 2. Naming Conventions
 
-- **Exported** (public): PascalCase (`GetMetrics`, `Config`, `SystemMetrics`)
-- **Unexported** (private): mixedCaps (`getCacheKey`, `tokenCache`, `parseResponse`)
+- **Exported** (public): PascalCase (`GetMetricsFromCloud`, `Config`, `SystemMetrics`)
+- **Unexported** (private): mixedCaps (`parseCacheResponse`, `tokenCache`, `isImmutablePeriod`)
 - **Constants**: MixedCaps only (`Reset`, `Bold`, `DateFormat`, `APIRequestTimeout`) — never `ALL_CAPS` or `k` prefix
 - **Interfaces**: Usually end with `-er` (`Reader`, `Writer`, `Closer`)
 - **Constructors**: Prefix with `New` (`NewDisplayWithColorsAndTimezone`, `NewEnlightenCloudClient`)
@@ -975,8 +973,8 @@ This section summarizes the coding conventions and best practices followed throu
 - **Test files end with `_test.go`** - Go test runner convention
 - **Test functions start with `Test`** - `func TestFunctionName(t *testing.T)`
 - **Use table-driven tests** - Test multiple cases in one function
-- **Validate against expected values** - This codebase uses `internal/validation/validation.go`
-- **Test refactor helpers** - Helpers introduced during go-style-core refactoring (e.g. `findSystemByID`, `runMetricTests`, `tryLoadPastDateCache`) have dedicated unit tests; see [TESTING.md](TESTING.md) § Testing Refactor Helpers.
+- **Inject `io.Writer` to test output** - e.g. `pge.VerifyPGERaw` writes its findings to a writer, so its tests assert on a `bytes.Buffer` (see [TESTING.md](TESTING.md) Pattern 5)
+- **Test refactor helpers** - Helpers introduced during go-style-core refactoring (e.g. `tryLoadPastDateCache`) have dedicated unit tests; see [TESTING.md](TESTING.md) § Testing Refactor Helpers.
 
 #### Test File Organization
 
@@ -993,7 +991,7 @@ For packages with many functions or complex logic, tests are split by **test cat
 
 **Cache Package** (`cache.go`):
 1. **`cache_test.go`** - State management tests
-   - Tests state flags (validationMode, cacheDisabled, budgetWarningShown)
+   - Tests state flags (cacheDisabled)
    - Tests ResetState() for test isolation
 
 2. **`cache_functions_test.go`** - Core functionality tests

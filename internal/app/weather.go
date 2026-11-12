@@ -84,6 +84,9 @@ func enrichWithTemperature(ctx context.Context, rc RunConfig, metrics *aggregato
 		WeatherCode:     w.WeatherCode,
 		Condition:       w.Condition,
 		CloudCoverPct:   w.CloudCoverPct,
+		HumidityPct:     w.HumidityPct,
+		HumidityMaxPct:  w.HumidityMaxPct,
+		HumidityMinPct:  w.HumidityMinPct,
 		PrecipitationMM: w.PrecipitationMM,
 		SolarRadiation:  w.SolarRadiation,
 	}
