@@ -90,18 +90,19 @@ func TestShowMetrics_WeatherShownWhenPresent(t *testing.T) {
 	metrics := &aggregator.AggregatedMetrics{
 		Timestamp: time.Now(),
 		Weather: &aggregator.DailyWeather{
-			TempHigh:       78.4,
-			TempLow:        54.1,
-			TempUnit:       "°F",
-			Condition:      "Partly cloudy",
-			CloudCoverPct:  41,
+			TempHigh:      78.4,
+			TempLow:       54.1,
+			TempUnit:      "°F",
+			Condition:     "Partly cloudy",
+			CloudCoverPct: 41,
+			HumidityPct:   57, HumidityMinPct: 33, HumidityMaxPct: 88,
 			SolarRadiation: 6.8,
 		},
 	}
 	d.ShowMetrics(metrics)
 
 	output := buf.String()
-	for _, want := range []string{"Temperature", "78°F", "54°F", "Partly cloudy", "41% cloud", "Irradiance", "6.8 kWh/m²"} {
+	for _, want := range []string{"Temperature", "78°F", "54°F", "Partly cloudy", "41% cloud", "Humidity", "33% — 88% · 57% mean", "Irradiance", "6.8 kWh/m²"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("output should contain %q\n%s", want, output)
 		}
@@ -142,7 +143,7 @@ func TestShowMetrics_WeatherAbsentWhenNil(t *testing.T) {
 	metrics := &aggregator.AggregatedMetrics{Timestamp: time.Now()}
 	d.ShowMetrics(metrics)
 
-	for _, unwanted := range []string{"Temperature", "Conditions", "Irradiance"} {
+	for _, unwanted := range []string{"Temperature", "Conditions", "Humidity", "Irradiance"} {
 		if strings.Contains(buf.String(), unwanted) {
 			t.Errorf("output should not contain %q when Weather is nil\n%s", unwanted, buf.String())
 		}

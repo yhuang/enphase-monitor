@@ -8,6 +8,11 @@
 // cached. The credential pool's combined budget (one set per system, many sets
 // available) comfortably absorbs a year of daily queries.
 //
+// Because every fetch is live, each response is also kept untouched under raw/enphase/
+// (see internal/rawstore); days skipped as already present make no calls and add nothing
+// there. Weather for a day comes from the weather client, which archives its own payload
+// when it actually fetches.
+//
 // The day-by-day fetch is intentionally sequential, not parallelized across the
 // credential pool. A year backfill is a rare, run-in-the-background operation,
 // and serial fetching keeps each key far below the per-minute rate-limit ceiling

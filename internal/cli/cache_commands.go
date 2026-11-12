@@ -7,6 +7,9 @@
 //   - --clear-cache-date: Clear cached responses for a specific date (YYYY-MM-DD)
 //   - --clear-all-cache: Clear all cached responses (all dates)
 //
+// These commands only touch cache/. The raw source archive (raw/) is never cleared by
+// them, so the untouched copies of source responses survive a cache clear.
+//
 // Flag parsing lives in flags.go; command handlers are in this file to keep main clean and focused.
 package cli
 

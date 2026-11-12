@@ -50,7 +50,7 @@ clean:
 	go clean -testcache
 	@echo "Clean complete"
 
-# Run tests (validation tests require test data - see README.md Testing section)
+# Run tests
 test: build
 	@echo "Running tests..."
 	go test -v ./...

@@ -8,7 +8,13 @@
 // its unit (_kwh, _mm, _pct) — so a downstream consumer can interpret a record
 // without external documentation.
 //
-// Records hold only aggregated daily values, not the raw API intervals. Battery
+// Records hold only aggregated daily values, not the raw API intervals (PG&E
+// records are the exception: they also carry the 15-minute interval list). Every
+// record can be re-derived from the untouched source responses kept under raw/
+// (see internal/rawstore), which the --verify-*-raw commands do. The directory also
+// holds dotfile sidecars that are not records and never match a record glob: the
+// per-dataset .<prefix>-index.json manifests and .weather-provenance.json (which
+// weather blocks were rebuilt from raw payloads). Battery
 // charge/discharge/SOC are intentionally omitted: they are unavailable for
 // historical dates (the lifetime endpoints that serve past days carry no
 // battery data), so they would always be zero in a backfill.
@@ -103,6 +109,9 @@ type WeatherRec struct {
 	WeatherCode         int     `json:"weather_code"` // precise WMO code; see weather_codes.json legend (project root)
 	Condition           string  `json:"condition"`    // human-readable label (collapses code intensities)
 	CloudCoverPct       float64 `json:"cloud_cover_pct"`
+	HumidityPct         float64 `json:"humidity_pct"` // daily mean relative humidity at 2 m
+	HumidityMaxPct      float64 `json:"humidity_max_pct"`
+	HumidityMinPct      float64 `json:"humidity_min_pct"`
 	PrecipitationMM     float64 `json:"precipitation_mm"`
 	SolarRadiationKWhM2 float64 `json:"solar_radiation_kwh_m2"` // daily shortwave radiation sum
 }
@@ -149,6 +158,9 @@ func FromMetrics(metrics *aggregator.AggregatedMetrics, tz *time.Location) (DayR
 			WeatherCode:         w.WeatherCode,
 			Condition:           w.Condition,
 			CloudCoverPct:       w.CloudCoverPct,
+			HumidityPct:         w.HumidityPct,
+			HumidityMaxPct:      w.HumidityMaxPct,
+			HumidityMinPct:      w.HumidityMinPct,
 			PrecipitationMM:     w.PrecipitationMM,
 			SolarRadiationKWhM2: w.SolarRadiation,
 		}

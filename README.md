@@ -33,11 +33,12 @@ A Go application for monitoring and aggregating data from one or more Enphase so
 - **Multi-System Monitoring**: Query and combine metrics from multiple independent Systems at a Site
 - **Comprehensive Metrics**: Track Production, Consumption, battery charge/discharge, Grid Import/Export, and Net Flow
 - **Flexible Querying**: Query past dates or monitor real-time with auto-refresh
-- **Weather Enrichment**: Day-Mode reports annotated with temperature, conditions, cloud cover, precipitation, and solar radiation (Open-Meteo; requires one-time `--init`)
+- **Weather Enrichment**: Day-Mode reports annotated with temperature, conditions, cloud cover, relative humidity (mean/max/min), precipitation, and solar radiation (Open-Meteo; requires one-time `--init`)
 - **Historical Backfill**: Build a per-day energy + weather dataset over a date range as JSON records for offline analysis (`--start-date`); pull PG&E utility-meter records from the web portal alongside Enphase data (`--pge-web-only`)
+- **Raw Source Archive & Verification**: Every source response (Enphase API, Open-Meteo, PG&E Green Button) is kept untouched under `raw/` with a SHA-256 manifest, and offline `--verify-*-raw` commands re-derive `history/` from it, so the processing can be checked locally at any time
 - **True-Up Report**: Energy metrics across a full utility True-Up Period (`--true-up`)
 - **Clean Display**: Formatted terminal output with customizable colors
-- **API Caching**: Automatic caching of API responses to reduce API calls and enable offline validation
+- **API Caching**: Automatic caching of API responses to reduce API calls
 - **Color Customization**: Customize terminal colors using hex codes or ANSI escape codes
 - **Cloud API v4**: Uses Enphase Enlighten Cloud API v4 for reliable data access
 - **OAuth Support**: Full OAuth 2.0 support for developer plan authentication
@@ -148,7 +149,7 @@ Configuration is split across two files:
 #### API Credentials
 
 These live in `credentials.yaml` (kept separate from `config.yaml` so secrets stay local) under a `credentials:` list of one or more credential sets. You will need the values from the [Enphase Developer Portal](https://developer-v4.enphase.com/). Each entry has:
-- `name`: A unique label for the credential set (names a credential for `--update-refresh-tokens <name>` and is the token-cache key)
+- `name`: A unique label for the credential set (the token-cache key)
 - `key`: Your API key
 - `client_id`: OAuth client ID
 - `client_secret`: OAuth client secret
@@ -193,34 +194,26 @@ To find your System IDs:
 
 **⚠️ Required for First-Time Setup**
 
-This application uses OAuth 2.0 for authentication. You must complete a one-time OAuth setup to get your refresh token.
+This application uses OAuth 2.0 for authentication. You must complete the OAuth setup to get your refresh tokens, and repeat it when Enphase rejects a stored token (refresh tokens expire after 30 days).
 
 ### Quick Setup
 
 ```bash
 ./enphase-monitor --update-refresh-tokens
 ```
-Run the interactive setup wizard that will:
-1. Open your browser to the Enphase authorization page
-2. Wait while you log in and authorize the application
-3. Capture the authorization code automatically (a local listener on your
-   `redirect_uri`, e.g. `http://localhost:8080/callback`) and exchange it for tokens
-4. Write the refresh token straight into the matching entry in your `credentials.yaml`
+Run the setup wizard, which opens one headed Chrome window and, for each credential in the file:
+1. Opens that credential's Enphase authorization page
+2. Waits for you to log in to Enlighten (once, on the first credential), then clicks "Allow Access" for you
+3. Reads the authorization code from the redirect through the browser's DevTools protocol (no local listener, so your `redirect_uri` need not be reachable) and exchanges it for tokens
+4. Writes the refresh token straight into the matching entry in your `credentials.yaml`
 
-You normally just authorize in the browser — no copy-paste. If your `redirect_uri`
-isn't a localhost address (or its port is busy), the wizard falls back to asking you
-to paste the redirect URL from your browser's address bar.
+There is nothing to copy or paste.
 
-With more than one credential set configured, name the one to set up:
+The wizard always re-authorizes **every** credential in the credentials file in turn, logging in once. By default that is `credentials.yaml`; to update another file, name it:
 
 ```bash
-./enphase-monitor --update-refresh-tokens enphase-monitor-02
-```
-
-Or re-authorize every credential in turn (e.g. after they've all expired):
-
-```bash
-./enphase-monitor --update-refresh-tokens --all
+./enphase-monitor --update-refresh-tokens --credentials-file credentials-mobile.yaml
+./enphase-monitor --update-refresh-tokens --credentials-file credentials-desktop.yaml
 ```
 
 ### Detailed Guide
@@ -239,7 +232,10 @@ For a comprehensive explanation of OAuth 2.0, what each component does, and how 
 The wizard writes the obtained `refresh_token` directly into the matching credential
 entry in your `credentials.yaml` (preserving your comments and other entries) — the
 secret is never displayed for copy-paste. From then on, the application automatically
-uses this token to get new access tokens when needed.
+uses this token to get new access tokens when needed. Enphase refresh tokens expire after
+30 days and can be replaced when used; the application keeps a replacement in memory for
+that run only and does not write it back to `credentials.yaml`, so re-run
+`--update-refresh-tokens` when a run fails with a 401 (invalid or expired refresh token).
 
 ## API Configuration
 
@@ -257,7 +253,7 @@ This application uses the **Enphase Enlighten Cloud API v4** exclusively to fetc
 
 The Enphase Cloud API v4 has the following technical limits:
 
-- **Interval Data: Single-Day Only**: Interval Data endpoints (15-minute data) return exactly **one calendar day** of data per request — the API ignores the `end_at` parameter and always responds with `granularity=day`. Querying a full month via Interval Data endpoints would require 28–31 separate calls, which would exceed the API Budget (10 calls/minute).
+- **Interval Data: Single-Day Only**: Interval Data endpoints (15-minute data) return exactly **one calendar day** of data per request — the API ignores the `end_at` parameter and always responds with `granularity=day`. Querying a full month via Interval Data endpoints would require 28–31 separate calls, which would burn through the API Budget (10 calls/minute and 1000/month per key).
   - The application automatically uses **daily aggregated `_lifetime` endpoints** (Lifetime Data) for Month and Year Mode queries
   - These endpoints return one value per calendar day and can span arbitrary date ranges in a single request
   - Example: Querying January 2026 (31 days) → **single API request** using `energy_lifetime` endpoint
@@ -292,7 +288,7 @@ Before running any report, initialize the systems' location once:
 ./enphase-monitor --init
 ```
 
-`--init` makes a single `/systems` call, geocodes each system's postal code to coordinates, and caches the result. This enables **weather enrichment**: Day-Mode reports are annotated with the day's temperature high/low, conditions, cloud cover, precipitation, and solar radiation (from the [Open-Meteo](https://open-meteo.com/) API). Resolving the location out of band keeps it off the API Budget on a live reporting run.
+`--init` makes a single `/systems` call, geocodes each system's postal code to coordinates, and caches the result. This enables **weather enrichment**: Day-Mode reports are annotated with the day's temperature high/low, conditions, cloud cover, relative humidity (mean/max/min), precipitation, and solar radiation (from the [Open-Meteo](https://open-meteo.com/) API). Resolving the location out of band keeps it off the API Budget on a live reporting run.
 
 `--init` also writes `weather_codes.json` to the project root — the authoritative WMO legend decoding the `weather_code` field carried by reports and History Records (each of the codes Open-Meteo emits, defined individually so intensities are preserved). It is a general reference rather than a dataset artifact, regenerated on each `--init`.
 
@@ -364,6 +360,7 @@ Build a local dataset of per-day energy + weather records for offline analysis (
 
 By default, `--start-date` fetches from **both** Enphase (live API) and PG&E (browser download). Use `--pge-web-only` or `--enphase-api-only` to restrict to one source. The range runs from `--start-date` through `--end-date` (or yesterday when `--end-date` is omitted). Key behaviors:
 
+- **PG&E is capped at one year per run.** PG&E's export form rejects ranges over a year, so a run that includes PG&E ends one year after `--start-date` (e.g. `--start-date 2025-10-01` ends 2026-09-30, and the Enphase backfill is aligned to that end). The tool prints the `--start-date` to continue from; run it again to extend coverage.
 - **Always live.** Range pulls disable the cache and pull fresh from the API, so records are authoritative. With the credential pool's combined budget, a full year of daily Enphase queries is comfortably within limits.
 - **Idempotent.** Days that already have a record in `history/` are skipped (no API calls) unless `--force` is given. PG&E records are always overwritten regardless of `--force`.
 - **Resilient.** A failure on one day is reported and skipped; the range continues.
@@ -371,7 +368,7 @@ By default, `--start-date` fetches from **both** Enphase (live API) and PG&E (br
 
 Range pull is the **only** writer of History Records — a plain `./enphase-monitor --date 2026-01-15` stays a read-only terminal report and writes nothing. To capture a single day to `history/`, run `./enphase-monitor --start-date 2026-01-15 --end-date 2026-01-15`. This keeps every record authoritative (live-sourced) and avoids a casual cache-served `--date` view silently shadowing a date that a range pull would then skip.
 
-Each run also (re)writes a manifest, `history/.index.json`, by **scanning the directory** — so it reflects the whole dataset (this run plus prior runs), not just the latest run. It lists the covered date range, present/missing counts, and every missing day with its reason (the API error for days the run attempted, or "not attempted in last run" otherwise) so gaps in the dataset are visible without diffing the directory:
+Each run also (re)writes a per-source index, the Backfill Index (`history/.enphase-index.json`, `history/.pge-index.json`), by **scanning the directory** — so it reflects the whole dataset (this run plus prior runs), not just the latest run. It lists the covered date range, present/missing counts, and every missing day with its reason (the API error for days the run attempted, or "not attempted in last run" otherwise) so gaps in the dataset are visible without diffing the directory:
 ```json
 {
   "updated_at": "2026-06-20T14:03:00-07:00",
@@ -380,11 +377,11 @@ Each run also (re)writes a manifest, `history/.index.json`, by **scanning the di
   "missing": [ { "date": "2025-12-03", "error": "API request failed with status 503" } ]
 }
 ```
-The manifest is a dotfile so it stays out of a `history/*.json` glob when you feed the dataset to your analysis tool. It is best-effort as of the last run — hand-deleting a record afterward won't update it until the next run.
+The index is a dotfile so it stays out of a `history/*.json` glob when you feed the dataset to your analysis tool (as is `history/.weather-provenance.json`, below). It is best-effort as of the last run — hand-deleting a record afterward won't update it until the next run. Not to be confused with the Raw Manifest, `raw/manifest.jsonl`, which lists archived source files.
 
 Each record's `weather_code` is the precise WMO interpretation code — the stable categorical feature for modeling, which (unlike the human `condition` label) distinguishes intensities (e.g. 61/63/65 = slight/moderate/heavy rain) and never drifts on rewording. Decode it with `weather_codes.json`, written at the project root by `--init` (see [Initialization & Weather](#initialization--weather)).
 
-**Record schema** (`history/<date>.json`):
+**Enphase record schema** (`history/enphase-<date>.json`):
 ```json
 {
   "date": "2026-01-15",
@@ -392,26 +389,88 @@ Each record's `weather_code` is the precise WMO interpretation code — the stab
   "systems": [
     { "id": "5525881", "name": "Right Subpanel", "production_kwh": 20.8, "consumption_kwh": 26.7, "grid_import_kwh": 18.4, "grid_export_kwh": 11.0, "net_flow_kwh": 7.4 }
   ],
-  "weather": { "temp_high": 58.2, "temp_low": 42.1, "temp_unit": "°F", "weather_code": 2, "condition": "Partly Cloudy", "cloud_cover_pct": 34, "precipitation_mm": 0, "solar_radiation_kwh_m2": 2.4 }
+  "weather": { "temp_high": 58.2, "temp_low": 42.1, "temp_unit": "°F", "weather_code": 2, "condition": "Partly Cloudy", "cloud_cover_pct": 34, "humidity_pct": 61, "humidity_max_pct": 88, "humidity_min_pct": 38, "precipitation_mm": 0, "solar_radiation_kwh_m2": 2.4 }
 }
 ```
 Battery charge/discharge/SOC are intentionally omitted from Enphase records: they are unavailable for historical dates (the lifetime endpoints that serve past days carry no battery data). Every Enphase record carries a `weather` object — a day whose weather is unavailable is treated as a failure and is not written (it appears in the manifest's `missing` and is retried on a plain re-run), so the dataset stays usable for correlation. (The field is `omitempty` at the schema level, but range pull never emits a weatherless Enphase record.) PG&E records have a different schema and are stored as `history/pge-<date>.json`; they do not carry weather data.
 
+**PG&E record schema** (`history/pge-<date>.json`):
+```json
+{
+  "date": "2025-11-08",
+  "import_kwh": 29.724, "export_kwh": 25.675, "net_kwh": 4.049,
+  "intervals": [
+    { "start": "2025-11-08T00:00:00-08:00", "end": "2025-11-08T00:14:59-08:00", "import_kwh": 0.518, "export_kwh": 0 }
+  ]
+}
+```
+Semantics (all verified against real Green Button exports, and pinned by tests):
+- **Units are true kWh.** `import_kwh` is *gross* energy delivered from the grid and `export_kwh` is gross energy received back; both are non-negative, and `net_kwh = import_kwh - export_kwh` (negative for a net exporter). No interval has negative import.
+- **Timestamps are real local instants** with the UTC offset in force at the time (`-08:00` PST, `-07:00` PDT). A day is local midnight to midnight. PG&E's own stamps are local wall-clock time encoded as UTC; the parser detects that and converts it (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#pge-feed-decoding)).
+- **Intervals run 899 s** (`00:00:00`–`00:14:59`), PG&E's own interval length.
+- **Daylight-saving days:** a spring-forward day has 92 intervals; a fall-back day has only 96 of its 100 real slots because PG&E's feed omits the repeated hour (that day is slightly understated, and the pull warns).
+- **Feed registers:** an export carries a signed net register, a received register, a demand register in watts and a gross-delivered register. Only gross delivered and received are used; the net register is never added. If a feed does not satisfy `net = delivered − received` the pull fails with an error rather than guessing.
+
+#### Raw source archive (`raw/`)
+
+`history/` is derived data. To make it checkable at any time, every external response is also kept untouched under `raw/<source>/` (gitignored: it contains account data):
+
+| Directory | Contents | Written by |
+|---|---|---|
+| `raw/enphase/` | Enphase API response bodies, named `<system>_<endpoint>_<date>_<fetch time>.json` | every live Enphase call; `--raw-import-cache` for responses that were already in `cache/` |
+| `raw/weather/` | Open-Meteo daily payloads, `daily_<date>_<fetch time>.json` | every live weather fetch; `--raw-refetch-weather` |
+| `raw/pge/` | PG&E Green Button downloads as received (the original ZIP), `pge-<from>_<to>.zip` | every PG&E download (`--pge-web-only`, or `--start-date` without a source flag) |
+| `raw/manifest.jsonl` | one JSON line per file: `fetched_at`, `source`, `file`, `sha256`, `bytes`, `request` (API keys removed) and an optional `note` | all of the above |
+
+Files are written once and never overwritten: a repeat fetch gets its own timestamped name (a repeated PG&E range gets `-1`, `-2`). Only live fetches archive — a cache hit makes no request and archives nothing, and days a backfill skips as already present add nothing. The `cache/` directory holds the same Enphase bodies but is a cache (clearable); no `--clear-*-cache` command ever touches `raw/`. Back it up outside the project, because git ignores it: `tar czf ~/enphase-data-$(date +%Y%m%d-%H%M).tar.gz raw/ history/`.
+
+**Re-collecting PG&E after a parser change or a suspected bad pull** (PG&E caps one export at a year, so a long span needs two runs):
+```bash
+tar czf ~/enphase-data-$(date +%Y%m%d-%H%M).tar.gz raw/ history/      # back up first: pulls overwrite pge-*.json
+./enphase-monitor --pge-web-only --start-date 2025-10-06 --end-date 2026-10-05
+./enphase-monitor --pge-web-only --start-date 2026-10-06              # end defaults to yesterday
+./enphase-monitor --verify-pge-raw && ./enphase-monitor --verify-enphase-raw && ./enphase-monitor --verify-weather-raw
+```
+For a parser fix alone no new pull is needed: `./enphase-monitor --pge-reprocess raw/pge/pge-2025-10-06_2026-10-05.zip` rebuilds the records from the archived download.
+
+The maintenance and verification flags for the archive are described under [Command-Line Options](#command-line-options). Two behaviors worth knowing here:
+
+- **Weather provenance.** Open-Meteo revises recent history, and older records could hold zeros for fields that were not yet fetched, so a cached past day is not guaranteed final. `--raw-apply-weather` rewrites a record's weather from the archived payload and records, per day in `history/.weather-provenance.json`, whether it was `rebuilt_from_raw` (with the replaced values under `previous`) or already `matches_raw`, plus the raw file, its SHA-256 and whether radiation is exactly 0. Either way the stored weather equals the newest payload in `raw/weather/`, which `--verify-weather-raw` confirms.
+- **What "verified" means.** Each `--verify-*-raw` command checks integrity (every manifest line re-hashed; altered, missing and unlisted files reported) and reproduction (history re-derived from the raw files with the same code the live run uses, and compared). Passing means `history/` is exactly what the current code derives from what the sources sent, not that the sources were right — see the caveats below.
+
+#### Known data caveats
+
+- **Enphase day totals omit the last 15 minutes.** The Day Mode interval endpoints return one interval fewer than the day's real length (95 on a normal day): the slot ending at midnight falls outside the response window and appears in neither that day's nor the next day's response. Measured against PG&E, that slot is a median 1.4% of a day's grid import and about 0% of export, so Enphase import reads slightly low.
+- **Enphase consumption reads about 3 kWh/day below** `grid_import + production - grid_export` (median 3.0, mean 3.4 over the history). This is a metering-scope effect (where the consumption CTs sit), not a parsing error; it is why consumption does not reconcile exactly with the other three metrics.
+- **2026-03-08 Enphase is unreliable.** One system's export meter returned zeros for 09:00-16:00 while its production was normal (the response in `raw/enphase/` is that way; the parser reproduces it), giving 20.1 kWh export against PG&E's 47.8 and an identity gap of 36.6 kWh. Prefer PG&E for that day. Other days with large Enphase/PG&E gaps (2025-11-07, 2026-03-18, 2026-09-07, 2026-09-26) are not explained by the raw data; 2025-11-07 is the panel-install day.
+- **PG&E daylight-saving days:** 2026-03-08 has 92 intervals (the correct length of that 23-hour day). 2025-11-02 has only 96 of its 100 real slots because PG&E's feed omits the repeated hour, so that day is slightly understated; the pull warns about it.
+
+The PG&E pull prints a warning before writing when a day's import is negative, an interval has import < 0 and export > 0, the interval count differs from the local day's real length (92/96/100), or PG&E's net differs from Enphase's by more than 10%.
+
 ### Command-Line Options
 
-- `--config <path>` - Path to configuration file (default: `config.yaml`)
-- `--credentials <path>` - Path to credentials file (default: `credentials.yaml`)
+- `--config-file <path>` - Path to configuration file (default: `config.yaml`)
 - `--init` - Resolve and cache the systems' location for weather reporting. Run once before normal use; re-run if the cache is cleared. Required before any report mode (see [Initialization & Weather](#initialization--weather))
 - `--force` - With `--init`, re-resolve the location from the API even if a cached value already exists. With `--start-date`, re-fetch and overwrite Enphase history records that already exist instead of skipping them; has no effect on PG&E records, which are always overwritten
 - `--date <YYYY-MM-DD|YYYY-MM|YYYY>` - Query specific date, month, or year (e.g., `2026-01-15`, `2026-01`, or `2025`)
 - `--start-date <YYYY-MM-DD>` - Start a range pull from this date through `--end-date` (or yesterday) with live API calls, writing one JSON record per day into `history/`. Fetches from both Enphase API and PG&E web by default; use `--enphase-api-only` or `--pge-web-only` to restrict the source. Skips Enphase days already written unless `--force` is given. Cannot be combined with `--true-up` or `--init` (see [Historical Backfill](#historical-backfill))
-- `--end-date <YYYY-MM-DD>` - End date (inclusive) for `--start-date` range pulls. Defaults to yesterday
+- `--end-date <YYYY-MM-DD>` - End date (inclusive) for `--start-date` range pulls. Defaults to yesterday. When PG&E is included, the run is capped at one year after `--start-date` (PG&E's export limit) and the tool prints the `--start-date` to continue from
 - `--pge-web-only` - With `--start-date`, pull only from the PG&E website (Green Button browser download). Does not require Enphase credentials
 - `--enphase-api-only` - With `--start-date`, pull only from the Enphase API. Skips all PG&E data sources
+- Raw archive, reprocessing and verification (grouped first in `--help`; run **one at a time** — combining two is rejected — and none takes `--start-date`/`--end-date` except the two raw weather commands, where either bound may be given alone). See [Raw source archive](#raw-source-archive-raw):
+  - `--raw-import-cache` - copy the raw Enphase responses held in `cache/` into `raw/enphase/`, keeping their original fetch times. Offline, no API calls; safe to repeat
+  - `--raw-refetch-weather` - re-fetch Open-Meteo for every history day (or a `--start-date`/`--end-date` range) with the weather cache bypassed, archiving each payload in `raw/weather/` and reporting days that differ from the stored record. No key or quota; needs `--init`
+  - `--raw-apply-weather` - rebuild the weather block of each `history/enphase-*.json` from the newest archived payload (never touches energy fields) and record what changed in `history/.weather-provenance.json`
+  - `--pge-reprocess <file>` - rebuild PG&E history records offline from an archived download (e.g. `raw/pge/pge-2025-10-01_2026-09-30.zip`); the range comes from the file name. Use after a parser fix instead of re-pulling
+  - `--verify-pge-raw` - re-hash `raw/pge` against the manifest, re-derive each archive with the current parser and diff against `history/pge-*.json`
+  - `--verify-weather-raw` - re-hash `raw/weather` and confirm every record's weather equals what its newest payload yields
+  - `--verify-enphase-raw` - re-hash `raw/enphase` and re-derive every day's per-system import/export/production/consumption from the archived responses
+  - `--verify-enphase-archive <YYYY-MM-DD>` - the only one that uses the API (about 10 calls from a key's monthly budget): fetch one completed past day, confirm each response was archived intact and the stored record reproduces from it; never writes `history/`
+  - The offline commands exit non-zero on any finding. There is deliberately no "verify everything" flag, so nothing spends API quota unless you ask for `--verify-enphase-archive`
 - `--true-up <YYYY-MM-DD>` - Activate True-Up Mode using this utility True-Up Start Date. Covers the 12-month True-Up Window (Current Period: through yesterday; Past True-Up Period: through last day of 12-month window). Takes precedence over `--date`
 - `--seed-credentials` - Seed `credentials.yaml` from the Enphase developer portal: opens Chrome to log in, then scrapes each application's `name`, `key`, `client_id`, and `client_secret`. New entries are appended with an empty `refresh_token` (fill it with `--update-refresh-tokens`); existing entries are resynced in place, preserving their refresh tokens. Filter with `--quota-prefix`
-- `--update-refresh-tokens [name]` - Run OAuth setup wizard (one-time for developer plan); pass a credential name when more than one is configured (e.g. `--update-refresh-tokens enphase-monitor-02`)
-- `--all` - With `--update-refresh-tokens`, re-authorize every configured credential in turn (e.g. `--update-refresh-tokens --all`)
+- `--update-refresh-tokens` - Run the OAuth wizard to re-authorize **every** credential in the credentials file, saving each refresh token back into it (one login, no per-app clicking)
+- `--credentials-file <path>` - Credentials file to use instead of `credentials_file` from config.yaml (default `credentials.yaml`), e.g. `--credentials-file credentials-mobile.yaml`. Applies to every mode
 - `--refresh-quota` - Out-of-band resync of each credential's monthly API-usage baseline from the developer portal stats page (opens Chrome to log in). Filter with `--quota-prefix`. The same baseline is also seeded by `--init`
 - `--quota-prefix <prefix>` - Application/credential name prefix filter (default `enphase-monitor-`). Scopes which applications `--seed-credentials` pulls and which credentials `--init`/`--refresh-quota` sync
 - `--no-cache` - Bypass cache and make live API calls. Propagates API errors (429/503/network) instead of serving stale cache. No effect with `--start-date`, which is always live
@@ -601,9 +660,10 @@ colors:
 - Ensure the system IDs are strings (quoted in YAML)
 
 ### "rate limit exceeded (429)"
-- The API Budget is 10 calls per minute
-- The program will display how many seconds to wait before retrying
-- Run with `--debug` to see when the 60-second window resets and how much budget remains
+- Enphase allows 10 calls per minute (and 1000 per month) per API key; a 429 means a key was throttled
+- With a credential pool the program puts that key in cooldown and retries the System on a spare key; you only see this error once every key has been tried
+- Wait a minute and re-run, or add more credentials to the pool (`--seed-credentials`)
+- Run with `--debug` to see the credential pool's monthly quota summary and each live/cached decision
 
 ### "API request failed with status 422"
 - This usually means the requested date is in the future
@@ -613,6 +673,17 @@ colors:
 ### No Interval Data returned
 - Some data may not be available for very recent time periods (try querying yesterday's data)
 - Ensure your systems are actively reporting to Enlighten
+
+### PG&E pull prints `WARNING:` lines
+The pull checks each day before writing it (the records are still written):
+- `daily import is negative` or `interval(s) have import < 0 and export > 0` — the gross and signed net registers were mixed. This should not happen with the current parser; if it does, keep the raw ZIP (`raw/pge/`) and re-run `--verify-pge-raw`.
+- `N intervals, expected M for this local day` — 92 (spring-forward) and 100 (fall-back) are the real lengths of those days. PG&E's feed omits the repeated hour on fall-back days, so that day arrives with 96 and is slightly understated; any other count means missing data.
+- `PG&E net … vs Enphase net …` — the day's net differs from Enphase's by more than 10% of the larger flow. Check which source is wrong (for example, Enphase's 2026-03-08 export meter reported zeros midday; see [Known data caveats](#known-data-caveats)).
+
+### `--verify-*-raw` reports a finding
+- `hash differs from manifest` / `listed in manifest but missing` — a file under `raw/` was altered or deleted; restore it from your backup. `not listed in manifest` — a file was added by hand.
+- `history record differs from the one re-derived from raw` (PG&E), `history weather differs from the newest raw payload`, or a `record … vs raw …` mismatch (Enphase) — `history/` no longer matches what the current code derives from the archive. For PG&E, `--pge-reprocess <archive>` rebuilds the records; for weather, `--raw-apply-weather`. A mismatch you did not cause means a record was edited or produced by older code.
+- `raw responses missing` (Enphase) — a day in `history/` has no archived body for some system/endpoint (for example a day fetched before archiving existed and no longer in `cache/`).
 
 ## Caching and API Budget
 
@@ -630,72 +701,25 @@ Because each API key is capped at **10 requests/minute AND 1000 requests/month**
 - **Failover.** When a key returns 429 (per-minute) or has spent its monthly budget, it is put in cooldown and the System retries on a spare; the run only errors when every key is exhausted.
 - **Monthly quota tracking.** Each credential's calls-this-month are persisted in `cache/monthly-quota.json`. The baseline is seeded from the developer portal by `--init` (or resynced with `--refresh-quota`) and incremented on every live call, resetting on the month boundary. A key with no monthly budget left is skipped just like one in per-minute cooldown — so the pool rotates off a key approaching its 1000/month cap, not only on a 429.
 
-**Setting up a pool** (one-time): run `--seed-credentials` to scrape every portal application's `name`/`key`/`client_id`/`client_secret` into `credentials.yaml`, then `--update-refresh-tokens --all` to authorize the newly-seeded entries. Adding more apps later repeats the same two steps.
+**Setting up a pool** (one-time): run `--seed-credentials` to scrape every portal application's `name`/`key`/`client_id`/`client_secret` into `credentials.yaml`, then `--update-refresh-tokens` to authorize the newly-seeded entries. Adding more apps later repeats the same two steps.
 
 ### Caching Strategy
 
-To respect these limits, the application combines disk caching with a sliding-window API Budget counter and a live-first serving policy:
+To respect these limits, the application combines disk caching with a live-first serving policy for current data:
 
 - **Automatic Disk Caching**: All API responses are cached as JSON files in the `cache/` directory.
-- **Live-First for Current Periods, Cached for Past Periods**:
-  - **Past Period Day / Month / Year / True-Up** — always served from Cache. The data is immutable; a live call would waste budget and return identical results.
-  - **Current Period queries** (today's Day Mode query, month-to-date, year-to-date, Current Period True-Up) — a live API call is made whenever budget allows. Cache is the fallback only when the budget is exhausted.
-- **Sliding-Window API Budget Counter**: Every live API response appends its timestamp to `cache/api_calls`. The available budget at any moment is `10 − count_of_timestamps_in_last_60s`. When budget reaches 0 the client falls back to cache (exact-URL match, then cross-endpoint same-system match at any age); if no cache exists, it short-circuits to the 429 "wait 60 seconds" message instead of issuing a guaranteed-failed call.
+- **Cached for Past Periods, Live for Current Periods**:
+  - **Past Period Day / Month / Year / True-Up** — served from Cache when an entry exists. The data is immutable; a live call would waste budget and return identical results.
+  - **Current Period queries** (today's Day Mode query, month-to-date, year-to-date, Current Period True-Up) — a live API call is made, because the data changes throughout the day.
+  - **`--no-cache`, Backfill Mode and `--verify-enphase-archive`** — always live; the cache is neither read nor trusted.
+- **Errors are never masked by stale cache.** A 429, 503 or network error on a live call is propagated. A 429 reaches the aggregator, which puts that credential in cooldown and retries the System on a spare credential from the pool; only when every credential has been tried does the System report a rate-limit error. If every credential has spent its monthly budget, the run stops with that message.
+- **Budget is the monthly count per credential** (`cache/monthly-quota.json`, see above). There is no per-minute counter: Enphase's 10/minute limit is handled reactively, through the 429 failover.
+- **Cache is not the audit trail.** It can be cleared (`--clear-cache`, `--clear-cache-date`, `--clear-all-cache`) or overwritten. Every live response is additionally kept untouched under `raw/` (see [Raw source archive](#raw-source-archive-raw)), which no cache command touches.
 - **Default Refresh Interval**: 1 hour (3600 seconds) — the default value for the `refresh_interval` config field (currently unused).
-- **429 / 503 Fallback**: If the API returns a rate-limit or service-unavailable error, any cached data is served — first an exact-URL match, then any prior cache for the same endpoint and system regardless of age. If no cache exists at all, the program surfaces the error to the user.
-
-### Cache File Format and Naming
-
-Cache files are stored in the `cache/` directory with the following structure:
-
-**File Naming Scheme:**
-- Each cached API response is stored as a JSON file
-- Filenames are SHA-256 hashes of the normalized API URL (including query parameters)
-- Format: `{hash}.json` where `{hash}` is a 64-character hexadecimal string
-- Example: `a1b2c3d4e5f6...{64 chars}.json`
-
-**Cache File Structure:**
-Each cache file contains:
-- `status_code`: HTTP status code from the API response
-- `headers`: HTTP response headers (as key-value pairs)
-- `body`: Raw API response body (JSON bytes)
-- `cached_at`: Timestamp when the response was cached (ISO 8601 format)
-- `queried_date`: The date that was queried (YYYY-MM-DD format), if applicable
-- `endpoint`: API endpoint (e.g. `telemetry/production_meter`, `energy_lifetime`), used for cross-date lookup when the API Budget is exhausted
-- `system_id`: System ID from the request URL, paired with `endpoint` for the cross-date lookup
-
-**API Budget Counter:**
-The cache directory also contains an `api_calls` file (no JSON extension) holding newline-separated RFC3339 timestamps of recent live API responses. Entries older than 60 seconds are pruned on each write. The remaining count is used to compute the available API Budget. The file is ignored by cache listing/clearing commands.
-
-**Cache Key Generation:**
-- Cache keys are generated from normalized API URLs
-- URLs are normalized to ensure consistent caching (timestamps converted to date strings)
-- The same API query will always produce the same cache key, regardless of when it's made
-
-**Cache Lookup:**
-- When making an API request, the application first checks for a cached response
-- If a cache file exists and is valid, the cached response is used (no API call)
-- For past dates, cached data is always preferred to avoid unnecessary API calls
-
-### Cache Management Commands
-
-```bash
-# Clear today's cache only (preserves data for past dates)
-./enphase-monitor --clear-cache
-
-# Clear cache for a specific past date (forces a re-fetch of that day)
-./enphase-monitor --clear-cache-date 2026-01-19
-
-# Clear all cached data
-./enphase-monitor --clear-all-cache
-
-# Disable caching (always make live API calls)
-./enphase-monitor --no-cache
-```
 
 ### Debug Mode
 
-The `--debug` flag prints a startup status line plus a trace of every cache/live decision to stderr:
+The `--debug` flag prints a startup status block plus a trace of every cache/live decision to stderr:
 
 ```bash
 ./enphase-monitor --debug
@@ -706,16 +730,14 @@ Sample output:
 ```
 [DEBUG] --- startup ---
 [DEBUG] current time : 2026-05-19 09:14:22 PDT
-[DEBUG] last API call: 09:13:55 PDT (27s ago)
-[DEBUG] rate window resets in: 33s
-[DEBUG] API budget   : 0/10 calls remaining
+[DEBUG] <credential pool monthly quota summary>
 [DEBUG] ---
 [DEBUG] serving cache (Past Period, age 6h12m0s): https://api.../energy_lifetime?...
-[DEBUG] budget exhausted (0/10), falling back to cache: https://api.../telemetry/production_meter?...
-[DEBUG] serving cache (budget exhausted, age 14m3s)
+[DEBUG] live API call: https://api.../telemetry/production_meter?...
+[DEBUG] live API call succeeded: https://api.../telemetry/production_meter?...
 ```
 
-Use it when you want to understand *why* a query returned cached vs live data, *when* the API Budget window will reset, or *how much* of the 10 calls/60s budget remains. Debug mode also: prints a `WARNING: Insufficient API budget` preflight message when the budget is low; and suppresses the screen-clearing escape sequence so the trace stays visible on subsequent runs.
+Use it when you want to understand *why* a query returned cached vs live data, or how much of each credential's monthly budget is spent. The API key never appears in the trace (URLs are redacted). Debug mode also suppresses the screen-clearing escape sequence so the trace stays visible on subsequent runs.
 
 ### Best Practices
 
@@ -757,15 +779,12 @@ enphase-monitor/
 │   │   ├── aggregator_test.go               # Aggregator tests with mock clients
 │   │   └── aggregator_bench_test.go         # Benchmark tests
 │   ├── api/                                 # HTTP client for Cloud API v4
-│   │   ├── client.go                        # Enlighten Cloud API client
+│   │   ├── client.go                        # Enlighten Cloud API client; archives each live response to raw/enphase; DayKWh for offline re-derivation
 │   │   ├── types.go                         # API request/response types
-│   │   ├── cache_check.go                   # Per-system/endpoint cache availability check
 │   │   ├── client_test.go                   # API client unit tests
-│   │   ├── client_caching_test.go           # Characterization tests for makeCachedAPIRequest fallback branches (validation/no-cache modes, 429/503/network-error cache fallbacks)
+│   │   ├── client_caching_test.go           # Characterization tests for makeCachedAPIRequest branches (no-cache mode, 429/503/network-error propagation)
 │   │   ├── client_functional_test.go        # Functional tests with mock HTTP servers
 │   │   ├── client_lifetime_test.go          # Lifetime Data tests (Month, Year, True-Up Mode queries)
-│   │   ├── preflight_test.go                # Budget-exhaustion cache-fallback tests (all 8 Query Mode × Period combinations)
-│   │   ├── query_cost_test.go               # QueryCost unit tests (all Query Mode × hasBattery combos)
 │   │   └── testmain_test.go                 # TestMain: redirects cache I/O to temp dir for all api tests
 │   ├── app/                                 # Application execution logic
 │   │   ├── setup.go                         # App initialization & configuration
@@ -777,18 +796,22 @@ enphase-monitor/
 │   │   ├── backfill.go                      # Backfill Mode: live per-day fetch over a date range into history/
 │   │   ├── backfill_test.go                 # Backfill range/skip/overwrite tests
 │   │   ├── weather.go                       # Best-effort weather enrichment for Day-Mode reports
-│   │   └── weather_test.go                  # Weather enrichment tests
+│   │   ├── weather_test.go                  # Weather enrichment tests
+│   │   ├── rawweather.go                    # HistoryDates, RefetchWeatherRaw, ApplyRawWeather (+ .weather-provenance.json sidecar)
+│   │   ├── rawweather_test.go               # Raw-weather, provenance, and offline Enphase-verification tests
+│   │   ├── verifyenphaseraw.go              # VerifyEnphaseRaw: re-derive each history day from raw/enphase (--verify-enphase-raw)
+│   │   └── verifyenphase.go                 # VerifyEnphaseArchive: one-day live archiving check (--verify-enphase-archive)
 │   ├── browser/                             # Headed Chrome launcher (chromedp) for portal automation
 │   │   ├── chrome.go                        # LaunchHeaded (disposable profile) + LaunchHeadedWithProfile (persistent profile)
 │   │   └── chrome_test.go                   # Chrome launcher tests
 │   ├── cache/                               # Disk-based response caching
-│   │   ├── cache.go                         # Cache implementation + sliding-window budget
-│   │   ├── cache_test.go                    # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
-│   │   ├── cache_functions_test.go          # Core caching tests (URL normalization, key generation, save/load, HasCacheForDate)
+│   │   ├── cache.go                         # Cache implementation (URL normalization, Past Period handling, endpoint/system tagging)
+│   │   ├── cache_test.go                    # Cache state management tests (CacheDisabled, ResetState)
+│   │   ├── cache_functions_test.go          # Core caching tests (URL normalization, key generation, save/load, ClearCacheForDate)
 │   │   ├── cli.go                           # Cache inspection utilities
 │   │   └── cli_test.go                      # CLI utilities tests
 │   ├── cli/                                 # Command-line interface
-│   │   ├── flags.go                         # CLI flag parsing
+│   │   ├── flags.go                         # CLI flag parsing, grouped --help, MaintenanceCommands/ValidateMaintenance
 │   │   ├── flags_test.go                    # Flag parsing tests
 │   │   ├── cache_commands.go                # Cache management commands
 │   │   └── cache_commands_test.go           # Cache commands tests
@@ -834,28 +857,31 @@ enphase-monitor/
 │   │   ├── browser_test.go                  # Browser-OAuth flow tests
 │   │   ├── oauth_functional_test.go         # Integration tests with mock servers
 │   │   └── oauth_edge_cases_test.go         # Edge case tests
-│   ├── pge/                                 # PG&E Share My Data (Green Button) integration
-│   │   ├── config.go                        # LoadConfig: compose from config.yaml + credentials.yaml pge: blocks
-│   │   ├── auth.go                          # OAuth2 authorize + token exchange (mTLS, Share My Data API)
-│   │   ├── pull.go                          # Pull: date-range fetch against Share My Data API (requires client cert)
-│   │   ├── browserpull.go                   # BrowserPull: Green Button download via headed Chrome session
-│   │   ├── espi.go                          # ParseReadings: ESPI XML → DayUsage intervals
+│   ├── pge/                                 # PG&E Green Button integration: browser download, ESPI decoding, sanity checks, raw-archive verification
+│   │   ├── doc.go                           # Package documentation: the PG&E data flow and the commands that reach it
+│   │   ├── browserpull.go                   # BrowserPull: Green Button download via headed Chrome session; archives the ZIP; ReprocessRaw (--pge-reprocess)
+│   │   ├── espi.go                          # ParseReadings (register selection, Wh scale), AggregateReadingsByDay (local-clock decoding, DST) → DayUsage intervals
+│   │   ├── sanity.go                        # CheckDays: write-time warnings (negative import, interval count, net vs Enphase)
+│   │   ├── verify.go                        # VerifyPGERaw: raw/pge hash check + re-derive and diff against history (--verify-pge-raw)
 │   │   ├── history.go                       # WriteHistory: aggregate DayUsage → pge-YYYY-MM-DD.json records
-│   │   ├── download.go                      # Download: HTTP helper for the Green Button XML file
-│   │   ├── login.go                         # PGE portal login via headed Chrome
-│   │   ├── autoform.go                      # Auto-fill date-range form on the PGE download page
-│   │   ├── cert.go                          # CertRenew: certbot DNS-01 via Enom API (no sudo)
-│   │   ├── dns.go                           # SetHostRecord: update Enom DNS TXT record for ACME challenge
-│   │   ├── enom.go                          # Enom reseller API client (SetHosts replaces whole zone)
-│   │   ├── autoform_test.go                 # Autoform field-fill tests
-│   │   ├── cert_test.go                     # CertRenew / certbot integration tests
-│   │   ├── download_test.go                 # Download HTTP helper tests
-│   │   ├── enom_test.go                     # Enom API client tests
-│   │   └── espi_test.go                     # ESPI XML parser tests
+│   │   ├── download.go                      # downloadGreenButton: drive the export form (autoform) and capture the new download by watching the download directory
+│   │   ├── login.go                         # openLoggedInSession: headed Chrome on a persistent profile; blocks until the user has signed in to PG&E
+│   │   ├── autoform.go                      # formDriver: auto-drive the Green Button export form inside PG&E's Visualforce iframe
+│   │   ├── autoform_test.go                 # Frame lookup and formDriver debug-buffer tests
+│   │   ├── download_test.go                 # Download-directory snapshot and completed-file detection tests
+│   │   ├── browserpull_test.go              # One-year export-range clamp and raw-archive naming tests
+│   │   ├── espi_test.go                     # ESPI parser/aggregation tests on real redacted feeds (registers, clock, DST days), CheckDays
+│   │   ├── verify_test.go                   # VerifyPGERaw round-trip: clean, edited record, tampered raw file; archive ordering by fetch time
+│   │   └── testdata/                        # Real PG&E exports with identifiers removed (2025-11-08, 2026-03-08, 2025-11-02)
 │   ├── parser/                              # JSON telemetry parsing
 │   │   ├── parser.go                        # Response parsing utilities
 │   │   ├── parser_test.go                   # Parser tests
 │   │   └── parser_bench_test.go             # Benchmark tests
+│   ├── rawstore/                            # Raw source archive: raw/<source>/ files + raw/manifest.jsonl (SHA-256)
+│   │   ├── rawstore.go                      # Save, Record, RedactURL; disabled unless rawstore.Dir is set
+│   │   ├── importcache.go                   # ImportEnphaseCache: copy cache/ bodies into raw/enphase (--raw-import-cache)
+│   │   ├── verify.go                        # VerifySource, manifest readers, VerifyEntry, PrintReport
+│   │   └── rawstore_test.go                 # Save/manifest, import idempotence, verification tests
 │   ├── timezone/                            # Timezone handling
 │   │   ├── timezone.go                      # Timezone utilities
 │   │   └── timezone_test.go                 # Timezone tests
@@ -864,12 +890,8 @@ enphase-monitor/
 │   ├── urlbuilder/                          # API URL construction
 │   │   ├── urlbuilder.go                    # URL building helpers
 │   │   └── urlbuilder_test.go               # URL builder tests
-│   ├── validation/                          # Metrics validation logic (tolerance-based checks)
-│   │   ├── validation.go                    # Metrics validation logic (uses io.Writer for testability)
-│   │   ├── validation_test.go               # Unit tests (tolerance calculations, edge cases)
-│   │   └── validation_integration_test.go   # Integration tests (real expected values)
 │   └── weather/                             # Open-Meteo daily/current weather client
-│       ├── weather.go                       # DailyWeather/CurrentWeather fetch + WMO code mapping
+│       ├── weather.go                       # DailyWeather/CurrentWeather fetch + WMO mapping; archives live payloads to raw/weather; ParseDailyPayload; BypassCache
 │       └── weather_test.go                  # Weather client tests
 ├── docs/                                    # Project documentation
 │   ├── ARCHITECTURE.md                      # Architecture documentation
@@ -880,19 +902,21 @@ enphase-monitor/
 │   └── adr/                                 # Architecture Decision Records
 │       ├── 0001-true-up-window-end-date.md  # ADR for the True-Up Window end-date rule
 │       └── 0002-init-guard-requires-weather-init.md  # ADR: report modes require --init (weather)
-├── test-data/                               # Test validation data
-│   └── enphase_api_*.json                   # Expected values for validation
+├── test-data/                               # Recorded fixtures for the geocode and location tests
+│   ├── zippopotam_api_*.json                # Zippopotam.us responses
+│   └── enphase_systems.json                 # Recorded systems response
 ├── config.yaml.example                      # Example non-secret configuration (systems, colors, etc.)
 ├── config.yaml                              # Your actual configuration (create from example)
 ├── credentials.yaml.example                 # Example credentials (credentials: list)
 ├── credentials.yaml                         # Your actual API secrets (create from example; gitignored)
-├── cache/                                   # Cached API responses (created at runtime)
-├── history/                                 # Per-day energy+weather and utility-meter JSON records (created by range pull and PG&E pull)
+├── cache/                                   # Cached API responses (created at runtime; clearable)
+├── raw/                                     # Untouched source responses + manifest.jsonl (created at runtime; gitignored — holds account data)
+├── history/                                 # Per-day energy+weather and utility-meter JSON records (created by range pull and PG&E pull), plus dotfile sidecars (.<prefix>-index.json, .weather-provenance.json)
+├── tmp/                                     # Scratch downloads (PG&E ZIP/XML before extraction); gitignored
 ├── weather_codes.json                       # WMO weather-code legend (written by --init)
 ├── go.mod                                   # Go module definition
 ├── go.sum                                   # Go module checksums
 ├── scripts/                                 # Utility scripts
-│   ├── run-tests.sh                         # Test runner script
 │   ├── migrate-history-layout.sh            # One-time migration: renames plain <date>.json records to enphase-<date>.json
 │   └── history.py                           # Git history inspection helper
 ├── Makefile                                 # Build automation
@@ -903,35 +927,35 @@ enphase-monitor/
 
 ## Testing
 
-The project includes a comprehensive test suite with **49.2% code coverage** across all packages. The test suite validates both functionality and metrics against expected values, enabling rapid iteration without exhausting the API Budget.
+The project includes a comprehensive test suite with **56.7% code coverage** across all packages. Tests run against mock servers, recorded fixtures and real redacted PG&E exports, so the suite never spends API Budget.
 
 ### Test Coverage by Package
 
 | Package | Coverage | Status |
 |---------|----------|--------|
 | urlbuilder | 100.0% | ✅ |
-| display | 98.7% | ✅ |
-| validation | 95.5% | ✅ |
+| display | 99.3% | ✅ |
+| cli | 96.5% | ✅ |
 | parser | 94.8% | ✅ |
 | timezone | 92.7% | ✅ |
-| cli | 91.9% | ✅ |
 | aggregator | 89.2% | ✅ |
-| weather | 88.2% | ✅ |
+| weather | 88.5% | ✅ |
 | credentials | 85.0% | ✅ |
 | config | 84.5% | ✅ |
 | history | 82.6% | ✅ |
+| api | 81.9% | ✅ |
 | geocode | 81.5% | ✅ |
-| location | 79.7% | ✅ |
-| api | 72.2% | ✅ |
+| location | 81.0% | ✅ |
+| cache | 74.8% | ✅ |
 | constants | 72.7% | ✅ |
-| cache | 68.9% | ✅ |
+| rawstore | 70.4% | ✅ |
 | oauth | 61.7% | ✅ |
-| app | 49.4% | ⚠️ |
+| app | 52.5% | ⚠️ |
+| pge | 37.4% | ⚠️ |
 | browser | 16.3% | ⚠️ |
 | enphase | 14.3% | ⚠️ |
-| pge | 9.8% | ⚠️ |
 
-**Total: 49.2% coverage** (the low-coverage packages are headed-Chrome/portal-scraping glue and the `pge` package — `app` orchestration is exercised via the api-package integration tests, while `browser`, `enphase`, and the `pge` browser-pull path drive a real Chrome session and are verified manually)
+**Total: 56.7% coverage** (the low-coverage packages are headed-Chrome/portal-scraping glue — `app` orchestration of the live paths is exercised via the api-package integration tests, while `browser`, `enphase`, and the `pge` browser-pull path drive a real Chrome session and are verified manually. The `pge` ESPI decoding, aggregation, sanity checks and raw-archive verification are unit-tested against real redacted feeds.)
 
 ### Running Tests
 
@@ -961,44 +985,6 @@ make lint
 
 CI is not yet configured. Run `make lint` and `go test ./...` locally before committing.
 
-### Expected Values Format
-
-The expected values JSON file should have this structure:
-
-```json
-{
-  "date": "2026-01-20",
-  "systems": [
-    {
-      "id": "5525881",
-      "name": "Right Subpanel",
-      "expected": {
-        "grid_import": 23.4,
-        "grid_export": 3.9,
-        "production": 14.6,
-        "battery_discharged": 6.8,
-        "battery_charged": 8.6,
-        "net_flow": 19.6,
-        "consumption": 32.3
-      }
-    }
-  ]
-}
-```
-
-### Validation Tolerance
-
-The validation function compares actual vs expected values with a tolerance of **±10% of the expected value**, with a minimum tolerance of **0.1 kWh** for small values. This means:
-- For large values (e.g., 20 kWh): tolerance is ±2.0 kWh (10%)
-- For small values (e.g., 0.5 kWh): tolerance is ±0.1 kWh (minimum)
-
-Metrics that differ by more than the calculated tolerance will be marked as failed (❌). The validation report shows:
-- Expected value
-- Actual value
-- Difference
-- Percentage difference
-- Pass/fail status
-
 ## Performance
 
 The codebase includes comprehensive benchmarks for performance-critical paths. Run benchmarks with:
@@ -1018,14 +1004,14 @@ go test -bench=. -benchmem -cpuprofile=cpu.prof ./internal/...
 - **API Response Caching**: Reduces redundant API calls and respects the API Budget
 - **Efficient JSON Parsing**: Optimized for 96 intervals/day (15-min intervals)
 - **Multi-System Aggregation**: Scales linearly with number of systems
-- **Minimal Dependencies**: Only 1 external library (gopkg.in/yaml.v3 for config); all HTTP and I/O uses the standard library
+- **Minimal Dependencies**: Only 3 direct external libraries (gopkg.in/yaml.v3 for config; chromedp + cdproto for portal automation); all HTTP and I/O uses the standard library
 
 ## Code Quality
 
 This project follows Go best practices and coding standards:
 
-- **Test Coverage**: 49.2% overall, 100% for urlbuilder, 99% for display, 95%+ for validation and parser, 90%+ for timezone, cli, and aggregator (the headed-Chrome `browser`/`enphase` portal-scraping packages and the `pge` browser-pull path are verified manually and pull the average down)
-- **Test Suite**: 47 test files across 21 tested packages with comprehensive unit, integration, and edge case tests
+- **Test Coverage**: 56.7% overall, 100% for urlbuilder, 99% for display, 95%+ for cli and parser, 90%+ for timezone, 89% for aggregator (the headed-Chrome `browser`/`enphase` portal-scraping packages and the `pge` browser-pull path are verified manually and pull the average down)
+- **Test Suite**: 47 test files across 21 tested packages with comprehensive unit, functional, and edge case tests
 - **Go Modules**: Proper dependency management with go.mod/go.sum
 - **Error Handling**: Comprehensive error wrapping with context
 - **Documentation**: Extensive inline comments and dedicated guides
@@ -1034,10 +1020,10 @@ This project follows Go best practices and coding standards:
 - **Performance**: Benchmarks included for hot paths
 
 **Code Metrics:**
-- Total Lines: ~11,900 (excluding tests)
-- Test Lines: ~12,200 (comprehensive test suite)
+- Total Lines: ~12,100 (excluding tests)
+- Test Lines: ~11,200 (comprehensive test suite)
 - Packages: 22 internal packages (21 with tests; `types` is a pure type-definition package)
-- Test Files: 47 (unit, integration, functional, edge case, and benchmark tests)
+- Test Files: 47 (unit, functional, edge case, and benchmark tests)
 - External Dependencies: 3 (gopkg.in/yaml.v3 and github.com/chromedp/chromedp + cdproto for portal automation)
 
 ## License

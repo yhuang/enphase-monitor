@@ -17,7 +17,6 @@
 //   - Energy conversion (WhToKWh)
 //   - Telemetry field names (API JSON field constants)
 //   - Battery formatting (BatterySOCPercentSuffix)
-//   - Validation tolerances and thresholds
 //   - Response parsing (ResponseBodyPreviewLength)
 //   - Color conversion (ANSI color cube constants, hex parsing)
 //   - Timezone (UTCTimezone, FallbackTimezone)
@@ -28,7 +27,7 @@
 // When adding new constants:
 //  1. Group them logically with related constants
 //  2. Add descriptive comments explaining purpose and usage
-//  3. Use descriptive names (e.g., ValidationTolerancePercent, not just Tolerance)
+//  3. Use descriptive names (e.g., ResponseBodyPreviewLength, not just Length)
 //  4. Consider if the constant should be configurable (move to config.yaml if so)
 package constants
 
@@ -146,18 +145,6 @@ const (
 const (
 	// BatterySOCPercentSuffix is the suffix used in SOC strings (e.g., "97%")
 	BatterySOCPercentSuffix = "%"
-)
-
-// Validation constants
-const (
-	// ValidationTolerancePercent is the acceptable deviation (10%)
-	ValidationTolerancePercent = 0.10
-	// ValidationMinToleranceKWh is the minimum tolerance for small values
-	ValidationMinToleranceKWh = 0.1
-	// ValidationPercentThreshold is the threshold below which percentage is shown as 0%
-	ValidationPercentThreshold = 0.5
-	// ValidationInfinitePercent is used for undefined percentage (when expected is 0)
-	ValidationInfinitePercent = 999.9
 )
 
 // Response parsing constants

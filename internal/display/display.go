@@ -73,12 +73,6 @@ func NewDisplayWithWriter(colors config.ColorConfig, tz *time.Location, w io.Wri
 	}
 }
 
-// ClearScreen clears the terminal screen by writing the ANSI clear-screen sequence
-// to the display writer.
-func (d *Display) ClearScreen() {
-	fmt.Fprint(d.writer, "\033[H\033[2J")
-}
-
 // ShowMetrics displays the aggregated metrics in a formatted output.
 func (d *Display) ShowMetrics(metrics *aggregator.AggregatedMetrics) {
 	d.printHeader(metrics)
@@ -127,8 +121,8 @@ func (d *Display) printHeader(metrics *aggregator.AggregatedMetrics) {
 // independent of the configurable PrimaryText color, per report styling.
 const weatherValueColor = "\033[38;2;255;255;255m"
 
-// printWeather renders the three-line weather block (temperature range,
-// conditions, and solar irradiance) within the COMBINED ENERGY REPORT, aligned
+// printWeather renders the four-line weather block (conditions, temperature
+// range, relative humidity, and solar irradiance) within the COMBINED ENERGY REPORT, aligned
 // with the energy metrics above it (indent 4, label column 22). Data values are
 // white.
 func (d *Display) printWeather(w *aggregator.DailyWeather) {
@@ -148,12 +142,14 @@ func (d *Display) printWeather(w *aggregator.DailyWeather) {
 		// Live today report: present conditions now, plus the day's range.
 		row("Conditions", fmt.Sprintf("%s · %.0f%% cloud · %.1f mm", w.CurrentCondition, w.CurrentCloudCoverPct, w.CurrentPrecipitationMM))
 		row("Temperature", fmt.Sprintf("%.0f%s now · %.0f%s — %.0f%s", w.CurrentTemp, w.TempUnit, w.TempLow, w.TempUnit, w.TempHigh, w.TempUnit))
+		row("Humidity", fmt.Sprintf("%.0f%% — %.0f%% · %.0f%% mean", w.HumidityMinPct, w.HumidityMaxPct, w.HumidityPct))
 		row("Irradiance", fmt.Sprintf("%.1f kWh/m² forecasted", w.SolarRadiation))
 		return
 	}
 	// Past-date report: whole-day aggregates.
 	row("Conditions", fmt.Sprintf("%s · %.0f%% cloud · %.1f mm", w.Condition, w.CloudCoverPct, w.PrecipitationMM))
 	row("Temperature", fmt.Sprintf("%.0f%s — %.0f%s", w.TempLow, w.TempUnit, w.TempHigh, w.TempUnit))
+	row("Humidity", fmt.Sprintf("%.0f%% — %.0f%% · %.0f%% mean", w.HumidityMinPct, w.HumidityMaxPct, w.HumidityPct))
 	row("Irradiance", fmt.Sprintf("%.1f kWh/m²", w.SolarRadiation))
 }
 

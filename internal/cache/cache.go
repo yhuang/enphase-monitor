@@ -13,12 +13,13 @@
 // ------------
 // The caching system:
 //   - Stores API responses on disk for reuse
-//   - Supports Validation Mode (--test flag) and Cached Mode (--cache flag)
+//   - Supports a disabled mode (SetCacheDisabled: --no-cache and Backfill Mode always
+//     go live and never read the cache)
 //   - Exposes inspection and clear-cache helpers (cli.go) used by --clear-cache, --clear-cache-date, and --clear-all-cache
 //   - Handles past date queries with cache fallback
 //   - Normalizes URLs for consistent cache keys (timestamps → dates)
-//   - Tags each cache entry with its endpoint + system ID so the API client can
-//     find the most recent cache for a given endpoint when budget is exhausted
+//   - Tags each cache entry with its endpoint + system ID (ExtractEndpointAndSystemID),
+//     which identifies an entry without parsing its body (--raw-import-cache relies on it)
 //
 // Per-credential API budget tracking lives in internal/credentials (pool quota).
 package cache
@@ -28,7 +29,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -85,20 +85,9 @@ func RedactURLKey(rawURL string) string {
 // These flags are set once at startup before any concurrent operations begin,
 // so no mutex protection is needed.
 var (
-	validationMode bool
-	cacheDisabled  bool
-	debugMode      bool
+	cacheDisabled bool
+	debugMode     bool
 )
-
-// ValidationMode returns whether Validation Mode is enabled.
-func ValidationMode() bool {
-	return validationMode
-}
-
-// SetValidationMode enables or disables Validation Mode.
-func SetValidationMode(enabled bool) {
-	validationMode = enabled
-}
 
 // CacheDisabled returns whether cache is disabled.
 //
@@ -111,9 +100,6 @@ func CacheDisabled() bool {
 func SetCacheDisabled(disabled bool) {
 	cacheDisabled = disabled
 }
-
-// DebugMode returns whether debug mode is enabled.
-func DebugMode() bool { return debugMode }
 
 // SetDebugMode enables or disables debug output.
 func SetDebugMode(enabled bool) { debugMode = enabled }
@@ -129,17 +115,8 @@ func Debugf(format string, args ...any) {
 // ResetState resets all cache state flags to their default values. Primarily
 // used for testing to ensure clean state between tests.
 func ResetState() {
-	validationMode = false
 	cacheDisabled = false
 	debugMode = false
-}
-
-// cachedResponseMeta holds only the lookup fields of a CachedResponse.
-// Used by FindMostRecentByEndpoint to scan files without allocating response bodies.
-type cachedResponseMeta struct {
-	CachedAt time.Time `json:"cached_at"`
-	Endpoint string    `json:"endpoint,omitempty"`
-	SystemID string    `json:"system_id,omitempty"`
 }
 
 // CachedResponse stores a cached API response
@@ -213,6 +190,13 @@ func NormalizeURLForCache(urlStr string, tz *time.Location) string {
 	return parsedURL.String()
 }
 
+// QueriedDateFromURL returns the calendar date (YYYY-MM-DD in tz) an Enphase API
+// URL asks for, or "" when it names none. It is what the cache records as the
+// entry's queried_date.
+func QueriedDateFromURL(urlStr string, tz *time.Location) string {
+	return extractQueriedDateFromURL(urlStr, tz)
+}
+
 // extractQueriedDateFromURL extracts the queried date from a URL
 // This is the date that was queried, not the API's start_date field
 func extractQueriedDateFromURL(urlStr string, tz *time.Location) string {
@@ -260,73 +244,6 @@ func ExtractEndpointAndSystemID(rawURL string) (endpoint, systemID string) {
 		}
 	}
 	return "", ""
-}
-
-// MaxCurrentDayCacheAge bounds how stale a today's-day-query cache may be
-// before we treat it as expired. Today's numbers change throughout the day,
-// so a stale cache would mislead the user about current production /
-// consumption.
-const MaxCurrentDayCacheAge = 1 * time.Hour
-
-// MaxCurrentPeriodCacheAge bounds how stale a current-period cache may be
-// for month-to-date / year-to-date / current-true-up-year queries. These
-// totals are large cumulative numbers where a one-day delay in the refresh
-// is acceptable but a multi-day delay would be misleading.
-//
-// Past Periods (already-ended Day / Month / Year / True-Up) never
-// expire and are served regardless of age — see client.cacheMaxAge.
-const MaxCurrentPeriodCacheAge = 24 * time.Hour
-
-// FindMostRecentByEndpoint scans the cache directory for entries matching the
-// given endpoint and system ID and returns the one with the latest CachedAt.
-// Returns nil and an error if no matching entry exists. Entries cached before
-// the Endpoint/SystemID fields were introduced are skipped.
-//
-// If maxAge > 0, entries older than time.Now() - maxAge are filtered out.
-// Pass 0 to accept entries of any age.
-func FindMostRecentByEndpoint(endpoint, systemID string, maxAge time.Duration) (*CachedResponse, error) {
-	if endpoint == "" || systemID == "" {
-		return nil, errors.New("endpoint and systemID required")
-	}
-	dir := getCacheDir()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	// First pass: read only metadata (no body) to find the best matching path.
-	var bestPath string
-	var bestCachedAt time.Time
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), constants.JSONExtension) {
-			continue
-		}
-		path := filepath.Join(dir, entry.Name())
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		var meta cachedResponseMeta
-		if err := json.Unmarshal(data, &meta); err != nil {
-			continue
-		}
-		if meta.Endpoint != endpoint || meta.SystemID != systemID {
-			continue
-		}
-		if maxAge > 0 && time.Since(meta.CachedAt) > maxAge {
-			continue
-		}
-		if bestPath == "" || meta.CachedAt.After(bestCachedAt) {
-			bestPath = path
-			bestCachedAt = meta.CachedAt
-		}
-	}
-	if bestPath == "" {
-		return nil, fmt.Errorf("no cache entry found for endpoint=%s system=%s", endpoint, systemID)
-	}
-
-	// Second pass: full load only for the winner.
-	return LoadCachedResponseByPath(bestPath)
 }
 
 // GetCachePath returns the file path for a cached response
@@ -437,21 +354,6 @@ func forEachCacheEntry(fn func(path string, cached *CachedResponse) bool) error 
 	}
 
 	return nil
-}
-
-// HasCacheForDate checks if any cached responses exist for the specified date.
-// Returns true if at least one cache file exists with a matching queried_date.
-// This is used to validate that --test mode has data available before running.
-func HasCacheForDate(targetDate string) (bool, error) {
-	var found bool
-	err := forEachCacheEntry(func(_ string, cached *CachedResponse) bool {
-		if cached.QueriedDate == targetDate {
-			found = true
-			return false // stop on first match
-		}
-		return true
-	})
-	return found, err
 }
 
 // GetCacheDir returns the cache directory path for external use (e.g., error messages).

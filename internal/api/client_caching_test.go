@@ -14,8 +14,8 @@ import (
 )
 
 // These are characterization tests: they pin down the CURRENT behavior of
-// makeCachedAPIRequest's fallback branches (validation mode, no-cache mode,
-// and the 429/503/network-error → cache fallbacks in the normal path) so a
+// makeCachedAPIRequest's branches (no-cache mode, and the 429/503/network-error
+// paths, which propagate the error rather than serving stale cache) so a
 // refactor of that function can be verified to preserve behavior. They are
 // intentionally driven through the public Get*ForDate API.
 //
@@ -23,7 +23,7 @@ import (
 // base URL, hence one stable cache key) whose status code can be flipped
 // between calls. That lets a test populate the cache with a 200 response and
 // then force a 429/503 against the *same* URL, reaching the with-cache
-// fallback branches that separate-server tests cannot.
+// branches that separate-server tests cannot.
 
 // prodOKBody is a production_meter day response summing to 1.5005 kWh.
 const prodOKBody = `{"intervals":[{"end_at":1737676800,"wh_del":1500.5,"enwh":1500.5}]}`
@@ -68,59 +68,6 @@ func newProdClient(t *testing.T, baseURL string) *EnlightenCloudClient {
 // fetchToday issues a today (current-period) production day query.
 func fetchToday(client *EnlightenCloudClient) (float64, error) {
 	return client.GetProductionForDate(context.Background(), time.Time{}, constants.QueryModeDay)
-}
-
-// --- Validation mode ----------------------------------------------------------
-
-// TestMakeCachedAPIRequest_ValidationMode_CacheHit: with validation mode on and
-// a populated cache, the request is served from cache (no live call).
-func TestMakeCachedAPIRequest_ValidationMode_CacheHit(t *testing.T) {
-	cache.ResetState()
-	defer cache.ResetState()
-
-	srv := newSwitchableServer()
-	defer srv.Close()
-	client := newProdClient(t, srv.URL)
-
-	// Populate cache with a live 200 response.
-	if _, err := fetchToday(client); err != nil {
-		t.Fatalf("populate: unexpected error: %v", err)
-	}
-
-	// Turn on validation mode and point the server at 500 to prove it is never called.
-	cache.SetValidationMode(true)
-	defer cache.SetValidationMode(false)
-	srv.setStatus(http.StatusInternalServerError)
-
-	got, err := fetchToday(client)
-	if err != nil {
-		t.Fatalf("validation-mode cache hit: unexpected error: %v", err)
-	}
-	if got != prodOKValueKWh {
-		t.Errorf("validation-mode cache hit: got %v kWh, want %v", got, prodOKValueKWh)
-	}
-}
-
-// TestMakeCachedAPIRequest_ValidationMode_CacheMiss: with validation mode on and
-// no cache, a descriptive error is returned and no live call is made.
-func TestMakeCachedAPIRequest_ValidationMode_CacheMiss(t *testing.T) {
-	cache.ResetState()
-	defer cache.ResetState()
-
-	srv := newSwitchableServer()
-	defer srv.Close()
-	client := newProdClient(t, srv.URL)
-
-	cache.SetValidationMode(true)
-	defer cache.SetValidationMode(false)
-
-	_, err := fetchToday(client)
-	if err == nil {
-		t.Fatal("validation-mode cache miss: want error, got nil")
-	}
-	if !strings.Contains(err.Error(), "validation mode") {
-		t.Errorf("validation-mode cache miss: error = %v, want it to mention validation mode", err)
-	}
 }
 
 // --- No-cache mode (--no-cache) -----------------------------------------------

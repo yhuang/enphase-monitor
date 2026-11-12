@@ -21,3 +21,8 @@ weather_codes.json
 
 *bak
 **/*bak
+# raw source downloads (account data)
+raw/
+
+# analysis-session outputs (CSVs derived from account data)
+Claude outputs/

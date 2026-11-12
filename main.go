@@ -24,6 +24,11 @@
 //   - Intelligent Caching: Disk-based caching to stay within the API Budget (1000 calls/month per key)
 //   - Past Period Queries: Query any past date with --date flag
 //   - Color Customization: Customize terminal output colors via config.yaml
+//   - Backfill and Weather: --start-date builds per-day Enphase + PG&E + Open-Meteo
+//     History Records in history/
+//   - Raw Source Archive: every source response (Enphase API, Open-Meteo, PG&E
+//     Green Button) is also kept untouched under raw/ with a SHA-256 manifest, and
+//     offline --verify-*-raw commands re-derive history/ from it at any time
 //
 // ARCHITECTURE
 // ------------
@@ -38,9 +43,16 @@
 //	- trueup.go: True-Up Mode report via single-batch Lifetime Data query and report conversion
 //	- backfill.go: Backfill Mode — live per-day fetch over a date range, writing History Records into history/
 //	- weather.go: Best-effort weather enrichment for Day-Mode reports
+//	- rawweather.go: Raw-weather maintenance — HistoryDates, RefetchWeatherRaw (--raw-refetch-weather),
+//	  ApplyRawWeather (--raw-apply-weather, with the history/.weather-provenance.json sidecar)
+//	- verifyenphaseraw.go: VerifyEnphaseRaw (--verify-enphase-raw), the offline re-derivation of every
+//	  history/enphase-*.json day from the archived API responses
+//	- verifyenphase.go: VerifyEnphaseArchive (--verify-enphase-archive), the one live check (about 10 API calls)
+//	  that Enphase raw archiving works and that a fresh fetch reproduces the stored record
 //
 //	CLI Layer (internal/cli):
-//	- flags.go: Command-line flag parsing and definitions
+//	- flags.go: Command-line flag parsing and definitions, the grouped --help, and ValidateMaintenance
+//	  (at most one maintenance command; only the raw weather ones take a date range)
 //	- cache_commands.go: Cache management command handlers
 //
 //	Authentication (internal/oauth):
@@ -53,13 +65,14 @@
 //	- types.go: Metric data structures (AggregatedMetrics, SystemMetrics)
 //
 //	API Communication (internal/api):
-//	- client.go: HTTP client for Enlighten Cloud API v4, handles all API requests
+//	- client.go: HTTP client for Enlighten Cloud API v4, handles all API requests; also archives
+//	  every live response via internal/rawstore and exposes DayKWh, the day-endpoint parser the
+//	  offline Enphase verification reuses
 //	- types.go: API request/response types
-//	- cache_check.go: Preflight per-system/endpoint cache-availability probe
 //
 //	Supporting Services:
 //	- internal/browser: Headed Chrome launcher (chromedp) with a disposable profile, for portal automation
-//	- internal/cache: Disk-based response caching with URL normalization and the sliding-window API Budget counter
+//	- internal/cache: Disk-based response caching with URL normalization, Past Period handling, and endpoint/system tagging (per-credential API Budget lives in internal/credentials)
 //	- internal/config: YAML configuration loading, validation, color conversion
 //	- internal/constants: Application-wide constants (ANSI codes, error messages, QueryMode enum, etc.)
 //	- internal/credentials: Credential pool — least-used-first spread, 429 failover, and per-key monthly API budget (--seed-credentials, --refresh-quota)
@@ -69,17 +82,28 @@
 //	- internal/history: Per-day energy+weather History Record schema and JSON writer (history/); Dataset type governs prefixed filenames (enphase-<date>.json, pge-<date>.json)
 //	- internal/location: Resolves and caches the systems' coordinates for weather (populated by --init)
 //	- internal/parser: JSON telemetry response parsing (Interval Data and Lifetime Data shapes)
-//	- internal/pge: PG&E Share My Data (Green Button) integration — OAuth mTLS pull (pull.go), headed-Chrome browser download (browserpull.go), ESPI XML parsing (espi.go), cert renewal via Enom DNS-01 (cert.go, dns.go, enom.go), history writer (history.go)
+//	- internal/pge: PG&E Green Button integration — headed-Chrome browser download
+//	  (browserpull.go, login.go, download.go, autoform.go) that archives the original ZIP and can rebuild history from it
+//	  offline (ReprocessRaw), ESPI XML parsing (espi.go: register selection, local-clock decoding, Wh scale), write-time
+//	  sanity warnings (sanity.go), raw-archive verification (verify.go), history writer (history.go)
+//	- internal/rawstore: Raw source archive under raw/<source>/ with a SHA-256 manifest (raw/manifest.jsonl) — Save/Record,
+//	  ImportEnphaseCache, VerifySource and the manifest readers; disabled unless rawstore.Dir is set
 //	- internal/timezone: Timezone handling, Past Period detection, and date boundary calculations
 //	- internal/types: Shared type definitions (SystemConfig, APIConfig) that break circular dependencies
 //	- internal/urlbuilder: API URL construction with proper date ranges
-//	- internal/validation: Metric validation helpers (tolerance-based comparison)
 //	- internal/weather: Open-Meteo daily/current weather client with WMO code mapping
 //
 // EXECUTION FLOW
 // --------------
-//  1. Parse CLI flags via internal/cli (--date, --no-cache, --debug, etc.)
-//  2. Handle cache commands via internal/cli if requested
+//  1. Parse CLI flags via internal/cli (--date, --no-cache, --debug, etc.) and enable the
+//     raw archive (rawstore.Dir = "raw") so every live response is kept
+//  2. Handle cache commands via internal/cli if requested, then validate the maintenance
+//     commands (flags.ValidateMaintenance)
+//     Commands that need no Enphase config or credentials dispatch here, before either
+//     is loaded, and exit. Offline: --raw-import-cache, --verify-pge-raw,
+//     --verify-enphase-raw, --verify-weather-raw, --raw-apply-weather, --pge-reprocess.
+//     Network but credential-free: --raw-refetch-weather (Open-Meteo; needs the location
+//     cached by --init) and the standalone --pge-web-only pull (PG&E browser download)
 //  3. Load and validate config.yaml via internal/config
 //  4. Handle OAuth setup via internal/oauth if requested
 //  5. Create DataAggregator with OAuth adapter from internal/app
@@ -87,7 +111,9 @@
 //  7. Enforce the init guard: every report mode requires a prior --init (cached
 //     location); cache-management and --update-refresh-tokens are exempt.
 //  8. Configure cache/debug modes via internal/app
-//  9. Dispatch to one of three run paths and exit:
+//  9. Dispatch to one of three run paths and exit (--verify-enphase-archive, the one
+//     maintenance command that spends API quota, runs just before these, after the
+//     init guard, and never writes history/):
 //     a. If --start-date: call app.RunBackfill (live per-day fetch over a date range into history/) and exit.
 //     b. Else if --true-up: call app.RunTrueUp (single-batch lifetime query, no battery) and exit.
 //     c. Otherwise, run the standard execution mode:
@@ -123,6 +149,7 @@ import (
 	"enphase-monitor/internal/location"
 	"enphase-monitor/internal/oauth"
 	"enphase-monitor/internal/pge"
+	"enphase-monitor/internal/rawstore"
 	"enphase-monitor/internal/timezone"
 	"enphase-monitor/internal/weather"
 )
@@ -131,9 +158,16 @@ import (
 // be committed (downloaded PG&E XML, etc.). Excluded from version control via .gitignore.
 const tmpDir = "tmp"
 
+// rawDir holds untouched source downloads (one subdirectory per source) kept so
+// processing can be re-verified later. Gitignored: it contains account data.
+const rawDir = "raw"
+
 func main() {
 	// Parse command-line flags
 	flags := cli.ParseFlags()
+
+	// Keep an untouched copy of every source response under raw/ (see rawstore).
+	rawstore.Dir = rawDir
 
 	// The cache-clearing commands are mutually exclusive; reject ambiguous
 	// combinations rather than silently running whichever is checked first.
@@ -152,6 +186,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Maintenance commands (raw archive, reprocess, verify): at most one, and only
+	// the raw weather ones take a date range.
+	if err := flags.ValidateMaintenance(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Source-flag mutual exclusivity.
 	if flags.PGEWebOnly && flags.EnphaseAPIOnly {
 		fmt.Fprintln(os.Stderr, "Error: --pge-web-only and --enphase-api-only are mutually exclusive")
@@ -164,8 +205,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// --end-date is only meaningful with --start-date.
-	if flags.EndDate != "" && flags.StartDate == "" {
+	// --end-date is only meaningful with --start-date, except for the raw weather
+	// commands, where either bound of the optional range may be given alone.
+	if flags.EndDate != "" && flags.StartDate == "" && !flags.RawRefetchWeather && !flags.RawApplyWeather {
 		fmt.Fprintln(os.Stderr, "Error: --end-date requires --start-date")
 		os.Exit(1)
 	}
@@ -207,6 +249,82 @@ func main() {
 		return
 	}
 
+	// --raw-import-cache: copy raw Enphase responses from cache/ into raw/; offline.
+	if flags.RawImportCache {
+		res, err := rawstore.ImportEnphaseCache(cache.GetCacheDir())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: raw import failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Raw import complete: %d imported, %d already present, %d cache files skipped (not Enphase responses). Archive: %s\n",
+			res.Imported, res.Existing, res.Skipped, filepath.Join(rawDir, "enphase"))
+		return
+	}
+
+	// --verify-pge-raw: offline integrity check of raw/pge against history.
+	if flags.VerifyPGERaw {
+		res, err := pge.VerifyPGERaw(filepath.Join(rawDir, "pge"), app.HistoryDir, pgeTimezone(flags.ConfigFile), os.Stdout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: PG&E raw verification failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("PG&E raw verification: %d archive(s) re-derived, %d day(s) compared: %d identical, %d differ, %d missing from history.\n",
+			res.Archives, res.Days, res.Identical, len(res.Differ), len(res.NoRecord))
+		if !res.OK() {
+			os.Exit(1)
+		}
+		fmt.Println("OK")
+		return
+	}
+
+	// --verify-enphase-raw: offline integrity check of raw/enphase against history.
+	if flags.VerifyEnphaseRaw {
+		res, err := app.VerifyEnphaseRaw(app.HistoryDir, os.Stdout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Enphase raw verification failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Enphase raw verification: %d day(s) examined: %d reproduced from raw, %d mismatched value(s), %d with missing raw.\n",
+			res.Days, res.Complete, len(res.Mismatches), len(res.NoRaw))
+		if !res.OK() {
+			os.Exit(1)
+		}
+		fmt.Println("OK")
+		return
+	}
+
+	// --verify-weather-raw: offline integrity check of raw/weather against history.
+	if flags.VerifyWeatherRaw {
+		os.Exit(runVerifyWeatherRaw(flags))
+	}
+
+	// --raw-apply-weather: rebuild record weather from archived payloads; offline.
+	if flags.RawApplyWeather {
+		os.Exit(runRawApplyWeather(flags))
+	}
+
+	// --raw-refetch-weather: re-fetch past weather to archive raw payloads. Needs
+	// no Enphase credentials, only the location cached by --init.
+	if flags.RawRefetchWeather {
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+		os.Exit(runRawRefetchWeather(ctx, flags))
+	}
+
+	// --pge-reprocess: rebuild PG&E history from an archived raw download; offline.
+	if flags.PGEReprocess != "" {
+		tz := pgeTimezone(flags.ConfigFile)
+		n, from, to, err := pge.ReprocessRaw(flags.PGEReprocess, app.HistoryDir, app.HistoryDir, tz,
+			func(msg string) { fmt.Fprintln(os.Stderr, msg) })
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: PG&E reprocess failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("PG&E reprocess complete: %d day(s) written to %s for %s..%s\n",
+			n, app.HistoryDir, from.Format(constants.DateFormat), to.Format(constants.DateFormat))
+		return
+	}
+
 	// --pge-web-only: standalone Green Button browser pull — needs no Enphase
 	// config or credentials, so dispatch before config load.
 	if flags.PGEWebOnly {
@@ -242,6 +360,10 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n\nPlease copy config.yaml.example to config.yaml and fill in your details.\n", err)
 		os.Exit(1)
+	}
+	// --credentials-file overrides credentials_file from config.yaml for every mode.
+	if flags.CredentialsFile != "" {
+		cfg.CredentialsFile = flags.CredentialsFile
 	}
 
 	// --seed-credentials writes credentials.yaml (path from cfg), so run after config load.
@@ -289,21 +411,7 @@ func main() {
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
 
-		// --all re-authorizes every configured credential in turn.
-		if flags.All {
-			if err := updateAllRefreshTokens(ctx, pool, cfg.CredentialsFile); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
-			}
-			return
-		}
-
-		cred, err := selectCredential(pool, flags.Credential)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
-		}
-		if err := updateOneRefreshToken(ctx, cred, cfg.CredentialsFile); err != nil {
+		if err := updateAllRefreshTokens(ctx, pool, cfg.CredentialsFile); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
 		}
@@ -352,6 +460,31 @@ func main() {
 		os.Exit(1)
 	}
 
+	// --verify-enphase-archive: one-day live check of raw archiving; never writes history.
+	if flags.VerifyEnphaseArchive != "" {
+		day, err := time.ParseInLocation(constants.DateFormat, flags.VerifyEnphaseArchive, reportTZ)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid --verify-enphase-archive %q: use YYYY-MM-DD\n", flags.VerifyEnphaseArchive)
+			os.Exit(1)
+		}
+		app.ConfigureModes(false /* noCache */, flags.Debug)
+		rc := app.RunConfig{Agg: agg, Pool: pool, Disp: disp, Cfg: cfg, ReportTZ: reportTZ, Debug: flags.Debug}
+		res, err := app.VerifyEnphaseArchive(ctx, rc, day, os.Stdout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Enphase archive check failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Enphase archive check for %s: %d response(s) archived this run.\n", flags.VerifyEnphaseArchive, res.Archived)
+		for _, p := range res.Problems {
+			fmt.Printf("✗ %s\n", p)
+		}
+		if len(res.Problems) > 0 {
+			os.Exit(1)
+		}
+		fmt.Println("OK: archived intact and stored record reproduced from the fresh fetch.")
+		return
+	}
+
 	// Range pull: --start-date with an optional source flag.
 	// --pge-web-only was already dispatched early; here we handle:
 	//   (no source flag)     → PG&E web pull, then Enphase API backfill
@@ -385,6 +518,8 @@ func main() {
 				pgeRes.From.Format(constants.DateFormat), pgeRes.To.Format(constants.DateFormat))
 			if !pgeRes.LastDay.IsZero() {
 				endDate = pgeRes.LastDay
+			} else if pgeRes.Clamped {
+				endDate = pgeRes.To // no PG&E data returned, but still honor the one-year cap
 			}
 		}
 
@@ -494,7 +629,7 @@ func runSeedCredentials(ctx context.Context, credentialsFile, namePrefix string)
 	fmt.Printf("Seeded %s: %d updated, %d added (%d apps scanned).\n", credentialsFile, updated, added, scanned)
 	if added > 0 {
 		fmt.Println("Next: obtain refresh tokens for the new entries with")
-		fmt.Println("  ./enphase-monitor --update-refresh-tokens --all")
+		fmt.Println("  ./enphase-monitor --update-refresh-tokens")
 	}
 	return nil
 }
@@ -524,6 +659,107 @@ func pgeTimezone(configFile string) *time.Location {
 	return time.UTC
 }
 
+// runVerifyWeatherRaw checks raw/weather against the manifest and against the
+// weather stored in history/, writing nothing, and returns the exit code.
+func runVerifyWeatherRaw(flags *cli.Flags) int {
+	tz := pgeTimezone(flags.ConfigFile)
+	rep, err := rawstore.VerifySource("weather")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: weather raw verification failed: %v\n", err)
+		return 1
+	}
+	rawstore.PrintReport(os.Stdout, "weather", rep)
+	dates, err := app.HistoryDates(app.HistoryDir, time.Time{}, time.Time{})
+	if err != nil || len(dates) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: no history/enphase-*.json days to compare (%v)\n", err)
+		return 1
+	}
+	res := app.ApplyRawWeather(dates, app.HistoryDir, filepath.Join(rawDir, "weather"), tz, os.Stdout, true)
+	fmt.Printf("Weather raw verification: %d day(s) match their raw payload, %d differ, %d without a usable payload.\n",
+		res.Unchanged, len(res.Updated), len(res.Failed))
+	if !rep.OK() || len(res.Updated) > 0 || len(res.Failed) > 0 {
+		return 1
+	}
+	fmt.Println("OK")
+	return 0
+}
+
+// runRawApplyWeather rewrites each history record's weather from the newest
+// archived payload under raw/weather and returns the process exit code.
+func runRawApplyWeather(flags *cli.Flags) int {
+	tz := pgeTimezone(flags.ConfigFile)
+	var from, to time.Time
+	var err error
+	if flags.StartDate != "" {
+		if from, err = time.ParseInLocation(constants.DateFormat, flags.StartDate, tz); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid --start-date %q: use YYYY-MM-DD\n", flags.StartDate)
+			return 1
+		}
+	}
+	if flags.EndDate != "" {
+		if to, err = time.ParseInLocation(constants.DateFormat, flags.EndDate, tz); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid --end-date %q: use YYYY-MM-DD\n", flags.EndDate)
+			return 1
+		}
+	}
+	dates, err := app.HistoryDates(app.HistoryDir, from, to)
+	if err != nil || len(dates) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: no history/enphase-*.json days in range (%v)\n", err)
+		return 1
+	}
+	res := app.ApplyRawWeather(dates, app.HistoryDir, filepath.Join(rawDir, "weather"), tz, os.Stdout, false)
+	fmt.Printf("Weather apply complete: %d updated, %d already matched, %d failed.\n", len(res.Updated), res.Unchanged, len(res.Failed))
+	if len(res.Failed) > 0 {
+		return 1
+	}
+	return 0
+}
+
+// runRawRefetchWeather re-fetches weather for every day in history/ (or the
+// --start-date..--end-date range) with the cache bypassed so each Open-Meteo
+// payload is archived under raw/weather, and returns the process exit code.
+func runRawRefetchWeather(ctx context.Context, flags *cli.Flags) int {
+	tz := pgeTimezone(flags.ConfigFile)
+	var from, to time.Time
+	var err error
+	if flags.StartDate != "" {
+		if from, err = time.ParseInLocation(constants.DateFormat, flags.StartDate, tz); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid --start-date %q: use YYYY-MM-DD\n", flags.StartDate)
+			return 1
+		}
+	}
+	if flags.EndDate != "" {
+		if to, err = time.ParseInLocation(constants.DateFormat, flags.EndDate, tz); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid --end-date %q: use YYYY-MM-DD\n", flags.EndDate)
+			return 1
+		}
+	}
+	coords, ok := location.NewResolver().CachedPrimaryCoordinates()
+	if !ok {
+		fmt.Fprintln(os.Stderr, "Error: no cached location — run `enphase-monitor --init` once first.")
+		return 1
+	}
+	dates, err := app.HistoryDates(app.HistoryDir, from, to)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: listing history: %v\n", err)
+		return 1
+	}
+	if len(dates) == 0 {
+		fmt.Fprintln(os.Stderr, "Error: no history/enphase-*.json days in range")
+		return 1
+	}
+	wc := weather.NewClient(cache.GetCacheDir())
+	wc.BypassCache = true
+	fmt.Printf("Re-fetching weather for %d day(s), %s..%s\n", len(dates), dates[0], dates[len(dates)-1])
+	res := app.RefetchWeatherRaw(ctx, wc, coords, dates, app.HistoryDir, tz, os.Stdout)
+	fmt.Printf("Weather refetch complete: %d archived to %s, %d failed, %d differ from history records.\n",
+		res.Fetched, filepath.Join(rawDir, "weather"), len(res.Failed), len(res.Differ))
+	if len(res.Failed) > 0 {
+		return 1
+	}
+	return 0
+}
+
 // runPgePull drives the PG&E browser pull for [from, to]: sign in,
 // auto-download the Green Button XML, and write one history record per day.
 // Zero from/to values are filled with defaults by BrowserPull (end = yesterday,
@@ -534,7 +770,9 @@ func runPgePull(ctx context.Context, tz *time.Location, from, to time.Time) (*pg
 	return pge.BrowserPull(ctx, pge.BrowserPullOptions{
 		ProfileDir: pgeProfileDir(),
 		HistoryDir: app.HistoryDir,
+		CompareDir: app.HistoryDir,
 		RawDir:     tmpDir,
+		ArchiveDir: filepath.Join(rawDir, "pge"),
 		From:       from,
 		To:         to,
 		TZ:         tz,
@@ -644,43 +882,8 @@ func initializeLocation(ctx context.Context, cred *config.APIConfig, pool *crede
 	return nil
 }
 
-// selectCredential picks which credential set --update-refresh-tokens operates on. With a
-// single credential the name is optional; with more than one, the name must be
-// passed as an argument (--update-refresh-tokens <name>) and must match a configured name.
-func selectCredential(pool *credentials.Pool, name string) (*config.APIConfig, error) {
-	if name == "" {
-		if pool.Len() == 1 {
-			return pool.First(), nil
-		}
-		return nil, fmt.Errorf("multiple credentials configured; name one as an argument: --update-refresh-tokens <name> (available: %s)", strings.Join(pool.Names(), ", "))
-	}
-	cred, ok := pool.ByName(name)
-	if !ok {
-		return nil, fmt.Errorf("no credential named %q (available: %s)", name, strings.Join(pool.Names(), ", "))
-	}
-	return cred, nil
-}
-
-// updateOneRefreshToken runs the OAuth wizard for a single credential and writes
-// the obtained refresh token into the credentials file.
-func updateOneRefreshToken(ctx context.Context, cred *config.APIConfig, credentialsFile string) error {
-	authorizer := oauth.NewBrowserAuthorizer(ctx)
-	defer authorizer.Close()
-	fmt.Println("A Chrome window will open. Log in — the app is approved automatically, no clicking required.")
-
-	refreshToken, err := oauth.AuthorizeViaBrowser(ctx, authorizer, cred)
-	if err != nil {
-		return fmt.Errorf("failed to obtain refresh token for %q: %w", cred.Name, err)
-	}
-	if err := config.UpdateRefreshToken(credentialsFile, cred.Name, refreshToken); err != nil {
-		return fmt.Errorf("obtained a refresh token for %q but failed to save it: %w", cred.Name, err)
-	}
-	fmt.Printf("Saved refresh_token for credential %q to %s\n", cred.Name, credentialsFile)
-	return nil
-}
-
-// updateAllRefreshTokens re-authorizes every configured credential in turn,
-// driving one browser session that approves each app's consent automatically —
+// updateAllRefreshTokens re-authorizes every credential in the credentials file
+// in turn, driving one browser session that approves each app's consent automatically —
 // the user logs in once and never clicks "Allow Access". It attempts each
 // credential even if an earlier one failed, then reports which failed; a Ctrl+C
 // (context cancellation) aborts the rest.

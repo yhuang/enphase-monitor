@@ -7,7 +7,6 @@
 // - Cache key generation (SHA-256 hashing)
 // - Cache file saving and loading
 // - Cache entry listing and inspection
-// - Cache existence validation for test mode
 //
 // TEST PLAN
 // ---------
@@ -33,9 +32,7 @@
 //   - Test cache inspection by date
 //   - Test URL redaction (hide sensitive data)
 //
-// 5. Cache Existence Tests (for --test mode validation)
-//   - Test HasCacheForDate returns false for non-existent dates
-//   - Test HasCacheForDate returns false for empty cache directory
+// 5. Cache Path Tests
 //   - Test GetCacheDir returns valid path
 //
 // TESTING APPROACH
@@ -406,30 +403,22 @@ func TestCachedResponse_EmptyHeaders(t *testing.T) {
 	}
 }
 
-// TestHasCacheForDate tests the cache existence check for a specific date.
-// This function is used to validate that --test mode has data available before running.
-func TestHasCacheForDate(t *testing.T) {
-	useTempCacheDir(t)
-
-	t.Run("returns false when no cache exists for distant future date", func(t *testing.T) {
-		hasCache, err := HasCacheForDate("2099-12-31")
-		if err != nil {
-			t.Errorf("HasCacheForDate() returned error: %v", err)
+// hasCacheForDate reports whether any cache file carries the given queried_date.
+// It is the assertion helper for the ClearCacheForDate tests below.
+func hasCacheForDate(t *testing.T, targetDate string) bool {
+	t.Helper()
+	found := false
+	err := forEachCacheEntry(func(_ string, cached *CachedResponse) bool {
+		if cached.QueriedDate == targetDate {
+			found = true
+			return false // stop on first match
 		}
-		if hasCache {
-			t.Error("HasCacheForDate() should return false for non-existent date")
-		}
+		return true
 	})
-
-	t.Run("returns false when no matching date in cache files", func(t *testing.T) {
-		hasCache, err := HasCacheForDate("1999-01-01")
-		if err != nil {
-			t.Errorf("HasCacheForDate() returned error: %v", err)
-		}
-		if hasCache {
-			t.Error("HasCacheForDate() should return false for date with no cache")
-		}
-	})
+	if err != nil {
+		t.Fatalf("scanning cache: %v", err)
+	}
+	return found
 }
 
 func TestClearCacheForDate(t *testing.T) {
@@ -451,10 +440,10 @@ func TestClearCacheForDate(t *testing.T) {
 	}
 
 	// The cleared date should be gone; the untouched date should remain.
-	if has, _ := HasCacheForDate("2026-01-19"); has {
+	if has := hasCacheForDate(t, "2026-01-19"); has {
 		t.Error("expected cache for 2026-01-19 to be cleared")
 	}
-	if has, _ := HasCacheForDate("2026-01-20"); !has {
+	if has := hasCacheForDate(t, "2026-01-20"); !has {
 		t.Error("expected cache for 2026-01-20 to be preserved")
 	}
 }
@@ -496,10 +485,10 @@ func TestClearCacheForDate_AggregateSemantics(t *testing.T) {
 	if err := ClearCacheForDate("2026-03-15"); err != nil {
 		t.Fatalf("ClearCacheForDate() error = %v", err)
 	}
-	if has, _ := HasCacheForDate("2026-03-15"); has {
+	if has := hasCacheForDate(t, "2026-03-15"); has {
 		t.Error("expected day cache for 2026-03-15 to be cleared")
 	}
-	if has, _ := HasCacheForDate("2026-03-01"); !has {
+	if has := hasCacheForDate(t, "2026-03-01"); !has {
 		t.Error("month aggregate (2026-03-01) should survive clearing a mid-period day")
 	}
 
@@ -507,7 +496,7 @@ func TestClearCacheForDate_AggregateSemantics(t *testing.T) {
 	if err := ClearCacheForDate("2026-03-01"); err != nil {
 		t.Fatalf("ClearCacheForDate() error = %v", err)
 	}
-	if has, _ := HasCacheForDate("2026-03-01"); has {
+	if has := hasCacheForDate(t, "2026-03-01"); has {
 		t.Error("expected month aggregate (2026-03-01) to be cleared")
 	}
 }

@@ -18,10 +18,6 @@ This document explains all the intermediate Go concepts that are used throughout
 7. [Time and Duration](#time-and-duration)
 8. [Channels and Signals](#channels-and-signals)
 9. [Package-Level Variables](#package-level-variables)
-10. [Hash Functions](#hash-functions)
-11. [Variable Declarations](#variable-declarations)
-12. [Multiple Return Values](#multiple-return-values)
-13. [File Organization Patterns](#file-organization-patterns) - includes shared types, interfaces for dependency breaking, and type aliases
 
 ---
 
@@ -96,7 +92,7 @@ if err != nil {
 
 ### Constructor Function Pattern
 
-**Location**: `internal/api/client.go:219-232`
+**Location**: `internal/api/client.go:232-245`
 
 Functions starting with "New" are constructors - they create and initialize structs. This is a Go naming convention, not a language feature. We return a pointer `(*EnlightenCloudClient)` because:
 1. the return type specifies a pointer type;
@@ -112,7 +108,7 @@ func NewEnlightenCloudClient(...) *EnlightenCloudClient {
 
 ### Struct Literal with Pointer
 
-**Location**: `internal/api/client.go:222-231`
+**Location**: `internal/api/client.go:235-244`
 
 `&EnlightenCloudClient{...}` creates a struct and returns a pointer to it. This is idiomatic Go - create struct, take address, return pointer.
 
@@ -138,7 +134,7 @@ metrics := &AggregatedMetrics{
 
 ### Nested Struct Initialization
 
-**Location**: `internal/api/client.go:228-230`
+**Location**: `internal/api/client.go:241-243`
 
 We initialize `httpClient` field with a struct literal. `http.Client` is from standard library - we set Timeout for safety.
 
@@ -263,7 +259,7 @@ rateLimitErrors = append(rateLimitErrors, sys.Name)
 
 ### Array to Slice Conversion
 
-**Location**: `internal/cache/cache.go:175-176`
+**Location**: `internal/cache/cache.go:152-153`
 
 `hash[:]` converts the `[32]byte` array to a `[]byte` slice. This is necessary because `hex.EncodeToString` expects `[]byte`, not `[32]byte`. The `[:]` syntax creates a slice that views the entire array.
 
@@ -335,7 +331,7 @@ if rateLimited {
 
 ### Zero Value Pattern
 
-**Location**: `internal/app/setup.go:79-84`
+**Location**: `internal/app/setup.go:78-84`
 
 Using `time.Time` (not `*time.Time`) with `.IsZero()` is the idiomatic Go approach. Zero value (`time.Time{}`) means "not set" (use today). Non-zero value means "use this specific date".
 
@@ -365,7 +361,7 @@ var total float64
 
 ## Interfaces
 
-> **📚 Advanced Topic:** For how interfaces can break circular dependencies (duck typing), see [Why Interfaces Can Avoid Shared Types](#why-interfaces-can-avoid-shared-types) in the File Organization Patterns section.
+> **📚 Advanced Topic:** For how this codebase breaks circular package dependencies (a shared `types` package, plus a consumer-side interface), see [Package Dependency Graph](ARCHITECTURE.md#package-dependency-graph).
 
 ### What Is an Interface?
 
@@ -468,25 +464,24 @@ bodyBytes, err := io.ReadAll(respBody)
 
 ### The io.Writer Pattern for Testable I/O
 
-**Location**: `internal/validation/validation.go`
+**Location**: `internal/pge/verify.go`
 
 A common pattern in Go is accepting `io.Writer` instead of writing directly to `os.Stdout`. This makes code testable:
 
 ```go
-// Production code passes os.Stdout
-func ValidateMetrics(w io.Writer, metrics *AggregatedMetrics, date string) error {
-    fmt.Fprintf(w, "Validating %s...\n", date)
-    // ...
+// Production code passes os.Stdout (main.go)
+func VerifyPGERaw(archiveDir, historyDir string, loc *time.Location, out io.Writer) (VerifyResult, error) {
+    // ... fmt.Fprintf(out, "≠ %s: history record differs ...\n", date)
 }
 
-// Test code passes a buffer to capture output
-func TestValidateMetrics(t *testing.T) {
-    var buf bytes.Buffer
-    err := ValidateMetrics(&buf, metrics, "2026-01-20")
+// Test code passes a buffer to capture output (verify_test.go)
+func TestVerifyPGERaw_CleanThenTampered(t *testing.T) {
+    var out bytes.Buffer
+    res, err := VerifyPGERaw(archiveDir, hist, loc, &out)
 
     // Now we can assert on the output!
-    if !strings.Contains(buf.String(), "ALL VALIDATIONS PASSED") {
-        t.Error("Expected success message")
+    if !strings.Contains(out.String(), "99.900") {
+        t.Error("expected the edited total in the finding")
     }
 }
 ```
@@ -535,7 +530,7 @@ if err := json.Unmarshal(bodyBytes, &data); err != nil {
 
 ### Duration Literals
 
-**Location**: `internal/api/client.go:228-230`
+**Location**: `internal/api/client.go:241-243`
 
 `time.Second` is a typed constant (`time.Duration`). Multiplying an integer by `time.Second` — e.g. `30 * time.Second` — is idiomatic Go for expressing durations. In this codebase the value is extracted to `constants.APIRequestTimeout` for clarity.
 

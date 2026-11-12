@@ -11,7 +11,7 @@ This guide will help you:
 ## Step 1: Prerequisites
 
 Make sure you have:
-- [ ] Go 1.21+ installed (`go version` to check)
+- [ ] Go 1.26+ installed (`go version` to check)
 - [ ] Enphase Developer Portal account at https://developer-v4.enphase.com/
 - [ ] API credentials from the Developer Portal:
   - API Key
@@ -75,21 +75,21 @@ refresh_interval: 3600         # Query every hour (recommended)
 
 **⚠️ This step is required before you can use the application!**
 
-The application uses OAuth 2.0 for authentication. You need to complete a one-time OAuth setup:
+The application uses OAuth 2.0 for authentication. You need to complete the OAuth setup:
 
 ```bash
 ./enphase-monitor --update-refresh-tokens
 ```
 
-This interactive wizard will:
-1. Open your browser to the authorization page
-2. Wait while you log in and authorize the application
-3. Capture the authorization code automatically (via a local listener on your `redirect_uri`) and exchange it for tokens
-4. Write the `refresh_token` straight into the matching credential entry in your `credentials.yaml`
+This wizard opens a Chrome window and will:
+1. Open the authorization page for each credential in your `credentials.yaml`
+2. Wait for you to log in to Enlighten — **once**, on the first credential
+3. Click "Allow Access" on every credential's consent screen for you
+4. Read the authorization code from the redirect through the browser (no local listener, so your `redirect_uri` doesn't need to be reachable), exchange it for tokens, and write each `refresh_token` straight into its entry in `credentials.yaml`
 
-No copy-paste needed — just authorize in the browser and the credential is ready to use. (If your `redirect_uri` isn't a localhost address, the wizard falls back to asking you to paste the redirect URL.)
+No copy-paste needed. Enphase refresh tokens expire after 30 days, so if a later run fails with a 401, re-run this step.
 
-> With more than one credential set, name the one to set up: `./enphase-monitor --update-refresh-tokens enphase-monitor-02`.
+> The wizard re-authorizes **every** credential in the file in one run. To target a different file: `./enphase-monitor --update-refresh-tokens --credentials-file credentials-mobile.yaml`.
 
 > **📖 Want to understand OAuth better?** See **[OAUTH_SETUP.md](docs/OAUTH_SETUP.md)** for a detailed explanation of how OAuth works, what each component does, and how authentication is performed.
 
@@ -140,7 +140,7 @@ make run
 → Make sure each entry under `credentials:` has a unique `name` plus `key`, `client_id`, and `client_secret` in `credentials.yaml`
 
 ### "API request failed with status 401"
-→ Your refresh token might be missing or expired. Complete OAuth setup: `./enphase-monitor --update-refresh-tokens`
+→ Your refresh token might be missing or expired (Enphase refresh tokens last 30 days). Complete OAuth setup: `./enphase-monitor --update-refresh-tokens`
 
 ### "system must have id"
 → You need to replace the example system IDs with your actual ones from Enlighten (see Step 3)
@@ -154,7 +154,9 @@ Once it is working:
 
 - Query a Past Period: `./enphase-monitor --date 2026-01-15`
 - View your True-Up Period balance: `./enphase-monitor --true-up 2025-01-15` (use the True-Up Start Date from your utility account)
-- Build a historical dataset: `./enphase-monitor --start-date 2025-06-19` (writes one JSON record per day into `history/`)
+- Build a historical dataset: `./enphase-monitor --start-date 2025-06-19` (writes one JSON record per day into `history/`). Every source response is also kept untouched under `raw/` (gitignored, contains account data), so you can re-check your data later
+- Check your data against the raw archive (offline, no API calls): `./enphase-monitor --verify-enphase-raw`, `--verify-weather-raw` and, if you pull PG&E data, `--verify-pge-raw`. Each ends with `OK` or lists what differs
+- Back up `raw/` and `history/` outside the project (git ignores them): `tar czf ~/enphase-data-$(date +%Y%m%d-%H%M).tar.gz raw/ history/`
 - Run on startup: Add to cron or systemd
 - Build a dashboard: Parse the output or extend the code
 - Set up alerts: Monitor grid dependence and trigger notifications

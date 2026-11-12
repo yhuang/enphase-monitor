@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"bytes"
 	"flag"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -81,16 +83,16 @@ func TestParseFlags_UpdateRefreshToken(t *testing.T) {
 	}
 }
 
-func TestParseFlags_UpdateRefreshTokenAll(t *testing.T) {
+func TestParseFlags_CredentialsFile(t *testing.T) {
 	resetFlags(t)
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "--update-refresh-tokens", "--all"}
+	os.Args = []string{"cmd", "--update-refresh-tokens", "--credentials-file", "credentials-mobile.yaml"}
 
 	flags := ParseFlags()
 
-	if !flags.UpdateRefreshTokens || !flags.All {
-		t.Errorf("UpdateRefreshTokens=%v All=%v, want both true", flags.UpdateRefreshTokens, flags.All)
+	if !flags.UpdateRefreshTokens || flags.CredentialsFile != "credentials-mobile.yaml" {
+		t.Errorf("UpdateRefreshTokens=%v CredentialsFile=%q, want true and credentials-mobile.yaml", flags.UpdateRefreshTokens, flags.CredentialsFile)
 	}
 }
 
@@ -196,5 +198,64 @@ func TestParseFlags_ComplexCombination(t *testing.T) {
 	}
 	if !flags.NoCache {
 		t.Error("NoCache should be true")
+	}
+}
+
+// TestPrintUsage_ListsEveryFlagOnceAndGroupsRaw guards --help: no registered flag
+// may be dropped or duplicated by the grouping, and the raw-archive/verification
+// flags must come under their own heading before the rest.
+func TestPrintUsage_ListsEveryFlagOnceAndGroupsRaw(t *testing.T) {
+	resetFlags(t)
+	os.Args = []string{"enphase-monitor"}
+	ParseFlags()
+	var buf bytes.Buffer
+	flag.CommandLine.SetOutput(&buf)
+	printUsage()
+	out := buf.String()
+
+	rawHeading := strings.Index(out, "Raw archive, reprocessing and verification")
+	otherHeading := strings.Index(out, "All other options:")
+	if rawHeading < 0 || otherHeading < rawHeading {
+		t.Fatalf("headings missing or out of order (raw=%d, other=%d)", rawHeading, otherHeading)
+	}
+	flag.VisitAll(func(f *flag.Flag) {
+		line := "\n  -" + f.Name
+		if n := strings.Count(out, line+"\n") + strings.Count(out, line+" "); n != 1 {
+			t.Errorf("flag -%s appears %d times in usage, want 1", f.Name, n)
+		}
+	})
+	for _, name := range rawFlagNames {
+		if i := strings.Index(out, "\n  -"+name); i < rawHeading || i > otherHeading {
+			t.Errorf("flag -%s is not under the raw-archive heading", name)
+		}
+	}
+	if !strings.Contains(out, "bounds --raw-refetch-weather and --raw-apply-weather") {
+		t.Error("--start-date/--end-date help should mention the raw weather flags they bound")
+	}
+}
+
+func TestValidateMaintenance(t *testing.T) {
+	cases := []struct {
+		name    string
+		flags   Flags
+		wantErr string // substring; "" means valid
+	}{
+		{"none", Flags{}, ""},
+		{"one command", Flags{VerifyPGERaw: true}, ""},
+		{"two commands", Flags{VerifyPGERaw: true, VerifyWeatherRaw: true}, "mutually exclusive"},
+		{"string flag counts", Flags{PGEReprocess: "raw/pge/x.zip", RawImportCache: true}, "--raw-import-cache, --pge-reprocess"},
+		{"verify takes no range", Flags{VerifyEnphaseRaw: true, StartDate: "2025-10-06"}, "does not take --start-date/--end-date"},
+		{"live check takes no range", Flags{VerifyEnphaseArchive: "2025-11-08", EndDate: "2025-11-09"}, "does not take"},
+		{"apply weather takes a range", Flags{RawApplyWeather: true, StartDate: "2025-10-06", EndDate: "2025-11-09"}, ""},
+		{"refetch weather end bound alone", Flags{RawRefetchWeather: true, EndDate: "2025-11-09"}, ""},
+	}
+	for _, c := range cases {
+		err := c.flags.ValidateMaintenance()
+		switch {
+		case c.wantErr == "" && err != nil:
+			t.Errorf("%s: unexpected error %v", c.name, err)
+		case c.wantErr != "" && (err == nil || !strings.Contains(err.Error(), c.wantErr)):
+			t.Errorf("%s: error = %v, want it to contain %q", c.name, err, c.wantErr)
+		}
 	}
 }

@@ -14,6 +14,18 @@
 //   - Reliable data: Aggregated and validated by Enphase servers
 //   - Standardized format: Consistent JSON responses across all Systems
 //
+// RAW ARCHIVE
+// -----------
+// Every successful live response is also saved untouched under raw/enphase/ (via
+// internal/rawstore), named <system>_<endpoint>_<date>_<fetch timestamp>.json with a
+// manifest line recording system, endpoint, date and the redacted URL. The cache
+// holds the same bodies but is a cache (clearable, overwritable); raw/ is the audit
+// trail. Cache hits make no request and archive nothing.
+// DayKWh converts an archived Day Mode body into kWh with the exact parsers the live
+// fetch uses, which is what --verify-enphase-raw re-derives history from. Known
+// limit: a Day Mode response covers start_at..start_at+86399 s, so the interval
+// ending exactly at local midnight (the day's final 15 minutes) is in no day's response.
+//
 // AUTHENTICATION
 // --------------
 // The Cloud API uses OAuth 2.0 with two authentication components:
@@ -130,7 +142,7 @@
 // constants.MaxRequestsPerMonth per calendar month (1000) per API key.
 //  1. Past Period serving: Past Period responses are always served from cache
 //     without making a live call — the data is immutable. Detected via
-//     cacheMaxAge returning 0. Current Period queries are live-first.
+//     isImmutablePeriod. Current Period queries are live-first.
 //  2. Monthly tracking: RecordAPICall increments the per-credential monthly
 //     counter in credentials.Pool on every successful live call.
 //  3. Errors propagate: on a transport error, 429, or 503, the client returns
@@ -163,6 +175,7 @@ import (
 	"enphase-monitor/internal/cache"
 	"enphase-monitor/internal/constants"
 	"enphase-monitor/internal/parser"
+	"enphase-monitor/internal/rawstore"
 	"enphase-monitor/internal/timezone"
 	"enphase-monitor/internal/urlbuilder"
 )
@@ -570,18 +583,16 @@ func (c *EnlightenCloudClient) GetMetricsFromCloud(ctx context.Context, testDate
 	return metrics, cacheUsed, nil
 }
 
-// cacheMaxAge returns the maximum age at which a cached response for a given
-// Query Mode and target date is still considered valid:
-//   - Past Periods (already-ended Day / Month / Year / True-Up) -> 0
-//     ("never expires" — the data won't change)
-//   - today's Day Mode query                                    -> 1 hour
-//   - Current Period MTD / YTD / True-Up                        -> 24 hours
+// isImmutablePeriod reports whether the data for targetDate and queryMode can no
+// longer change, so a cached response may be served without a live call:
+//   - Past Periods (already-ended Day / Month / Year / True-Up) -> true
+//   - today's Day Mode query, Current Period MTD / YTD / True-Up -> false (live-first)
 //
 // Note: timezone.IsPastPeriod always returns false for QueryModeTrueUp by
 // design (so its Lifetime Data endpoints are refreshed each run). For cache
 // purposes we override that here: a True-Up Period whose start + 1 year is
 // in the past is treated as past, since its totals are immutable.
-func (c *EnlightenCloudClient) cacheMaxAge(targetDate time.Time, queryMode constants.QueryMode) time.Duration {
+func (c *EnlightenCloudClient) isImmutablePeriod(targetDate time.Time, queryMode constants.QueryMode) bool {
 	isPast := timezone.IsPastPeriod(targetDate, queryMode, c.timezone)
 	if !isPast && queryMode == constants.QueryModeTrueUp && !targetDate.IsZero() {
 		trueUpEnd := targetDate.AddDate(1, 0, 0).In(c.timezone)
@@ -589,33 +600,7 @@ func (c *EnlightenCloudClient) cacheMaxAge(targetDate time.Time, queryMode const
 			isPast = true
 		}
 	}
-	if isPast {
-		return 0
-	}
-	if queryMode == constants.QueryModeDay {
-		return cache.MaxCurrentDayCacheAge
-	}
-	return cache.MaxCurrentPeriodCacheAge
-}
-
-// serveRecentEndpointCache returns the most recent cache entry for the same
-// endpoint+systemID as url, filtered by maxAge (0 = no upper bound). Returns
-// nil and false when the URL can't be parsed or no eligible entry exists.
-//
-// Caller is responsible for gating this on budgetExhausted(); the lookup is
-// shaped specifically for the budget-depleted fallback path so that a query
-// against a new --date can still surface the most recent same-endpoint cache
-// the user has on disk.
-func serveRecentEndpointCache(url string, maxAge time.Duration) (*http.Response, bool) {
-	endpoint, systemID := cache.ExtractEndpointAndSystemID(url)
-	if endpoint == "" || systemID == "" {
-		return nil, false
-	}
-	recent, err := cache.FindMostRecentByEndpoint(endpoint, systemID, maxAge)
-	if err != nil {
-		return nil, false
-	}
-	return recent.ToHTTPResponse(), true
+	return isPast
 }
 
 // tryLoadPastDateCache attempts to load a cached response by matching URL endpoint,
@@ -671,33 +656,24 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 // │       START                                                             │
 // │         │                                                               │
 // │         ▼                                                               │
-// │  ┌─────────────┐                                                        │
-// │  │ Validation  │──YES──► Return cache only (fail if no cache)           │
-// │  │    Mode?    │                                                        |
-// │  └──────┬──────┘                                                        │
-// │         │ NO                                                            │
-// │         ▼                                                               │
 // │  ┌───────────────┐                                                      │
-// │  │Cache Disabled?│──YES──► Make API call (fall back to cache on error)  │
+// │  │Cache Disabled?│──YES──► Live call; never reads the cache             │
+// │  │ (--no-cache,  │         (429/503/network errors propagate)           │
+// │  │  Backfill)    │                                                      │
 // │  └──────┬────────┘                                                      │
 // │         │ NO                                                            │
 // │         ▼                                                               │
 // │  ┌─────────────────────────────────┐                                    │
 // │  │ Past Period with valid cache?   │──YES──► Return immutable cache     │
-// │  │ (cacheMaxAge == 0)              │         (no API call, no budget)   │
+// │  │ (isImmutablePeriod)             │         (no API call, no budget)   │
 // │  └──────┬──────────────────────────┘                                    │
-// │         │ NO (Current Period)                                           │
-// │         ▼                                                               │
-// │  ┌────────────────────┐                                                 │
-// │  │ Budget exhausted?  │──YES──► Exact-URL cache (any age);              │
-// │  │ (>=10 calls in 60s)│         cross-endpoint cache; RateLimitError    │
-// │  └──────┬─────────────┘                                                 │
-// │         │ NO (budget available)                                         │
+// │         │ NO (Current Period, or no cache entry)                        │
 // │         ▼                                                               │
 // │  ┌─────────────┐                                                        │
-// │  │ Make API    │──429──► Serve any-age cache if available               │
-// │  │   Request   │──OK───► RecordAPICall, save to cache, return data      │
-// │  └─────────────┘                                                        │
+// │  │ Live call   │──429/503/error──► Propagate (the aggregator fails over │
+// │  │             │                   to a spare credential on a 429)      │
+// │  │             │──OK─────────────► RecordAPICall, save to cache, archive│
+// │  └─────────────┘                   to raw/enphase, return data          │
 // └─────────────────────────────────────────────────────────────────────────┘
 //
 // Parameters:
@@ -712,9 +688,9 @@ func (c *EnlightenCloudClient) tryLoadPastDateCache(url string, targetDate time.
 //   - bool: true if cache was used, false if fresh API call
 //   - error: Any error encountered
 func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url string, targetDate time.Time, queryMode constants.QueryMode) (*http.Response, bool, error) {
-	// Load any existing cached response for this URL. It is used either directly
-	// (Past Period / validation mode / budget exhausted) or as a fallback when a
-	// live call fails. IsPastPeriod is granularity-aware, so a current-month or
+	// Load any existing cached response for this URL. It is served only for an
+	// immutable Past Period; a live call's errors are never masked by it.
+	// IsPastPeriod is granularity-aware, so a current-month or
 	// current-year query is not treated as past even though its start date is
 	// before today; that flag only gates the past-date cache rescan below, which
 	// recovers a hit when URL normalization differs from the original query.
@@ -725,17 +701,14 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 			cached, cacheErr = found, nil
 		}
 	}
-	fb := cacheFallback{c: c, url: url, cached: cached, cacheErr: cacheErr}
+	fb := cacheLookup{url: url, cached: cached, cacheErr: cacheErr}
 
 	switch {
-	case cache.ValidationMode():
-		return c.serveValidationMode(fb)
 	case cache.CacheDisabled():
 		return c.requestNoCacheMode(ctx, fb)
-	case fb.has() && c.cacheMaxAge(targetDate, queryMode) == 0:
-		// Past Period: the data is immutable (maxAge == 0 is the "never expires"
-		// sentinel from cacheMaxAge), so serving cache avoids a live call that
-		// would waste budget and return identical results.
+	case fb.has() && c.isImmutablePeriod(targetDate, queryMode):
+		// Past Period: the data is immutable, so serving cache avoids a live call
+		// that would waste budget and return identical results.
 		cache.Debugf("serving cache (Past Period, age %s): %s", time.Since(fb.cached.CachedAt).Round(time.Second), cache.RedactURLKey(url))
 		return fb.serve()
 	default:
@@ -745,34 +718,26 @@ func (c *EnlightenCloudClient) makeCachedAPIRequest(ctx context.Context, url str
 	}
 }
 
-// cacheFallback bundles the cache entry loaded for a request (if any) with the
-// request URL, so the various failure paths can serve or re-find it without
-// re-threading these values through every helper.
-type cacheFallback struct {
-	c        *EnlightenCloudClient
+// cacheLookup bundles the cache entry loaded for a request (if any) with the
+// request URL, so the request helpers need not re-thread them. A loaded entry is
+// served only for an immutable Past Period; it never masks a live call's error.
+type cacheLookup struct {
 	url      string
 	cached   *cache.CachedResponse // valid only when cacheErr == nil
 	cacheErr error
 }
 
 // has reports whether a usable cache entry was loaded for this request.
-func (f cacheFallback) has() bool { return f.cacheErr == nil }
+func (f cacheLookup) has() bool { return f.cacheErr == nil }
 
 // serve returns the loaded cache entry as an HTTP response, flagged as a cache
 // hit. Only valid when has() is true.
-func (f cacheFallback) serve() (*http.Response, bool, error) {
+func (f cacheLookup) serve() (*http.Response, bool, error) {
 	return f.cached.ToHTTPResponse(), true, nil
 }
 
-// crossDate returns the most recent cache entry for the same endpoint+system as
-// this URL, regardless of date or age — the last-resort fallback when no
-// exact-URL cache exists. Returns (resp, true) on a hit.
-func (f cacheFallback) crossDate() (*http.Response, bool) {
-	return serveRecentEndpointCache(f.url, 0)
-}
-
 // newAPIRequest builds an authenticated GET request for url. A build failure is
-// fatal (callers never fall back to cache on it), matching the original behavior.
+// fatal.
 func (c *EnlightenCloudClient) newAPIRequest(ctx context.Context, url string) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -796,6 +761,13 @@ func (c *EnlightenCloudClient) finalizeAndCache(url string, resp *http.Response)
 	}
 	resp.Body.Close()
 
+	if resp.StatusCode == http.StatusOK {
+		// Untouched copy for later integrity checks; best effort like the cache.
+		sys, endpoint, date := rawMeta(url, c.timezone)
+		_, _ = rawstore.Save("enphase", rawName(sys, endpoint, date), ".json", bodyBytes,
+			fmt.Sprintf("system=%s endpoint=%s date=%s url=%s", sys, endpoint, date, rawstore.RedactURL(url)))
+	}
+
 	tempResp := &http.Response{StatusCode: resp.StatusCode, Header: resp.Header}
 	// Best-effort: a failed cache write just means a future request re-fetches
 	// live; it must not fail the response we already have in hand.
@@ -808,16 +780,52 @@ func (c *EnlightenCloudClient) finalizeAndCache(url string, resp *http.Response)
 	}, false, nil
 }
 
-// serveValidationMode handles validation mode: only cache is used, never a live
-// call. Returns the cache entry, or a detailed error when none is available.
-func (c *EnlightenCloudClient) serveValidationMode(fb cacheFallback) (*http.Response, bool, error) {
-	if fb.has() {
-		return fb.serve() // Cache was used (Validation Mode)
+// rawMeta identifies an Enphase API request for the raw archive: the system id,
+// the endpoint path after it (e.g. "telemetry/production_meter") and the calendar
+// date queried in tz. Any part it cannot find is empty.
+func rawMeta(rawURL string, tz *time.Location) (system, endpoint, date string) {
+	path := rawURL
+	if i := strings.IndexByte(path, '?'); i >= 0 {
+		path = path[:i]
 	}
-	// Provide a detailed error about the missing cache to aid debugging.
-	cachePath := cache.GetCachePath(fb.url, c.timezone)
-	normalizedURL := cache.NormalizeURLForCache(fb.url, c.timezone)
-	return nil, false, fmt.Errorf("validation mode: no cached response available; cache path: %s, normalized URL: %s", cachePath, cache.RedactURLKey(normalizedURL))
+	parts := strings.Split(strings.TrimRight(path, "/"), "/")
+	for i, p := range parts {
+		if p == "systems" && i+2 < len(parts) {
+			system, endpoint = parts[i+1], strings.Join(parts[i+2:], "/")
+			break
+		}
+	}
+	return system, endpoint, cache.QueriedDateFromURL(rawURL, tz)
+}
+
+// rawName is the raw-archive file name for a request: <system>_<endpoint>_<date>,
+// with "/" in the endpoint replaced by "_". It matches the names ImportEnphaseCache
+// gives imported cache entries.
+func rawName(system, endpoint, date string) string {
+	name := system + "_" + strings.ReplaceAll(endpoint, "/", "_")
+	if date != "" {
+		name += "_" + date
+	}
+	return strings.Trim(name, "_")
+}
+
+// DayKWh converts a Day Mode interval response for one of the four day endpoints
+// ("energy_import_telemetry", "energy_export_telemetry", "telemetry/production_meter",
+// "telemetry/consumption_meter") into kWh using exactly the parsers the live fetch
+// uses. ok is false for any other endpoint. It lets offline verification re-derive
+// a day's totals from archived raw bodies.
+func DayKWh(endpoint string, body []byte) (kwh float64, ok bool, err error) {
+	for _, m := range []intervalMetric{importMetric, exportMetric, productionMetric, consumptionMetric} {
+		if m.dayEndpoint != endpoint {
+			continue
+		}
+		intervals, err := m.parseDay(body)
+		if err != nil {
+			return 0, true, err
+		}
+		return parser.SumIntervalValues(intervals, m.field) / constants.WhToKWh, true, nil
+	}
+	return 0, false, nil
 }
 
 // errServiceUnavailable is returned when Enphase responds 503 and there is no
@@ -830,7 +838,7 @@ var errServiceUnavailable = errors.New("API request failed with status 503: Enph
 // credential, or fail explicitly — essential for Backfill Mode, whose records
 // must be authoritative live data rather than silently-served stale cache.
 // Successful responses are still written to cache for later (non-no-cache) reads.
-func (c *EnlightenCloudClient) requestNoCacheMode(ctx context.Context, fb cacheFallback) (*http.Response, bool, error) {
+func (c *EnlightenCloudClient) requestNoCacheMode(ctx context.Context, fb cacheLookup) (*http.Response, bool, error) {
 	req, err := c.newAPIRequest(ctx, fb.url)
 	if err != nil {
 		return nil, false, err
@@ -858,7 +866,7 @@ func (c *EnlightenCloudClient) requestNoCacheMode(ctx context.Context, fb cacheF
 // Errors (transport, 429, 503, other non-OK) are propagated rather than masked
 // by serving stale cache — a 429 must reach the aggregator so it can fail over
 // to a spare credential. On success the response is cached and returned fresh.
-func (c *EnlightenCloudClient) requestLiveMode(ctx context.Context, fb cacheFallback) (*http.Response, bool, error) {
+func (c *EnlightenCloudClient) requestLiveMode(ctx context.Context, fb cacheLookup) (*http.Response, bool, error) {
 	cache.Debugf("live API call: %s", cache.RedactURLKey(fb.url))
 	req, err := c.newAPIRequest(ctx, fb.url)
 	if err != nil {

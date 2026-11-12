@@ -16,10 +16,12 @@ designed to help new engineers learn Go development patterns and best practices.
 2. [Module Structure](#module-structure)
 3. [Execution Flow](#execution-flow)
 4. [Data Flow Diagram](#data-flow-diagram)
-5. [API Budget Checks](#api-budget-checks)
-6. [Key Go Patterns Used](#key-go-patterns-used)
-7. [File Descriptions](#file-descriptions)
-8. [Next Steps for Learning](#next-steps-for-learning)
+5. [Raw Archive and Verification](#raw-archive-and-verification)
+6. [PG&E Feed Decoding](#pge-feed-decoding)
+7. [API Budget Checks](#api-budget-checks)
+8. [Key Go Patterns Used](#key-go-patterns-used)
+9. [File Descriptions](#file-descriptions)
+10. [Next Steps for Learning](#next-steps-for-learning)
 
 ---
 
@@ -31,18 +33,23 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 - **Multi-System Monitoring**: Query and aggregate data from multiple independent Systems at a Site
 - **Cloud API Integration**: Uses Enphase Enlighten Cloud API v4 exclusively (no local network access required)
-- **Intelligent Caching**: Disk-based response caching to stay within the API Budget (10 calls/minute)
+- **Intelligent Caching**: Disk-based response caching to stay within the API Budget (1000 calls/month per key, spread across a credential pool)
 - **Past Period Queries**: Query any past date with `--date` flag (auto-runs once since Past Period data is immutable)
 - **True-Up Report**: Energy metrics across a full utility True-Up Period with `--true-up`
+- **Historical Backfill**: Per-day Enphase + weather records (`--start-date`) and PG&E utility-meter records (Green Button download) written to `history/`
+- **Raw Source Archive**: Every source response kept untouched under `raw/` with a SHA-256 manifest, so `history/` can be re-derived and audited offline at any time
+- **Integrity Verification**: One offline `--verify-*-raw` command per source, plus a single live Enphase archiving check
 - **Color Customization**: Customize terminal output colors via YAML configuration
 
 ### Tech Stack
 
-- **Language**: Go 1.21+
+- **Language**: Go 1.26 (see `go.mod`)
 - **Configuration**: YAML (`gopkg.in/yaml.v3`)
 - **HTTP Client**: Standard library `net/http` (no frameworks)
 - **Authentication**: OAuth 2.0 with Bearer tokens
 - **Caching**: File-based (JSON responses stored on disk)
+- **Browser automation**: `chromedp` (headed Chrome for the Enphase developer portal and the PG&E Green Button download)
+- **Raw archive**: files under `raw/<source>/` plus an append-only `raw/manifest.jsonl` (standard library only)
 
 ---
 
@@ -50,7 +57,7 @@ The **enphase-monitor** is a CLI application that monitors energy metrics from o
 
 ```
 enphase-monitor/
-├── main.go                                # Entry point (~720 lines) - orchestration only
+├── main.go                                # Entry point (~940 lines) - orchestration only
 ├── internal/
 │   ├── aggregator/                        # Multi-system data aggregation
 │   │   ├── types.go                       # Metric data structures (AggregatedMetrics, SystemMetrics)
@@ -58,15 +65,12 @@ enphase-monitor/
 │   │   ├── aggregator_test.go             # Aggregator tests with mock clients
 │   │   └── aggregator_bench_test.go       # Benchmark tests
 │   ├── api/                               # HTTP client for Cloud API v4
-│   │   ├── client.go                      # Enlighten Cloud API client
+│   │   ├── client.go                      # Enlighten Cloud API client; archives each live response to raw/enphase (rawMeta/rawName) and exposes DayKWh for offline re-derivation
 │   │   ├── types.go                       # API request/response types
-│   │   ├── cache_check.go                 # Per-system/endpoint cache availability check
 │   │   ├── client_test.go                 # API client unit tests
-│   │   ├── client_caching_test.go         # Characterization tests for makeCachedAPIRequest fallback branches (validation/no-cache modes, 429/503/network-error cache fallbacks)
+│   │   ├── client_caching_test.go         # Characterization tests for makeCachedAPIRequest fallback branches (no-cache mode, 429/503/network-error propagation)
 │   │   ├── client_functional_test.go      # Functional tests with mock HTTP servers
 │   │   ├── client_lifetime_test.go        # Lifetime Data tests (Month, Year, True-Up Mode queries)
-│   │   ├── preflight_test.go              # Budget-exhaustion cache-fallback tests (all 8 Query Mode × Period combinations)
-│   │   ├── query_cost_test.go             # QueryCost unit tests (all QueryMode × hasBattery combos)
 │   │   └── testmain_test.go               # TestMain: redirects cache I/O to temp dir for all api tests
 │   ├── app/                               # Application execution logic
 │   │   ├── setup.go                       # App initialization & configuration
@@ -78,18 +82,22 @@ enphase-monitor/
 │   │   ├── backfill.go                    # Backfill Mode: live per-day fetch over a date range into history/
 │   │   ├── backfill_test.go               # Backfill range/skip/overwrite tests
 │   │   ├── weather.go                     # Best-effort weather enrichment for Day-Mode reports
-│   │   └── weather_test.go                # Weather enrichment tests
+│   │   ├── weather_test.go                # Weather enrichment tests
+│   │   ├── rawweather.go                  # HistoryDates, RefetchWeatherRaw (--raw-refetch-weather), ApplyRawWeather (--raw-apply-weather) + history/.weather-provenance.json sidecar
+│   │   ├── rawweather_test.go             # Raw-weather, provenance, and offline Enphase-verification tests
+│   │   ├── verifyenphaseraw.go            # VerifyEnphaseRaw (--verify-enphase-raw): re-derive each history day from raw/enphase bodies
+│   │   └── verifyenphase.go               # VerifyEnphaseArchive (--verify-enphase-archive): one-day live archiving check
 │   ├── browser/                           # Headed Chrome launcher (chromedp) for portal automation
 │   │   ├── chrome.go                      # LaunchHeaded (disposable profile) + LaunchHeadedWithProfile (persistent profile)
 │   │   └── chrome_test.go                 # Chrome launcher tests
 │   ├── cache/                             # Disk-based response caching
-│   │   ├── cache.go                       # Cache implementation + sliding-window budget
-│   │   ├── cache_test.go                  # Cache state management tests (ValidationMode, CacheDisabled, BudgetWarningShown, ResetState)
-│   │   ├── cache_functions_test.go        # Core caching tests (URL normalization, save/load, HasCacheForDate)
+│   │   ├── cache.go                       # Cache implementation (URL normalization, Past Period handling, endpoint/system tagging)
+│   │   ├── cache_test.go                  # Cache state management tests (CacheDisabled, ResetState)
+│   │   ├── cache_functions_test.go        # Core caching tests (URL normalization, save/load, ClearCacheForDate)
 │   │   ├── cli.go                         # Cache inspection utilities
 │   │   └── cli_test.go                    # CLI utilities tests
 │   ├── cli/                               # Command-line interface
-│   │   ├── flags.go                       # CLI flag parsing
+│   │   ├── flags.go                       # CLI flag parsing, grouped --help (printUsage), MaintenanceCommands/ValidateMaintenance
 │   │   ├── flags_test.go                  # Flag parsing tests
 │   │   ├── cache_commands.go              # Cache management commands
 │   │   └── cache_commands_test.go         # Cache commands tests
@@ -123,7 +131,7 @@ enphase-monitor/
 │   │   ├── geocode.go                     # ZIP lookup for weather geolocation
 │   │   └── geocode_test.go                # Geocode tests
 │   ├── history/                           # Per-day energy+weather and utility-meter JSON records (history/)
-│   │   ├── history.go                     # Dataset type (Enphase/PGE sentinels), DayRecord schema, FromMetrics, WriteRecord, WriteIndex
+│   │   ├── history.go                     # Dataset type (Enphase/PGE sentinels), DayRecord/WeatherRec schema, FromMetrics, WriteRecord, WriteIndex
 │   │   └── history_test.go                # History mapping, write, index, and Dataset tests
 │   ├── location/                          # Resolve & cache systems' coordinates (--init)
 │   │   ├── location.go                    # Location resolver with disk cache
@@ -135,28 +143,31 @@ enphase-monitor/
 │   │   ├── browser_test.go                # Browser-OAuth flow tests
 │   │   ├── oauth_functional_test.go       # Integration tests with mock servers
 │   │   └── oauth_edge_cases_test.go       # Edge case and error path tests
-│   ├── pge/                               # PG&E Share My Data (Green Button) integration
-│   │   ├── config.go                      # LoadConfig: compose from config.yaml + credentials.yaml pge: blocks
-│   │   ├── auth.go                        # OAuth2 authorize + token exchange (mTLS, Share My Data API)
-│   │   ├── pull.go                        # Pull: date-range fetch against Share My Data API (requires client cert)
-│   │   ├── browserpull.go                 # BrowserPull: Green Button download via headed Chrome session
-│   │   ├── espi.go                        # ParseReadings: ESPI XML → DayUsage intervals
+│   ├── pge/                               # PG&E Green Button integration: browser download, ESPI decoding, sanity checks, raw-archive verification
+│   │   ├── doc.go                         # Package documentation: the PG&E data flow and the commands that reach it
+│   │   ├── browserpull.go                 # BrowserPull: Green Button download via headed Chrome session (range capped at one year); archives the original ZIP; ingestDownload and ReprocessRaw (--pge-reprocess)
+│   │   ├── espi.go                        # ParseReadings (register selection, Wh scale), AggregateReadingsByDay (wall-clock decoding, DST gap handling) → DayUsage intervals
+│   │   ├── sanity.go                      # CheckDays: write-time warnings (negative import, interval count vs real local day, net vs Enphase)
+│   │   ├── verify.go                      # VerifyPGERaw (--verify-pge-raw): hash check + re-derive raw/pge archives and diff against history
 │   │   ├── history.go                     # WriteHistory: aggregate DayUsage → pge-YYYY-MM-DD.json records
-│   │   ├── download.go                    # Download: HTTP helper for the Green Button XML file
-│   │   ├── login.go                       # PGE portal login via headed Chrome
-│   │   ├── autoform.go                    # Auto-fill date-range form on the PGE download page
-│   │   ├── cert.go                        # CertRenew: certbot DNS-01 via Enom API (no sudo)
-│   │   ├── dns.go                         # SetHostRecord: update Enom DNS TXT record for ACME challenge
-│   │   ├── enom.go                        # Enom reseller API client (SetHosts replaces whole zone)
-│   │   ├── autoform_test.go               # Autoform field-fill tests
-│   │   ├── cert_test.go                   # CertRenew / certbot integration tests
-│   │   ├── download_test.go               # Download HTTP helper tests
-│   │   ├── enom_test.go                   # Enom API client tests
-│   │   └── espi_test.go                   # ESPI XML parser tests
+│   │   ├── download.go                    # downloadGreenButton: drive the export form (autoform) and capture the new download by watching the download directory
+│   │   ├── login.go                       # openLoggedInSession: headed Chrome on a persistent profile; blocks until the user has signed in to PG&E
+│   │   ├── autoform.go                    # formDriver: auto-drive the Green Button export form inside PG&E's Visualforce iframe
+│   │   ├── autoform_test.go               # Frame lookup and formDriver debug-buffer tests
+│   │   ├── download_test.go               # Download-directory snapshot and completed-file detection tests
+│   │   ├── browserpull_test.go            # One-year export-range clamp and raw-archive naming tests
+│   │   ├── espi_test.go                   # ESPI parser/aggregation tests against real redacted feeds (register selection, clock decoding, DST days), CheckDays
+│   │   ├── verify_test.go                 # VerifyPGERaw round-trip: clean, hand-edited record, tampered raw file; archive ordering by fetch time
+│   │   └── testdata/                      # Real PG&E exports with identifiers removed: 2025-11-08, 2026-03-08 (spring-forward), 2025-11-02 (fall-back)
 │   ├── parser/                            # JSON telemetry parsing
 │   │   ├── parser.go                      # Response parsing utilities
 │   │   ├── parser_test.go                 # Parser tests
 │   │   └── parser_bench_test.go           # Benchmark tests
+│   ├── rawstore/                          # Raw source archive: raw/<source>/ files + raw/manifest.jsonl (SHA-256)
+│   │   ├── rawstore.go                    # Save, Record, RedactURL; disabled unless Dir is set
+│   │   ├── importcache.go                 # ImportEnphaseCache: copy raw bodies from cache/ into raw/enphase (--raw-import-cache)
+│   │   ├── verify.go                      # VerifySource, Entries/EntriesSince, VerifyEntry, PrintReport
+│   │   └── rawstore_test.go               # Save/manifest, import idempotence, verification tests
 │   ├── timezone/                          # Timezone handling
 │   │   ├── timezone.go                    # Timezone utilities
 │   │   └── timezone_test.go               # Timezone tests
@@ -165,12 +176,8 @@ enphase-monitor/
 │   ├── urlbuilder/                        # API URL construction
 │   │   ├── urlbuilder.go                  # URL building helpers
 │   │   └── urlbuilder_test.go             # URL builder tests
-│   ├── validation/                        # Metrics validation logic (tolerance-based checks)
-│   │   ├── validation.go                  # Metrics validation logic (uses io.Writer for testability)
-│   │   ├── validation_test.go             # Unit tests (tolerance calculations, edge cases)
-│   │   └── validation_integration_test.go # Integration tests (real expected values)
 │   └── weather/                           # Open-Meteo daily/current weather client
-│       ├── weather.go                     # DailyWeather/CurrentWeather fetch + WMO code mapping
+│       ├── weather.go                     # DailyWeather/CurrentWeather fetch + WMO code mapping; archives each live payload to raw/weather; ParseDailyPayload; BypassCache
 │       └── weather_test.go                # Weather client tests
 │
 ├── docs/                                  # Additional documentation
@@ -183,18 +190,20 @@ enphase-monitor/
 │       ├── 0001-true-up-window-end-date.md # ADR for the True-Up Window end-date rule
 │       └── 0002-init-guard-requires-weather-init.md # ADR: report modes require --init (weather)
 ├── CONTEXT.md                             # Domain glossary (Site, System, Query Mode, Net Flow, API Budget, ...)
-├── test-data/                             # Test validation data (expected values)
+├── test-data/                             # Recorded fixtures for the geocode and location tests
 ├── config.yaml                            # User configuration: non-secret settings (not in git)
 ├── config.yaml.example                    # Configuration template
 ├── credentials.yaml                       # API secrets: credentials: pool (not in git)
 ├── credentials.yaml.example               # Credentials template
-├── cache/                                 # Cached API responses (created at runtime)
-├── history/                               # Per-day energy+weather and utility-meter JSON records (created at runtime)
-├── scripts/                               # Utility scripts
-│   ├── run-tests.sh                       # Test runner script
-│   ├── migrate-history-layout.sh          # One-time migration: renames <date>.json records to enphase-<date>.json
-│   └── history.py                         # Git history inspection helper
-└── certs/                                 # PG&E mTLS client certificate (gitignored)
+├── cache/                                 # Cached API responses (created at runtime; clearable)
+├── raw/                                   # Untouched source responses + manifest.jsonl (created at runtime; gitignored — holds account data)
+│   ├── enphase/  weather/  pge/           # One directory per source; files are never overwritten
+│   └── manifest.jsonl                     # One line per file: fetched_at, source, file, sha256, bytes, request, note
+├── history/                               # Per-day energy+weather and utility-meter JSON records (created at runtime) + dotfile sidecars (.<prefix>-index.json, .weather-provenance.json)
+├── tmp/                                   # Scratch downloads (PG&E ZIP/XML before extraction); gitignored
+└── scripts/                               # Utility scripts
+    ├── migrate-history-layout.sh          # One-time migration: renames <date>.json records to enphase-<date>.json
+    └── history.py                         # Git history inspection helper
 ```
 
 ### Package Dependency Graph
@@ -228,9 +237,12 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 │  1. ENTRY POINT (main.go)                                           │
 │     └─► cli.ParseFlags() from internal/cli                          │
 │     └─► Handle cache commands (internal/cli) or continue            │
+│     └─► Maintenance commands (raw archive / reprocess / verify)     │
+│         dispatch here and exit (see Raw Archive and Verification)   │
 │     └─► Build credentials.Pool from cfg.Credentials                 │
-│     └─► If --update-refresh-tokens: select credential (positional name),       │
-│         signal context, oauth.Authorize(ctx, cred); Ctrl+C cancels it │
+│     └─► If --update-refresh-tokens: signal context; one Chrome       │
+│         session authorizes every credential                         │
+│         (oauth.AuthorizeViaBrowser); Ctrl+C cancels it             │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -271,13 +283,11 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 ┌──────────────────────────────────────────────────────────────────────┐
 │  5. API CALLS (internal/api)                                         │
 │     └─► Each call goes through caching layer (internal/cache)        │
-│         ├─► Past periods: always served from cache (data immutable)  │
-│         ├─► Current periods: live call when budget allows;           │
-│         │   cache is fallback only when budget exhausted             │
-│         ├─► Budget exhausted: exact-URL cache → cross-endpoint       │
-│         │   same-system cache (any age) → RateLimitError             │
-│         ├─► Make HTTP request if Current Period and budget > 0       │
-│         └─► Save response to cache + append timestamp to api_calls   │
+│         ├─► Past periods: served from cache (data immutable)         │
+│         ├─► Current periods / cache disabled: live call; 429/503     │
+│         │   propagate (aggregator fails over to a spare credential)  │
+│         └─► Live success: count against the credential's monthly     │
+│             quota, save to cache/, archive untouched to raw/enphase  │
 └──────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -340,8 +350,8 @@ These types are re-exported as type aliases in `config` and `aggregator` package
                              ▼
 ┌────────────────────────────────────────────────────────────────────┐
 │                  internal/cache/Cache Layer                        │
-│  - Sliding-window API Budget counter (api_calls, 10/60s)           │
-│  - Past Periods: always from cache; Current Periods: live-first    │
+│  - Past Periods: from cache; Current Periods: live, errors propagate│
+│  - Monthly API Budget is tracked per credential (internal/credentials)│
 │  - Disk-based storage tagged with endpoint + system ID             │
 └────────────────────────────┬───────────────────────────────────────┘
                              │
@@ -364,93 +374,110 @@ These types are re-exported as type aliases in `config` and `aggregator` package
 
 ---
 
+## Raw Archive and Verification
+
+`history/` is derived data. To make it checkable at any time, every external response is also kept untouched, and a family of offline commands re-derives `history/` from those copies.
+
+### What is archived, and when
+
+```
+  live Enphase call ──► api.finalizeAndCache ───────────► raw/enphase/<system>_<endpoint>_<date>_<ts>.json
+  live Open-Meteo call ─► weather.DailyWeather ─────────► raw/weather/daily_<date>_<ts>.json
+  PG&E export ZIP ──────► pge.BrowserPull (before extract) ► raw/pge/pge-<from>_<to>[-n].zip
+                                      │
+                                      └──────────────────► raw/manifest.jsonl  (one line per file)
+```
+
+- **Only live fetches archive.** A cache hit makes no request, so nothing is written; backfill is always live (cache disabled), and days skipped as already present add nothing. The Enphase cache already holds the same bodies (it was the source for `--raw-import-cache`), but a cache can be cleared or overwritten and `raw/` cannot be touched by any cache command.
+- **Write once.** Files get a UTC timestamp suffix and are created with `O_EXCL`; the PG&E archive appends `-1`, `-2` when a range is pulled again. Nothing in `raw/` is ever overwritten.
+- **Opt-in at the package level.** `rawstore.Dir` is empty by default, so tests and library use never write files; `main` sets it to `raw`.
+- **Manifest line**: `{fetched_at, source, file, sha256, bytes, request, note?}`. `request` is a redacted description (`system=… endpoint=… date=… url=…` for Enphase, the redacted URL for weather, the export range for PG&E; `key`, `access_token` and `client_secret` query parameters are removed). `note` records provenance for files that were not archived by a live fetch (`imported from cache`, `added retroactively`).
+
+### Maintenance and verification commands
+
+All of these exit after doing their one job and are dispatched in `main()` before any report mode: all but `--verify-enphase-archive` before config and credentials are loaded, and `--verify-enphase-archive` after the config load and init guard, because it needs a credential; `flags.ValidateMaintenance` rejects combining two of them and rejects `--start-date/--end-date` on any but the two raw weather commands (where either bound may be given alone).
+
+| Command | Network | Reads | Writes |
+|---|---|---|---|
+| `--raw-import-cache` | none | `cache/` | `raw/enphase/`, manifest (idempotent: names derive from system, endpoint, date, fetch time) |
+| `--raw-refetch-weather` | Open-Meteo (no key/quota) | `history/` days, cached location | `raw/weather/`, manifest; weather cache bypassed and left untouched; reports days that differ from history |
+| `--raw-apply-weather` | none | `raw/weather/` | weather block of changed `history/enphase-*.json` (never energy fields), `history/.weather-provenance.json` |
+| `--pge-reprocess <zip>` | none | one `raw/pge` archive (copied to scratch first) | `history/pge-*.json` for the range in the file name |
+| `--verify-pge-raw` | none | `raw/pge`, manifest, `history/pge-*.json` | nothing |
+| `--verify-weather-raw` | none | `raw/weather`, manifest, `history/enphase-*.json` | nothing |
+| `--verify-enphase-raw` | none | `raw/enphase`, manifest, `history/enphase-*.json` | nothing |
+| `--verify-enphase-archive <date>` | Enphase API (about 10 calls) | stored record for that day | new `raw/enphase` files + manifest lines, plus the cache entries and monthly-quota count any live call makes; never `history/` |
+
+Each `--verify-*-raw` command does two checks. **Integrity** (`rawstore.VerifySource`): re-hash every manifest line for the source and report altered, missing and unlisted files. **Reproduction**: re-derive history from the raw files with the same code path the live run uses — `pge.ReprocessRaw` into a scratch directory then a byte comparison; `weather.ParseDailyPayload` via `ApplyRawWeather(dryRun)`; `api.DayKWh` per (system, endpoint, date), taking the newest manifest entry for each — and report each day that does not match. They exit non-zero on any finding.
+
+There is deliberately **no umbrella "verify everything" flag**: `--verify-enphase-archive` spends API Budget, and an umbrella would spend it on every routine check. It is the one live command, it checks a single completed past day, and it never writes `history/`.
+
+### Why PG&E processing is re-runnable
+
+`ingestDownload` is the single extract → parse → aggregate → `CheckDays` → `WriteHistory` path, used by `BrowserPull` after archiving and by `ReprocessRaw` on a copy of an archive, so a parser fix is applied to data already collected with `--pge-reprocess` instead of a new pull. `VerifyPGERaw` runs the same path against a scratch directory, so "does history match what the current parser derives from raw" is a byte comparison.
+
+### Weather provenance
+
+Open-Meteo revises recent history, and older records could hold zeros for fields not yet fetched, so `--raw-apply-weather` records per day in `history/.weather-provenance.json` whether the weather was `rebuilt_from_raw` (with the replaced values in `previous`) or already `matches_raw`, with the raw file, its hash and whether radiation is exactly 0.
+
+---
+
+## PG&E Feed Decoding
+
+`internal/pge/espi.go` turns a Green Button electric export into per-day `import_kwh`/`export_kwh`/`net_kwh` plus 15-minute intervals. Four properties of the real feed drive the design (each verified against real exports, and pinned by redacted fixtures in `internal/pge/testdata/`):
+
+1. **Four registers, two of them in the same direction.** A feed carries signed *net* (`flowDirection` 1), *received* (19), *demand* in watts (0, skipped) and *gross delivered* (1). Net and gross have identical metadata, so `selectRegisters` identifies gross by the identity `net = delivered − received` on every interval and fails if it does not hold. Only gross and received are used (summing both `flowDirection` 1 registers doubled import).
+2. **Wall-clock timestamps encoded as UTC.** `detectWallClock` accepts the encoding only if the earliest reading sits on a midnight in UTC (local clock) or in the report timezone (true UTC) and errors otherwise; `localStart` converts labels with `time.Date`, mapping a label inside a spring-forward gap to the instant after the gap.
+3. **Wh with a misleading multiplier.** PG&E tags Wh values with `powerOfTenMultiplier` 3; values are plain Wh, so the multiplier is ignored and a per-interval magnitude guard (`maxIntervalKWh`) fails the parse if the scale ever looks wrong.
+4. **DST days are not 96 intervals.** Spring-forward has 92; fall-back has only 96 of its 100 real slots because the feed omits the repeated hour. `CheckDays` compares each day's count with its real local length and warns, alongside negative import, interval import < 0 with export > 0, and net more than 10% away from Enphase's for the same date.
+
+---
+
 ## API Budget Checks
 
-The Enphase Cloud API enforces a budget of **10 requests per 60-second sliding window**. With two systems each making a full day query (5 endpoints each), that is exactly 10 calls — right at the limit. To stay within it, the client uses three cooperating layers: a cost estimator, a preflight warning, and a per-request gate.
+The Enphase Cloud API allows **1000 requests per month per API key** and, server-side, **10 requests per minute per key**. The application enforces the monthly limit itself and treats the per-minute limit as something Enphase signals with HTTP 429. With two systems each making a full day query (4 endpoints, plus a 5th for today's battery), a single run is up to 10 calls, so a run alone can saturate one key's per-minute allowance; the credential pool exists to spread that.
 
-### Layer 1: `QueryCost` — call-count estimator
+### Where budget is tracked
 
-`QueryCost(queryMode, hasBattery)` in [internal/api/client.go](../internal/api/client.go) returns the number of live API calls that `GetMetricsFromCloud` will make for a **single System**:
+- **Monthly count per credential** lives in `internal/credentials` (`Pool.RecordAPICall`, persisted in `cache/monthly-quota.json`). The baseline is seeded from the developer portal by `--init` / `--refresh-quota`, incremented on every live call (`api.BudgetTracker`), and resets on the month boundary. `hasMonthlyBudget` is true while a credential is under `constants.MaxRequestsPerMonth`.
+- **No per-minute counter.** Enphase's 10/minute limit is not tracked locally: a 429 is handled reactively, by the credential failover below.
 
-| Query mode | hasBattery=false | hasBattery=true |
-|------------|------------------|-----------------|
-| Day | 4 | 5 |
-| Month | 4 | 4 |
-| Year | 4 | 4 |
-| True-Up | 4 | 4 |
+### Layer 1: credential selection and failover (`internal/aggregator`, `internal/credentials`)
 
-The base of 4 covers: Grid Import, Grid Export, Production, and Consumption. Battery telemetry adds a 5th call **only for today's Day query** (`testDate.IsZero() && QueryModeDay`) — all other cases skip it because:
-1. The battery telemetry endpoint returns per-15-minute intervals; fetching it for Past Period or multi-day queries would require one call per day, far exceeding the budget.
-2. Battery SOC is a point-in-time reading that is not meaningful as a Past Period or multi-day aggregate, so the call is omitted for any non-today query.
+`GetAggregatedMetrics` first refuses to run when every credential has spent its monthly budget (`Pool.AllMonthlyExhausted`). Each system is then assigned a credential least-used-first (`Pool.ForSystem`). When a call returns `RateLimitError` (HTTP 429), or a token request fails, the credential is put in cooldown (`MarkUnavailable`) and the system retries on a spare (`Failover`); the system only reports a rate-limit error once every credential has been tried.
 
-This means 2 systems × 5 (day + battery) = **exactly 10** — the documented architectural limit. Adding a third system or a supplementary call would exceed it.
+### Layer 2: per-request decision in `makeCachedAPIRequest` (`internal/api/client.go`)
 
-### Layer 2: Preflight check in `GetMetricsFromCloud`
-
-Before making any API calls, `GetMetricsFromCloud` compares the query cost against the remaining budget:
-
-```go
-// internal/api/client.go (inside GetMetricsFromCloud)
-if cache.DebugMode() && !timezone.IsPastPeriod(testDate, queryMode, c.timezone) {
-    needed := QueryCost(queryMode, queryMode == constants.QueryModeDay)
-    remaining := cache.RemainingBudget()
-    if remaining < needed {
-        fmt.Printf("WARNING: ... Insufficient API budget: need %d call(s), %d/%d remaining ...\n", ...)
-    }
-}
-```
-
-Key design decisions:
-- **Past Periods are skipped entirely.** A Past Period Day / Month / Year / True-Up always comes from immutable Cache and never consumes any budget, so a preflight check would be misleading noise.
-- **Day queries use `hasBattery=true` (5 calls) as the conservative count.** At this point the client does not know whether the hardware has a battery, so it assumes the worst case. This ensures the warning fires early enough to be useful.
-- **The preflight only warns — it does not abort.** Each individual call will still try cache before giving up, so partial data is still possible even when the budget is tight.
-- **The warning is debug-only.** When `--debug` is off the check is skipped entirely so that normal report output is not cluttered with diagnostic noise.
-
-### Layer 3: Per-request gate in `makeCachedAPIRequest`
-
-The actual enforcement happens inside `makeCachedAPIRequest` for every URL. The decision tree (simplified):
+The decision tree for one URL:
 
 ```
-Is this a Past Period with a valid cache entry?
-  YES → serve immutable cache, no budget consumed, done
-  NO  ↓  (Current Period: live-first — data changes throughout the day)
-Is budget exhausted (RemainingBudget() <= 0)?
-  YES → try exact-URL cache (any age)
-      → try cross-endpoint same-system cache (any age)
-      → return RateLimitError
-  NO  ↓
-Make live API call → record timestamp → save to cache → return
-  → on 429/503: serve any-age cache if available, else RateLimitError
+Load the cached response for this URL (for Past Periods, also rescan by queried date)
+Cache disabled?             YES → live call (--no-cache, Backfill Mode, --verify-enphase-archive)
+                                   errors (429, 503, transport) propagate; no stale cache served
+Past Period with a cache?   YES → serve the immutable cache; no budget consumed
+otherwise (Current Period)  → live call; errors propagate
+                              (a 429 reaches the aggregator, which fails over)
+Every successful live call: RecordAPICall(credential) → finalizeAndCache
+                            → save to cache/ AND archive the untouched body to raw/enphase
 ```
 
-The cross-endpoint fallback (step 3, middle branch) lets the client surface *some* recent data for the same endpoint+system even when the URL differs (e.g. a new `--date` value), rather than failing outright.
-
-### Interaction between layers
-
-The preflight (Layer 2) fires once per `GetMetricsFromCloud` call and is a forward-looking warning. The per-request gate (Layer 3) fires once per endpoint and is the actual enforcement. Together:
-
-- If budget is full when the run starts and is exhausted mid-run (e.g. the first 4 calls succeed but the 5th lands after the window), Layer 3 handles it gracefully with a cache fallback.
-- If budget is already low before the run, Layer 2 warns the user up front (debug mode only) so they understand why the output may show stale numbers.
-- If budget is zero and no cache exists for the endpoint, `RateLimitError` is returned and the metric is shown as 0 in the output (non-fatal for optional metrics like Grid Import/Export; fatal for Production which is required).
+Key points:
+- **Past Periods are immutable**, so a cached Past Period day/month/year is always served from cache and costs nothing. Live calls are made for Current Periods and whenever the cache is disabled.
+- **Errors are never masked by stale cache on the live path.** A 429 must reach the aggregator so it can fail over to a spare credential, and a 503 surfaces as an error rather than a guess.
+- **Only live calls are archived.** `finalizeAndCache` writes the body to `raw/enphase/` as well as the cache; a cache hit archives nothing (see [Raw Archive and Verification](#raw-archive-and-verification)).
+- The 5th (battery) call exists only for today's live Day query (`queryMode == QueryModeDay && testDate.IsZero()`), because the battery endpoint is per-15-minute and the lifetime endpoints that serve past days carry no battery data.
 
 ### Observability: `--debug` mode
 
-When run with `--debug`, the application emits structured logs to stderr that expose Layer 2 and Layer 3 decisions:
+With `--debug` the application writes to stderr:
+- a **startup banner** (`printDebugStartup` in [main.go](../main.go)): the current time and the credential pool's monthly quota summary (`Pool.QuotaSummary`);
+- a **per-request trace** (`cache.Debugf` from `makeCachedAPIRequest`): one line per URL saying whether it served an immutable Past Period cache, made a live call, or got a 429, each with the redacted URL (the API key never appears).
 
-- **Startup banner** (`printDebugStartup` in [main.go](../main.go)) shows the current time, the most recent recorded API call (`cache.LastAPICallTime()`), how long until the 60-second window resets, and the remaining budget. This is the single best diagnostic for "why am I getting 429s?" because it answers "is the window still active?" before any work begins.
-- **Preflight warning** (Layer 2, in `GetMetricsFromCloud`) prints `WARNING: … Insufficient API budget …` to stderr when the remaining budget is smaller than the query cost for a current-period run. Only emitted in debug mode to avoid cluttering normal report output.
-- **Per-request trace** (`cache.Debugf` from `makeCachedAPIRequest` in [internal/api/client.go](../internal/api/client.go)) emits one line per URL describing the decision taken: serving Past Period immutable cache, falling back due to budget exhaustion, making a live call, or hitting the 429/503 fallback paths. Each line includes the redacted URL and the cache age so traces are reproducible without leaking the API key.
-
-Debug mode also suppresses the terminal-clearing escape sequence in `RunOnce` so the trace remains visible after the report is printed. The `cache.Debugf` helper is a no-op when debug mode is off — callers do not need to guard the call sites.
+Debug mode also suppresses the terminal-clearing escape sequence in `RunOnce` so the trace stays visible after the report. `cache.Debugf` is a no-op when debug mode is off.
 
 ### Tests
 
-| Test File | What it covers |
-|-----------|---------------|
-| [internal/api/query_cost_test.go](../internal/api/query_cost_test.go) | All 8 `QueryCost` combinations; asserts 2 Systems × Day Mode with battery = exactly 10 calls |
-| [internal/api/preflight_test.go](../internal/api/preflight_test.go) | Budget-exhaustion cache fallback for all 8 Query Mode × Period combinations; preflight warning emitted/suppressed correctly |
-
-`preflight_test.go` follows the same **prime → exhaust → probe** pattern for every Query Mode × Period combination: a first live call populates the cache, the budget is manually drained to zero via `cache.RecordAPICall()`, and the probe call must serve from cache with zero additional server hits. Past Period probes (scenarios 2, 4, 6, 8) never even reach the budget check — they short-circuit at the `isPast` branch — making them a useful control group that confirms immutable-cache behaviour is budget-free.
+Budget and fallback behavior is covered by [client_caching_test.go](../internal/api/client_caching_test.go) (characterization tests for each `makeCachedAPIRequest` branch: no-cache mode, Past Period cache hits, and error propagation on 429/503/transport failure) and by the pool tests in [internal/credentials/pool_test.go](../internal/credentials/pool_test.go) and [quota_test.go](../internal/credentials/quota_test.go).
 
 ---
 
@@ -600,7 +627,7 @@ ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.
 defer stop()
 ```
 
-This context is passed to `RunOnce` (and to `oauth.Authorize`) so any in-flight HTTP request is cancelled when the process receives a signal.
+This context is passed to `RunOnce` (and to `oauth.AuthorizeViaBrowser`) so any in-flight HTTP request is cancelled when the process receives a signal.
 
 > **Note:** The `for`/`select` ticker loop that drove periodic re-fetches (`RunContinuous`) has been removed. The channel/select/ticker pattern it used is documented in [GO_CONCEPTS.md](GO_CONCEPTS.md#channels-and-signals) as a Go reference — the pattern itself is valid Go; it is simply no longer exercised by production code.
 
@@ -625,14 +652,12 @@ var tokenCache *TokenCache  // Shared token cache (singleton)
 
 // internal/cache/cache.go - Package-level state (set at startup, read-only during execution)
 var (
-    validationMode     bool
-    cacheDisabled      bool
-    debugMode          bool
-    budgetWarningShown bool
+    cacheDisabled bool
+    debugMode     bool
 )
 
-func ValidationMode() bool {
-    return validationMode
+func CacheDisabled() bool {
+    return cacheDisabled
 }
 ```
 
@@ -652,7 +677,7 @@ when possible to improve testability.
 
 | File | Responsibility |
 |------|----------------|
-| [main.go](main.go) | Application entry point (pure orchestration) |
+| [main.go](../main.go) | Application entry point (pure orchestration) |
 
 ### Internal Packages - Application Layer
 
@@ -661,12 +686,17 @@ when possible to improve testability.
 | [internal/app/setup.go](../internal/app/setup.go) | Application initialization & configuration |
 | [internal/app/runner.go](../internal/app/runner.go) | RunOnce execution mode |
 | [internal/app/trueup.go](../internal/app/trueup.go) | True-Up Mode: single-batch Lifetime Data query (QueryModeTrueUp) and report conversion |
+| [internal/app/backfill.go](../internal/app/backfill.go) | Backfill Mode: live per-day fetch over a date range into `history/` |
+| [internal/app/weather.go](../internal/app/weather.go) | Best-effort weather enrichment for Day-Mode reports |
+| [internal/app/rawweather.go](../internal/app/rawweather.go) | Re-fetch past weather for the raw archive; rebuild record weather from archived payloads; weather provenance sidecar |
+| [internal/app/verifyenphaseraw.go](../internal/app/verifyenphaseraw.go) | Offline re-derivation of every Enphase history day from `raw/enphase` |
+| [internal/app/verifyenphase.go](../internal/app/verifyenphase.go) | Live one-day check that Enphase raw archiving works |
 
 ### Internal Packages - CLI Layer
 
 | Package/File | Responsibility |
 |--------------|----------------|
-| [internal/cli/flags.go](../internal/cli/flags.go) | CLI flag parsing and definitions |
+| [internal/cli/flags.go](../internal/cli/flags.go) | CLI flag parsing and definitions, grouped `--help`, validation of the maintenance commands |
 | [internal/cli/cache_commands.go](../internal/cli/cache_commands.go) | Cache management command handlers |
 
 ### Internal Packages - Authentication
@@ -685,13 +715,15 @@ when possible to improve testability.
 | [internal/aggregator/aggregator.go](../internal/aggregator/aggregator.go) | Multi-system aggregation with DI |
 | [internal/display/display.go](../internal/display/display.go) | Terminal output formatting with colors |
 | [internal/api/client.go](../internal/api/client.go) | HTTP client for Enphase Cloud API v4 |
-| [internal/api/cache_check.go](../internal/api/cache_check.go) | Per-system/endpoint cache availability probe |
 | [internal/cache/*](../internal/cache/) | Disk-based response caching |
 | [internal/parser/*](../internal/parser/) | JSON telemetry response parsing |
 | [internal/config/*](../internal/config/) | Configuration types and utilities |
 | [internal/timezone/*](../internal/timezone/) | Timezone handling and date boundaries |
-| [internal/validation/*](../internal/validation/) | Validation Mode with tolerance-based checks |
 | [internal/constants/*](../internal/constants/) | Centralized constants |
+| [internal/history/*](../internal/history/) | Per-day History Record schema and writer (`history/`), dataset index |
+| [internal/weather/*](../internal/weather/) | Open-Meteo client (daily/current), WMO code mapping, raw-payload parsing |
+| [internal/pge/*](../internal/pge/) | PG&E Green Button: browser download, ESPI decoding, sanity checks, raw archive and its verification |
+| [internal/rawstore/*](../internal/rawstore/) | Raw source archive (`raw/`), SHA-256 manifest, cache import, verification primitives |
 
 ### Internal Packages - Shared Types
 
@@ -752,10 +784,10 @@ Each file has package-level documentation explaining its purpose and design deci
 
 Before committing, run the linter and tests:
 
-- **make lint** — Runs golangci-lint (errcheck, goimports, revive, govet, staticcheck). See [.golangci.yml](.golangci.yml).
+- **make lint** — Runs golangci-lint (errcheck, goimports, revive, govet, staticcheck). See [.golangci.yml](../.golangci.yml).
 - **CI** — Not yet configured. Run `make lint` and `go test ./...` locally before committing.
 
-See [README.md#lint-and-ci](README.md#lint-and-ci) for details.
+See [README.md#lint-and-ci](../README.md#lint-and-ci) for details.
 
 ### Related Documentation
 

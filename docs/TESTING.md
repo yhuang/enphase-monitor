@@ -23,33 +23,33 @@ The project follows a pragmatic approach to testing:
 | Package | Coverage | Status |
 |---------|----------|--------|
 | urlbuilder | 100.0% | ✅ Full coverage - URL construction |
-| display | 98.7% | ✅ Near-full - output formatting |
-| validation | 95.5% | ✅ Near-full - metrics validation |
+| display | 99.3% | ✅ Near-full - output formatting |
+| cli | 96.5% | ✅ Near-full - CLI interface, grouped `--help`, maintenance-flag validation |
 | parser | 94.8% | ✅ Near-full - JSON parsing |
 | timezone | 92.7% | ✅ High - timezone handling |
-| cli | 91.9% | ✅ High - CLI interface |
 | aggregator | 89.2% | ✅ High - data aggregation |
-| weather | 88.2% | ✅ High - Open-Meteo client |
+| weather | 88.5% | ✅ High - Open-Meteo client |
 | credentials | 85.0% | ✅ High - credential pool + monthly quota |
 | config | 84.5% | ✅ High - YAML parsing |
 | history | 82.6% | ✅ High - per-day record schema/write/index |
+| api | 81.9% | ✅ High - HTTP client |
 | geocode | 81.5% | ✅ High - ZIP geolocation |
-| location | 79.7% | ✅ High - location resolver/cache |
+| location | 81.0% | ✅ High - location resolver/cache |
+| cache | 74.8% | ✅ Adequate - file caching |
 | constants | 72.7% | ✅ Adequate - pure constants (some portal/quota constants untested) |
-| api | 72.2% | ✅ Adequate - HTTP client |
-| cache | 68.9% | ✅ Adequate - file caching |
+| rawstore | 70.4% | ✅ Adequate - raw archive writer, cache import, manifest verification |
 | oauth | 61.7% | ✅ Adequate - OAuth flows (browser-driven path verified manually) |
-| app | 49.4% | ⚠️ Moderate - application glue incl. range-pull orchestration (exercised end-to-end via api/preflight) |
+| app | 52.5% | ⚠️ Moderate - application glue: range-pull orchestration (exercised end-to-end via api tests), raw-weather/provenance and offline Enphase verification (unit-tested); the live `VerifyEnphaseArchive` call path is not exercised |
+| pge | 37.4% | ⚠️ Low - ESPI decoding, DST handling, sanity checks, raw reprocess/verify are unit-tested against real redacted feeds; the browser-pull path is verified manually |
 | browser | 16.3% | ⚠️ Low - headed-Chrome launcher, verified manually |
 | enphase | 14.3% | ⚠️ Low - developer-portal scraping, verified manually |
-| pge | 9.8% | ⚠️ Low - ESPI parser and config tested; browser-pull path verified manually |
 | main.go | 0.0% | ✅ **Acceptable** - entry point |
 
-**Overall**: 49.2% coverage (`app` orchestration paths are covered end-to-end by `internal/api/preflight_test.go` rather than direct unit tests; the `browser`, `enphase`, and `pge` browser-pull packages drive a real Chrome session against live portals and are verified manually rather than in CI; the new `pge` package accounts for much of the overall coverage drop)
+**Overall**: 56.7% coverage (the `browser`, `enphase`, and `pge` browser-pull packages drive a real Chrome session against live portals and are verified manually rather than in CI, which pulls the total down; `app` live paths are covered end-to-end through the `internal/api` tests rather than direct unit tests)
 
 ### Why main.go Has 0% Coverage
 
-The `main.go` file is pure orchestration (~720 lines) and has 0% coverage by design. This is an **industry standard** because:
+The `main.go` file is pure orchestration (~940 lines) and has 0% coverage by design. This is an **industry standard** because:
 
 1. **Cannot unit test**: `main()` function, `os.Exit()`, signal handling
 2. **All logic tested**: All functions `main.go` calls are tested in internal packages
@@ -58,7 +58,7 @@ The `main.go` file is pure orchestration (~720 lines) and has 0% coverage by des
 
 ### Testing Priorities
 
-1. **Critical paths**: Business logic (aggregation, parsing, validation)
+1. **Critical paths**: Business logic (aggregation, parsing, PG&E feed decoding)
 2. **Complex logic**: OAuth flows, HTTP clients, caching
 3. **Public APIs**: Exported functions and methods
 4. **Edge cases**: Error handling, boundary conditions
@@ -90,11 +90,11 @@ For packages with extensive functionality or different test concerns, tests are 
 
 **Cache Package** (3 test files):
 - `cache.go` → 3 test files:
-  - `cache_test.go` - State management tests (ValidationMode/CacheDisabled/BudgetWarningShown getters/setters, ResetState)
-  - `cache_functions_test.go` - Core functionality tests (RedactURLKey, normalize, save/load, HasCacheForDate)
+  - `cache_test.go` - State management tests (CacheDisabled getter/setter, ResetState)
+  - `cache_functions_test.go` - Core functionality tests (RedactURLKey, normalize, save/load, ClearCacheForDate)
   - `cli_test.go` - CLI utilities tests (ListCacheEntries, ClearTodayCache, parseCacheResponse)
 
-The sliding-window budget surface is exercised end-to-end through [`internal/api/preflight_test.go`](#integration-test-files), which primes the cache, drains the budget, and verifies the fallback path.
+The per-credential monthly budget is covered in `internal/credentials/quota_test.go`, and the per-request cache/live decision (cache disabled, Past Period cache hit, 429/503/network errors propagating instead of serving stale cache) is pinned by [`internal/api/client_caching_test.go`](#integration-test-files).
 
 **OAuth Package** (4 test files):
 - `oauth.go` / `browser.go` → 4 test files:
@@ -112,12 +112,11 @@ The sliding-window budget surface is exercised end-to-end through [`internal/api
 
 ### Test Categories
 
-The codebase includes five types of tests:
+The codebase includes four types of tests:
 
 | Category | Suffix | Purpose | Example |
 |----------|--------|---------|---------|
 | **Unit Tests** | `*_test.go` | Test individual functions/methods | `config_test.go` |
-| **Integration Tests** | `*_integration_test.go` | Test component interactions | `validation_integration_test.go` |
 | **Functional Tests** | `*_functional_test.go` | Test end-to-end flows | `oauth_functional_test.go` |
 | **Edge Case Tests** | `*_edge_cases_test.go` | Test error paths and boundaries | `oauth_edge_cases_test.go` |
 | **Benchmark Tests** | `*_bench_test.go` | Measure performance | `parser_bench_test.go` |
@@ -168,7 +167,7 @@ func TestParseTelemetryResponse(t *testing.T) {
 }
 ```
 
-**Used in**: All test files (`parser_test.go`, `config_test.go`, `validation_test.go`, `oauth_test.go`)
+**Used in**: All test files (`parser_test.go`, `config_test.go`, `flags_test.go`, `oauth_test.go`)
 
 ### Pattern 2: Mock Objects for Dependency Injection
 
@@ -209,22 +208,29 @@ func (m *MockCloudClient) GetMetricsFromCloud(ctx context.Context, testDate time
 - Can run specific subtests: `go test -run TestName/SubtestName`
 - Parallel execution support with `t.Parallel()`
 
-**Example** (`validation_test.go`):
+**Example** (`parser_test.go`):
 ```go
-func TestValidationTolerance(t *testing.T) {
+func TestSumIntervalValues(t *testing.T) {
+    intervals := []TelemetryInterval{
+        {EndAt: 1234567890, WhDel: 100.5, WhImported: 50.0, WhExported: 10.0, Enwh: 75.0},
+        // ...
+    }
+
     tests := []struct {
-        name       string
-        expected   float64
-        actual     float64
-        shouldPass bool
+        name      string
+        fieldName string
+        expected  float64
     }{
-        {name: "within 10% tolerance", expected: 100.0, actual: 105.0, shouldPass: true},
-        {name: "exceeds tolerance", expected: 100.0, actual: 115.0, shouldPass: false},
+        {name: "sum wh_imported", fieldName: constants.FieldWhImported, expected: 150.0},
+        {name: "unknown field", fieldName: "unknown", expected: 0.0},
     }
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            // Test logic for this specific case
+            result := SumIntervalValues(intervals, tt.fieldName)
+            if result != tt.expected {
+                t.Errorf("SumIntervalValues(%s) = %.1f, want %.1f", tt.fieldName, result, tt.expected)
+            }
         })
     }
 }
@@ -304,24 +310,16 @@ func TestShowMetrics_ContainsHeader(t *testing.T) {
 }
 ```
 
-**Used in**: `display_test.go` (all output tests), `validation_test.go`, `validation_integration_test.go`
+**Used in**: `display_test.go` (all output tests), `verify_test.go`, `rawweather_test.go`
 
-**Additional Example** (`validation_integration_test.go`):
+**Additional Example** (`internal/pge/verify_test.go`): the verifier reports its findings to a writer, so the test asserts on them.
 ```go
-func TestValidateMetrics_FullFlow_OutsideTolerance(t *testing.T) {
-    metrics := &aggregator.AggregatedMetrics{...}
+var out bytes.Buffer
+res, err := VerifyPGERaw(archiveDir, hist, loc, &out)
 
-    var buf bytes.Buffer
-    err := ValidateMetrics(&buf, metrics, "2026-01-20")
-
-    // Verify expected failure in output
-    output := buf.String()
-    if !strings.Contains(output, "SOME VALIDATIONS FAILED") {
-        t.Error("Expected output to contain 'SOME VALIDATIONS FAILED'")
-    }
-    if !strings.Contains(output, "❌") {
-        t.Error("Expected output to show failure indicator")
-    }
+// A hand-edited history record must be reported with both totals in the message
+if err != nil || res.OK() || len(res.Differ) != 1 || !strings.Contains(out.String(), "99.900") {
+    t.Fatalf("edited-record verify = %+v, %v\n%s", res, err, out.String())
 }
 ```
 
@@ -352,7 +350,7 @@ func makeTestMetrics(production, consumption, gridImport, gridExport float64) *a
 }
 ```
 
-**Used in**: `aggregator_test.go`, `display_test.go`, `validation_test.go`
+**Used in**: `aggregator_test.go`, `display_test.go`, `rawweather_test.go`
 
 ### Pattern 7: Error Path Testing
 
@@ -430,14 +428,14 @@ func BenchmarkParseTelemetryResponse(b *testing.B) {
 
 **Example** (`cache_test.go`):
 ```go
-func TestValidationModeGetterSetter(t *testing.T) {
+func TestCacheDisabledGetterSetter(t *testing.T) {
     // Reset to known state
     ResetState()
 
     // Run test
-    SetValidationMode(true)
-    if !ValidationMode() {
-        t.Error("ValidationMode should be true after SetValidationMode(true)")
+    SetCacheDisabled(true)
+    if !CacheDisabled() {
+        t.Error("CacheDisabled should be true after SetCacheDisabled(true)")
     }
 
     // Clean up (or use defer)
@@ -447,41 +445,7 @@ func TestValidationModeGetterSetter(t *testing.T) {
 
 **Used in**: `cache_test.go`, `oauth_test.go`
 
-### Pattern 11: Validation Against Golden Data
-
-**What**: Compare test output against known-good reference data.
-
-**Why**:
-- Test against real-world data
-- Validate calculations against manual verification
-- Integration testing with actual API responses (cached)
-- Tolerance-based comparisons for floating-point values
-
-**Example** (`validation_integration_test.go`):
-```go
-func TestValidateMetrics_RealData(t *testing.T) {
-    // Load expected values from JSON file
-    expected := loadExpectedValues("test-data/enphase_api_2026-01-20.json")
-
-    // Load cached API responses and aggregate
-    metrics := aggregateFromCache("2026-01-20")
-
-    // Validate with tolerance - capture output in buffer for verification
-    var buf bytes.Buffer
-    err := ValidateMetrics(&buf, metrics, "2026-01-20")
-    if err != nil {
-        t.Errorf("Validation failed: %v", err)
-    }
-    // Verify output contains expected success indicator
-    if !strings.Contains(buf.String(), "ALL VALIDATIONS PASSED") {
-        t.Error("Expected validation success message in output")
-    }
-}
-```
-
-**Used in**: `validation_integration_test.go`, `scripts/run-tests.sh`
-
-### Pattern 12: Context Cancellation Testing
+### Pattern 10: Context Cancellation Testing
 
 **What**: Test behavior when context is cancelled (timeout, interrupt).
 
@@ -511,6 +475,50 @@ func TestGetAggregatedMetrics_ContextCancellation(t *testing.T) {
 ```
 
 **Used in**: `aggregator_test.go`, `client_test.go`
+
+---
+
+### Pattern 11: Real Redacted Fixtures with Known Answers
+
+**What**: Build fixtures from real source data, strip every identifier, and assert answers that were checked against an independent source.
+
+**Why**: A synthetic, sandbox-shaped feed hides the defects that matter (a doubled import register, a local-clock-as-UTC encoding, a Wh/kWh scale error), and a test that only asserts "N readings were kept" pins buggy behavior. Real feeds carry the quirks that matter (four registers with two sharing a direction, 899-second intervals, `powerOfTenMultiplier` 3 on Wh values, a gap-labelled slot on the spring-forward day).
+
+**Example** (`internal/pge/espi_test.go`, fixtures in `internal/pge/testdata/`):
+```go
+// pge_real_2025-11-08.xml is a real export trimmed to one day, with account,
+// meter and UUID identifiers removed. Known answer: delivered 29.724 kWh,
+// received 25.675 kWh (Enphase's own meters: 28.4 / 25.2).
+func TestParseReadings_RealFeedUsesGrossAndReceivedOnly(t *testing.T) { /* 192 readings, no negative import, totals */ }
+
+// Two more real days pin the daylight-saving behavior: 2026-03-08 is 92 intervals
+// with no slot in the nonexistent 02:00 hour; 2025-11-02 is 96 of 100 and CheckDays warns.
+func TestAggregate_RealSpringForwardDay(t *testing.T) { /* ... */ }
+func TestAggregate_RealFallBackDay(t *testing.T)      { /* ... */ }
+```
+
+Guidelines: keep the real structure and values, redact only identifiers (grep the fixture for `urn:`/`Subscription` before committing), state in the fixture header what it is and what the known answer is, and prefer asserting a total that was cross-checked (against Enphase or a statement) over one merely observed. Fixtures that were cross-checked are `pge_real_2025-11-08.xml`; the two DST fixtures pin observed counts that are explained by the source (the raw feed itself has 96 labels on the fall-back day).
+
+**Used in**: `espi_test.go`
+
+### Pattern 12: Archive Round-Trip and Tamper Tests
+
+**What**: Exercise the raw-archive code against a temporary directory, then deliberately corrupt the data and assert the verifier notices.
+
+**Why**: A verifier that only ever sees good data proves nothing. Each test builds a clean state that must verify, then breaks one thing (edits a history record, alters a raw file, deletes one, drops a stray file) and asserts the specific finding.
+
+**Example** (`internal/pge/verify_test.go`):
+```go
+rawstore.Dir = filepath.Join(root, "raw")
+t.Cleanup(func() { rawstore.Dir = "" })      // global state: always reset
+// archive -> ReprocessRaw into history -> VerifyPGERaw is clean
+// hand-edit import_kwh                      -> Differ finding, with both totals in the message
+// append a byte to the archived download    -> Manifest.Mismatched finding
+```
+
+Notes: `rawstore.Dir` is package-level state that is empty by default (so ordinary tests never write files); a test that sets it must reset it in `t.Cleanup`. Tests that call `CheckDays` must pass local-midnight bounds, not UTC midnight: a UTC midnight converts to the previous local date and the day is silently skipped, so the test would pass vacuously.
+
+**Used in**: `internal/rawstore/rawstore_test.go`, `internal/pge/verify_test.go`, `internal/app/rawweather_test.go`
 
 ---
 
@@ -547,7 +555,7 @@ go test ./internal/parser -v
 go test -run TestParseTelemetryResponse ./internal/parser
 
 # Run specific subtest
-go test -run TestValidation/within_tolerance ./internal/validation
+go test -run TestSumIntervalValues/sum_wh_imported ./internal/parser
 
 # Run benchmarks
 go test -bench=. ./internal/parser
@@ -648,10 +656,10 @@ Tests in this repo follow the [go-testing](https://github.com/golang/go/wiki/Cod
 
 | Coverage Level | Expectation | Examples |
 |----------------|-------------|----------|
-| **100%** | Pure logic, no I/O | `constants`, `display`, `urlbuilder` |
-| **80-100%** | Core business logic | `parser`, `aggregator`, `validation` |
-| **60-80%** | Complex I/O operations | `cache`, `api`, `oauth` |
-| **40-60%** | CLI/glue code | `cli`, `app` |
+| **100%** | Pure logic, no I/O | `urlbuilder` (and `display`, near-full) |
+| **80-100%** | Core business logic | `parser`, `aggregator`, `weather` |
+| **60-80%** | Complex I/O operations | `cache`, `api`, `oauth`, `rawstore` |
+| **40-60%** | Glue code | `app` |
 | **0%** | Entry points only | `main.go` |
 
 ---
@@ -667,16 +675,20 @@ These files test individual functions and methods in isolation. Per-package cove
 | `constants_test.go` | `constants.go` | Constant values, helper functions |
 | `display_test.go` | `display.go` | Output formatting, color codes |
 | `urlbuilder_test.go` | `urlbuilder.go` | URL construction, parameter encoding |
-| `validation_test.go` | `validation.go` | Tolerance calculations, metric comparison, edge cases |
 | `timezone_test.go` | `timezone.go` | Timezone loading, date boundaries |
 | `config_test.go` | `config.go` | YAML parsing, validation, color conversion |
 | `parser_test.go` | `parser.go` | JSON parsing, interval summing |
-| `flags_test.go` | `flags.go` | CLI flag parsing and defaults |
+| `flags_test.go` | `flags.go` | CLI flag parsing and defaults; `TestPrintUsage_ListsEveryFlagOnceAndGroupsRaw` (every registered flag appears exactly once in the grouped `--help`, the raw/verify flags under their own heading); `TestValidateMaintenance` (at most one maintenance command; only the raw weather commands take a date range) |
 | `cache_commands_test.go` | `cache_commands.go` | Cache management command handlers (clear today, clear all) |
 | `runner_test.go` | `runner.go` | RunOnce execution mode |
 | `setup_test.go` | `setup.go` | `FormatDateForQueryMode`, `CreateOAuthAdapter`, `SetupDisplay`, `ParseTestDate`, `ConfigureModes`, `GetAggregatorTypes`, plus `RunOnce` context-cancellation guard |
 | `trueup_test.go` | `trueup.go` | `buildTrueUpReport` field mapping, net flow, per-system entries |
 | `aggregator_test.go` | `aggregator.go` | Multi-system aggregation with mock clients |
+| `espi_test.go` | `espi.go`, `sanity.go` | PG&E ESPI parsing and aggregation against real redacted feeds: gross/received register selection (a net register never double-counts; ambiguous or mismatched registers fail), local-clock decoding (wall-clock and true-UTC accepted, anything else rejected), the spring-forward gap label, the real DST days (92, and 96 of 100 with a warning), `CheckDays`, `expectedIntervals` |
+| `verify_test.go` | `verify.go` | `VerifyPGERaw` round-trip: clean, hand-edited record, tampered raw archive; `orderArchives` sorts by manifest fetch time, not file name |
+| `browserpull_test.go` | `browserpull.go` | One-year export-range clamp; `archiveRawDownload` keeps the bytes and never overwrites |
+| `rawstore_test.go` | `rawstore/*.go` | Save/manifest, `RedactURL`, `ImportEnphaseCache` (byte-exact, idempotent, skips non-responses), `VerifySource` (altered/missing/unlisted), `EntriesSince`/`VerifyEntry` |
+| `rawweather_test.go` | `app/rawweather.go`, `verifyenphase*.go` | `HistoryDates` range uses calendar dates (not timezone-mixed instants), `ApplyRawWeather` (weather only, only when changed, provenance kept across re-runs), `diffRecords`, `VerifyEnphaseRaw` (reproduces a day, catches a wrong record) |
 
 ### Integration Test Files
 
@@ -684,14 +696,11 @@ These files test component interactions:
 
 | Test File | Tests | Purpose |
 |-----------|-------|---------|
-| `validation_integration_test.go` | 7 test functions | End-to-end validation with real cached data and expected values files |
 | `client_functional_test.go` | API client tests | HTTP interactions with mock server |
-| `client_caching_test.go` | Characterization tests | Pin `makeCachedAPIRequest` fallback branches (validation/no-cache modes, 429/503/network-error → cache) via a switchable mock server with one stable cache key |
+| `client_caching_test.go` | Characterization tests | Pin `makeCachedAPIRequest` branches (no-cache mode; 429/503/network errors propagate instead of serving stale cache) via a switchable mock server with one stable cache key |
 | `client_lifetime_test.go` | Lifetime Data tests | Month, Year, and True-Up Mode queries via `_lifetime` API endpoints |
 | `oauth_functional_test.go` | OAuth flows | Token exchange with mock auth server |
-| `preflight_test.go` | 11 test functions | Budget-exhaustion cache-fallback for all 8 Query Mode × Period combinations; preflight warning on/off; exercises `RecordAPICall`/`RemainingBudget` along the way |
-| `query_cost_test.go` | 3 test functions | `QueryCost` output for all Query Mode × hasBattery combinations; 2-System budget constraint |
-| `testmain_test.go` | (no test functions) | `TestMain`: package-level setup redirecting all cache I/O to a temp dir so api tests never touch the production cache |
+| `testmain_test.go` | (no test functions) | `TestMain`: package-level setup redirecting all cache I/O to a temp dir so api tests never touch the production cache (`rawstore.Dir` stays empty there, so the raw archive is never written either) |
 
 ### OAuth Test Files
 
@@ -760,13 +769,12 @@ Unit tests cover helpers introduced during go-style-core refactoring (reduce nes
 
 | Test File | Test(s) | Helper(s) | Purpose |
 |-----------|---------|-----------|---------|
-| `validation_test.go` | `TestFindSystemByID`, `TestRunMetricTests` | `findSystemByID`, `runMetricTests` | Validation loop helpers; table-driven cases. |
 | `client_test.go` | `TestTryLoadPastDateCache_InvalidURL`, `TestTryLoadPastDateCache_NoMatch` | `tryLoadPastDateCache` | Past-date cache fallback when primary lookup fails (invalid URL, no matching cache). |
 
 ---
 
 ## Related Documentation
 
-- **[README.md](README.md)** - User guide and project overview
+- **[README.md](../README.md)** - User guide and project overview
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design
 - **[GO_BEST_PRACTICES.md](GO_BEST_PRACTICES.md)** - Go patterns used in codebase

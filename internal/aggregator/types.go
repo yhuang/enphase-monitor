@@ -46,6 +46,9 @@ type DailyWeather struct {
 	WeatherCode     int     // WMO weather interpretation code (precise; Condition is its collapsed label)
 	Condition       string  // human-readable label (from WMO weather code)
 	CloudCoverPct   float64 // mean cloud cover, %
+	HumidityPct     float64 // mean relative humidity at 2 m, %
+	HumidityMaxPct  float64 // daily maximum relative humidity, %
+	HumidityMinPct  float64 // daily minimum relative humidity, %
 	PrecipitationMM float64 // total precipitation, mm
 	SolarRadiation  float64 // daily shortwave radiation, kWh/m²
 
